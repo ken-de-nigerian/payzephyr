@@ -45,10 +45,17 @@ jobs:
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
           composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
+      - name: List installed packages
+        run: composer show -i
+
       - name: Execute tests
-        run: vendor/bin/pest
+        run: vendor/bin/pest --colors=always
 
       - name: Execute tests with coverage
+        if: matrix.php == '8.3' && matrix.laravel == '11.*'
+        run: vendor/bin/pest --coverage --min=80 --colors=always
+
+      - name: Generate coverage report
         if: matrix.php == '8.3' && matrix.laravel == '11.*'
         run: vendor/bin/pest --coverage --coverage-clover coverage.xml
 

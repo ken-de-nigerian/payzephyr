@@ -56,8 +56,8 @@ composer test
 ## Development Setup
 
 ```bash
-git clone https://github.com/kendenigerian/payments-router.git
-cd payments-router
+git clone https://github.com/ken-de-nigerian/payzephyr.git
+cd payzephyr
 composer install
 composer test
 ```

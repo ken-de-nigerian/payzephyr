@@ -5,7 +5,7 @@
 
 ## 📦 Package Overview
 
-**Name:** `kendenigerian/payments-router`  
+**Name:** `ken-de-nigerian/payzephyr`  
 **Version:** 1.0.0  
 **PHP:** ^8.2  
 **Laravel:** ^10.0|^11.0  
@@ -83,7 +83,7 @@ A production-ready, enterprise-grade payment abstraction layer for Laravel suppo
 ## 📁 Complete File Structure
 
 ```
-payments-router/
+payzephyr/
 ├── .github/
 │   └── workflows/
 │       ├── tests.yml              # CI pipeline
@@ -159,7 +159,7 @@ payments-router/
 ### Installation
 
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 ```
 
 ### Configuration
@@ -251,7 +251,7 @@ git push origin v1.0.0
 2. **Submit to Packagist:**
 - Go to https://packagist.org
 - Click "Submit"
-- Enter: `https://github.com/kendenigerian/payments-router`
+- Enter: `https://github.com/ken-de-nigerian/payzephyr`
 - Click "Check" then "Submit"
 
 3. **Set up auto-update:**
@@ -260,7 +260,7 @@ git push origin v1.0.0
 
 4. **Installation for users:**
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 ```
 
 ### Package is now live! 🎉
@@ -406,8 +406,8 @@ Contributions welcome! See CONTRIBUTING.md for guidelines.
 
 ## 📞 Support
 
-- **Issues:** https://github.com/kendenigerian/payments-router/issues
-- **Email:** support@example.com
+- **Issues:** https://github.com/ken-de-nigerian/payzephyr/issues
+- **Email:** ken.de.nigerian@gmail.com
 - **Documentation:** Full docs in `/docs` folder
 
 ---
@@ -431,7 +431,7 @@ Contributions welcome! See CONTRIBUTING.md for guidelines.
 
 1. **Push to GitHub:**
 ```bash
-git remote add origin https://github.com/kendenigerian/payments-router.git
+git remote add origin https://github.com/ken-de-nigerian/payzephyr.git
 git branch -M main
 git push -u origin main
 git tag v1.0.0

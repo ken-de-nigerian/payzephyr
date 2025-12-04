@@ -1,8 +1,8 @@
 # Payments Router
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/kendenigerian/payments-router.svg?style=flat-square)](https://packagist.org/packages/kendenigerian/payments-router)
-[![Total Downloads](https://img.shields.io/packagist/dt/kendenigerian/payments-router.svg?style=flat-square)](https://packagist.org/packages/kendenigerian/payments-router)
-[![Tests](https://github.com/kendenigerian/payments-router/actions/workflows/tests.yml/badge.svg)](https://github.com/kendenigerian/payments-router/actions/workflows/tests.yml)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/ken-de-nigerian/payzephyr.svg?style=flat-square)](https://packagist.org/packages/ken-de-nigerian/payzephyr)
+[![Total Downloads](https://img.shields.io/packagist/dt/ken-de-nigerian/payzephyr.svg?style=flat-square)](https://packagist.org/packages/ken-de-nigerian/payzephyr)
+[![Tests](https://github.com/ken-de-nigerian/payzephyr/actions/workflows/tests.yml/badge.svg)](https://github.com/ken-de-nigerian/payzephyr/actions/workflows/tests.yml)
 
 A unified payment abstraction layer for Laravel that supports multiple payment providers with automatic fallback, webhooks, and currency conversion. Built for production use with clean architecture and comprehensive testing.
 
@@ -34,7 +34,7 @@ A unified payment abstraction layer for Laravel that supports multiple payment p
 You can install the package via Composer:
 
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 ```
 
 ### Publish Configuration
@@ -457,7 +457,7 @@ The MIT License (MIT). Please see [License File](LICENSE.md) for more informatio
 
 ## Support
 
-- 📧 Email: support@example.com
-- 🐛 Issues: [GitHub Issues](https://github.com/kendenigerian/payments-router/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/kendenigerian/payments-router/discussions)
-- 📖 Documentation: [Full Documentation](https://github.com/kendenigerian/payments-router/wiki)
+- 📧 Email: ken.de.nigerian@gmail.com
+- 🐛 Issues: [GitHub Issues](https://github.com/ken-de-nigerian/payzephyr/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/ken-de-nigerian/payzephyr/discussions)
+- 📖 Documentation: [Full Documentation](https://github.com/ken-de-nigerian/payzephyr/wiki)

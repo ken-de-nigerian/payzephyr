@@ -37,9 +37,9 @@
         "moneyphp/money": "^4.5"
     },
     "require-dev": {
-        "pestphp/pest": "^2.34",
-        "pestphp/pest-plugin-laravel": "^2.3",
-        "orchestra/testbench": "^8.0|^9.0",
+        "pestphp/pest": "^3.0",
+        "pestphp/pest-plugin-laravel": "^3.0",
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
         "mockery/mockery": "^1.6",
         "phpstan/phpstan": "^1.10",
         "laravel/pint": "^1.13"

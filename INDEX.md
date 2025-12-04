@@ -189,13 +189,13 @@ payments-router/
 ## 📞 Getting Help
 
 **Found a bug?**
-→ [Open an issue](https://github.com/kendenigerian/payments-router/issues)
+→ [Open an issue](https://github.com/ken-de-nigerian/payzephyr/issues)
 
 **Have a question?**
-→ [Start a discussion](https://github.com/kendenigerian/payments-router/discussions)
+→ [Start a discussion](https://github.com/ken-de-nigerian/payzephyr/discussions)
 
 **Need support?**
-→ Email: support@example.com
+→ Email: ken.de.nigerian@gmail.com
 
 **Want to contribute?**
 → Read [CONTRIBUTING.md](CONTRIBUTING.md)
@@ -204,7 +204,7 @@ payments-router/
 
 ### Install Package
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 ```
 
 ### Publish Config
@@ -219,7 +219,7 @@ composer test
 
 ### Update Package
 ```bash
-composer update kendenigerian/payments-router
+composer update ken-de-nigerian/payzephyr
 ```
 
 ## 📊 Package Stats

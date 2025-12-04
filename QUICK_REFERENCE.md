@@ -2,7 +2,7 @@
 
 ## Installation
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 php artisan vendor:publish --tag=payments-config
 php artisan migrate  # Optional, for transaction logging
 ```
@@ -204,9 +204,9 @@ php artisan cache:clear
 - Examples: examples/laravel-app/
 
 ## Support
-- GitHub: https://github.com/kendenigerian/payments-router
-- Issues: https://github.com/kendenigerian/payments-router/issues
-- Email: support@example.com
+- GitHub: https://github.com/ken-de-nigerian/payzephyr
+- Issues: https://github.com/ken-de-nigerian/payzephyr/issues
+- Email: ken.de.nigerian@gmail.com
 
 ## Quick Troubleshooting
 

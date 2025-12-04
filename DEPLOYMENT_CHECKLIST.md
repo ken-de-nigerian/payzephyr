@@ -13,7 +13,7 @@ Quick reference for deploying the Payments Router package.
 
 ## GitHub Setup
 
-- [ ] Create repository: `kendenigerian/payments-router`
+- [ ] Create repository: `ken-de-nigerian/payzephyr`
 - [ ] Push code to main branch
 - [ ] Add repository description
 - [ ] Add topics: `laravel`, `payment`, `paystack`, `stripe`, `flutterwave`
@@ -26,7 +26,7 @@ git init
 git add .
 git commit -m "Initial release v1.0.0"
 git branch -M main
-git remote add origin https://github.com/kendenigerian/payments-router.git
+git remote add origin https://github.com/ken-de-nigerian/payzephyr.git
 git push -u origin main
 git tag v1.0.0
 git push --tags
@@ -44,7 +44,7 @@ git push --tags
 ## Verification
 
 - [ ] Package appears on Packagist
-- [ ] Try installing: `composer require kendenigerian/payments-router`
+- [ ] Try installing: `composer require ken-de-nigerian/payzephyr`
 - [ ] Check badge displays on README
 - [ ] GitHub Actions tests run successfully
 - [ ] Webhook triggers on push
@@ -148,7 +148,7 @@ git push origin main     # Push code
 
 ### Installation (for users)
 ```bash
-composer require kendenigerian/payments-router
+composer require ken-de-nigerian/payzephyr
 php artisan vendor:publish --tag=payments-config
 php artisan migrate
 ```

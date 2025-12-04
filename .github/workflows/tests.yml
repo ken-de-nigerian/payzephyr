@@ -11,24 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: true
+      fail-fast: false  # Changed to false to see all failures
       matrix:
         php: [8.2, 8.3, 8.4]
         laravel: [10.*, 11.*, 12.*]
         include:
-          # Laravel 10 with Pest v2
           - laravel: 10.*
             testbench: 8.*
             pest: ^2.34
             pest-plugin: ^2.3
 
-          # Laravel 11 with Pest v3
           - laravel: 11.*
             testbench: 9.*
             pest: ^3.0
             pest-plugin: ^3.0
 
-          # Laravel 12 with Pest v3
           - laravel: 12.*
             testbench: 10.*
             pest: ^3.0
@@ -65,18 +62,29 @@ jobs:
       - name: Install dependencies
         run: composer update --prefer-dist --no-interaction
 
-      - name: Verify Pest exists
+      - name: Prepare test environment
+        run: |
+          mkdir -p .phpunit.cache
+          mkdir -p tests/Feature
+          mkdir -p tests/Unit
+
+      - name: List test files
+        run: |
+          echo "Test files in tests/:"
+          find tests -name "*.php" -type f || echo "No test files found"
+
+      - name: Verify Pest installation
         run: |
           if [ ! -f vendor/bin/pest ]; then
             echo "❌ Pest is missing!"
             exit 1
           fi
+          vendor/bin/pest --version
           echo "✅ Pest installed successfully."
 
       - name: Execute tests
         run: vendor/bin/pest --colors=always
 
-      # Run coverage only once: PHP 8.4 + Laravel 12
       - name: Coverage
         if: matrix.php == '8.4' && matrix.laravel == '12.*'
         run: vendor/bin/pest --coverage --min=80 --coverage-clover coverage.xml --colors=always

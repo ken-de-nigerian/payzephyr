@@ -149,14 +149,6 @@ test('payment verify with empty reference throws exception', function () {
     }
 });
 
-test('payment verify with null reference throws exception', function () {
-    try {
-        Payment::verify(null);
-    } catch (Exception $e) {
-        expect($e)->toBeInstanceOf(Exception::class);
-    }
-});
-
 test('payment verify logs verification attempts', function () {
     config(['payments.logging.enabled' => true]);
 

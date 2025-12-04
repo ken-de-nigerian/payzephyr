@@ -139,4 +139,12 @@ abstract class AbstractDriver implements DriverInterface
             logger()->{$level}("[{$this->getName()}] $message", $context);
         }
     }
+
+    /**
+     * Set HTTP client (for testing)
+     */
+    public function setClient(Client $client): void
+    {
+        $this->client = $client;
+    }
 }

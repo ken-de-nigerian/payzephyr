@@ -8,21 +8,22 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+
     strategy:
       fail-fast: true
       matrix:
-        os: [ubuntu-latest]
-        php: [8.2, 8.3]
-        laravel: [10.*, 11.*]
-        stability: [prefer-stable]
+        php: [8.2, 8.3, 8.4, 8.5]
+        laravel: [10.*, 11.*, 12.*]
         include:
           - laravel: 10.*
             testbench: 8.*
           - laravel: 11.*
             testbench: 9.*
+          - laravel: 12.*
+            testbench: 10.*
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }}
+    name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
 
     steps:
       - name: Checkout code
@@ -32,35 +33,43 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, soap, gd, exif, iconv
           coverage: xdebug
 
-      - name: Setup problem matchers
+      - name: Cache Composer
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: composer-${{ matrix.php }}-${{ matrix.laravel }}-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            composer-${{ matrix.php }}-${{ matrix.laravel }}-
+
+      - name: Configure framework + Testbench
         run: |
-          echo "::add-matcher::${{ runner.tool_cache }}/php.json"
-          echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
+          composer require "laravel/framework:${{ matrix.laravel }}" --no-interaction --no-update
+          composer require --dev "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
 
       - name: Install dependencies
-        run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+        run: composer update --prefer-dist --no-interaction
 
-      - name: List installed packages
-        run: composer show -i
+      - name: Verify Pest exists
+        run: |
+          if [ ! -f vendor/bin/pest ]; then
+            echo "❌ Pest is missing!"
+            exit 1
+          fi
+          echo "Pest installed successfully."
 
       - name: Execute tests
         run: vendor/bin/pest --colors=always
 
-      - name: Execute tests with coverage
-        if: matrix.php == '8.3' && matrix.laravel == '11.*'
-        run: vendor/bin/pest --coverage --min=80 --colors=always
-
-      - name: Generate coverage report
-        if: matrix.php == '8.3' && matrix.laravel == '11.*'
-        run: vendor/bin/pest --coverage --coverage-clover coverage.xml
+      # Run coverage only once: PHP 8.5 + Laravel 12
+      - name: Coverage
+        if: matrix.php == '8.5' && matrix.laravel == '12.*'
+        run: vendor/bin/pest --coverage --min=80 --coverage-clover coverage.xml --colors=always
 
       - name: Upload coverage
-        if: matrix.php == '8.3' && matrix.laravel == '11.*'
+        if: matrix.php == '8.5' && matrix.laravel == '12.*'
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage.xml

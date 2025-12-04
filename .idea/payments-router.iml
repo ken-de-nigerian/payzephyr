@@ -2,12 +2,8 @@
 <module type="WEB_MODULE" version="4">
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" packagePrefix="KenDeNigerian\PaymentsRouter\" />
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" packagePrefix="KenDeNigerian\PayZephyr\" />
-      <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" packagePrefix="KenDeNigerian\PaymentsRouter\Tests\" />
       <sourceFolder url="file://$MODULE_DIR$/tests" isTestSource="true" packagePrefix="KenDeNigerian\PayZephyr\Tests\" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Drivers/files/src" isTestSource="false" packagePrefix="KenDeNigerian\PaymentsRouter\" />
-      <sourceFolder url="file://$MODULE_DIR$/src/Drivers/files/tests" isTestSource="true" packagePrefix="KenDeNigerian\PaymentsRouter\Tests\" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/brianium/paratest" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/brick/math" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/carbonphp/carbon-doctrine-types" />

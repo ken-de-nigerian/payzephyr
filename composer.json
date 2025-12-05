@@ -1,6 +1,6 @@
 {
     "name": "kendenigerian/payzephyr",
-    "description": "A unified payment abstraction layer for Laravel supporting multiple providers (Paystack, Flutterwave, Monnify, Stripe, PayPal) with automatic fallback, webhooks, and currency conversion",
+    "description": "Managing multiple payment gateways usually means writing messy, conditional code for each provider (Stripe, PayPal, LemonSqueezy, etc.). This package solves that by acting as a smart abstraction layer for your payments. It standardizes the checkout process, webhook handling, and error management into one fluent interface.",
     "keywords": [
         "laravel",
         "payment",

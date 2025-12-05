@@ -1,4 +1,4 @@
-# Payments Router
+# PayZephyr
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/ken-de-nigerian/payzephyr.svg?style=flat-square)](https://packagist.org/packages/ken-de-nigerian/payzephyr)
 [![Total Downloads](https://img.shields.io/packagist/dt/ken-de-nigerian/payzephyr.svg?style=flat-square)](https://packagist.org/packages/ken-de-nigerian/payzephyr)

@@ -97,15 +97,12 @@ return [
     | Currency Configuration
     |--------------------------------------------------------------------------
     |
-    | Configure currency conversion settings. The converter will use the
-    | specified driver to fetch exchange rates for currency conversion.
+    | Configure currency conversion settings.
     |
     */
     'currency' => [
         'default' => env('PAYMENTS_DEFAULT_CURRENCY', 'NGN'),
-        'converter' => env('PAYMENTS_CURRENCY_CONVERTER', 'exchangerate'),
         'cache_ttl' => env('PAYMENTS_CURRENCY_CACHE_TTL', 3600), // 1 hour
-        'api_key' => env('CURRENCY_CONVERTER_API_KEY'),
     ],
 
     /*

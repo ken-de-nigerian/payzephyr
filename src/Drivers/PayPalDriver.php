@@ -33,6 +33,11 @@ class PayPalDriver extends AbstractDriver
         return ['Content-Type' => 'application/json', 'Accept' => 'application/json'];
     }
 
+    private function getCurrencyDecimals(string $currency): int
+    {
+        return in_array(strtoupper($currency), ['JPY', 'KRW', 'VND']) ? 0 : 2;
+    }
+
     private function getAccessToken(): string
     {
         if ($this->accessToken && $this->tokenExpiry && time() < $this->tokenExpiry) {
@@ -70,7 +75,13 @@ class PayPalDriver extends AbstractDriver
                     'description' => $request->description ?? 'Payment',
                     'amount' => [
                         'currency_code' => $request->currency,
-                        'value' => number_format($request->amount, 2, '.', ''),
+                        // Dynamic decimals
+                        'value' => number_format(
+                            $request->amount,
+                            $this->getCurrencyDecimals($request->currency),
+                            '.',
+                            ''
+                        ),
                     ],
                     'custom_id' => $reference,
                 ]],

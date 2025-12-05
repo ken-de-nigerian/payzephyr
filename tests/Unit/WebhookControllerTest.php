@@ -6,7 +6,10 @@ use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
 beforeEach(function () {
+    // Disable logging to prevent "Table not found" errors during unit tests
     config([
+        'payments.logging.enabled' => false,
+
         'payments.webhook.verify_signature' => true,
         'payments.providers.paystack' => [
             'driver' => 'paystack',

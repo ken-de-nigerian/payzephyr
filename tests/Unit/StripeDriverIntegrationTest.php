@@ -2,6 +2,7 @@
 
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use Stripe\Exception\InvalidRequestException;
 
@@ -30,28 +31,34 @@ function createMockStripeDriver(object $stripeMock): StripeDriver
 }
 
 test('stripe charge succeeds', function () {
-    // Mock the Intent object
-    $intentMock = (object) [
-        'id' => 'pi_test_123',
-        'client_secret' => 'secret_123',
-        'status' => 'pending', // 'processing' or 'requires_payment_method' usually
+    // 1. Mock the Session object (Result of the API call)
+    $sessionMock = (object) [
+        'id' => 'cs_test_123',
+        'url' => 'https://checkout.stripe.com/pay/cs_test_123',
+        'status' => 'open',
     ];
 
-    // Mock the paymentIntents service
-    $paymentIntents = new class($intentMock)
+    // 2. Mock the Sessions Service (The ->sessions part)
+    $sessionsService = new class($sessionMock)
     {
-        public function __construct(private readonly object $intent) {}
+        public function __construct(private readonly object $session) {}
 
         public function create()
         {
-            return $this->intent;
+            return $this->session;
         }
     };
 
-    // Mock the StripeClient
-    $stripeMock = new class($paymentIntents)
+    // 3. Mock the Checkout Service (The ->checkout part)
+    $checkoutService = new class($sessionsService)
     {
-        public function __construct(public object $paymentIntents) {}
+        public function __construct(public object $sessions) {}
+    };
+
+    // 4. Mock the Stripe Client (The root object)
+    $stripeMock = new class($checkoutService)
+    {
+        public function __construct(public object $checkout) {}
     };
 
     $driver = createMockStripeDriver($stripeMock);
@@ -59,14 +66,16 @@ test('stripe charge succeeds', function () {
     $request = new ChargeRequest(10000, 'USD', 'test@example.com', 'stripe_ref_123');
     $response = $driver->charge($request);
 
+    // Assertions based on the new Checkout Session logic
     expect($response->reference)->toBe('stripe_ref_123')
-        ->and($response->authorizationUrl)->toBe('secret_123')
+        ->and($response->authorizationUrl)->toBe('https://checkout.stripe.com/pay/cs_test_123')
+        ->and($response->accessCode)->toBe('cs_test_123')
         ->and($response->status)->toBe('pending');
 });
 
 test('stripe charge handles api error', function () {
-    // Mock throwing exception
-    $paymentIntents = new class
+    // Mock throwing exception from the checkout session creation
+    $sessionsService = new class
     {
         public function create()
         {
@@ -74,18 +83,32 @@ test('stripe charge handles api error', function () {
         }
     };
 
-    $stripeMock = new class($paymentIntents)
+    $checkoutService = new class($sessionsService)
     {
-        public function __construct(public object $paymentIntents) {}
+        public function __construct(public object $sessions) {}
+    };
+
+    $stripeMock = new class($checkoutService)
+    {
+        public function __construct(public object $checkout) {}
     };
 
     $driver = createMockStripeDriver($stripeMock);
 
-    // This should fail with InvalidArgumentException because ChargeRequest validates first!
-    $driver->charge(new ChargeRequest(10000, 'INVALID', 'test@example.com'));
-})->throws(InvalidArgumentException::class);
+    // This checks that the driver correctly catches the Stripe exception
+    // and rethrows it as a ChargeException (which extends PaymentException)
+    // Note: The previous test checked for InvalidArgumentException from ChargeRequest,
+    // but here we want to test the Driver error handling.
+    // If you want to test invalid currency validation inside ChargeRequest, that is a separate unit test.
+    // Here we simulate Stripe rejecting it.
+
+    // We expect a ChargeException (wrapper), not the raw Stripe exception
+    expect(fn () => $driver->charge(new ChargeRequest(100, 'USD', 'test@example.com')))
+        ->toThrow(ChargeException::class);
+});
 
 test('stripe verify returns success', function () {
+    // Verify uses paymentIntents, so we keep this mock structure
     $intentMock = (object) [
         'id' => 'pi_test_123',
         'status' => 'succeeded',

@@ -1,7 +1,6 @@
 <?php
 
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
-use KenDeNigerian\PayZephyr\Exceptions\CurrencyException;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
@@ -77,12 +76,6 @@ test('invalid configuration exception is instance of payment exception', functio
 
 test('webhook exception is instance of payment exception', function () {
     $exception = new WebhookException('Webhook failed');
-
-    expect($exception)->toBeInstanceOf(PaymentException::class);
-});
-
-test('currency exception is instance of payment exception', function () {
-    $exception = new CurrencyException('Currency not supported');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });

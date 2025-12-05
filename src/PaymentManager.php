@@ -16,6 +16,7 @@ use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use Throwable;
 
 /**
@@ -95,6 +96,21 @@ class PaymentManager
                 }
 
                 $response = $driver->charge($request);
+
+                // Log to Database
+                if (config('payments.logging.enabled', true)) {
+                    PaymentTransaction::create([
+                        'reference' => $response->reference,
+                        'provider' => $providerName,
+                        'status' => $response->status,
+                        'amount' => $request->amount,
+                        'currency' => $request->currency,
+                        'email' => $request->email,
+                        'metadata' => json_encode($request->metadata), // Ensure array is JSON
+                        'description' => $request->description,
+                        'paid_at' => null, // Not paid yet
+                    ]);
+                }
 
                 logger()->info("Payment charged successfully via [$providerName]", [
                     'reference' => $response->reference,

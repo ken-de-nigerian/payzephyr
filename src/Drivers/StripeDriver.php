@@ -81,38 +81,41 @@ class StripeDriver extends AbstractDriver
         try {
             $reference = $request->reference ?? $this->generateReference('STRIPE');
 
-            $params = [
-                'amount' => $request->getAmountInMinorUnits(),
-                'currency' => strtolower($request->currency),
-                'receipt_email' => $request->email,
+            // Use Checkout Session instead of PaymentIntent
+            $session = $this->stripe->checkout->sessions->create([
+                'payment_method_types' => ['card'],
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => strtolower($request->currency),
+                        'product_data' => [
+                            'name' => $request->description ?? 'Payment',
+                        ],
+                        'unit_amount' => $request->getAmountInMinorUnits(),
+                    ],
+                    'quantity' => 1,
+                ]],
+                'mode' => 'payment',
+                'success_url' => $request->callbackUrl.'?status=success&reference='.$reference,
+                'cancel_url' => $request->callbackUrl.'?status=cancelled&reference='.$reference,
+                'client_reference_id' => $reference,
+                'customer_email' => $request->email,
                 'metadata' => array_merge($request->metadata, [
                     'reference' => $reference,
-                    'email' => $request->email,
                 ]),
-                'description' => $request->description ?? 'Payment',
-            ];
-
-            if ($request->customer) {
-                $params['customer'] = $request->customer['id'] ?? null;
-            }
-
-            // We treat $this->stripe as dynamic here to allow both StripeClient and Mock calls
-            $intent = $this->stripe->paymentIntents->create($params);
+            ]);
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
-                'intent_id' => $intent->id,
+                'session_id' => $session->id,
             ]);
 
-            // Return payment intent details for client-side confirmation
             return new ChargeResponse(
                 reference: $reference,
-                authorizationUrl: $intent->client_secret, // For Stripe, we use client_secret
-                accessCode: $intent->id,
-                status: $intent->status,
+                authorizationUrl: $session->url, // Now we have a real URL!
+                accessCode: $session->id,
+                status: 'pending',
                 metadata: [
-                    'client_secret' => $intent->client_secret,
-                    'payment_intent_id' => $intent->id,
+                    'session_id' => $session->id,
                 ],
                 provider: $this->getName(),
             );

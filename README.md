@@ -444,11 +444,11 @@ Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
 
 ## Security
 
-If you discover any security-related issues, please email security@example.com instead of using the issue tracker.
+If you discover any security-related issues, please email ken-de-nigerian@gmail.com instead of using the issue tracker.
 
 ## Credits
 
-- [Nwaneri Kenneth](https://github.com/kendenigerian)
+- [Nwaneri Chukwunyere Kenneth](https://github.com/ken-de-nigeriann)
 - [All Contributors](../../contributors)
 
 ## License

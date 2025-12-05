@@ -7,11 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [1.0.2] - 2025-12-05
 
 ### 🐛 Fixed
 - **Rounding Precision Handling**:
-  - ChargeRequest now automatically rounds amounts to 2 decimal places
+  - ChargeRequest now automatically rounds amounts to two decimal places
   - Prevents validation exceptions on high-precision inputs (e.g., 100.999)
   - Ensures consistent monetary formatting across all providers
 
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.1.0] - 2025-12-05
+## [1.0.1] - 2025-12-04
 
 ### 🚀 Added
 - **PaymentTransaction Model**: Full Eloquent model for transaction management
@@ -69,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Mass Assignment Protection**:
   - PaymentTransaction model properly guarded
-  - Only necessary fields marked as fillable
+  - Only necessary fields are marked as fillable
   - Prevents unauthorized field modification
 
 ### 🐛 Fixed
@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - No changes needed - working as intended
 
 - **Database Migration Usage**:
-  - Migration now actively used by transaction logging
+  - Migration is now actively used by transaction logging
   - Webhook controller updates records automatically
   - Verification updates records on success
 
@@ -273,19 +273,10 @@ composer update kendenigerian/payzephyr
    $transactions = PaymentTransaction::successful()->get();
    ```
 
-3. Enhanced security - ensure webhook verification is enabled:
+3. Enhanced security—ensure webhook verification is enabled:
    ```env
    PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true
    ```
-
----
-
-## Security Vulnerabilities
-
-Please review our [Security Policy](SECURITY.md) for reporting vulnerabilities.
-
-**Critical Security Updates**:
-- **v1.1.0**: Webhook signature validation fix (CVE-TBD)
 
 ---
 
@@ -306,11 +297,11 @@ Please review our [Security Policy](SECURITY.md) for reporting vulnerabilities.
 ---
 
 **Legend**:
-- 🚀 Added - New features
-- 🔒 Security - Security improvements
+- 🚀 Added—New features
+- 🔒 Security—Security improvements
 - 🐛 Fixed - Bug fixes
-- 🗑️ Removed - Removed features
-- 📝 Changed - Changes to existing features
+- 🗑️ Removed—Removed features
+- 📝 Changed—Changes to existing features
 - 📚 Documentation - Documentation updates
 - ⚠️ Breaking - Breaking changes
-- 🔄 Migration - Migration required
+- 🔄 Migration—Migration required

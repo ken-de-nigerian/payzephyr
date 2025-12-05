@@ -52,6 +52,14 @@ class MonnifyDriver extends AbstractDriver
     }
 
     /**
+     * Monnify uses 'Idempotency-Key' header
+     */
+    protected function getIdempotencyHeader(string $key): array
+    {
+        return ['Idempotency-Key' => $key];
+    }
+
+    /**
      * Retrieve a valid access token, generating a new one if necessary.
      *
      * Monnify requires Basic Auth (base64 encoded API Key + Secret) to obtain
@@ -92,6 +100,8 @@ class MonnifyDriver extends AbstractDriver
      */
     public function charge(ChargeRequest $request): ChargeResponse
     {
+        $this->setCurrentRequest($request);
+
         try {
             $reference = $request->reference ?? $this->generateReference('MON');
 
@@ -133,6 +143,8 @@ class MonnifyDriver extends AbstractDriver
         } catch (GuzzleException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
             throw new ChargeException('Monnify charge failed: '.$e->getMessage(), 0, $e);
+        } finally {
+            $this->clearCurrentRequest();
         }
     }
 

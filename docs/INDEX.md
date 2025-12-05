@@ -12,20 +12,20 @@ Welcome to the PayZephyr documentation! This guide will help you get started and
 3. [Basic Usage Examples](#basic-usage)
 
 ### Core Documentation
-4. [Architecture Overview](architecture.md) - System design and components
-5. [Payment Providers](providers.md) - Detailed provider information
-6. [Webhook Integration](webhooks.md) - Complete webhook guide
+1. [Architecture Overview](architecture.md) - System design and components
+2. [Payment Providers](providers.md) - Detailed provider information
+3. [Webhook Integration](webhooks.md) - Complete webhook guide
 
 ### Advanced Topics
-7. [Transaction Logging](#transaction-logging)
-8. [Error Handling](#error-handling)
-9. [Security Best Practices](../SECURITY_AUDIT.md)
-10. [Testing Your Integration](#testing)
+1. [Transaction Logging](#transaction-logging)
+2. [Error Handling](#error-handling)
+3. [Security Best Practices](../SECURITY_AUDIT.md)
+4. [Testing Your Integration](#testing)
 
 ### Development
-11. [Contributing Guidelines](../CONTRIBUTING.md)
-12. [Changelog](../CHANGELOG.md)
-13. [API Reference](#api-reference)
+1. [Contributing Guidelines](../CONTRIBUTING.md)
+2. [Changelog](../CHANGELOG.md)
+3. [API Reference](#api-reference)
 
 ---
 
@@ -126,6 +126,7 @@ return Payment::amount(50000)
     ->currency('NGN')
     ->email('customer@example.com')
     ->reference('ORDER_' . time())
+    ->idempotency(Str::uuid()->toString()) // Prevent double billing
     ->metadata([
         'order_id' => 12345,
         'customer_id' => auth()->id(),
@@ -396,7 +397,7 @@ Payment::with(string|array $providers)   // Set provider(s)
 
 ```php
 Payment::charge()                        // Get ChargeResponse (no redirect)
-Payment::redirect()                      // Redirect user to payment page
+Payment::redirect()                      // Redirect user to the payment page
 Payment::verify(string $reference)       // Verify payment status
 ```
 
@@ -571,7 +572,7 @@ Enable detailed logging:
 
 ## Next Steps
 
-1. ✅ [Install the package](../README.md#installation)
+1. ✅ [Install the package](../README.md)
 2. ✅ [Configure your providers](providers.md)
 3. ✅ [Implement basic payment flow](#basic-usage)
 4. ✅ [Set up webhooks](webhooks.md)

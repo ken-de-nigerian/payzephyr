@@ -12,8 +12,9 @@ A unified payment abstraction layer for Laravel that supports multiple payment p
 ## 🚀 Features
 
 - **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, and PayPal
-- **Automatic Fallback**: Seamlessly switch to backup providers if primary fails
+- **Automatic Fallback**: Seamlessly switch to back-up providers if primary fails
 - **Fluent API**: Clean, expressive syntax for payment operations
+- **Idempotency Support**: Prevent duplicate charges with unique keys across supported providers
 - **Webhook Security**: Secure signature validation for all providers
 - **Transaction Logging**: Automatic database logging with status tracking
 - **Multi-Currency Support**: Support for 100+ currencies across providers
@@ -92,6 +93,7 @@ STRIPE_ENABLED=false
 # PayPal
 PAYPAL_CLIENT_ID=xxxxxxxxxxxxx
 PAYPAL_CLIENT_SECRET=xxxxxxxxxxxxx
+PAYPAL_WEBHOOK_ID=YOUR_WEBHOOK_ID_HERE
 PAYPAL_MODE=sandbox  # sandbox or live
 PAYPAL_ENABLED=false
 
@@ -111,7 +113,7 @@ PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true
 ```php
 use KenDeNigerian\PayZephyr\Facades\Payment;
 
-// Redirect user to payment page
+// Redirect user to the payment page
 return Payment::amount(10000)
     ->email('customer@example.com')
     ->callback(route('payment.callback'))
@@ -131,16 +133,20 @@ return payment()
 ### With All Options
 
 ```php
+use Illuminate\Support\Str;
+
 return Payment::amount(50000)
     ->currency('NGN')
     ->email('customer@example.com')
     ->reference('ORDER_' . time())
     ->description('Premium subscription')
+    ->idempotency(Str::uuid()->toString()) // Prevent double billing
     ->metadata(['order_id' => 12345])
     ->customer(['name' => 'John Doe', 'phone' => '+2348012345678'])
     ->channels(['card', 'bank_transfer'])
     ->with('paystack')
     ->redirect();
+
 ```
 
 ### Verify Payment
@@ -239,13 +245,13 @@ class HandlePaystackWebhook
 
 ## 🏦 Supported Providers
 
-| Provider | Charge | Verify | Webhooks | Currencies | Special Features |
-|----------|:------:|:------:|:--------:|------------|------------------|
-| **Paystack** | ✅ | ✅ | ✅ | NGN, GHS, ZAR, USD | USSD, Bank Transfer |
-| **Flutterwave** | ✅ | ✅ | ✅ | NGN, USD, EUR, GBP, KES, UGX, TZS | Mobile Money, MPESA |
-| **Monnify** | ✅ | ✅ | ✅ | NGN | Bank Transfer, Dynamic Accounts |
-| **Stripe** | ✅ | ✅ | ✅ | 135+ currencies | Apple Pay, Google Pay, SCA |
-| **PayPal** | ✅ | ✅ | ✅ | USD, EUR, GBP, CAD, AUD | PayPal Balance, Credit |
+| Provider        | Charge | Verify | Webhooks | Currencies                        | Special Features                |
+|-----------------|:------:|:------:|:--------:|-----------------------------------|---------------------------------|
+| **Paystack**    |   ✅    |   ✅    |    ✅     | NGN, GHS, ZAR, USD                | USSD, Bank Transfer             |
+| **Flutterwave** |   ✅    |   ✅    |    ✅     | NGN, USD, EUR, GBP, KES, UGX, TZS | Mobile Money, MPESA             |
+| **Monnify**     |   ✅    |   ✅    |    ✅     | NGN                               | Bank Transfer, Dynamic Accounts |
+| **Stripe**      |   ✅    |   ✅    |    ✅     | 135+ currencies                   | Apple Pay, Google Pay, SCA      |
+| **PayPal**      |   ✅    |   ✅    |    ✅     | USD, EUR, GBP, CAD, AUD           | PayPal Balance, Credit          |
 
 **📖 For provider-specific details, see [docs/providers.md](docs/providers.md)**
 
@@ -362,7 +368,7 @@ return response()->json([
 6. ✅ Implement rate limiting on webhooks
 7. ✅ Keep the package updated
 
-**📖 For complete security guide, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md)**
+**📖 For the complete security guide, see [SECURITY_AUDIT.md](SECURITY_AUDIT.md)**
 
 ---
 
@@ -451,6 +457,7 @@ Payment::amount(float $amount)
 Payment::currency(string $currency)
 Payment::email(string $email)
 Payment::reference(string $reference)
+Payment::idempotency(string $key)        // Set unique idempotency key
 Payment::callback(string $url)
 Payment::metadata(array $metadata)
 Payment::description(string $description)
@@ -531,11 +538,6 @@ The MIT License (MIT). Please see [LICENSE](LICENSE) for more information.
 
 ---
 
-## 🙏 Credits
-
-- **Author**: [Nwaneri Chukwunyere Kenneth](https://github.com/ken-de-nigerian)
-- **Contributors**: [All Contributors](../../contributors)
-
 ### Built With
 - [Laravel](https://laravel.com) - The PHP Framework
 - [Guzzle](https://docs.guzzlephp.org) - HTTP Client
@@ -595,12 +597,12 @@ If PayZephyr helped your project:
 
 ## Quick Links
 
-| Resource | Link |
-|----------|------|
-| 📦 Packagist | [kendenigerian/payzephyr](https://packagist.org/packages/kendenigerian/payzephyr) |
-| 🐙 GitHub | [ken-de-nigerian/payzephyr](https://github.com/ken-de-nigerian/payzephyr) |
-| 📖 Documentation | [docs/](docs/) |
-| 🔐 Security | [SECURITY_AUDIT.md](SECURITY_AUDIT.md) |
-| 📝 Changelog | [CHANGELOG.md](CHANGELOG.md) |
-| 🤝 Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| ⚖️ License | [LICENSE](LICENSE) |
+| Resource         | Link                                                                              |
+|------------------|-----------------------------------------------------------------------------------|
+| 📦 Packagist     | [kendenigerian/payzephyr](https://packagist.org/packages/kendenigerian/payzephyr) |
+| 🐙 GitHub        | [ken-de-nigerian/payzephyr](https://github.com/ken-de-nigerian/payzephyr)         |
+| 📖 Documentation | [docs/](docs/INDEX.md)                                                            |
+| 🔐 Security      | [SECURITY_AUDIT.md](SECURITY_AUDIT.md)                                            |
+| 📝 Changelog     | [CHANGELOG.md](CHANGELOG.md)                                                      |
+| 🤝 Contributing  | [CONTRIBUTING.md](CONTRIBUTING.md)                                                |
+| ⚖️ License       | [LICENSE](LICENSE)                                                                |

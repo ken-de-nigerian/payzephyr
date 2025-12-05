@@ -72,16 +72,16 @@ public function validateWebhook(array $headers, string $body): bool
 ### 8. ✅ SQL Injection Protection
 - All database queries use Eloquent ORM
 - No raw SQL queries detected
-- All user inputs validated before database operations
+- All user inputs are validated before database operations
 
 ### 9. ✅ XSS Protection
 - No direct output of user input
-- All data properly escaped by Laravel's Blade engine
+- All data properly escaped by Laravel Blade engine
 - JSON responses properly encoded
 
 ### 10. ✅ CSRF Protection
 - Webhook routes use API middleware (CSRF exempt by default)
-- Regular routes protected by Laravel's CSRF middleware
+- Regular routes are protected by Laravel CSRF middleware
 
 ---
 
@@ -102,7 +102,7 @@ MONNIFY_SECRET_KEY=xxx
 ```
 
 ### Recommendations:
-1. Use Laravel's encryption for storing credentials in database
+1. Use Laravel encryption for storing credentials in database
 2. Rotate API keys periodically
 3. Use separate keys for development/staging/production
 4. Implement key rotation without downtime
@@ -122,7 +122,7 @@ MONNIFY_SECRET_KEY=xxx
 - [ ] Enable transaction logging (`PAYMENTS_LOGGING_ENABLED=true`)
 - [ ] Set up database backups for payment_transactions table
 - [ ] Configure proper error monitoring (Sentry, Bugsnag, etc.)
-- [ ] Add IP whitelist for webhook endpoints (if provider supports)
+- [ ] Add an IP allowlist for webhook endpoints (if the provider supports)
 - [ ] Implement idempotency keys for charge requests
 
 ---
@@ -134,10 +134,10 @@ MONNIFY_SECRET_KEY=xxx
 2. Unusual payment amounts or frequencies
 3. Failed API calls to payment providers
 4. Database transaction inconsistencies
-5. Repeated failed charges from same user
+5. Repeated failed charges from the same user
 
 ### Log Retention:
-- Keep payment transaction logs for minimum 7 years (regulatory compliance)
+- Keep payment transaction logs for a minimum of 7 years (regulatory compliance)
 - Webhook payloads: 90 days
 - Error logs: 30 days
 - Access logs: 90 days
@@ -152,7 +152,7 @@ MONNIFY_SECRET_KEY=xxx
 - ✅ No card numbers stored in application database
 
 ### GDPR:
-- ⚠️ Customer email addresses stored in transactions table
+- ⚠️ Customer email addresses stored in the transactions table
 - Recommendation: Implement data retention policy
 - Recommendation: Add customer data deletion endpoint
 

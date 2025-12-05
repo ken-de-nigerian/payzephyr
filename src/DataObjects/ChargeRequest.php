@@ -28,6 +28,7 @@ readonly class ChargeRequest
         public ?array $customFields = null,
         public ?array $split = null,
         public ?array $channels = null,
+        public ?string $idempotencyKey = null,
     ) {
         $this->validate();
     }
@@ -95,6 +96,7 @@ readonly class ChargeRequest
             customFields: $data['custom_fields'] ?? null,
             split: $data['split'] ?? null,
             channels: $data['channels'] ?? null,
+            idempotencyKey: $data['idempotency_key'] ?? null,
         );
     }
 

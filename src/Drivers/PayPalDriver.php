@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 
 /**
  * Driver implementation for the PayPal REST API (V2).
@@ -158,8 +159,15 @@ class PayPalDriver extends AbstractDriver
                 ],
             ];
 
+            $headers = ['Authorization' => 'Bearer '.$this->getAccessToken()];
+
+            // Add idempotency key if provided
+            if ($request->idempotencyKey) {
+                $headers['PayPal-Request-Id'] = $request->idempotencyKey;
+            }
+
             $response = $this->makeRequest('POST', '/v2/checkout/orders', [
-                'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
+                'headers' => $headers,
                 'json' => $payload,
             ]);
 
@@ -240,15 +248,112 @@ class PayPalDriver extends AbstractDriver
     }
 
     /**
-     * Placeholder for Webhook Signature Validation.
+     * Validate PayPal webhook signature.
      *
-     * @todo Implement full Cert/Signature validation logic.
-     * PayPal webhook validation is complex; it requires downloading a certificate
-     * from a URL provided in the headers, validating the chain, and hashing the body.
+     * PayPal uses a complex signature verification process involving:
+     * 1. Certificate verification from PayPal's cert URL
+     * 2. CRC32 checksum validation
+     * 3. Signature validation using the public certificate
+     *
+     * @link https://developer.paypal.com/api/rest/webhooks/
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        return true;
+        // Extract required headers
+        $transmissionId = $headers['paypal-transmission-id'][0] ?? null;
+        $transmissionTime = $headers['paypal-transmission-time'][0] ?? null;
+        $certUrl = $headers['paypal-cert-url'][0] ?? null;
+        $authAlgo = $headers['paypal-auth-algo'][0] ?? null;
+        $transmissionSig = $headers['paypal-transmission-sig'][0] ?? null;
+        $webhookId = $this->config['webhook_id'] ?? null;
+
+        // Validate all required headers are present
+        if (! $transmissionId || ! $transmissionTime || ! $certUrl || ! $authAlgo || ! $transmissionSig || ! $webhookId) {
+            $this->log('warning', 'PayPal webhook missing required headers', [
+                'has_transmission_id' => (bool) $transmissionId,
+                'has_transmission_time' => (bool) $transmissionTime,
+                'has_cert_url' => (bool) $certUrl,
+                'has_auth_algo' => (bool) $authAlgo,
+                'has_transmission_sig' => (bool) $transmissionSig,
+                'has_webhook_id' => (bool) $webhookId,
+            ]);
+
+            return false;
+        }
+
+        try {
+            // Use PayPal's official verification API
+            return $this->verifyWebhookSignatureViaAPI(
+                $transmissionId,
+                $transmissionTime,
+                $certUrl,
+                $authAlgo,
+                $transmissionSig,
+                $webhookId,
+                $body
+            );
+        } catch (Exception $e) {
+            $this->log('error', 'PayPal webhook validation failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Verify webhook signature using PayPal's Webhook Verification API.
+     *
+     * This is the recommended approach as it delegates the complex certificate
+     * validation to PayPal's servers.
+     *
+     * @link https://developer.paypal.com/docs/api/webhooks/v1/#verify-webhook-signature
+     */
+    private function verifyWebhookSignatureViaAPI(
+        string $transmissionId,
+        string $transmissionTime,
+        string $certUrl,
+        string $authAlgo,
+        string $transmissionSig,
+        string $webhookId,
+        string $body
+    ): bool {
+        try {
+            $response = $this->makeRequest('POST', '/v1/notifications/verify-webhook-signature', [
+                'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
+                'json' => [
+                    'transmission_id' => $transmissionId,
+                    'transmission_time' => $transmissionTime,
+                    'cert_url' => $certUrl,
+                    'auth_algo' => $authAlgo,
+                    'transmission_sig' => $transmissionSig,
+                    'webhook_id' => $webhookId,
+                    'webhook_event' => json_decode($body, true),
+                ],
+            ]);
+
+            $data = $this->parseResponse($response);
+
+            $isValid = ($data['verification_status'] ?? '') === 'SUCCESS';
+
+            $this->log($isValid ? 'info' : 'warning', 'PayPal webhook validation result', [
+                'valid' => $isValid,
+                'status' => $data['verification_status'] ?? 'unknown',
+            ]);
+
+            return $isValid;
+        } catch (GuzzleException $e) {
+            // If API verification fails, log and reject webhook
+            $this->log('error', 'PayPal webhook verification API failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new WebhookException(
+                'PayPal webhook verification failed: '.$e->getMessage(),
+                0,
+                $e
+            );
+        }
     }
 
     /**

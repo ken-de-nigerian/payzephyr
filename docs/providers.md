@@ -248,7 +248,7 @@ Set in config:
 'fallback' => 'stripe',
 ```
 
-Then simply use:
+Then use:
 ```php
 Payment::amount(10000)
     ->email('customer@example.com')
@@ -259,13 +259,13 @@ Payment::amount(10000)
 
 ## Currency Support Matrix
 
-| Provider | NGN | USD | EUR | GBP | KES | Other |
-|----------|:---:|:---:|:---:|:---:|:---:|:-----:|
-| Paystack | ✅ | ✅ | ❌ | ❌ | ❌ | GHS, ZAR |
-| Flutterwave | ✅ | ✅ | ✅ | ✅ | ✅ | UGX, TZS, GHS, ZAR |
-| Monnify | ✅ | ❌ | ❌ | ❌ | ❌ | - |
-| Stripe | ✅ | ✅ | ✅ | ✅ | ❌ | 135+ |
-| PayPal | ❌ | ✅ | ✅ | ✅ | ❌ | 25+ |
+| Provider    | NGN | USD | EUR | GBP | KES |       Other        |
+|-------------|:---:|:---:|:---:|:---:|:---:|:------------------:|
+| Paystack    |  ✅  |  ✅  |  ❌  |  ❌  |  ❌  |      GHS, ZAR      |
+| Flutterwave |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  | UGX, TZS, GHS, ZAR |
+| Monnify     |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  |         -          |
+| Stripe      |  ✅  |  ✅  |  ✅  |  ✅  |  ❌  |        135+        |
+| PayPal      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  |        25+         |
 
 ---
 

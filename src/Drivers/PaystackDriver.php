@@ -48,6 +48,14 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
+     * Paystack uses 'Idempotency-Key' header (standard)
+     */
+    protected function getIdempotencyHeader(string $key): array
+    {
+        return ['Idempotency-Key' => $key];
+    }
+
+    /**
      * Initialize a transaction on Paystack.
      *
      * Note: Paystack requires amounts in minor units (e.g., Kobo for NGN).
@@ -59,6 +67,8 @@ class PaystackDriver extends AbstractDriver
      */
     public function charge(ChargeRequest $request): ChargeResponse
     {
+        $this->setCurrentRequest($request);
+
         try {
             $payload = [
                 'email' => $request->email,
@@ -102,6 +112,8 @@ class PaystackDriver extends AbstractDriver
         } catch (GuzzleException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
             throw new ChargeException('Paystack charge failed: '.$e->getMessage(), 0, $e);
+        } finally {
+            $this->clearCurrentRequest();
         }
     }
 

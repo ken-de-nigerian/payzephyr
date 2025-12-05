@@ -8,6 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use Psr\Http\Message\ResponseInterface;
 use Random\RandomException;
@@ -24,6 +25,11 @@ abstract class AbstractDriver implements DriverInterface
     protected array $config;
 
     protected string $name;
+
+    /**
+     * Current request being processed (for idempotency key access)
+     */
+    protected ?ChargeRequest $currentRequest = null;
 
     /**
      * AbstractDriver constructor.
@@ -63,13 +69,47 @@ abstract class AbstractDriver implements DriverInterface
     abstract protected function getDefaultHeaders(): array;
 
     /**
-     * Make HTTP request
+     * Make HTTP request with automatic idempotency key injection
      *
      * @throws GuzzleException
      */
     protected function makeRequest(string $method, string $uri, array $options = []): ResponseInterface
     {
+        // Inject idempotency key if available and not already set
+        if ($this->currentRequest?->idempotencyKey && ! isset($options['headers']['Idempotency-Key'])) {
+            $options['headers'] = array_merge(
+                $options['headers'] ?? [],
+                $this->getIdempotencyHeader($this->currentRequest->idempotencyKey)
+            );
+        }
+
         return $this->client->request($method, $uri, $options);
+    }
+
+    /**
+     * Get provider-specific idempotency header
+     *
+     * Override this in specific drivers if they use different header names
+     */
+    protected function getIdempotencyHeader(string $key): array
+    {
+        return ['Idempotency-Key' => $key];
+    }
+
+    /**
+     * Set the current request context (called by charge method)
+     */
+    protected function setCurrentRequest(ChargeRequest $request): void
+    {
+        $this->currentRequest = $request;
+    }
+
+    /**
+     * Clear the current request context
+     */
+    protected function clearCurrentRequest(): void
+    {
+        $this->currentRequest = null;
     }
 
     /**
@@ -100,6 +140,7 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Generate unique reference
+     *
      * @throws RandomException
      */
     protected function generateReference(?string $prefix = null): string

@@ -10,8 +10,6 @@ First off, thank you for considering contributing to PayZephyr! It's people like
 - [Coding Standards](#coding-standards)
 - [Testing Guidelines](#testing-guidelines)
 - [Pull Request Process](#pull-request-process)
-- [Reporting Bugs](#reporting-bugs)
-- [Suggesting Enhancements](#suggesting-enhancements)
 - [Adding New Payment Providers](#adding-new-payment-providers)
 
 ---

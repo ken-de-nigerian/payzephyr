@@ -47,6 +47,14 @@ class FlutterwaveDriver extends AbstractDriver
     }
 
     /**
+     * Flutterwave uses standard 'Idempotency-Key' header
+     */
+    protected function getIdempotencyHeader(string $key): array
+    {
+        return ['Idempotency-Key' => $key];
+    }
+
+    /**
      * Initialize a charge using the Flutterwave Standard Payment Link.
      *
      * Maps the internal ChargeRequest to Flutterwave's payload structure,
@@ -57,6 +65,9 @@ class FlutterwaveDriver extends AbstractDriver
      */
     public function charge(ChargeRequest $request): ChargeResponse
     {
+        // Store request so AbstractDriver can access idempotency key
+        $this->setCurrentRequest($request);
+
         try {
             $reference = $request->reference ?? $this->generateReference('FLW');
 
@@ -92,6 +103,7 @@ class FlutterwaveDriver extends AbstractDriver
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
+                'idempotent' => $request->idempotencyKey !== null,
             ]);
 
             return new ChargeResponse(
@@ -105,6 +117,9 @@ class FlutterwaveDriver extends AbstractDriver
         } catch (GuzzleException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
             throw new ChargeException('Flutterwave charge failed: '.$e->getMessage(), 0, $e);
+        } finally {
+            // Always clear context to prevent memory leaks
+            $this->clearCurrentRequest();
         }
     }
 

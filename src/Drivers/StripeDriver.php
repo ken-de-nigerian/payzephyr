@@ -76,6 +76,14 @@ class StripeDriver extends AbstractDriver
     }
 
     /**
+     * Stripe uses standard 'Idempotency-Key' header
+     */
+    protected function getIdempotencyHeader(string $key): array
+    {
+        return ['Idempotency-Key' => $key];
+    }
+
+    /**
      * Initialize a Stripe Checkout Session.
      *
      * This creates a session on Stripe servers and returns the URL the user
@@ -88,10 +96,14 @@ class StripeDriver extends AbstractDriver
      */
     public function charge(ChargeRequest $request): ChargeResponse
     {
+        // Store request for potential HTTP fallback (though SDK handles it)
+        $this->setCurrentRequest($request);
+
         try {
             $reference = $request->reference ?? $this->generateReference('STRIPE');
 
-            $session = $this->stripe->checkout->sessions->create([
+            // Build Stripe API parameters
+            $params = [
                 'payment_method_types' => ['card'],
                 'line_items' => [[
                     'price_data' => [
@@ -111,11 +123,19 @@ class StripeDriver extends AbstractDriver
                 'metadata' => array_merge($request->metadata, [
                     'reference' => $reference,
                 ]),
-            ]);
+            ];
+
+            $options = [];
+            if ($request->idempotencyKey) {
+                $options['idempotency_key'] = $request->idempotencyKey;
+            }
+
+            $session = $this->stripe->checkout->sessions->create($params, $options);
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
                 'session_id' => $session->id,
+                'idempotent' => $request->idempotencyKey !== null,
             ]);
 
             return new ChargeResponse(
@@ -131,6 +151,8 @@ class StripeDriver extends AbstractDriver
         } catch (ApiErrorException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
+        } finally {
+            $this->clearCurrentRequest();
         }
     }
 

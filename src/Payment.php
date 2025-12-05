@@ -109,6 +109,16 @@ class Payment
     }
 
     /**
+     * Set the idempotency key for the request
+     */
+    public function idempotency(string $key): static
+    {
+        $this->data['idempotency_key'] = $key;
+
+        return $this;
+    }
+
+    /**
      * Set a human-readable description for the transaction.
      */
     public function description(string $description): static

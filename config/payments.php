@@ -84,6 +84,7 @@ return [
             'driver' => 'paypal',
             'client_id' => env('PAYPAL_CLIENT_ID'),
             'client_secret' => env('PAYPAL_CLIENT_SECRET'),
+            'webhook_id' => env('PAYPAL_WEBHOOK_ID'), // Required for webhook validation
             'mode' => env('PAYPAL_MODE', 'sandbox'), // sandbox or live
             'callback_url' => env('PAYPAL_CALLBACK_URL'),
             'base_url' => env('PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com'),
@@ -120,7 +121,7 @@ return [
     'webhook' => [
         'path' => env('PAYMENTS_WEBHOOK_PATH', '/payments/webhook'),
         'verify_signature' => env('PAYMENTS_WEBHOOK_VERIFY_SIGNATURE', true),
-        'middleware' => ['api'],
+        'middleware' => ['api', 'throttle:60,1'], // 60 requests per minute
         'tolerance' => 300, // 5 minutes tolerance for timestamp validation
     ],
 

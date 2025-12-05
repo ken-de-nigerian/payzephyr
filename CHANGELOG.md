@@ -7,26 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.2] - 2025-12-05
-
-### 🐛 Fixed
-- **Rounding Precision Handling**:
-  - ChargeRequest now automatically rounds amounts to two decimal places
-  - Prevents validation exceptions on high-precision inputs (e.g., 100.999)
-  - Ensures consistent monetary formatting across all providers
-
-- **Webhook Error Status Codes**:
-  - WebhookController now returns HTTP 500 on internal errors
-  - Previously returned HTTP 200 even on failures
-  - Ensures payment providers trigger automatic retries
-  - Improves webhook reliability and event processing
-
-### Added
-- Initial release preparation
-- Comprehensive test coverage
-
----
-
 ## [1.0.1] - 2025-12-04
 
 ### 🚀 Added
@@ -53,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Production deployment checklist
   - Incident response guidelines
   - GDPR and PCI-DSS compliance notes
+
+- **Rounding Precision Handling**:
+  - ChargeRequest now automatically rounds amounts to two decimal places
+  - Prevents validation exceptions on high-precision inputs (e.g., 100.999)
+  - Ensures consistent monetary formatting across all providers
+
+- **Webhook Error Status Codes**:
+  - WebhookController now returns HTTP 500 on internal errors
+  - Previously returned HTTP 200 even on failures
+  - Ensures payment providers trigger automatic retries
+  - Improves webhook reliability and event processing
 
 ### 🔒 Security
 - **CRITICAL: Webhook Signature Validation Fix**

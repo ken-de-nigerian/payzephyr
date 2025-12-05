@@ -147,6 +147,7 @@ return Payment::amount(50000)
         'name' => 'John Doe',
         'phone' => '+2348012345678',
     ])
+    ->channels(['card']) // Specific channels (Paystack/Monnify)
     ->callback(route('payment.callback'))
     ->with('paystack')
     ->redirect();

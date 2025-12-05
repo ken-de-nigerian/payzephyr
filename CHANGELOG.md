@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 🐛 Fixed
+- **Rounding Precision Handling**:
+  - ChargeRequest now automatically rounds amounts to 2 decimal places
+  - Prevents validation exceptions on high-precision inputs (e.g., 100.999)
+  - Ensures consistent monetary formatting across all providers
+
+- **Webhook Error Status Codes**:
+  - WebhookController now returns HTTP 500 on internal errors
+  - Previously returned HTTP 200 even on failures
+  - Ensures payment providers trigger automatic retries
+  - Improves webhook reliability and event processing
+
 ### Added
 - Initial release preparation
 - Comprehensive test coverage
@@ -19,106 +31,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 🚀 Added
 - **PaymentTransaction Model**: Full Eloquent model for transaction management
-    - Mass assignment protection with explicit `$fillable` array
-    - Convenient scopes: `successful()`, `failed()`, `pending()`
-    - Helper methods: `isSuccessful()`, `isFailed()`, `isPending()`
-    - Automatic JSON casting for metadata and customer fields
-    - Configurable table name via config
+  - Mass assignment protection with explicit `$fillable` array
+  - Convenient scopes: `successful()`, `failed()`, `pending()`
+  - Helper methods: `isSuccessful()`, `isFailed()`, `isPending()`
+  - Automatic JSON casting for metadata and customer fields
+  - Configurable table name via config
 
 - **Automatic Transaction Logging**:
-    - All charges automatically logged to database on initialization
-    - Webhook events automatically update transaction status
-    - Verification events update transaction records
-    - Graceful fallback if database logging fails
+  - All charges automatically logged to database on initialization
+  - Webhook events automatically update transaction status
+  - Verification events update transaction records
+  - Graceful fallback if database logging fails
 
 - **PayPal Zero-Decimal Currency Support**:
-    - Intelligent currency precision detection
-    - Supports 16 zero-decimal currencies (JPY, KRW, etc.)
-    - Automatic formatting based on currency type
+  - Intelligent currency precision detection
+  - Supports 16 zero-decimal currencies (JPY, KRW, etc.)
+  - Automatic formatting based on currency type
 
 - **Enhanced Security Audit Documentation**:
-    - Comprehensive security review document
-    - Production deployment checklist
-    - Incident response guidelines
-    - GDPR and PCI-DSS compliance notes
+  - Comprehensive security review document
+  - Production deployment checklist
+  - Incident response guidelines
+  - GDPR and PCI-DSS compliance notes
 
 ### 🔒 Security
 - **CRITICAL: Webhook Signature Validation Fix**
-    - Fixed webhook signature bypass vulnerability
-    - Now uses raw request body for signature verification
-    - Prevents forged webhook attacks
-    - **Impact**: HIGH - All users should update immediately
+  - Fixed webhook signature bypass vulnerability
+  - Now uses raw request body for signature verification
+  - Prevents forged webhook attacks
+  - **Impact**: HIGH - All users should update immediately
 
 - **Input Validation Enhancements**:
-    - Added maximum amount validation (999,999,999.99)
-    - Strict decimal precision validation (max 2 places)
-    - Protected against floating-point overflow
-    - Enhanced email validation
+  - Added maximum amount validation (999,999,999.99)
+  - Strict decimal precision validation (max 2 places)
+  - Protected against floating-point overflow
+  - Enhanced email validation
 
 - **Mass Assignment Protection**:
-    - PaymentTransaction model properly guarded
-    - Only necessary fields marked as fillable
-    - Prevents unauthorized field modification
+  - PaymentTransaction model properly guarded
+  - Only necessary fields marked as fillable
+  - Prevents unauthorized field modification
 
 ### 🐛 Fixed
 - **Floating-Point Precision Issues**:
-    - Improved `getAmountInMinorUnits()` with proper rounding
-    - Uses `PHP_ROUND_HALF_UP` for consistent banker's rounding
-    - Added validation for unreasonable decimal precision
-    - Documented monetary value handling best practices
+  - Improved `getAmountInMinorUnits()` with proper rounding
+  - Uses `PHP_ROUND_HALF_UP` for consistent banker's rounding
+  - Added validation for unreasonable decimal precision
+  - Documented monetary value handling best practices
 
 - **Stripe Driver** (Already Correct):
-    - Confirmed Checkout Sessions implementation
-    - Proper URL generation for `redirect()` method
-    - No changes needed - working as intended
+  - Confirmed Checkout Sessions implementation
+  - Proper URL generation for `redirect()` method
+  - No changes needed - working as intended
 
 - **Database Migration Usage**:
-    - Migration now actively used by transaction logging
-    - Webhook controller updates records automatically
-    - Verification updates records on success
+  - Migration now actively used by transaction logging
+  - Webhook controller updates records automatically
+  - Verification updates records on success
 
 ### 🗑️ Removed
 - **Unused Dependencies**:
-    - Removed `moneyphp/money` from composer.json
-    - Removed unused `CurrencyConverterInterface` contract
-    - Cleaned up unused exception classes
-    - Reduced package size and complexity
+  - Removed `moneyphp/money` from composer.json
+  - Removed unused `CurrencyConverterInterface` contract
+  - Cleaned up unused exception classes
+  - Reduced package size and complexity
 
 ### 📝 Changed
 - **WebhookController**:
-    - Now uses raw request body for signature validation
-    - Extracts reference intelligently per provider
-    - Updates transaction status automatically
-    - Normalizes status across all providers
-    - Enhanced error logging with context
+  - Now uses raw request body for signature validation
+  - Extracts reference intelligently per provider
+  - Updates transaction status automatically
+  - Normalizes status across all providers
+  - Enhanced error logging with context
 
 - **PaymentManager**:
-    - Added `logTransaction()` method for database logging
-    - Added `updateTransactionFromVerification()` method
-    - Improved error handling with context
-    - Better exception aggregation on failure
+  - Added `logTransaction()` method for database logging
+  - Added `updateTransactionFromVerification()` method
+  - Improved error handling with context
+  - Better exception aggregation on failure
 
 - **ChargeRequest**:
-    - Enhanced validation with security in mind
-    - Better error messages for invalid inputs
-    - Documented floating-point handling
-    - Added overflow protection
+  - Enhanced validation with security in mind
+  - Better error messages for invalid inputs
+  - Documented floating-point handling
+  - Added overflow protection
 
 ### 📚 Documentation
 - **New README.md**:
-    - Professional formatting with badges
-    - Comprehensive usage examples
-    - Webhook setup guide with code samples
-    - Security best practices section
-    - API reference
-    - Contributing guidelines
+  - Professional formatting with badges
+  - Comprehensive usage examples
+  - Webhook setup guide with code samples
+  - Security best practices section
+  - API reference
+  - Contributing guidelines
 
 - **New SECURITY_AUDIT.md**:
-    - Complete security review findings
-    - Production deployment checklist
-    - Monitoring and logging recommendations
-    - Compliance notes (PCI-DSS, GDPR)
-    - Incident response procedures
+  - Complete security review findings
+  - Production deployment checklist
+  - Monitoring and logging recommendations
+  - Compliance notes (PCI-DSS, GDPR)
+  - Incident response procedures
 
 ### ⚠️ Breaking Changes
 None - This release is fully backward compatible.
@@ -139,60 +151,60 @@ php artisan migrate  # Run new migration if not already run
 
 #### Added
 - **Multi-Provider Support**:
-    - Paystack integration
-    - Flutterwave integration
-    - Monnify integration
-    - Stripe integration
-    - PayPal integration
+  - Paystack integration
+  - Flutterwave integration
+  - Monnify integration
+  - Stripe integration
+  - PayPal integration
 
 - **Core Features**:
-    - Fluent payment API with chainable methods
-    - Automatic provider fallback
-    - Health check system with caching
-    - Webhook signature verification
-    - Currency support validation
-    - Transaction reference generation
+  - Fluent payment API with chainable methods
+  - Automatic provider fallback
+  - Health check system with caching
+  - Webhook signature verification
+  - Currency support validation
+  - Transaction reference generation
 
 - **Developer Experience**:
-    - Facade support (`Payment::charge()`)
-    - Helper function (`payment()->charge()`)
-    - Clean exception hierarchy
-    - Comprehensive test suite (Pest PHP)
-    - PSR-4 autoloading
-    - Laravel auto-discovery
+  - Facade support (`Payment::charge()`)
+  - Helper function (`payment()->charge()`)
+  - Clean exception hierarchy
+  - Comprehensive test suite (Pest PHP)
+  - PSR-4 autoloading
+  - Laravel auto-discovery
 
 - **Configuration**:
-    - Environment-based configuration
-    - Per-provider settings
-    - Webhook path customization
-    - Health check configuration
-    - Logging options
+  - Environment-based configuration
+  - Per-provider settings
+  - Webhook path customization
+  - Health check configuration
+  - Logging options
 
 - **Data Transfer Objects**:
-    - `ChargeRequest` - Standardized payment request
-    - `ChargeResponse` - Standardized charge response
-    - `VerificationResponse` - Standardized verification
+  - `ChargeRequest` - Standardized payment request
+  - `ChargeResponse` - Standardized charge response
+  - `VerificationResponse` - Standardized verification
 
 - **Driver Architecture**:
-    - `AbstractDriver` base class
-    - `DriverInterface` contract
-    - Individual driver implementations
-    - HTTP client abstraction
-    - Automatic header management
+  - `AbstractDriver` base class
+  - `DriverInterface` contract
+  - Individual driver implementations
+  - HTTP client abstraction
+  - Automatic header management
 
 - **Testing**:
-    - 70+ comprehensive tests
-    - Unit tests for all drivers
-    - Integration tests for workflows
-    - Feature tests for facades
-    - Mock support for external APIs
+  - 70+ comprehensive tests
+  - Unit tests for all drivers
+  - Integration tests for workflows
+  - Feature tests for facades
+  - Mock support for external APIs
 
 - **Documentation**:
-    - Installation guide
-    - Configuration examples
-    - Usage documentation
-    - Provider-specific guides
-    - Webhook setup instructions
+  - Installation guide
+  - Configuration examples
+  - Usage documentation
+  - Provider-specific guides
+  - Webhook setup instructions
 
 #### Provider-Specific Features
 

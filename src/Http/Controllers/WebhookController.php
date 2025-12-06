@@ -12,11 +12,13 @@ use KenDeNigerian\PayZephyr\PaymentManager;
 use Throwable;
 
 /**
- * Handles incoming webhooks from various payment providers.
+ * WebhookController - Handles Payment Notifications from Providers
  *
- * This controller is responsible for verifying signatures, parsing payloads,
- * updating local transaction records, and dispatching events for the
- * host application to consume.
+ * When a payment is completed (or fails), the payment provider sends a webhook
+ * (a POST request) to this controller. This controller:
+ * 1. Verifies the webhook is really from the provider (security check)
+ * 2. Updates the payment record in the database
+ * 3. Fires Laravel events so your app can react (e.g., send email, update order status)
  */
 class WebhookController extends Controller
 {
@@ -25,10 +27,14 @@ class WebhookController extends Controller
     ) {}
 
     /**
-     * Handle the incoming webhook request.
+     * Process an incoming webhook from a payment provider.
      *
-     * Validates the webhook signature (if enabled), updates the database,
-     * and dispatches Laravel events.
+     * This is called automatically when a provider sends a webhook.
+     * It verifies the webhook is legitimate, updates your database,
+     * and fires events so your app can handle the payment status change.
+     *
+     * @param  Request  $request  The webhook HTTP request
+     * @param  string  $provider  Which provider sent it (e.g., 'paystack', 'stripe')
      */
     public function handle(Request $request, string $provider): JsonResponse
     {
@@ -80,7 +86,10 @@ class WebhookController extends Controller
     }
 
     /**
-     * Parse the provider-specific payload to find the unique transaction reference.
+     * Find the transaction reference in the webhook data.
+     *
+     * Each provider structures their webhook differently, so this method
+     * knows where to look for the reference in each provider's format.
      */
     protected function extractReference(string $provider, array $payload): ?string
     {
@@ -97,7 +106,10 @@ class WebhookController extends Controller
     }
 
     /**
-     * Parse the provider-specific payload to find the status.
+     * Figure out the payment status from the webhook data.
+     *
+     * Each provider uses different status names (e.g., 'successful', 'succeeded', 'PAID'),
+     * so this converts them all to our standard format: 'success', 'failed', or 'pending'.
      */
     protected function determineStatus(string $provider, array $payload): string
     {
@@ -116,9 +128,12 @@ class WebhookController extends Controller
     }
 
     /**
-     * Map provider specific statuses to a unified set of internal statuses.
+     * Convert provider-specific status names to our standard format.
      *
-     * Returns: success, failed, pending, or the original status string.
+     * Examples:
+     * - 'successful', 'succeeded', 'completed', 'PAID' → 'success'
+     * - 'failed', 'cancelled', 'declined' → 'failed'
+     * - 'pending', 'processing' → 'pending'
      */
     protected function normalizeStatus(string $status): string
     {
@@ -140,9 +155,9 @@ class WebhookController extends Controller
     }
 
     /**
-     * Update the local database record based on the webhook data.
+     * Update the payment record in the database when we receive a webhook.
      *
-     * This captures the status change, channel information, and payment timestamp.
+     * Updates the payment status, which payment method was used, and when it was paid.
      */
     protected function updateTransactionFromWebhook(string $provider, string $reference, array $payload): void
     {

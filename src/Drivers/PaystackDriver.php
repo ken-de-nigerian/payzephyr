@@ -14,17 +14,18 @@ use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use Random\RandomException;
 
 /**
- * Driver implementation for the Paystack payment gateway.
+ * PaystackDriver - Handles Payments via Paystack
  *
- * This driver handles the Standard Initialization flow, where the user is
- * redirected to Paystack's hosted checkout page.
+ * This driver processes payments through Paystack's API.
+ * When you initialize a payment, it redirects the customer to Paystack's
+ * hosted checkout page where they can pay with card, bank transfer, USSD, etc.
  */
 class PaystackDriver extends AbstractDriver
 {
     protected string $name = 'paystack';
 
     /**
-     * Ensure the configuration contains the Secret Key.
+     * Make sure the Paystack secret key is configured.
      */
     protected function validateConfig(): void
     {
@@ -34,9 +35,8 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Get the default headers for API requests.
-     *
-     * Paystack uses Bearer Token authentication with the Secret Key.
+     * Get the HTTP headers needed for Paystack API requests.
+     * Paystack uses Bearer token authentication (your secret key).
      */
     protected function getDefaultHeaders(): array
     {
@@ -48,7 +48,7 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Paystack uses 'Idempotency-Key' header (standard)
+     * Paystack uses the standard 'Idempotency-Key' header.
      */
     protected function getIdempotencyHeader(string $key): array
     {
@@ -56,14 +56,14 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Initialize a transaction on Paystack.
+     * Create a new payment on Paystack.
      *
-     * Note: Paystack requires amounts in minor units (e.g., Kobo for NGN).
-     * This method utilizes `getAmountInMinorUnits()` to ensure the API
-     * receives the correct integer value.
+     * Important: Paystack requires amounts in the smallest currency unit
+     * (kobo for NGN, cents for USD). This method automatically converts
+     * your amount (e.g., 100.00) to the correct format (10000).
      *
-     * @throws ChargeException
-     * @throws RandomException
+     * @throws ChargeException If the payment creation fails.
+     * @throws RandomException If reference generation fails.
      */
     public function charge(ChargeRequest $request): ChargeResponse
     {
@@ -118,11 +118,13 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Verify a payment using the Transaction Reference.
+     * Check if a Paystack payment was successful.
      *
-     * Returns the amount converted back from minor units (kobo) to main units.
+     * Looks up the transaction by reference and returns the payment details.
+     * The amount is automatically converted back from kobo/cents to main units.
      *
-     * @throws VerificationException
+     * @param  string  $reference  The transaction reference from Paystack
+     * @throws VerificationException If the payment can't be found or verified.
      */
     public function verify(string $reference): VerificationResponse
     {
@@ -169,10 +171,11 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Validate the webhook signature.
+     * Verify that a webhook is really from Paystack (security check).
      *
-     * Paystack signs webhooks using HMAC SHA512 with the Secret Key.
-     * The signature is sent in the 'x-paystack-signature' header.
+     * Paystack signs webhooks using HMAC SHA512 with your secret key.
+     * The signature comes in the 'x-paystack-signature' header.
+     * This prevents fake webhooks from malicious actors.
      */
     public function validateWebhook(array $headers, string $body): bool
     {
@@ -198,11 +201,11 @@ class PaystackDriver extends AbstractDriver
     }
 
     /**
-     * Check API connectivity.
+     * Check if Paystack's API is working.
      *
-     * Intentionally queries an invalid reference to check if the API is reachable.
-     * A 404 response is considered "Healthy" (API is up), whereas a 500 or
-     * connection error is considered "Unhealthy".
+     * Tries to verify a fake reference. If we get a 404 (reference not found),
+     * that means the API is working. If we get a 500 or connection error,
+     * the API is down.
      */
     public function healthCheck(): bool
     {

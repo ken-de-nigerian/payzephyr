@@ -14,9 +14,14 @@ use Psr\Http\Message\ResponseInterface;
 use Random\RandomException;
 
 /**
- * Abstract Class AbstractDriver
+ * AbstractDriver - Base Class for All Payment Providers
  *
- * Base class for all payment drivers
+ * This is the parent class that all payment provider drivers extend.
+ * It provides common functionality like HTTP requests, health checks,
+ * currency validation, and reference generation.
+ * 
+ * Each provider (Paystack, Stripe, etc.) extends this class and implements
+ * the provider-specific logic.
  */
 abstract class AbstractDriver implements DriverInterface
 {
@@ -27,14 +32,15 @@ abstract class AbstractDriver implements DriverInterface
     protected string $name;
 
     /**
-     * Current request being processed (for idempotency key access)
+     * The payment request currently being processed.
+     * Used to access the idempotency key when making API requests.
      */
     protected ?ChargeRequest $currentRequest = null;
 
     /**
-     * AbstractDriver constructor.
+     * Create a new payment driver instance.
      *
-     * @throws InvalidConfigurationException
+     * @throws InvalidConfigurationException If required config is missing.
      */
     public function __construct(array $config)
     {
@@ -44,14 +50,15 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Validate driver configuration
+     * Check that all required configuration is present (API keys, etc.).
+     * Each driver implements this to check for their specific requirements.
      *
-     * @throws InvalidConfigurationException
+     * @throws InvalidConfigurationException If something is missing.
      */
     abstract protected function validateConfig(): void;
 
     /**
-     * Initialize HTTP client
+     * Set up the HTTP client for making API requests to the payment provider.
      */
     protected function initializeClient(): void
     {
@@ -64,14 +71,18 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Get default HTTP headers
+     * Get the default HTTP headers needed for API requests (like Authorization).
+     * Each driver implements this with their provider's specific headers.
      */
     abstract protected function getDefaultHeaders(): array;
 
     /**
-     * Make HTTP request with automatic idempotency key injection
+     * Make an HTTP request to the payment provider's API.
      *
-     * @throws GuzzleException
+     * Automatically adds the idempotency key header if one was provided,
+     * which prevents accidentally charging the same payment twice.
+     *
+     * @throws GuzzleException If the HTTP request fails.
      */
     protected function makeRequest(string $method, string $uri, array $options = []): ResponseInterface
     {
@@ -87,9 +98,9 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Get provider-specific idempotency header
-     *
-     * Override this in specific drivers if they use different header names
+     * Get the HTTP header name and value for idempotency.
+     * Most providers use 'Idempotency-Key', but some might use different names.
+     * Override this in specific drivers if needed.
      */
     protected function getIdempotencyHeader(string $key): array
     {
@@ -97,7 +108,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Set the current request context (called by charge method)
+     * Store the current payment request so we can access it later (for idempotency keys).
      */
     protected function setCurrentRequest(ChargeRequest $request): void
     {
@@ -105,7 +116,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Clear the current request context
+     * Clear the stored request (cleanup after processing).
      */
     protected function clearCurrentRequest(): void
     {
@@ -113,7 +124,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Parse JSON response
+     * Convert the HTTP response body from JSON to a PHP array.
      */
     protected function parseResponse(ResponseInterface $response): array
     {
@@ -123,7 +134,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Get provider name
+     * Get the name of this payment provider (e.g., 'paystack', 'stripe').
      */
     public function getName(): string
     {
@@ -131,7 +142,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Get supported currencies
+     * Get the list of currencies this provider supports (e.g., ['NGN', 'USD', 'EUR']).
      */
     public function getSupportedCurrencies(): array
     {
@@ -139,9 +150,12 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Generate unique reference
-     *
-     * @throws RandomException
+     * Create a unique transaction reference (like 'PAYSTACK_1234567890_abc123def456').
+     * 
+     * Format: PREFIX_TIMESTAMP_RANDOMHEX
+     * 
+     * @param  string|null  $prefix  Custom prefix (defaults to provider name in uppercase)
+     * @throws RandomException If random number generation fails.
      */
     protected function generateReference(?string $prefix = null): string
     {
@@ -151,7 +165,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Check if currency is supported
+     * Check if this provider supports a specific currency (e.g., 'NGN', 'USD').
      */
     public function isCurrencySupported(string $currency): bool
     {
@@ -159,7 +173,10 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Get cached health check result
+     * Check if the provider is working (cached result).
+     * 
+     * The result is cached for a few minutes so we don't check too often.
+     * This prevents slowing down payments with repeated health checks.
      */
     public function getCachedHealthCheck(): bool
     {
@@ -172,7 +189,11 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Log activity
+     * Write a log message (for debugging and monitoring).
+     * 
+     * @param  string  $level  Log level: 'info', 'warning', 'error', etc.
+     * @param  string  $message  The log message
+     * @param  array  $context  Extra data to include in the log
      */
     protected function log(string $level, string $message, array $context = []): void
     {
@@ -182,7 +203,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Set HTTP client (for testing)
+     * Replace the HTTP client (mainly used for testing with mock clients).
      */
     public function setClient(Client $client): void
     {

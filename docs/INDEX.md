@@ -34,8 +34,8 @@ Welcome to the PayZephyr documentation! This guide will help you get started and
 ### By Use Case
 
 **I want to...**
-- 💳 **Accept payments** → [Basic Usage](#basic-usage)
-- 🔔 **Handle webhooks** → [Webhook Guide](webhooks.md)
+- 💳 **Accept payments** → [Basic Usage](#basic-usage) - Start here for your first payment!
+- 🔔 **Handle webhooks** → [Webhook Guide](webhooks.md) - Learn how to receive payment notifications
 - 🏦 **Add a new provider** → [Architecture](architecture.md) + [Contributing](../CONTRIBUTING.md)
 - 🔐 **Secure my integration** → [Security Audit](../SECURITY_AUDIT.md)
 - 🐛 **Debug issues** → [Error Handling](#error-handling)

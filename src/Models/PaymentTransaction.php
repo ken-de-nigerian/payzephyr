@@ -8,26 +8,22 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * Payment Transaction Model
+ * PaymentTransaction - Database Model for Payment Records
  *
- * @property int $id
- * @property string $reference
- * @property string $provider
- * @property string $status
- * @property float $amount
- * @property string $currency
- * @property string $email
- * @property string|null $channel
- * @property array|null $metadata
- * @property array|null $customer
- * @property Carbon|null $paid_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- * @method static create(array $array)
- * @method static where(string $string, string $reference)
- * @method static successful()
- * @method static failed()
- * @method static pending()
+ * This model represents a payment transaction in your database.
+ * Every payment attempt is automatically logged here (if logging is enabled).
+ *
+ * Properties:
+ * - reference: Unique transaction ID
+ * - provider: Which payment provider was used (paystack, stripe, etc.)
+ * - status: Payment status (success, failed, pending)
+ * - amount: Payment amount
+ * - currency: Currency code (NGN, USD, etc.)
+ * - email: Customer email
+ * - channel: Payment method used (card, bank_transfer, etc.)
+ * - metadata: Extra data you attached to the payment
+ * - customer: Customer information
+ * - paid_at: When the payment was completed
  */
 class PaymentTransaction extends Model
 {
@@ -81,7 +77,8 @@ class PaymentTransaction extends Model
     }
 
     /**
-     * Scope a query to only include successful payments.
+     * Get only payments that were successful.
+     * Usage: PaymentTransaction::successful()->get()
      */
     public function scopeSuccessful($query)
     {
@@ -89,7 +86,8 @@ class PaymentTransaction extends Model
     }
 
     /**
-     * Scope a query to only include failed payments.
+     * Get only payments that failed.
+     * Usage: PaymentTransaction::failed()->get()
      */
     public function scopeFailed($query)
     {
@@ -97,7 +95,8 @@ class PaymentTransaction extends Model
     }
 
     /**
-     * Scope a query to only include pending payments.
+     * Get only payments that are still pending (waiting for customer).
+     * Usage: PaymentTransaction::pending()->get()
      */
     public function scopePending($query)
     {

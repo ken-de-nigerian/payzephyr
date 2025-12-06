@@ -191,6 +191,154 @@ public function callback(Request $request)
 
 ---
 
+## 🔄 How It Works - Complete Payment Flow
+
+Understanding how payments work in this package will help you use it effectively. Here's the step-by-step process:
+
+### Step 1: Initialize Payment (Your Code)
+
+```php
+// In your controller
+return Payment::amount(10000)
+    ->email('customer@example.com')
+    ->callback(route('payment.callback'))
+    ->redirect();
+```
+
+**What happens:**
+1. You call `Payment::amount()` to start building a payment request
+2. You chain methods to add details (email, currency, reference, etc.)
+3. You call `redirect()` which:
+   - Builds a `ChargeRequest` object with all your data
+   - Sends it to `PaymentManager`
+   - `PaymentManager` picks a payment provider (Paystack, Stripe, etc.)
+   - The provider creates a payment and returns a checkout URL
+   - Customer gets redirected to that URL
+
+### Step 2: Customer Pays (On Provider's Site)
+
+- Customer enters card details on Paystack/Stripe's secure checkout page
+- Provider processes the payment
+- Customer sees success/failure message
+
+### Step 3: Customer Returns (Callback Route)
+
+```php
+// routes/web.php
+Route::get('/payment/callback', [PaymentController::class, 'callback']);
+
+// In your controller
+public function callback(Request $request)
+{
+    $reference = $request->input('reference');
+    $verification = Payment::verify($reference);
+    
+    if ($verification->isSuccessful()) {
+        // Payment succeeded - update your database
+        Order::where('payment_reference', $reference)
+            ->update(['status' => 'paid']);
+    }
+}
+```
+
+**What happens:**
+1. Provider redirects customer back to your `callback` URL
+2. You get the payment reference from the URL
+3. You call `Payment::verify()` to check payment status
+4. `PaymentManager` searches all providers to find the payment
+5. You update your database based on the result
+
+### Step 4: Webhook Arrives (Automatic Notification)
+
+**Important:** Webhooks can arrive BEFORE or AFTER the customer returns!
+
+```php
+// app/Listeners/HandlePaystackWebhook.php
+public function handle(array $payload): void
+{
+    if ($payload['event'] === 'charge.success') {
+        $reference = $payload['data']['reference'];
+        
+        // Update order status
+        Order::where('payment_reference', $reference)
+            ->update(['status' => 'paid']);
+    }
+}
+```
+
+**What happens:**
+1. Provider sends a POST request to `/payments/webhook/paystack`
+2. `WebhookController` receives it
+3. Controller verifies the webhook signature (security check)
+4. Controller updates the payment record in database
+5. Controller fires Laravel events
+6. Your event listeners handle the webhook
+7. You update orders, send emails, etc.
+
+### Complete Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. YOUR CODE: Initialize Payment                            │
+│    Payment::amount(1000)->email('user@example.com')->redirect() │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 2. PAYMENT MANAGER: Choose Provider & Create Payment        │
+│    - Checks which providers are enabled                     │
+│    - Tries default provider (e.g., Paystack)                │
+│    - If fails, tries fallback (e.g., Stripe)               │
+│    - Creates payment on provider's API                      │
+│    - Gets checkout URL                                      │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. CUSTOMER: Redirected to Provider's Checkout             │
+│    - Customer enters card details                           │
+│    - Provider processes payment                             │
+│    - Payment succeeds or fails                              │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+        ┌──────────────┴──────────────┐
+        │                              │
+        ▼                              ▼
+┌──────────────────┐        ┌──────────────────┐
+│ 4A. CALLBACK     │        │ 4B. WEBHOOK      │
+│ Customer returns │        │ Provider sends   │
+│ to your site     │        │ notification     │
+└────────┬─────────┘        └────────┬─────────┘
+         │                           │
+         │                           │
+         ▼                           ▼
+┌──────────────────┐        ┌──────────────────┐
+│ Verify payment   │        │ Update database  │
+│ Update order     │        │ Fire events      │
+│ Show success     │        │ Handle webhook   │
+└──────────────────┘        └──────────────────┘
+```
+
+### Key Points to Remember
+
+1. **Two Ways to Know Payment Status:**
+   - **Callback:** Customer returns to your site (may not always happen)
+   - **Webhook:** Provider sends notification (more reliable)
+
+2. **Always Handle Both:**
+   - Check if order is already paid (webhook might have updated it first)
+   - Use idempotency checks to prevent processing twice
+
+3. **Automatic Fallback:**
+   - If Paystack fails, automatically tries Stripe
+   - No code changes needed - just configure multiple providers
+
+4. **Database Logging:**
+   - All payments are automatically logged to `payment_transactions` table
+   - You can query this table to see payment history
+
+---
+
 ## 🔔 Webhooks
 
 ### Webhook URLs

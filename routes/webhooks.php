@@ -4,12 +4,16 @@ use Illuminate\Support\Facades\Route;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 
 /**
- * Register the main webhook entry point.
+ * Webhook Routes - Payment Provider Notifications
  *
- * This route listens for POST requests from payment gateways (identified by the
- * {provider} parameter).
- * Both the URL path and the middleware stack are retrieved
- * from the configuration file to allow for easy customization in the host app.
+ * These routes receive webhooks (POST requests) from payment providers
+ * when a payment status changes (success, failure, etc.).
+ *
+ * The {provider} parameter tells us which provider sent the webhook
+ * (e.g., 'paystack', 'stripe', 'paypal').
+ *
+ * Routes are automatically registered when the package is loaded.
+ * You can customize the path and middleware in config/payments.php.
  */
 Route::post(
     config('payments.webhook.path', '/payments/webhook').'/{provider}',

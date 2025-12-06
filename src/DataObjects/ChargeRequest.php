@@ -7,12 +7,14 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use InvalidArgumentException;
 
 /**
- * Class ChargeRequest
+ * ChargeRequest - Payment Request Data Object
  *
- * Data transfer object for payment charge requests
+ * This class holds all the information needed to process a payment:
+ * amount, currency, customer email, reference, etc.
  *
- * Note: Amount is stored as float for API compatibility but should be treated as a monetary value.
- * Always use getAmountInMinorUnits() for precise calculations and API calls.
+ * Important: Amount is stored as a float (e.g., 100.00 for $100), but when
+ * sending to payment providers, always use getAmountInMinorUnits() which
+ * converts it to the smallest currency unit (e.g., 10000 cents for $100).
  */
 readonly class ChargeRequest
 {
@@ -34,9 +36,10 @@ readonly class ChargeRequest
     }
 
     /**
-     * Validate the request data
+     * Check that all required payment data is valid.
+     * Makes sure amount is positive, email is valid, currency is 3 letters, etc.
      *
-     * @throws InvalidArgumentException
+     * @throws InvalidArgumentException If any data is invalid.
      */
     private function validate(): void
     {
@@ -64,12 +67,15 @@ readonly class ChargeRequest
     }
 
     /**
-     * Convert amount to minor units (cents, kobo, etc.)
+     * Convert the amount to the smallest currency unit (cents, kobo, etc.).
      *
-     * This method ensures precision by rounding to the nearest integer
-     * to avoid floating-point arithmetic issues.
+     * Payment providers need amounts in the smallest unit:
+     * - $100.00 becomes 10000 cents
+     * - ₦100.00 becomes 10000 kobo
      *
-     * @return int Amount in minor units (e.g., cents for USD, kobo for NGN)
+     * This method rounds to avoid floating-point precision issues.
+     *
+     * @return int Amount in minor units (always an integer)
      */
     public function getAmountInMinorUnits(): int
     {

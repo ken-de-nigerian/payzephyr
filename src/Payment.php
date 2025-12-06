@@ -11,31 +11,33 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 
 /**
- * The Fluent Builder for Payment Operations.
+ * The Payment Builder - Your main interface for processing payments.
  *
- * This class provides a chainable interface to construct a payment request step-by-step.
- * Once the data is gathered, it delegates the actual processing logic to the
- * PaymentManager.
+ * This class lets you build payment requests step-by-step using a simple chainable syntax.
+ * For example: Payment::amount(1000)->email('user@example.com')->redirect()
+ *
+ * Once you call redirect() or charge(), it sends everything to PaymentManager to handle.
  */
 class Payment
 {
     /**
-     * The core manager instance.
+     * The payment manager that handles all the actual payment processing.
      */
     protected PaymentManager $manager;
 
     /**
-     * Accumulated transaction data to be sent to the provider.
+     * All the payment details you've set (amount, email, currency, etc.)
      */
     protected array $data = [];
 
     /**
-     * Specific providers chosen for this transaction (overrides defaults).
+     * Which payment provider(s) to use for this payment (e.g., 'paystack', 'stripe').
+     * If empty, uses the default from config.
      */
     protected array $providers = [];
 
     /**
-     * Create a new fluent payment builder instance.
+     * Create a new payment builder.
      */
     public function __construct(PaymentManager $manager)
     {
@@ -43,7 +45,7 @@ class Payment
     }
 
     /**
-     * Set the monetary value of the transaction.
+     * Set how much money to charge (in the main currency unit, e.g., 100.00 for $100).
      */
     public function amount(float $amount): static
     {
@@ -53,9 +55,8 @@ class Payment
     }
 
     /**
-     * Set the currency code (ISO 4217).
-     *
-     * Automatically converts the input to uppercase (e.g., 'ngn' -> 'NGN').
+     * Set the currency (e.g., 'NGN', 'USD', 'EUR').
+     * Automatically converts to uppercase, so 'ngn' becomes 'NGN'.
      */
     public function currency(string $currency): static
     {
@@ -65,7 +66,7 @@ class Payment
     }
 
     /**
-     * Set the primary customer email address.
+     * Set the customer's email address (required for most providers).
      */
     public function email(string $email): static
     {
@@ -75,9 +76,8 @@ class Payment
     }
 
     /**
-     * Set a custom unique transaction reference.
-     *
-     * If not set, the specific Driver will usually generate one automatically.
+     * Set your own unique transaction reference (like 'ORDER_12345').
+     * If you don't set this, the system will generate one automatically.
      */
     public function reference(string $reference): static
     {
@@ -87,7 +87,8 @@ class Payment
     }
 
     /**
-     * Set the URL where the user should be redirected after payment.
+     * Set the URL where the customer should be sent after they finish paying.
+     * This is where you'll verify the payment status.
      */
     public function callback(string $url): static
     {
@@ -97,9 +98,8 @@ class Payment
     }
 
     /**
-     * Attach arbitrary metadata to the transaction.
-     *
-     * This data is usually passed to the provider and returned in webhooks.
+     * Add extra information to the payment (like order ID, user ID, etc.).
+     * This data gets sent to the payment provider and comes back in webhooks.
      */
     public function metadata(array $metadata): static
     {
@@ -109,7 +109,8 @@ class Payment
     }
 
     /**
-     * Set the idempotency key for the request
+     * Set an idempotency key to prevent charging the same payment twice.
+     * Use a unique value (like a UUID) for each payment attempt.
      */
     public function idempotency(string $key): static
     {
@@ -119,7 +120,7 @@ class Payment
     }
 
     /**
-     * Set a human-readable description for the transaction.
+     * Set a description for the payment (what the customer is paying for).
      */
     public function description(string $description): static
     {
@@ -129,7 +130,8 @@ class Payment
     }
 
     /**
-     * Set detailed customer information (name, phone, etc.).
+     * Set customer details like name, phone number, address, etc.
+     * Pass an array: ['name' => 'John Doe', 'phone' => '+1234567890']
      */
     public function customer(array $customer): static
     {
@@ -139,10 +141,9 @@ class Payment
     }
 
     /**
-     * Restrict the allowed payment channels.
-     *
-     * Useful for providers like Paystack where you might want to limit
-     * payment to specific channels (e.g., ['card', 'bank_transfer']).
+     * Limit which payment methods the customer can use.
+     * For example: ['card', 'bank_transfer'] means only cards and bank transfers.
+     * Useful for providers like Paystack.
      */
     public function channels(array $channels): static
     {
@@ -152,12 +153,15 @@ class Payment
     }
 
     /**
-     * Explicitly specify which provider(s) to attempt for this transaction.
+     * Choose which payment provider(s) to use for this payment.
+     * 
+     * Examples:
+     * - with('paystack') - Use only Paystack
+     * - with(['paystack', 'stripe']) - Try Paystack first, then Stripe if it fails
+     * 
+     * If you don't call this, it uses the default provider from your config.
      *
-     * If an array is passed, the system will attempt them in order (Fallback logic).
-     * If not set, the default provider from config is used.
-     *
-     * @param  string|array  $providers  Single provider name or array of names.
+     * @param  string|array  $providers  Provider name(s) like 'paystack', 'stripe', etc.
      */
     public function with(string|array $providers): static
     {
@@ -167,9 +171,8 @@ class Payment
     }
 
     /**
-     * Alias for with().
-     *
-     * Syntactic sugar for readability (e.g., Payment::using('stripe')...).
+     * Same as with() - just an alternative name for better readability.
+     * You can use either: with('paystack') or using('paystack')
      */
     public function using(string|array $providers): static
     {
@@ -177,13 +180,15 @@ class Payment
     }
 
     /**
-     * Execute the charge operation.
+     * Process the payment and get the response (without redirecting the user).
      *
-     * Compiles the fluent data into a ChargeRequest object and delegates
-     * to the PaymentManager to execute the transaction, handling any
-     * fallback logic defined in `with()`.
+     * This creates a payment request and sends it to the payment provider.
+     * Returns a ChargeResponse object with details like the payment URL.
+     * 
+     * Use this when you want to handle the redirect yourself (e.g., for API responses).
+     * For automatic redirects, use redirect() instead.
      *
-     * @throws ProviderException If all attempted providers fail.
+     * @throws ProviderException If all payment providers fail.
      */
     public function charge(): ChargeResponse
     {
@@ -196,12 +201,14 @@ class Payment
     }
 
     /**
-     * Execute the charge and immediately return a Laravel Redirect response.
+     * Process the payment and automatically redirect the customer to the payment page.
      *
-     * This is a convenience method for controllers that need to send the
-     * user directly to the payment gateway.
+     * This is the easiest way to handle payments - it processes the payment
+     * and sends the customer to the provider's checkout page.
+     * 
+     * Use this in your controller: return Payment::amount(1000)->email('user@example.com')->redirect();
      *
-     * @throws ProviderException
+     * @throws ProviderException If all payment providers fail.
      */
     public function redirect(): RedirectResponse
     {
@@ -211,12 +218,16 @@ class Payment
     }
 
     /**
-     * Verify the status of an existing transaction.
+     * Check if a payment was successful by looking up the transaction reference.
      *
-     * @param  string  $reference  The unique transaction reference.
-     * @param  string|null  $provider  Optional provider name. If null, the manager attempts to resolve it.
+     * This searches for the payment across all enabled providers (or the one you specify).
+     * Use this in your callback route after the customer returns from payment.
      *
-     * @throws ProviderException
+     * @param  string  $reference  The transaction reference (from the payment response or callback).
+     * @param  string|null  $provider  Optional: specify which provider to check (e.g., 'paystack').
+     *                                  If null, searches all providers automatically.
+     *
+     * @throws ProviderException If the payment can't be found or verified.
      */
     public function verify(string $reference, ?string $provider = null): VerificationResponse
     {

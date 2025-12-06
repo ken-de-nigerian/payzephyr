@@ -1,8 +1,14 @@
-# Architecture
+# Architecture Guide
 
 ## Overview
 
-The Payments Router package follows clean architecture principles with clear separation of concerns:
+This guide explains how PayZephyr is built internally. You don't need to understand this to use the package, but it's helpful if you want to:
+- Customize the package
+- Add new payment providers
+- Debug issues
+- Understand how everything works together
+
+The package follows clean architecture principles with clear separation of concerns:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -42,106 +48,224 @@ The Payments Router package follows clean architecture principles with clear sep
 
 ### 1. Contracts (Interfaces)
 
-- **DriverInterface**: Defines the contract all payment drivers must implement
-- **CurrencyConverterInterface**: Defines currency conversion contract
+Think of interfaces as "contracts" that define what a class must do.
+
+- **DriverInterface**: Every payment provider driver (PaystackDriver, StripeDriver, etc.) must implement this interface. It defines methods like `charge()`, `verify()`, and `validateWebhook()`.
 
 ### 2. Data Transfer Objects (DTOs)
 
-- **ChargeRequest**: Standardized payment request
-- **ChargeResponse**: Standardized charge response  
-- **VerificationResponse**: Standardized verification response
+DTOs are simple classes that hold data. They ensure all payment providers use the same data format.
 
-These DTOs ensure consistent data structures across all providers.
+- **ChargeRequest**: Holds payment request data (amount, email, currency, etc.)
+- **ChargeResponse**: Holds the response after creating a payment (reference, checkout URL, etc.)
+- **VerificationResponse**: Holds the result of checking a payment status
+
+**Why DTOs?** Different providers have different API formats, but DTOs give us a consistent format to work with internally.
 
 ### 3. Drivers
 
-Each driver extends `AbstractDriver` and implements `DriverInterface`:
+Drivers are classes that talk to specific payment providers. Each provider has its own driver.
 
-**AbstractDriver** provides:
-- HTTP client initialization
+**AbstractDriver** (Base Class):
+All drivers extend this class. It provides common functionality:
+- HTTP client setup (for making API requests)
 - Request/response handling
-- Health check caching
+- Health checks (checking if provider is working)
 - Logging
-- Currency support checking
+- Currency validation
 - Reference generation
 
-**Individual Drivers**:
-- Paystack: Nigerian payments via REST API
-- Flutterwave: African payments via REST API
-- Monnify: Nigerian payments with OAuth2
-- Stripe: Global payments via official SDK
-- PayPal: Global payments via REST API
+**Individual Drivers** (Each Provider Has One):
+- **PaystackDriver**: Handles Paystack payments (Nigerian-focused)
+- **FlutterwaveDriver**: Handles Flutterwave payments (African-focused)
+- **MonnifyDriver**: Handles Monnify payments (Nigerian, uses OAuth2)
+- **StripeDriver**: Handles Stripe payments (Global, uses official SDK)
+- **PayPalDriver**: Handles PayPal payments (Global, uses REST API)
+
+**How They Work:**
+Each driver knows how to:
+1. Format requests for that provider's API
+2. Parse responses from that provider
+3. Validate webhooks from that provider
+4. Check if the provider is healthy/working
 
 ### 4. PaymentManager
 
-The manager:
-- Instantiates and caches driver instances
-- Resolves driver classes from configuration
-- Manages fallback chains
-- Coordinates health checks before charges
-- Handles provider failures gracefully
+The PaymentManager is the "brain" that coordinates everything:
+
+**What it does:**
+- Creates and caches driver instances (so we don't recreate them every time)
+- Figures out which driver class to use based on config (e.g., 'paystack' → PaystackDriver)
+- Manages fallback logic (if Paystack fails, try Stripe)
+- Runs health checks before processing payments
+- Handles errors gracefully (catches exceptions, tries next provider)
+
+**Think of it as:** A traffic controller that routes payment requests to the right provider and handles failures.
 
 ### 5. Payment (Fluent API)
 
-Provides a clean, expressive interface:
+This is the main class you interact with. It provides a clean, chainable interface:
+
 ```php
-// Builder methods can be chained in any order
-// with() or using() can be called anywhere in the chain
-// redirect() or charge() must be called last to execute
 Payment::amount(1000)
     ->currency('NGN')
     ->email('user@example.com')
-    ->with('paystack') // or ->using('paystack')
-    ->redirect(); // Must be called last
+    ->with('paystack')
+    ->redirect();
 ```
+
+**How it works:**
+1. You call methods like `amount()`, `email()`, etc. to build up payment details
+2. Each method returns the Payment instance, so you can chain them
+3. When you call `redirect()` or `charge()`, it:
+   - Builds a `ChargeRequest` object from all the chained data
+   - Sends it to `PaymentManager` to process
+   - Returns the result (redirect URL or response object)
+
+**Builder Methods** (can be called in any order):
+- `amount()`, `currency()`, `email()`, `reference()`, `metadata()`, etc.
+
+**Action Methods** (must be called last):
+- `redirect()` - Process payment and redirect customer
+- `charge()` - Process payment and return response object
 
 ### 6. Service Provider
 
-Registers:
-- PaymentManager as singleton
-- Payment class binding
-- Config file
-- Migrations
-- Webhook routes
+The `PaymentServiceProvider` is what connects this package to Laravel:
 
-## Data Flow
+**What it registers:**
+- PaymentManager as a singleton (only one instance exists)
+- Payment class binding (so you can use the Payment facade)
+- Config file (publishes `config/payments.php`)
+- Migrations (creates `payment_transactions` table)
+- Webhook routes (registers `/payments/webhook/{provider}` routes)
 
-### Charge Flow
+**When Laravel boots:** This service provider runs and sets everything up automatically.
 
-1. User calls `Payment::amount()->email()->redirect()` (builder methods can be in any order)
-2. Payment builds ChargeRequest DTO from all chained builder methods
-3. PaymentManager receives request via `chargeWithFallback()`
-4. Manager gets fallback provider chain (from `with()`/`using()` or config defaults)
-5. For each provider in chain:
-   - Check if enabled
-   - Run health check (if enabled)
-   - Verify currency support
-   - Attempt charge
-   - Return on success, continue on failure
-6. Driver makes API call
-7. Driver returns ChargeResponse DTO
-8. Transaction logged to database (if enabled)
-9. User redirected to payment page (if `redirect()` was called) or response returned (if `charge()` was called)
+## Data Flow - How Payments Are Processed
 
-### Verification Flow
+### Charge Flow (Creating a Payment)
 
-1. User calls `Payment::verify($reference)` or `Payment::verify($reference, $provider)`
-   - **Note:** `verify()` is a standalone method, NOT chainable
-2. Manager tries all enabled providers (or specified one)
-3. First successful verification returns
-4. Transaction status updated in database (if logging enabled)
-5. VerificationResponse DTO returned
-6. Application handles result
+Here's what happens step-by-step when you create a payment:
 
-### Webhook Flow
+1. **You call the Payment API:**
+   ```php
+   Payment::amount(1000)->email('user@example.com')->redirect()
+   ```
 
-1. Provider POSTs to `/payments/webhook/{provider}`
-2. WebhookController receives request
-3. Manager loads appropriate driver
-4. Driver validates signature
-5. Event dispatched: `payments.webhook.{provider}`
-6. Application handles event
-7. 200 response sent to provider
+2. **Payment class builds a ChargeRequest:**
+   - Takes all the data from your chained methods
+   - Creates a `ChargeRequest` object with amount, email, currency, etc.
+
+3. **PaymentManager receives the request:**
+   - Gets the list of providers to try (from `with()` or config defaults)
+   - Example: `['paystack', 'stripe']` means try Paystack first, then Stripe
+
+4. **For each provider in the list:**
+   - ✅ Check if provider is enabled in config
+   - ✅ Run health check (is the provider's API working?)
+   - ✅ Verify currency support (does Paystack support NGN?)
+   - ✅ Try to create the payment
+   - ✅ If successful: return the result
+   - ✅ If failed: try the next provider
+
+5. **Driver makes the API call:**
+   - PaystackDriver formats the request for Paystack's API
+   - Sends HTTP POST request to Paystack
+   - Gets response back
+
+6. **Driver returns ChargeResponse:**
+   - Converts Paystack's response to our standard `ChargeResponse` format
+   - Contains: reference, checkout URL, status, etc.
+
+7. **Transaction is logged:**
+   - Saves payment details to `payment_transactions` table
+   - This happens automatically (if logging is enabled)
+
+8. **User is redirected:**
+   - If you called `redirect()`: customer goes to checkout page
+   - If you called `charge()`: you get the response object to handle yourself
+
+### Verification Flow (Checking Payment Status)
+
+Here's what happens when you verify a payment:
+
+1. **You call verify:**
+   ```php
+   Payment::verify($reference)  // Searches all providers
+   // OR
+   Payment::verify($reference, 'paystack')  // Check specific provider
+   ```
+
+2. **PaymentManager searches for the payment:**
+   - If you specified a provider: only checks that one
+   - If you didn't: checks ALL enabled providers
+   - This is useful because you might not know which provider processed the payment (if fallback was used)
+
+3. **For each provider:**
+   - Gets the driver (e.g., PaystackDriver)
+   - Calls `verify()` on the driver
+   - Driver makes API call to check payment status
+   - If found: returns the result
+   - If not found: tries next provider
+
+4. **Transaction is updated:**
+   - Updates the `payment_transactions` record with latest status
+   - Updates: status, payment method, timestamp, etc.
+
+5. **VerificationResponse is returned:**
+   - Contains: reference, status, amount, currency, payment date, etc.
+   - You can check `$response->isSuccessful()` to see if payment succeeded
+
+6. **Your app handles the result:**
+   - Update order status
+   - Send confirmation email
+   - Process the order
+
+### Webhook Flow (Receiving Payment Notifications)
+
+Here's what happens when a payment provider sends a webhook:
+
+1. **Provider sends webhook:**
+   - Paystack sends POST request to `/payments/webhook/paystack`
+   - Contains payment status, reference, amount, etc.
+
+2. **WebhookController receives it:**
+   - Laravel routes the request to `WebhookController@handle`
+   - Controller gets the provider name from the URL (`paystack`)
+
+3. **PaymentManager loads the driver:**
+   - Gets PaystackDriver instance
+   - Driver knows how to validate Paystack webhooks
+
+4. **Driver validates signature:**
+   - Checks the webhook signature to ensure it's really from Paystack
+   - Prevents fake webhooks from hackers
+   - Uses HMAC SHA512 with your secret key
+
+5. **Controller extracts payment data:**
+   - Finds the payment reference in the webhook data
+   - Each provider structures data differently, so controller knows where to look
+
+6. **Controller updates database:**
+   - Updates `payment_transactions` record
+   - Changes status from 'pending' to 'success' or 'failed'
+   - Saves payment method, timestamp, etc.
+
+7. **Controller fires Laravel events:**
+   - `payments.webhook.paystack` (provider-specific event)
+   - `payments.webhook` (generic event for all providers)
+   - Your event listeners can react to these events
+
+8. **Your listeners handle the webhook:**
+   - Update order status
+   - Send confirmation email
+   - Process the order
+   - Whatever you need!
+
+9. **Controller returns 200 OK:**
+   - Tells the provider "Got it, thanks!"
+   - Provider won't retry the webhook
 
 ## Design Patterns
 

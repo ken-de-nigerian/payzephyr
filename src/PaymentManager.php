@@ -20,21 +20,23 @@ use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use Throwable;
 
 /**
- * The core orchestrator for the PayZephyr package.
+ * PaymentManager - The Brain of the Payment System
  *
- * This class is responsible for resolving driver instances, managing the
- * "smart routing" (fallback) logic during charges, and logging transaction
- * lifecycles to the database.
+ * This class coordinates everything:
+ * - Creates and manages payment provider drivers (Paystack, Stripe, etc.)
+ * - Handles automatic fallback (if one provider fails, tries the next)
+ * - Logs all transactions to the database
+ * - Verifies payments across multiple providers
  */
 class PaymentManager
 {
     /**
-     * Cache for instantiated driver objects.
+     * Cache of payment provider drivers we've already created (so we don't recreate them).
      */
     protected array $drivers = [];
 
     /**
-     * The raw configuration array.
+     * The payment configuration from config/payments.php
      */
     protected array $config;
 
@@ -44,13 +46,13 @@ class PaymentManager
     }
 
     /**
-     * Resolve and return a driver instance.
+     * Get a payment provider driver (like PaystackDriver, StripeDriver, etc.).
      *
-     * If a name is not provided, the default driver from config is used.
-     * Instances are cached in memory to prevent multiple instantiation
-     * during the same request lifecycle.
+     * If you don't specify a name, it uses the default provider from your config.
+     * Drivers are cached so we only create each one once per request.
      *
-     * @throws DriverNotFoundException If the driver is disabled or the class doesn't exist.
+     * @param  string|null  $name  Provider name like 'paystack', 'stripe', etc. (null = use default)
+     * @throws DriverNotFoundException If the provider doesn't exist or is disabled.
      */
     public function driver(?string $name = null): DriverInterface
     {
@@ -78,16 +80,19 @@ class PaymentManager
     }
 
     /**
-     * Execute a charge attempt, iterating through a list of providers if necessary.
+     * Process a payment, trying multiple providers if needed (automatic fallback).
      *
-     * This method implements the Failover/Redundancy pattern:
-     * 1. Checks if the provider is "healthy" (API is reachable).
-     * 2. Checks if the provider supports the requested currency.
-     * 3. Attempts the charge.
-     * 4. If successful, logs to DB and returns.
-     * 5. If failed, catches the exception and moves to the next provider in the chain.
+     * How it works:
+     * 1. Checks if the provider is working (health check)
+     * 2. Checks if the provider supports the currency (e.g., NGN, USD)
+     * 3. Tries to process the payment
+     * 4. If successful: saves to database and returns the result
+     * 5. If failed: tries the next provider in the list
      *
-     * @throws ProviderException If all providers in the chain fail.
+     * @param  ChargeRequest  $request  The payment details (amount, email, etc.)
+     * @param  array|null  $providers  List of providers to try (e.g., ['paystack', 'stripe'])
+     *                                 If null, uses the default fallback chain from config.
+     * @throws ProviderException If ALL providers fail (none of them could process the payment).
      */
     public function chargeWithFallback(ChargeRequest $request, ?array $providers = null): ChargeResponse
     {
@@ -140,11 +145,11 @@ class PaymentManager
     }
 
     /**
-     * Persist the initial transaction details to the database.
+     * Save the payment transaction to the database for tracking.
      *
-     * Wrapped in a try-catch block to ensure that a logging failure
-     * (e.g., DB connection issue) does not cause the actual payment
-     * flow to throw an error to the user.
+     * This is wrapped in try-catch so that if the database is down,
+     * the payment still processes (we just can't log it).
+     * The payment itself is more important than the log.
      */
     protected function logTransaction(ChargeRequest $request, ChargeResponse $response, string $provider): void
     {
@@ -175,13 +180,15 @@ class PaymentManager
     }
 
     /**
-     * Verify a transaction reference.
+     * Check if a payment was successful by looking up the transaction reference.
      *
-     * If a specific provider is not given, this method attempts to find the
-     * transaction across ALL configured providers.
-     * This is useful when the frontend doesn't know which provider successfully processed the fallback charge.
+     * If you don't specify a provider, it searches ALL enabled providers automatically.
+     * This is super useful because you might not know which provider processed the payment
+     * (especially if fallback was used).
      *
-     * @throws ProviderException If the reference cannot be found on any provider.
+     * @param  string  $reference  The transaction reference to look up
+     * @param  string|null  $provider  Optional: check only this provider (e.g., 'paystack')
+     * @throws ProviderException If the payment can't be found on any provider.
      */
     public function verify(string $reference, ?string $provider = null): VerificationResponse
     {
@@ -209,9 +216,9 @@ class PaymentManager
     }
 
     /**
-     * Update the local database record based on the verification response.
+     * Update the payment record in the database after verifying it.
      *
-     * This syncs the status, channel, and payment timestamp.
+     * Updates the status (success/failed/pending), payment method used, and when it was paid.
      */
     protected function updateTransactionFromVerification(string $reference, VerificationResponse $response): void
     {
@@ -234,7 +241,7 @@ class PaymentManager
     }
 
     /**
-     * Retrieve the default driver name from configuration.
+     * Get the default payment provider name from config (e.g., 'paystack').
      */
     public function getDefaultDriver(): string
     {
@@ -242,10 +249,10 @@ class PaymentManager
     }
 
     /**
-     * Construct the priority list of providers.
+     * Get the list of providers to try in order (default + fallback).
      *
-     * Returns an array starting with the default driver, followed by
-     * any fallback drivers defined in the config.
+     * Returns something like ['paystack', 'stripe'] - first tries Paystack,
+     * then Stripe if Paystack fails.
      */
     public function getFallbackChain(): array
     {
@@ -259,10 +266,10 @@ class PaymentManager
     }
 
     /**
-     * Map a driver alias (e.g., 'paystack') to its fully qualified class name.
+     * Convert a short provider name (like 'paystack') to the full class name.
      *
-     * This allows the config file to be cleaner, using short names instead of
-     * full namespaces.
+     * This lets you use simple names in config instead of long class paths.
+     * Example: 'paystack' becomes 'KenDeNigerian\PayZephyr\Drivers\PaystackDriver'
      */
     protected function resolveDriverClass(string $driver): string
     {
@@ -278,7 +285,7 @@ class PaymentManager
     }
 
     /**
-     * Return a list of all providers that are enabled in the config.
+     * Get all payment providers that are currently enabled in your config.
      */
     public function getEnabledProviders(): array
     {

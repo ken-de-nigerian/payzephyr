@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 /**
- * Class ChargeResponse
+ * ChargeResponse - Payment Initialization Response
  *
- * Data transfer object for payment charge responses
+ * This class holds the response after you initialize a payment.
+ * It contains the payment reference, the URL to redirect the customer to,
+ * and the current status (usually 'pending' until they pay).
  */
 readonly class ChargeResponse
 {
@@ -51,7 +53,7 @@ readonly class ChargeResponse
     }
 
     /**
-     * Check if charge was successful
+     * Check if the payment was successfully created and is ready for the customer to pay.
      */
     public function isSuccessful(): bool
     {
@@ -59,7 +61,7 @@ readonly class ChargeResponse
     }
 
     /**
-     * Check if charge is pending
+     * Check if the payment is still waiting for the customer to complete it.
      */
     public function isPending(): bool
     {

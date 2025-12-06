@@ -87,7 +87,7 @@ class FlutterwaveDriver extends AbstractDriver
                 'meta' => $request->metadata,
             ];
 
-            $response = $this->makeRequest('POST', '/payments', [
+            $response = $this->makeRequest('POST', 'payments', [
                 'json' => $payload,
             ]);
 
@@ -126,7 +126,7 @@ class FlutterwaveDriver extends AbstractDriver
     /**
      * Verify a payment using the Transaction Reference (tx_ref).
      *
-     * Note: This uses the '/transactions/verify_by_reference' endpoint rather
+     * Note: This uses the 'transactions/verify_by_reference' endpoint rather
      * than the standard ID-based verification.
      *
      * @throws VerificationException
@@ -134,7 +134,7 @@ class FlutterwaveDriver extends AbstractDriver
     public function verify(string $reference): VerificationResponse
     {
         try {
-            $response = $this->makeRequest('GET', '/transactions/verify_by_reference', [
+            $response = $this->makeRequest('GET', 'transactions/verify_by_reference', [
                 'query' => ['tx_ref' => $reference],
             ]);
 
@@ -202,7 +202,7 @@ class FlutterwaveDriver extends AbstractDriver
     public function healthCheck(): bool
     {
         try {
-            $response = $this->makeRequest('GET', '/banks/NG');
+            $response = $this->makeRequest('GET', 'banks/NG');
             return $response->getStatusCode() === 200;
             
         } catch (\GuzzleHttp\Exception\ClientException $e) {

@@ -143,17 +143,14 @@ class PayPalDriver extends AbstractDriver
                     ],
                     'custom_id' => $reference,
                 ]],
-                'application_context' => [
-                    'return_url' => $callback,
-                    'cancel_url' => $callback,
-                    'brand_name' => $this->config['brand_name'] ?? 'Your Store',
-                    'user_action' => 'PAY_NOW',
-                ],
                 'payment_source' => [
                     'paypal' => [
                         'experience_context' => [
+                            'brand_name' => $this->config['brand_name'] ?? 'Your Store',
                             'payment_method_preference' => 'IMMEDIATE_PAYMENT_REQUIRED',
                             'user_action' => 'PAY_NOW',
+                            'return_url' => $callback,
+                            'cancel_url' => $callback,
                         ],
                     ],
                 ],

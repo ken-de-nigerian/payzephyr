@@ -13,6 +13,7 @@ use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use Random\RandomException;
 use Stripe\Exception\ApiErrorException;
+use Stripe\Exception\AuthenticationException;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 
@@ -260,14 +261,16 @@ class StripeDriver extends AbstractDriver
     {
         try {
             $this->stripe->balance->retrieve();
+
             return true;
-            
-        } catch (\Stripe\Exception\AuthenticationException $e) {
+
+        } catch (AuthenticationException) {
             // Invalid API key, but API is reachable
             return true;
-            
+
         } catch (ApiErrorException $e) {
             $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
+
             return $e->getHttpStatus() < 500;
         }
     }

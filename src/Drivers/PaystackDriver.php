@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
@@ -60,7 +61,7 @@ class PaystackDriver extends AbstractDriver
      *
      * Important: Paystack requires amounts in the smallest currency unit
      * (kobo for NGN, cents for USD). This method automatically converts
-     * your amount (e.g., 100.00) to the correct format (10000).
+     * your amount (e.g., 100.00) to the correct format (10,000).
      *
      * @throws ChargeException If the payment creation fails.
      * @throws RandomException If reference generation fails.
@@ -124,6 +125,7 @@ class PaystackDriver extends AbstractDriver
      * The amount is automatically converted back from kobo/cents to main units.
      *
      * @param  string  $reference  The transaction reference from Paystack
+     *
      * @throws VerificationException If the payment can't be found or verified.
      */
     public function verify(string $reference): VerificationResponse
@@ -211,19 +213,21 @@ class PaystackDriver extends AbstractDriver
     {
         try {
             $response = $this->makeRequest('GET', '/transaction/verify/invalid_ref_test');
-            
+
             // If we get here, the API is reachable
             // Accept both successful responses and 4xx errors (which mean API is working)
             $statusCode = $response->getStatusCode();
+
             return $statusCode < 500; // API is healthy if it responds with anything < 500
-            
-        } catch (\GuzzleHttp\Exception\ClientException $e) {
+
+        } catch (ClientException $e) {
             // 4xx errors mean the API is working (just invalid reference)
             return $e->getResponse()->getStatusCode() < 500;
-            
+
         } catch (GuzzleException $e) {
             // Network errors, timeouts, 5xx errors = unhealthy
             $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
+
             return false;
         }
     }

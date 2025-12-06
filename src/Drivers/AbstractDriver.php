@@ -19,7 +19,7 @@ use Random\RandomException;
  * This is the parent class that all payment provider drivers extend.
  * It provides common functionality like HTTP requests, health checks,
  * currency validation, and reference generation.
- * 
+ *
  * Each provider (Paystack, Stripe, etc.) extends this class and implements
  * the provider-specific logic.
  */
@@ -151,10 +151,11 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Create a unique transaction reference (like 'PAYSTACK_1234567890_abc123def456').
-     * 
+     *
      * Format: PREFIX_TIMESTAMP_RANDOMHEX
-     * 
+     *
      * @param  string|null  $prefix  Custom prefix (defaults to provider name in uppercase)
+     *
      * @throws RandomException If random number generation fails.
      */
     protected function generateReference(?string $prefix = null): string
@@ -174,7 +175,7 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Check if the provider is working (cached result).
-     * 
+     *
      * The result is cached for a few minutes so we don't check too often.
      * This prevents slowing down payments with repeated health checks.
      */
@@ -190,7 +191,7 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Write a log message (for debugging and monitoring).
-     * 
+     *
      * @param  string  $level  Log level: 'info', 'warning', 'error', etc.
      * @param  string  $message  The log message
      * @param  array  $context  Extra data to include in the log

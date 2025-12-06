@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Exception;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
@@ -210,13 +211,14 @@ class MonnifyDriver extends AbstractDriver
     {
         try {
             $this->getAccessToken();
+
             return true;
-            
-        } catch (\GuzzleHttp\Exception\ClientException $e) {
+
+        } catch (ClientException) {
             // 4xx means API is reachable
             return true;
-            
-        } catch (Exception $e) {
+
+        } catch (Exception) {
             return false;
         }
     }

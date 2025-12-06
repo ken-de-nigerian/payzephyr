@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Exception;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
@@ -174,7 +175,13 @@ class PayPalDriver extends AbstractDriver
                 throw new ChargeException('Failed to create PayPal order');
             }
 
-            $approveLink = collect($data['links'] ?? [])->firstWhere('rel', 'approve');
+            // Check for 'approve' OR 'payer-action'
+            $approveLink = collect($data['links'] ?? [])->firstWhere('rel', 'approve')
+                ?? collect($data['links'] ?? [])->firstWhere('rel', 'payer-action');
+
+            if (! $approveLink) {
+                throw new ChargeException('No approval link found in PayPal response');
+            }
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
@@ -183,7 +190,7 @@ class PayPalDriver extends AbstractDriver
 
             return new ChargeResponse(
                 reference: $reference,
-                authorizationUrl: $approveLink['href'] ?? '',
+                authorizationUrl: $approveLink['href'],
                 accessCode: $data['id'],
                 status: $this->normalizeStatus($data['status']),
                 metadata: [
@@ -360,13 +367,14 @@ class PayPalDriver extends AbstractDriver
     {
         try {
             $this->getAccessToken();
+
             return true;
-            
-        } catch (\GuzzleHttp\Exception\ClientException $e) {
+
+        } catch (ClientException) {
             // 4xx means API is reachable
             return true;
-            
-        } catch (Exception $e) {
+
+        } catch (Exception) {
             return false;
         }
     }

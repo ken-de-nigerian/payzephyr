@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
@@ -203,13 +204,14 @@ class FlutterwaveDriver extends AbstractDriver
     {
         try {
             $response = $this->makeRequest('GET', 'banks/NG');
+
             return $response->getStatusCode() === 200;
-            
-        } catch (\GuzzleHttp\Exception\ClientException $e) {
+
+        } catch (ClientException) {
             // 4xx means API is reachable
             return true;
-            
-        } catch (GuzzleException $e) {
+
+        } catch (GuzzleException) {
             return false;
         }
     }

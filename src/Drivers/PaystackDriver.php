@@ -211,11 +211,19 @@ class PaystackDriver extends AbstractDriver
     {
         try {
             $response = $this->makeRequest('GET', '/transaction/verify/invalid_ref_test');
-
-            return $response->getStatusCode() < 500;
+            
+            // If we get here, the API is reachable
+            // Accept both successful responses and 4xx errors (which mean API is working)
+            $statusCode = $response->getStatusCode();
+            return $statusCode < 500; // API is healthy if it responds with anything < 500
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            // 4xx errors mean the API is working (just invalid reference)
+            return $e->getResponse()->getStatusCode() < 500;
+            
         } catch (GuzzleException $e) {
+            // Network errors, timeouts, 5xx errors = unhealthy
             $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
-
             return false;
         }
     }

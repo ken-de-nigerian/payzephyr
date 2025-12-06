@@ -63,45 +63,79 @@ This creates the `payment_transactions` table for automatic transaction logging.
 Add your provider credentials to `.env`:
 
 ```env
-# Default Provider
+# Default Payment Provider
 PAYMENTS_DEFAULT_PROVIDER=paystack
+
+# Fallback Provider
 PAYMENTS_FALLBACK_PROVIDER=stripe
 
-# Paystack
-PAYSTACK_SECRET_KEY=sk_test_xxxxxxxxxxxxx
-PAYSTACK_PUBLIC_KEY=pk_test_xxxxxxxxxxxxx
+# Paystack Configuration
+PAYSTACK_SECRET_KEY=your_paystack_secret_key_here
+PAYSTACK_PUBLIC_KEY=your_paystack_public_key_here
+PAYSTACK_MERCHANT_EMAIL=your_merchant_email@example.com
+PAYSTACK_CALLBACK_URL=https://yourapp.com/payments/paystack/callback
+PAYSTACK_WEBHOOK_URL=https://yourapp.com/payments/paystack/webhook
+PAYSTACK_BASE_URL=https://api.paystack.co
 PAYSTACK_ENABLED=true
 
-# Flutterwave
-FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-xxxxxxxxxxxxx
-FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_TEST-xxxxxxxxxxxxx
-FLUTTERWAVE_ENCRYPTION_KEY=FLWSECK_TESTxxxxxxxxxxxxx
+# Flutterwave Configuration
+FLUTTERWAVE_SECRET_KEY=your_flutterwave_secret_key_here
+FLUTTERWAVE_PUBLIC_KEY=your_flutterwave_public_key_here
+FLUTTERWAVE_ENCRYPTION_KEY=your_flutterwave_encryption_key_here
+FLUTTERWAVE_CALLBACK_URL=https://yourapp.com/payments/flutterwave/callback
+FLUTTERWAVE_WEBHOOK_URL=https://yourapp.com/payments/flutterwave/webhook
+FLUTTERWAVE_BASE_URL=https://api.flutterwave.com/v3
 FLUTTERWAVE_ENABLED=false
 
-# Monnify
-MONNIFY_API_KEY=MK_TEST_xxxxxxxxxxxxx
-MONNIFY_SECRET_KEY=xxxxxxxxxxxxx
-MONNIFY_CONTRACT_CODE=xxxxxxxxxxxxx
+# Monnify Configuration
+MONNIFY_API_KEY=your_monnify_api_key_here
+MONNIFY_SECRET_KEY=your_monnify_secret_key_here
+MONNIFY_CONTRACT_CODE=your_monnify_contract_code_here
+MONNIFY_CALLBACK_URL=https://yourapp.com/payments/monnify/callback
+MONNIFY_BASE_URL=https://api.monnify.com
 MONNIFY_ENABLED=false
 
-# Stripe
-STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxxx
-STRIPE_PUBLIC_KEY=pk_test_xxxxxxxxxxxxx
-STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxxx
+# Stripe Configuration
+STRIPE_SECRET_KEY=your_stripe_secret_key_here
+STRIPE_PUBLIC_KEY=your_stripe_public_key_here
+STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret_here
+STRIPE_CALLBACK_URL=https://yourapp.com/payments/stripe/callback
+STRIPE_BASE_URL=https://api.stripe.com
 STRIPE_ENABLED=false
 
-# PayPal
-PAYPAL_CLIENT_ID=xxxxxxxxxxxxx
-PAYPAL_CLIENT_SECRET=xxxxxxxxxxxxx
-PAYPAL_WEBHOOK_ID=YOUR_WEBHOOK_ID_HERE
-PAYPAL_MODE=sandbox  # sandbox or live
+# PayPal Configuration
+PAYPAL_CLIENT_ID=your_paypal_client_id_here
+PAYPAL_CLIENT_SECRET=your_paypal_client_secret_here
+PAYPAL_MODE=sandbox
+PAYPAL_CALLBACK_URL=https://yourapp.com/payments/paypal/callback
+PAYPAL_BASE_URL=https://api-m.sandbox.paypal.com
 PAYPAL_ENABLED=false
 
-# Transaction Logging
-PAYMENTS_LOGGING_ENABLED=true
+# Currency Configuration
+PAYMENTS_DEFAULT_CURRENCY=NGN
+PAYMENTS_CURRENCY_CACHE_TTL=3600
 
 # Webhook Configuration
+PAYMENTS_WEBHOOK_PATH=/payments/webhook
 PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true
+
+# Health Check Configuration
+PAYMENTS_HEALTH_CHECK_ENABLED=true
+PAYMENTS_HEALTH_CHECK_CACHE_TTL=300
+PAYMENTS_HEALTH_CHECK_TIMEOUT=5
+
+# Logging Configuration
+PAYMENTS_LOGGING_ENABLED=true
+PAYMENTS_LOG_CHANNEL=stack
+
+# Security Configuration
+PAYMENTS_ENCRYPT_KEYS=true
+PAYMENTS_RATE_LIMIT_ENABLED=true
+PAYMENTS_RATE_LIMIT_ATTEMPTS=60
+PAYMENTS_RATE_LIMIT_DECAY=1
+
+# Testing Mode
+PAYMENTS_TESTING_MODE=false
 ```
 
 ---

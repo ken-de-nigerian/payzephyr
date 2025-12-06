@@ -260,12 +260,15 @@ class StripeDriver extends AbstractDriver
     {
         try {
             $this->stripe->balance->retrieve();
-
             return true;
+            
+        } catch (\Stripe\Exception\AuthenticationException $e) {
+            // Invalid API key, but API is reachable
+            return true;
+            
         } catch (ApiErrorException $e) {
             $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
-
-            return false;
+            return $e->getHttpStatus() < 500;
         }
     }
 

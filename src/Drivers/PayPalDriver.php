@@ -363,9 +363,13 @@ class PayPalDriver extends AbstractDriver
     {
         try {
             $this->getAccessToken();
-
             return true;
-        } catch (Exception) {
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            // 4xx means API is reachable
+            return true;
+            
+        } catch (Exception $e) {
             return false;
         }
     }

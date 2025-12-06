@@ -203,9 +203,13 @@ class FlutterwaveDriver extends AbstractDriver
     {
         try {
             $response = $this->makeRequest('GET', '/banks/NG');
-
             return $response->getStatusCode() === 200;
-        } catch (GuzzleException) {
+            
+        } catch (\GuzzleHttp\Exception\ClientException $e) {
+            // 4xx means API is reachable
+            return true;
+            
+        } catch (GuzzleException $e) {
             return false;
         }
     }

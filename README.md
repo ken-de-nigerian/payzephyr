@@ -513,7 +513,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 Please see [CHANGELOG.md](CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.1.0
+### Latest Release: v1.0.1
 
 **Security Updates:**
 - ✅ Fixed critical webhook signature validation
@@ -585,9 +585,8 @@ If PayZephyr helped your project:
 - [ ] Split payments enhancements
 
 ### In Progress
-- [x] Transaction logging (v1.1.0)
-- [x] Security enhancements (v1.1.0)
-- [x] PayPal improvements (v1.1.0)
+- [x] Security enhancements (v1.0.1)
+- [x] PayPal improvements (v1.0.2)
 
 ---
 

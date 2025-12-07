@@ -110,10 +110,10 @@ class StripeDriver extends AbstractDriver
             }
 
             // Build the URLs safely using the helper
-            $successUrl = $this->appendQueryParam($request->callbackUrl, 'status', 'success');
+            $successUrl = $this->appendQueryParam($callback, 'status', 'success');
             $successUrl = $this->appendQueryParam($successUrl, 'reference', $reference);
 
-            $cancelUrl = $this->appendQueryParam($request->callbackUrl, 'status', 'cancelled');
+            $cancelUrl = $this->appendQueryParam($callback, 'status', 'cancelled');
             $cancelUrl = $this->appendQueryParam($cancelUrl, 'reference', $reference);
 
             // Build Stripe API parameters

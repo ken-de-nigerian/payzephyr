@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 /**
- * Class VerificationResponse
+ * Class VerificationResponseDTO
  *
  * Data transfer object for payment verification responses
  */
-readonly class VerificationResponse
+final readonly class VerificationResponseDTO
 {
     public function __construct(
         public string $reference,
@@ -28,9 +28,9 @@ readonly class VerificationResponse
     /**
      * Create from array
      */
-    public static function fromArray(array $data): static
+    public static function fromArray(array $data): VerificationResponseDTO
     {
-        return new static(
+        return new self(
             reference: $data['reference'] ?? '',
             status: $data['status'] ?? 'unknown',
             amount: (float) ($data['amount'] ?? 0),

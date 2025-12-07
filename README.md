@@ -675,7 +675,7 @@ Payment::using(string|array $providers)   // Alias for with()
 #### Action Methods (Must be called last)
 
 ```php
-Payment::charge()                        // Returns ChargeResponse (no redirect)
+Payment::charge()                        // Returns ChargeResponseDTO (no redirect)
 Payment::redirect()                      // Redirects user to payment page
 ```
 
@@ -684,7 +684,7 @@ Payment::redirect()                      // Redirects user to payment page
 #### Verification Method (Standalone - NOT chainable)
 
 ```php
-Payment::verify(string $reference, ?string $provider = null)  // Returns VerificationResponse
+Payment::verify(string $reference, ?string $provider = null)  // Returns VerificationResponseDTO
 ```
 
 **Note:** `verify()` is a standalone method that cannot be chained. It searches all enabled providers if no provider is specified, or verifies with the specified provider.
@@ -692,7 +692,7 @@ Payment::verify(string $reference, ?string $provider = null)  // Returns Verific
 ### Response Objects
 
 ```php
-// ChargeResponse
+// ChargeResponseDTO
 $response->reference          // Payment reference
 $response->authorizationUrl   // URL to redirect user
 $response->accessCode         // Access code
@@ -700,7 +700,7 @@ $response->status             // Payment status
 $response->metadata           // Metadata array
 $response->provider           // Provider name
 
-// VerificationResponse
+// VerificationResponseDTO
 $verification->reference      // Payment reference
 $verification->status         // Payment status
 $verification->amount         // Amount paid

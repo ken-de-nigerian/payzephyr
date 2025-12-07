@@ -6,7 +6,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -58,7 +58,7 @@ test('monnify authenticates and charges successfully', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(20000, 'NGN', 'test@example.com', 'mn_ref_123');
+    $request = new ChargeRequestDTO(20000, 'NGN', 'test@example.com', 'mn_ref_123');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('mn_ref_123')
@@ -74,7 +74,7 @@ test('monnify charge handles authentication failure', function () {
         ])),
     ]);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('monnify charge handles api error', function () {
@@ -91,7 +91,7 @@ test('monnify charge handles api error', function () {
         ])),
     ]);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('monnify verify returns success', function () {
@@ -174,5 +174,5 @@ test('monnify handles network error during charge', function () {
     };
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);

@@ -1,9 +1,9 @@
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 
 test('charge response checks successful status', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -15,7 +15,7 @@ test('charge response checks successful status', function () {
 });
 
 test('charge response checks succeeded status variation', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -26,7 +26,7 @@ test('charge response checks succeeded status variation', function () {
 });
 
 test('charge response checks completed status variation', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -37,7 +37,7 @@ test('charge response checks completed status variation', function () {
 });
 
 test('charge response checks pending status', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -49,7 +49,7 @@ test('charge response checks pending status', function () {
 });
 
 test('charge response handles case insensitive status', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -60,7 +60,7 @@ test('charge response handles case insensitive status', function () {
 });
 
 test('charge response converts to array', function () {
-    $response = ChargeResponse::fromArray([
+    $response = ChargeResponseDTO::fromArray([
         'reference' => 'ref_123',
         'authorization_url' => 'https://example.com',
         'access_code' => 'code_123',
@@ -80,7 +80,7 @@ test('charge response converts to array', function () {
 });
 
 test('charge response creates from array with defaults', function () {
-    $response = ChargeResponse::fromArray([]);
+    $response = ChargeResponseDTO::fromArray([]);
 
     expect($response->reference)->toBe('')
         ->and($response->authorizationUrl)->toBe('')
@@ -97,7 +97,7 @@ test('charge response includes metadata', function () {
         'custom_field' => 'value',
     ];
 
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -109,7 +109,7 @@ test('charge response includes metadata', function () {
 });
 
 test('charge response includes provider name', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
@@ -121,19 +121,19 @@ test('charge response includes provider name', function () {
 });
 
 test('charge response is immutable', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',
         status: 'pending'
     );
 
-    expect($response)->toBeInstanceOf(ChargeResponse::class)
+    expect($response)->toBeInstanceOf(ChargeResponseDTO::class)
         ->and($response->reference)->toBe('ref_123');
 });
 
 test('charge response handles empty metadata', function () {
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
         accessCode: 'code_123',

@@ -1,6 +1,6 @@
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
@@ -25,7 +25,7 @@ test(/**
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',

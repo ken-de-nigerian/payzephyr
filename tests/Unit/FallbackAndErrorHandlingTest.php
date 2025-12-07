@@ -1,6 +1,6 @@
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
@@ -27,7 +27,7 @@ test('throws exception when all providers fail', function () {
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -56,7 +56,7 @@ test('skips providers that do not support currency', function () {
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'EUR', // Only Stripe supports EUR
         'email' => 'test@example.com',
@@ -82,7 +82,7 @@ test('provider exception includes context about all failures', function () {
 
     try {
         $manager = new PaymentManager;
-        $request = ChargeRequest::fromArray([
+        $request = ChargeRequestDTO::fromArray([
             'amount' => 1000,
             'currency' => 'NGN',
             'email' => 'test@example.com',
@@ -188,7 +188,7 @@ test('custom provider list overrides config fallback', function () {
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',

@@ -6,7 +6,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -48,7 +48,7 @@ test('paystack charge succeeds with valid response', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(10000, 'NGN', 'test@example.com', 'ref_test_123');
+    $request = new ChargeRequestDTO(10000, 'NGN', 'test@example.com', 'ref_test_123');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('ref_test_123')
@@ -68,7 +68,7 @@ test('paystack charge handles metadata', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(50000, 'NGN', 'test@example.com', null, null, ['order_id' => 12345]);
+    $request = new ChargeRequestDTO(50000, 'NGN', 'test@example.com', null, null, ['order_id' => 12345]);
     $response = $driver->charge($request);
 
     expect($response->metadata)->toBe(['order_id' => 12345]);
@@ -79,7 +79,7 @@ test('paystack charge throws exception on api error', function () {
         new Response(400, [], json_encode(['status' => false, 'message' => 'Invalid amount'])),
     ]);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('paystack charge handles network error', function () {
@@ -97,7 +97,7 @@ test('paystack charge handles network error', function () {
     };
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('paystack verify returns success', function () {

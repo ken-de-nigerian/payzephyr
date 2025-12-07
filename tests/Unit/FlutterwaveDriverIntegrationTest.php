@@ -6,7 +6,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -48,7 +48,7 @@ test('flutterwave charge succeeds', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(15000, 'NGN', 'test@example.com', 'fw_ref_123');
+    $request = new ChargeRequestDTO(15000, 'NGN', 'test@example.com', 'fw_ref_123');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('fw_ref_123')
@@ -64,7 +64,7 @@ test('flutterwave charge throws exception on error', function () {
         ])),
     ]);
 
-    $driver->charge(new ChargeRequest(10000, 'INVALID', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com'));
 })->throws(InvalidArgumentException::class);
 
 test('flutterwave charge handles network error', function () {
@@ -82,7 +82,7 @@ test('flutterwave charge handles network error', function () {
     };
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequest(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('flutterwave verify returns success', function () {

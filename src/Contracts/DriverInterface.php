@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Contracts;
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 
 /**
@@ -21,7 +21,7 @@ interface DriverInterface
      *
      * @throws PaymentException
      */
-    public function charge(ChargeRequest $request): ChargeResponse;
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO;
 
     /**
      * Verify a payment transaction
@@ -30,7 +30,7 @@ interface DriverInterface
      *
      * @throws PaymentException
      */
-    public function verify(string $reference): VerificationResponse;
+    public function verify(string $reference): VerificationResponseDTO;
 
     /**
      * Validate webhook signature

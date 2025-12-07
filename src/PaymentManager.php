@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
@@ -91,13 +91,13 @@ class PaymentManager
      * 4. If successful: saves to database and returns the result
      * 5. If failed: tries the next provider in the list
      *
-     * @param  ChargeRequest  $request  The payment details (amount, email, etc.)
+     * @param  ChargeRequestDTO  $request  The payment details (amount, email, etc.)
      * @param  array|null  $providers  List of providers to try (e.g., ['paystack', 'stripe'])
      *                                 If null, uses the default fallback chain from config.
      *
      * @throws ProviderException If ALL providers fail (none of them could process the payment).
      */
-    public function chargeWithFallback(ChargeRequest $request, ?array $providers = null): ChargeResponse
+    public function chargeWithFallback(ChargeRequestDTO $request, ?array $providers = null): ChargeResponseDTO
     {
         $providers = $providers ?? $this->getFallbackChain();
         $exceptions = [];
@@ -155,7 +155,7 @@ class PaymentManager
      * the payment still processes (we just can't log it).
      * The payment itself is more important than the log.
      */
-    protected function logTransaction(ChargeRequest $request, ChargeResponse $response, string $provider): void
+    protected function logTransaction(ChargeRequestDTO $request, ChargeResponseDTO $response, string $provider): void
     {
         if (! config('payments.logging.enabled', true)) {
             return;
@@ -198,7 +198,7 @@ class PaymentManager
      *
      * @throws ProviderException If the payment can't be found on any provider.
      */
-    public function verify(string $reference, ?string $provider = null): VerificationResponse
+    public function verify(string $reference, ?string $provider = null): VerificationResponseDTO
     {
         $resolution = $this->resolveVerificationContext($reference, $provider);
         $providers = $resolution['provider'] ? [$resolution['provider']] : array_keys($this->getEnabledProviders());
@@ -302,7 +302,7 @@ class PaymentManager
      *
      * Updates the status (success/failed/pending), payment method used, and when it was paid.
      */
-    protected function updateTransactionFromVerification(string $reference, VerificationResponse $response): void
+    protected function updateTransactionFromVerification(string $reference, VerificationResponseDTO $response): void
     {
         if (! config('payments.logging.enabled', true)) {
             return;

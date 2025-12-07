@@ -6,9 +6,9 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -58,13 +58,13 @@ class FlutterwaveDriver extends AbstractDriver
     /**
      * Initialize a charge using the Flutterwave Standard Payment Link.
      *
-     * Maps the internal ChargeRequest to Flutterwave's payload structure,
+     * Maps the internal ChargeRequestDTO to Flutterwave's payload structure,
      * specifically mapping 'reference' to 'tx_ref' and 'metadata' to 'meta'.
      *
      * @throws ChargeException If the API request fails or returns an error status.
      * @throws RandomException If reference generation fails.
      */
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         // Store request so AbstractDriver can access idempotency key
         $this->setCurrentRequest($request);
@@ -111,7 +111,7 @@ class FlutterwaveDriver extends AbstractDriver
                 'idempotent' => $request->idempotencyKey !== null,
             ]);
 
-            return new ChargeResponse(
+            return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $result['link'],
                 accessCode: $reference,
@@ -136,7 +136,7 @@ class FlutterwaveDriver extends AbstractDriver
      *
      * @throws VerificationException
      */
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         try {
             $response = $this->makeRequest('GET', 'transactions/verify_by_reference', [
@@ -158,7 +158,7 @@ class FlutterwaveDriver extends AbstractDriver
                 'status' => $result['status'],
             ]);
 
-            return new VerificationResponse(
+            return new VerificationResponseDTO(
                 reference: $result['tx_ref'],
                 status: $this->normalizeStatus($result['status']),
                 amount: (float) $result['amount'],

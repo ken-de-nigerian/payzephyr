@@ -8,7 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use Psr\Http\Message\ResponseInterface;
 use Random\RandomException;
@@ -35,12 +35,12 @@ abstract class AbstractDriver implements DriverInterface
      * The payment request currently being processed.
      * Used to access the idempotency key when making API requests.
      */
-    protected ?ChargeRequest $currentRequest = null;
+    protected ?ChargeRequestDTO $currentRequest = null;
 
     /**
      * Create a new payment driver instance.
      *
-     * @throws InvalidConfigurationException If required config is missing.
+     * @throws InvalidConfigurationException If required, config is missing.
      */
     public function __construct(array $config)
     {
@@ -108,9 +108,9 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Store the current payment request so we can access it later (for idempotency keys).
+     * Store the current payment request, so we can access it later (for idempotency keys).
      */
-    protected function setCurrentRequest(ChargeRequest $request): void
+    protected function setCurrentRequest(ChargeRequestDTO $request): void
     {
         $this->currentRequest = $request;
     }
@@ -176,7 +176,7 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Check if the provider is working (cached result).
      *
-     * The result is cached for a few minutes so we don't check too often.
+     * The result is cached for a few minutes, so we don't check too often.
      * This prevents slowing down payments with repeated health checks.
      */
     public function getCachedHealthCheck(): bool

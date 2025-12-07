@@ -1,6 +1,6 @@
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -63,7 +63,7 @@ test('stripe charge succeeds', function () {
 
     $driver = createMockStripeDriver($stripeMock);
 
-    $request = new ChargeRequest(10000, 'USD', 'test@example.com', 'stripe_ref_123');
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'stripe_ref_123');
     $response = $driver->charge($request);
 
     // Assertions based on the new Checkout Session logic
@@ -97,13 +97,13 @@ test('stripe charge handles api error', function () {
 
     // This checks that the driver correctly catches the Stripe exception
     // and rethrows it as a ChargeException (which extends PaymentException)
-    // Note: The previous test checked for InvalidArgumentException from ChargeRequest,
+    // Note: The previous test checked for InvalidArgumentException from ChargeRequestDTO,
     // but here we want to test the Driver error handling.
-    // If you want to test invalid currency validation inside ChargeRequest, that is a separate unit test.
+    // If you want to test invalid currency validation inside ChargeRequestDTO, that is a separate unit test.
     // Here we simulate Stripe rejecting it.
 
     // We expect a ChargeException (wrapper), not the raw Stripe exception
-    expect(fn () => $driver->charge(new ChargeRequest(100, 'USD', 'test@example.com')))
+    expect(fn () => $driver->charge(new ChargeRequestDTO(100, 'USD', 'test@example.com')))
         ->toThrow(ChargeException::class);
 });
 

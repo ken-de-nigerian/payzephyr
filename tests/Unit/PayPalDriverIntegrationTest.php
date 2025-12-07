@@ -6,7 +6,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -56,7 +56,7 @@ test('paypal authenticates and charges successfully', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(10000, 'USD', 'test@example.com', 'pp_ref_123');
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'pp_ref_123');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('pp_ref_123')
@@ -72,7 +72,7 @@ test('paypal charge handles authentication failure', function () {
         ])),
     ]);
 
-    $driver->charge(new ChargeRequest(10000, 'USD', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com'));
 })->throws(ChargeException::class);
 
 test('paypal charge handles api error', function () {
@@ -87,8 +87,8 @@ test('paypal charge handles api error', function () {
         ])),
     ]);
 
-    // This throws InvalidArgumentException because ChargeRequest validation runs first
-    $driver->charge(new ChargeRequest(10000, 'INVALID', 'test@example.com'));
+    // This throws InvalidArgumentException because ChargeRequestDTO validation runs first
+    $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com'));
 })->throws(InvalidArgumentException::class);
 
 test('paypal verify returns success', function () {
@@ -164,5 +164,5 @@ test('paypal handles network error', function () {
     };
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequest(10000, 'USD', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com'));
 })->throws(ChargeException::class);

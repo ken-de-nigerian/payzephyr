@@ -7,7 +7,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use InvalidArgumentException;
 
 /**
- * ChargeRequest - Payment Request Data Object
+ * ChargeRequestDTO - Payment Request Data Object
  *
  * This class holds all the information needed to process a payment:
  * amount, currency, customer email, reference, etc.
@@ -16,7 +16,7 @@ use InvalidArgumentException;
  * sending to payment providers, always use getAmountInMinorUnits() which
  * converts it to the smallest currency unit (e.g., 10000 cents for $100).
  */
-readonly class ChargeRequest
+final readonly class ChargeRequestDTO
 {
     public function __construct(
         public float $amount,
@@ -85,12 +85,12 @@ readonly class ChargeRequest
     /**
      * Create from array
      */
-    public static function fromArray(array $data): static
+    public static function fromArray(array $data): ChargeRequestDTO
     {
         // We round here before passing to constructor to ensure data integrity
         $amount = isset($data['amount']) ? round((float) $data['amount'], 2) : 0.0;
 
-        return new static(
+        return new self(
             amount: $amount,
             currency: strtoupper($data['currency'] ?? ''),
             email: $data['email'] ?? '',

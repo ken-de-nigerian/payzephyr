@@ -378,11 +378,11 @@ test('payment verification works', function () {
 ### Mocking in Tests
 
 ```php
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 
 Payment::shouldReceive('charge')
     ->once()
-    ->andReturn(new ChargeResponse(
+    ->andReturn(new ChargeResponseDTO(
         reference: 'TEST_REF',
         authorizationUrl: 'https://checkout.test.com',
         accessCode: 'access_123',
@@ -418,7 +418,7 @@ Payment::using(string|array $providers)  // Alias for with()
 #### Action Methods (Must be called last)
 
 ```php
-Payment::charge()                        // Returns ChargeResponse (no redirect)
+Payment::charge()                        // Returns ChargeResponseDTO (no redirect)
 Payment::redirect()                      // Redirects user to payment page
 ```
 
@@ -427,7 +427,7 @@ Payment::redirect()                      // Redirects user to payment page
 #### Verification Method (Standalone - NOT chainable)
 
 ```php
-Payment::verify(string $reference, ?string $provider = null)  // Returns VerificationResponse
+Payment::verify(string $reference, ?string $provider = null)  // Returns VerificationResponseDTO
 ```
 
 **Note:** `verify()` is a standalone method that cannot be chained. It searches all enabled providers if no provider is specified, or verifies with the specified provider.

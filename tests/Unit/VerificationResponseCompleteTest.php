@@ -1,9 +1,9 @@
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
 test('verification response checks success status', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
         'amount' => 1000,
@@ -16,7 +16,7 @@ test('verification response checks success status', function () {
 });
 
 test('verification response checks failed status', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'failed',
         'amount' => 1000,
@@ -28,7 +28,7 @@ test('verification response checks failed status', function () {
 });
 
 test('verification response checks pending status', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'pending',
         'amount' => 1000,
@@ -40,7 +40,7 @@ test('verification response checks pending status', function () {
 });
 
 test('verification response converts to array', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
         'amount' => 1000,
@@ -64,25 +64,25 @@ test('verification response converts to array', function () {
 });
 
 test('verification response handles all successful status variations', function () {
-    expect(VerificationResponse::fromArray([
+    expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'success',
         'amount' => 100,
         'currency' => 'NGN',
     ])->isSuccessful())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'succeeded',
             'amount' => 100,
             'currency' => 'NGN',
         ])->isSuccessful())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'completed',
             'amount' => 100,
             'currency' => 'NGN',
         ])->isSuccessful())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'successful',
             'amount' => 100,
@@ -92,19 +92,19 @@ test('verification response handles all successful status variations', function 
 });
 
 test('verification response handles all failed status variations', function () {
-    expect(VerificationResponse::fromArray([
+    expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'failed',
         'amount' => 100,
         'currency' => 'NGN',
     ])->isFailed())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'cancelled',
             'amount' => 100,
             'currency' => 'NGN',
         ])->isFailed())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'declined',
             'amount' => 100,
@@ -114,13 +114,13 @@ test('verification response handles all failed status variations', function () {
 });
 
 test('verification response handles case insensitive status', function () {
-    expect(VerificationResponse::fromArray([
+    expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'SUCCESS',
         'amount' => 100,
         'currency' => 'NGN',
     ])->isSuccessful())->toBeTrue()
-        ->and(VerificationResponse::fromArray([
+        ->and(VerificationResponseDTO::fromArray([
             'reference' => 'ref',
             'status' => 'FAILED',
             'amount' => 100,
@@ -130,7 +130,7 @@ test('verification response handles case insensitive status', function () {
 });
 
 test('verification response includes payment details', function () {
-    $response = new VerificationResponse(
+    $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
         amount: 5000.0,
@@ -154,7 +154,7 @@ test('verification response includes payment details', function () {
 });
 
 test('verification response handles optional fields as null', function () {
-    $response = new VerificationResponse(
+    $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
         amount: 1000.0,
@@ -171,7 +171,7 @@ test('verification response handles optional fields as null', function () {
 });
 
 test('verification response from array with defaults', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
     ]);
 
@@ -182,7 +182,7 @@ test('verification response from array with defaults', function () {
 });
 
 test('verification response normalizes currency to uppercase', function () {
-    $response = VerificationResponse::fromArray([
+    $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
         'amount' => 1000,
@@ -193,13 +193,13 @@ test('verification response normalizes currency to uppercase', function () {
 });
 
 test('verification response is immutable', function () {
-    $response = new VerificationResponse(
+    $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
         amount: 1000.0,
         currency: 'NGN'
     );
 
-    expect($response)->toBeInstanceOf(VerificationResponse::class)
+    expect($response)->toBeInstanceOf(VerificationResponseDTO::class)
         ->and($response->reference)->toBe('ref_123');
 });

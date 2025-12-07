@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Exception;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -89,13 +89,13 @@ class StripeDriver extends AbstractDriver
      *
      * This creates a session on Stripe servers and returns the URL the user
      * must visit.
-     * It maps the internal ChargeRequest to Stripe's line-item format,
+     * It maps the internal ChargeRequestDTO to Stripe's line-item format,
      * converting the amount to minor units (cents) automatically.
      *
      * @throws ChargeException
      * @throws RandomException|InvalidConfigurationException
      */
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         $this->setCurrentRequest($request);
 
@@ -153,7 +153,7 @@ class StripeDriver extends AbstractDriver
                 'idempotent' => $request->idempotencyKey !== null,
             ]);
 
-            return new ChargeResponse(
+            return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $session->url,
                 accessCode: $session->id,
@@ -180,7 +180,7 @@ class StripeDriver extends AbstractDriver
      *
      * @throws VerificationException
      */
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         try {
             if (str_starts_with($reference, 'cs_')) {
@@ -192,7 +192,7 @@ class StripeDriver extends AbstractDriver
                     default => 'failed'
                 };
 
-                return new VerificationResponse(
+                return new VerificationResponseDTO(
                     reference: $session->client_reference_id ?? $session->id,
                     status: $status,
                     amount: $session->amount_total / 100,
@@ -229,7 +229,7 @@ class StripeDriver extends AbstractDriver
                 'status' => $intent->status,
             ]);
 
-            return new VerificationResponse(
+            return new VerificationResponseDTO(
                 reference: $intent->metadata['reference'] ?? $intent->id,
                 status: $this->normalizeStatus($intent->status),
                 amount: $intent->amount / 100,

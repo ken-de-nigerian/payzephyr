@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 /**
  * PaymentTransaction - Database Model for Payment Records
@@ -24,6 +23,7 @@ use Illuminate\Support\Carbon;
  * - metadata: Extra data you attached to the payment
  * - customer: Customer information
  * - paid_at: When the payment was completed
+ *
  * @method static create(array $array)
  * @method static where(string $string, string $reference)
  */

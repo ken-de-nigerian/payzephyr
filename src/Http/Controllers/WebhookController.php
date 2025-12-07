@@ -17,7 +17,7 @@ use Throwable;
  * When a payment is completed (or fails), the payment provider sends a webhook
  * (a POST request) to this controller. This controller:
  * 1. Verifies the webhook is really from the provider (security check)
- * 2. Updates the payment record in the database
+ * 2. Updates the payment record in database
  * 3. Fires Laravel events so your app can react (e.g., send email, update order status)
  */
 class WebhookController extends Controller
@@ -34,7 +34,7 @@ class WebhookController extends Controller
      * and fires events so your app can handle the payment status change.
      *
      * @param  Request  $request  The webhook HTTP request
-     * @param  string  $provider  Which provider sent it (e.g., 'paystack', 'stripe')
+     * @param  string  $provider  Which provider sent it (e.g., 'paystack', 'stripe')?
      */
     public function handle(Request $request, string $provider): JsonResponse
     {

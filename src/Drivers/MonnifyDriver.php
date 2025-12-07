@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -96,10 +96,10 @@ class MonnifyDriver extends AbstractDriver
     /**
      * Initialize a transaction on Monnify.
      *
-     * Maps the standardized ChargeRequest to the Monnify 'init-transaction' payload.
+     * Maps the standardized ChargeRequestDTO to the Monnify 'init-transaction' payload.
      * Requires a 'contract_code' from configuration.
      */
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         $this->setCurrentRequest($request);
 
@@ -137,7 +137,7 @@ class MonnifyDriver extends AbstractDriver
             $result = $data['responseBody'];
             $this->log('info', 'Charge initialized successfully', ['reference' => $reference]);
 
-            return new ChargeResponse(
+            return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $result['checkoutUrl'],
                 accessCode: $result['transactionReference'],
@@ -156,7 +156,7 @@ class MonnifyDriver extends AbstractDriver
     /**
      * Verify a transaction status using the Monnify V2 API.
      */
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         $cleanReference = explode('?', $reference)[0];
 
@@ -173,7 +173,7 @@ class MonnifyDriver extends AbstractDriver
 
             $result = $data['responseBody'];
 
-            return new VerificationResponse(
+            return new VerificationResponseDTO(
                 reference: $result['paymentReference'] ?? $reference,
                 status: $this->normalizeStatus($result['paymentStatus']),
                 amount: (float) $result['amountPaid'],

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
 /**
  * Main Facade for the PayZephyr payment processing system.
@@ -25,9 +25,9 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
  * @method static \KenDeNigerian\PayZephyr\Payment customer(array $customer)
  * @method static \KenDeNigerian\PayZephyr\Payment with(string|array $providers)
  * @method static \KenDeNigerian\PayZephyr\Payment using(string|array $providers)
- * @method static ChargeResponse charge()
+ * @method static ChargeResponseDTO charge()
  * @method static mixed redirect()
- * @method static VerificationResponse verify(string $reference, ?string $provider = null)
+ * @method static VerificationResponseDTO verify(string $reference, ?string $provider = null)
  *
  * @see \KenDeNigerian\PayZephyr\Payment
  */

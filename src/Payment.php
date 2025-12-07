@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Http\RedirectResponse;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 
 /**
@@ -183,16 +183,16 @@ class Payment
      * Process the payment and get the response (without redirecting the user).
      *
      * This creates a payment request and sends it to the payment provider.
-     * Returns a ChargeResponse object with details like the payment URL.
+     * Returns a ChargeResponseDTO object with details like the payment URL.
      *
      * Use this when you want to handle the redirect yourself (e.g., for API responses).
      * For automatic redirects, use redirect() instead.
      *
      * @throws ProviderException If all payment providers fail.
      */
-    public function charge(): ChargeResponse
+    public function charge(): ChargeResponseDTO
     {
-        $request = ChargeRequest::fromArray(array_merge([
+        $request = ChargeRequestDTO::fromArray(array_merge([
             'currency' => config('payments.currency.default', 'NGN'),
             'channels' => $this->data['channels'] ?? null,
         ], $this->data));
@@ -229,7 +229,7 @@ class Payment
      *
      * @throws ProviderException If the payment can't be found or verified.
      */
-    public function verify(string $reference, ?string $provider = null): VerificationResponse
+    public function verify(string $reference, ?string $provider = null): VerificationResponseDTO
     {
         return $this->manager->verify($reference, $provider);
     }

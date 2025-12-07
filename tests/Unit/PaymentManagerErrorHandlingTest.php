@@ -2,9 +2,9 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
@@ -20,7 +20,7 @@ test('payment manager handles database error during transaction logging graceful
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -160,7 +160,7 @@ test('payment manager handles logging disabled during charge', function () {
     ]);
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -238,7 +238,7 @@ test('payment manager updateTransactionFromVerification handles successful payme
     ]);
 
     $manager = new PaymentManager;
-    $response = new VerificationResponse(
+    $response = new VerificationResponseDTO(
         reference: 'test_ref_123',
         status: 'success',
         amount: 1000,
@@ -304,7 +304,7 @@ test('payment manager updateTransactionFromVerification handles failed payment',
     ]);
 
     $manager = new PaymentManager;
-    $response = new VerificationResponse(
+    $response = new VerificationResponseDTO(
         reference: 'test_ref_failed',
         status: 'failed',
         amount: 1000,
@@ -360,7 +360,7 @@ test('payment manager logTransaction creates transaction with all fields', funct
     });
 
     $manager = new PaymentManager;
-    $request = ChargeRequest::fromArray([
+    $request = ChargeRequestDTO::fromArray([
         'amount' => 5000,
         'currency' => 'NGN',
         'email' => 'customer@example.com',
@@ -369,7 +369,7 @@ test('payment manager logTransaction creates transaction with all fields', funct
         'customer' => ['name' => 'John Doe'],
     ]);
 
-    $response = new ChargeResponse(
+    $response = new ChargeResponseDTO(
         reference: 'test_ref_log',
         authorizationUrl: 'https://example.com',
         accessCode: 'access_123',

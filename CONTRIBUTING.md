@@ -16,7 +16,9 @@ First off, thank you for considering contributing to PayZephyr! It's people like
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our Code of Conduct. By participating, you are expected to uphold this code. Please report unacceptable behavior to ken.de.nigerian@gmail.com.
+Our Code of Conduct governs this project and everyone participating in it.
+By participating, you are expected to uphold this code.
+Please report unacceptable behavior to ken.de.nigerian@gmail.com.
 
 ### Our Standards
 
@@ -374,7 +376,7 @@ open build/coverage/index.html
 ```php
 <?php
 
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\NewProviderDriver;
 
 test('new provider driver initializes correctly', function () {
@@ -404,7 +406,7 @@ test('new provider charge succeeds with valid request', function () {
         ])),
     ]);
 
-    $request = new ChargeRequest(10000, 'USD', 'test@example.com');
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('ref_123')
@@ -442,7 +444,7 @@ test('new provider validates webhook signature', function () {
 
 ### PR Title Format
 
-Use conventional commits format:
+Use conventional commits formats:
 
 ```
 feat: Add support for Square payment provider
@@ -516,9 +518,9 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
 class NewProviderDriver extends AbstractDriver implements DriverInterface
 {
@@ -539,12 +541,12 @@ class NewProviderDriver extends AbstractDriver implements DriverInterface
         ];
     }
 
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         // Implementation
     }
 
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         // Implementation
     }

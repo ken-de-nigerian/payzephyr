@@ -6,9 +6,9 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -66,7 +66,7 @@ class PaystackDriver extends AbstractDriver
      * @throws ChargeException If the payment creation fails.
      * @throws RandomException If reference generation fails.
      */
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         $this->setCurrentRequest($request);
 
@@ -102,7 +102,7 @@ class PaystackDriver extends AbstractDriver
                 'reference' => $result['reference'],
             ]);
 
-            return new ChargeResponse(
+            return new ChargeResponseDTO(
                 reference: $result['reference'],
                 authorizationUrl: $result['authorization_url'],
                 accessCode: $result['access_code'],
@@ -128,7 +128,7 @@ class PaystackDriver extends AbstractDriver
      *
      * @throws VerificationException If the payment can't be found or verified.
      */
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         try {
             $response = $this->makeRequest('GET', "/transaction/verify/$reference");
@@ -147,7 +147,7 @@ class PaystackDriver extends AbstractDriver
                 'status' => $result['status'],
             ]);
 
-            return new VerificationResponse(
+            return new VerificationResponseDTO(
                 reference: $result['reference'],
                 status: $result['status'],
                 amount: ($result['amount'] ?? 0) / 100,

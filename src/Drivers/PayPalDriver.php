@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\GuzzleException;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
-use KenDeNigerian\PayZephyr\DataObjects\ChargeResponse;
-use KenDeNigerian\PayZephyr\DataObjects\VerificationResponse;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -126,7 +126,7 @@ class PayPalDriver extends AbstractDriver
      * Formats the amount based on currency precision and sets up the
      * application context (return/cancel URLs).
      */
-    public function charge(ChargeRequest $request): ChargeResponse
+    public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
         try {
             $reference = $request->reference ?? $this->generateReference('PAYPAL');
@@ -190,7 +190,7 @@ class PayPalDriver extends AbstractDriver
                 'order_id' => $data['id'],
             ]);
 
-            return new ChargeResponse(
+            return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $approveLink['href'],
                 accessCode: $data['id'],
@@ -213,7 +213,7 @@ class PayPalDriver extends AbstractDriver
      * Note: PayPal 'verification' usually involves checking the Order details
      * to see if the funds have been CAPTURED or COMPLETED.
      */
-    public function verify(string $reference): VerificationResponse
+    public function verify(string $reference): VerificationResponseDTO
     {
         try {
             // Note: $reference here is expected to be the PayPal Order ID (accessCode),
@@ -232,7 +232,7 @@ class PayPalDriver extends AbstractDriver
             $amount = $purchaseUnit['amount'] ?? [];
             $payments = $purchaseUnit['payments']['captures'][0] ?? null;
 
-            return new VerificationResponse(
+            return new VerificationResponseDTO(
                 reference: $purchaseUnit['custom_id'] ?? $reference,
                 status: $this->normalizeStatus($data['status']),
                 amount: (float) ($amount['value'] ?? 0),

@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 /**
- * ChargeResponse - Payment Initialization Response
+ * ChargeResponseDTO - Payment Initialization Response
  *
  * This class holds the response after you initialize a payment.
  * It contains the payment reference, the URL to redirect the customer to,
  * and the current status (usually 'pending' until they pay).
  */
-readonly class ChargeResponse
+final readonly class ChargeResponseDTO
 {
     public function __construct(
         public string $reference,
@@ -25,9 +25,9 @@ readonly class ChargeResponse
     /**
      * Create from array
      */
-    public static function fromArray(array $data): static
+    public static function fromArray(array $data): ChargeResponseDTO
     {
-        return new static(
+        return new self(
             reference: $data['reference'] ?? '',
             authorizationUrl: $data['authorization_url'] ?? '',
             accessCode: $data['access_code'] ?? '',

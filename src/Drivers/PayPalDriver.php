@@ -54,7 +54,8 @@ class PayPalDriver extends AbstractDriver
      * Get the required decimal precision for a specific currency.
      *
      * PayPal is strict about amount formatting.
-     * Zero-decimal currencies (like JPY) must be sent as integers, while others (like USD) usually require 2 decimal places.
+     * Zero-decimal currencies (like JPY) must be sent as integers,
+     * while others (like USD) usually require two decimal places.
      *
      * @param  string  $currency  ISO currency code
      * @return int Number of decimal places (0 or 2)
@@ -151,8 +152,8 @@ class PayPalDriver extends AbstractDriver
                             'payment_method_preference' => 'IMMEDIATE_PAYMENT_REQUIRED',
                             'landing_page' => 'GUEST_CHECKOUT',
                             'user_action' => 'PAY_NOW',
-                            'return_url' => $callback,
-                            'cancel_url' => $callback,
+                            'return_url' => $this->appendQueryParam($callback, 'reference', $reference),
+                            'cancel_url' => $this->appendQueryParam($callback, 'reference', $reference),
                         ],
                     ],
                 ],

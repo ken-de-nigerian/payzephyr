@@ -204,6 +204,21 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * Helper to append a query parameter to a URL.
+     * Handles cases where the URL already has query params.
+     */
+    protected function appendQueryParam(?string $url, string $key, string $value): ?string
+    {
+        if (! $url) {
+            return null;
+        }
+
+        $separator = parse_url($url, PHP_URL_QUERY) ? '&' : '?';
+
+        return "$url$separator$key=$value";
+    }
+
+    /**
      * Replace the HTTP client (mainly used for testing with mock clients).
      */
     public function setClient(Client $client): void

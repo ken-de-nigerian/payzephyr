@@ -103,6 +103,13 @@ class StripeDriver extends AbstractDriver
         try {
             $reference = $request->reference ?? $this->generateReference('STRIPE');
 
+            // Build the URLs safely using the helper
+            $successUrl = $this->appendQueryParam($request->callbackUrl, 'status', 'success');
+            $successUrl = $this->appendQueryParam($successUrl, 'reference', $reference);
+
+            $cancelUrl = $this->appendQueryParam($request->callbackUrl, 'status', 'cancelled');
+            $cancelUrl = $this->appendQueryParam($cancelUrl, 'reference', $reference);
+
             // Build Stripe API parameters
             $params = [
                 'payment_method_types' => ['card'],
@@ -117,8 +124,8 @@ class StripeDriver extends AbstractDriver
                     'quantity' => 1,
                 ]],
                 'mode' => 'payment',
-                'success_url' => $request->callbackUrl.'?status=success&reference='.$reference,
-                'cancel_url' => $request->callbackUrl.'?status=cancelled&reference='.$reference,
+                'success_url' => $successUrl,
+                'cancel_url' => $cancelUrl,
                 'client_reference_id' => $reference,
                 'customer_email' => $request->email,
                 'metadata' => array_merge($request->metadata, [

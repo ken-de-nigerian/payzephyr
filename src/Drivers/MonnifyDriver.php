@@ -114,7 +114,11 @@ class MonnifyDriver extends AbstractDriver
                 'paymentDescription' => $request->description ?? 'Payment',
                 'currencyCode' => $request->currency,
                 'contractCode' => $this->config['contract_code'],
-                'redirectUrl' => $request->callbackUrl ?? $this->config['callback_url'] ?? null,
+                'redirectUrl' => $this->appendQueryParam(
+                    $request->callbackUrl ?? $this->config['callback_url'] ?? null,
+                    'reference',
+                    $reference
+                ),
                 'paymentMethods' => ['CARD', 'ACCOUNT_TRANSFER'],
                 'metadata' => $request->metadata,
             ];

@@ -24,6 +24,8 @@ use Illuminate\Support\Carbon;
  * - metadata: Extra data you attached to the payment
  * - customer: Customer information
  * - paid_at: When the payment was completed
+ * @method static create(array $array)
+ * @method static where(string $string, string $reference)
  */
 class PaymentTransaction extends Model
 {

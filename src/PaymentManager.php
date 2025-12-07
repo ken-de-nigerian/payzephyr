@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequest;
@@ -49,9 +50,10 @@ class PaymentManager
      * Get a payment provider driver (like PaystackDriver, StripeDriver, etc.).
      *
      * If you don't specify a name, it uses the default provider from your config.
-     * Drivers are cached so we only create each one once per request.
+     * Drivers are cached, so we only create each one once per request.
      *
      * @param  string|null  $name  Provider name like 'paystack', 'stripe', etc. (null = use default)
+     *
      * @throws DriverNotFoundException If the provider doesn't exist or is disabled.
      */
     public function driver(?string $name = null): DriverInterface
@@ -92,6 +94,7 @@ class PaymentManager
      * @param  ChargeRequest  $request  The payment details (amount, email, etc.)
      * @param  array|null  $providers  List of providers to try (e.g., ['paystack', 'stripe'])
      *                                 If null, uses the default fallback chain from config.
+     *
      * @throws ProviderException If ALL providers fail (none of them could process the payment).
      */
     public function chargeWithFallback(ChargeRequest $request, ?array $providers = null): ChargeResponse
@@ -120,6 +123,9 @@ class PaymentManager
                 }
 
                 $response = $driver->charge($request);
+
+                // This ensures verify() works fast even if DB logging is disabled
+                Cache::put("payzephyr_ref_$response->reference", $providerName, now()->addHour());
 
                 // Log transaction to database
                 $this->logTransaction($request, $response, $providerName);
@@ -188,11 +194,13 @@ class PaymentManager
      *
      * @param  string  $reference  The transaction reference to look up
      * @param  string|null  $provider  Optional: check only this provider (e.g., 'paystack')
+     *
      * @throws ProviderException If the payment can't be found on any provider.
      */
     public function verify(string $reference, ?string $provider = null): VerificationResponse
     {
-        $providers = $provider ? [$provider] : array_keys($this->config['providers'] ?? []);
+        // Use the smart resolver to find the correct provider(s)
+        $providers = $this->resolveProvidersForVerification($reference, $provider);
         $exceptions = [];
 
         foreach ($providers as $providerName) {
@@ -213,6 +221,62 @@ class PaymentManager
             "Unable to verify payment reference: $reference",
             ['exceptions' => array_map(fn ($e) => $e->getMessage(), $exceptions)]
         );
+    }
+
+    /**
+     * Smartly determine which provider(s) to check.
+     */
+    protected function resolveProvidersForVerification(string $reference, ?string $explicitProvider): array
+    {
+        // 1. Explicit provider passed? Use it (Fastest).
+        if ($explicitProvider) {
+            return [$explicitProvider];
+        }
+
+        // 2. Check Cache (Fast & Works for Custom Refs without DB)
+        $cachedProvider = Cache::get("payzephyr_ref_$reference");
+        if ($cachedProvider) {
+            return [$cachedProvider];
+        }
+
+        // 3. Check Database (Reliable for long-term / if cache expired)
+        if (config('payments.logging.enabled', true)) {
+            $dbProvider = PaymentTransaction::where('reference', $reference)->value('provider');
+            if ($dbProvider) {
+                return [$dbProvider];
+            }
+        }
+
+        // 4. Check Prefix (Reliable for Package-Generated Refs)
+        $guessedProvider = $this->detectProviderFromReference($reference);
+        if ($guessedProvider) {
+            return [$guessedProvider];
+        }
+
+        // 5. Fallback: Check ALL providers (Slow, Safety Net)
+        return array_keys($this->getEnabledProviders());
+    }
+
+    /**
+     * Attempt to identify the provider based on the reference prefix.
+     */
+    protected function detectProviderFromReference(string $reference): ?string
+    {
+        $prefixes = [
+            'PAYSTACK' => 'paystack',
+            'FLW' => 'flutterwave',
+            'MON' => 'monnify',
+            'STRIPE' => 'stripe',
+            'PAYPAL' => 'paypal',
+        ];
+
+        foreach ($prefixes as $prefix => $driver) {
+            if (str_starts_with(strtoupper($reference), $prefix.'_')) {
+                return $driver;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -249,7 +313,7 @@ class PaymentManager
     }
 
     /**
-     * Get the list of providers to try in order (default + fallback).
+     * Get the list of providers to try in order (default and fallback).
      *
      * Returns something like ['paystack', 'stripe'] - first tries Paystack,
      * then Stripe if Paystack fails.

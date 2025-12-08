@@ -341,4 +341,32 @@ class StripeDriver extends AbstractDriver
             ],
         );
     }
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['object']['metadata']['reference']
+            ?? $payload['data']['object']['client_reference_id']
+            ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['object']['status'] ?? $payload['type'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['object']['payment_method'] ?? null;
+    }
+
+    // Inherits resolveVerificationId from AbstractDriver (uses $providerId)
 }

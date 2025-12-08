@@ -224,4 +224,38 @@ class FlutterwaveDriver extends AbstractDriver
             return false;
         }
     }
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['tx_ref'] ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['status'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['payment_type'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification.
+     * Flutterwave verifies by tx_ref, not the internal access code.
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Flutterwave verifies by tx_ref, not the internal access code
+        return $reference;
+    }
 }

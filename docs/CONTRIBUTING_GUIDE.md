@@ -334,8 +334,46 @@ class SquareDriver extends AbstractDriver
     {
         // Check if Square API is accessible
     }
+
+    /**
+     * Extract the transaction reference from Square's webhook payload.
+     * Each provider structures webhooks differently - this method handles Square's format.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['id'] ?? $payload['data']['object']['id'] ?? null;
+    }
+
+    /**
+     * Extract the payment status from Square's webhook payload.
+     * Returns the raw status - it will be normalized by StatusNormalizer.
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['status'] ?? $payload['type'] ?? 'unknown';
+    }
+
+    /**
+     * Extract the payment channel from Square's webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['payment_method'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification.
+     * Some providers use the reference directly, others need a different ID.
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Square uses the provider ID (payment ID) for verification
+        return $providerId;
+    }
 }
 ```
+
+**Important:** The four new methods (`extractWebhookReference`, `extractWebhookStatus`, `extractWebhookChannel`, and `resolveVerificationId`) are required by the `DriverInterface`. They allow the system to handle webhooks and verification without hardcoding provider-specific logic in the core classes.
 
 ### Step 3: Add Configuration
 

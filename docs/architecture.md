@@ -88,6 +88,17 @@ Each driver knows how to:
 2. Parse responses from that provider
 3. Validate webhooks from that provider
 4. Check if the provider is healthy/working
+5. Extract data from webhook payloads (reference, status, channel)
+6. Resolve the correct verification ID (some providers use reference, others use access codes/session IDs)
+
+**Webhook Data Extraction:**
+Each driver implements provider-specific methods for extracting data from webhooks:
+- `extractWebhookReference()` - Gets the payment reference from the webhook
+- `extractWebhookStatus()` - Gets the payment status (in provider-native format)
+- `extractWebhookChannel()` - Gets the payment channel/method
+- `resolveVerificationId()` - Determines which ID to use for verification
+
+This follows the **Open/Closed Principle** - adding new providers doesn't require modifying core classes.
 
 ### 4. PaymentManager
 
@@ -197,27 +208,36 @@ Here's what happens when you verify a payment:
    Payment::verify($reference, 'paystack')  // Check specific provider
    ```
 
-2. **PaymentManager searches for the payment:**
+2. **PaymentManager resolves verification context:**
+   - Checks cache for the provider and ID associated with the reference
+   - If cached: uses the driver's `resolveVerificationId()` to get the correct verification ID
+   - If not cached: checks database for the transaction
+   - If found in database: uses the driver's `resolveVerificationId()` to resolve the ID
+   - Falls back to heuristics (reference format) if needed
+   - This ensures the correct ID is used for verification (some providers use reference, others use access codes/session IDs)
+
+3. **PaymentManager searches for the payment:**
    - If you specified a provider: only checks that one
    - If you didn't: checks ALL enabled providers
    - This is useful because you might not know which provider processed the payment (if fallback was used)
 
-3. **For each provider:**
+4. **For each provider:**
    - Gets the driver (e.g., PaystackDriver)
-   - Calls `verify()` on the driver
+   - Uses the resolved verification ID (from step 2)
+   - Calls `verify()` on the driver with the correct ID
    - Driver makes API call to check payment status
    - If found: returns the result
    - If not found: tries next provider
 
-4. **Transaction is updated:**
+5. **Transaction is updated:**
    - Updates the `payment_transactions` record with latest status
    - Updates: status, payment method, timestamp, etc.
 
-5. **VerificationResponse is returned:**
+6. **VerificationResponse is returned:**
    - Contains: reference, status, amount, currency, payment date, etc.
    - You can check `$response->isSuccessful()` to see if payment succeeded
 
-6. **Your app handles the result:**
+7. **Your app handles the result:**
    - Update order status
    - Send confirmation email
    - Process the order
@@ -243,14 +263,16 @@ Here's what happens when a payment provider sends a webhook:
    - Prevents fake webhooks from hackers
    - Uses HMAC SHA512 with your secret key
 
-5. **Controller extracts payment data:**
-   - Finds the payment reference in the webhook data
-   - Each provider structures data differently, so controller knows where to look
+5. **Controller extracts payment data (via Driver):**
+   - Delegates to the driver to extract reference, status, and channel
+   - Each driver implements `extractWebhookReference()`, `extractWebhookStatus()`, and `extractWebhookChannel()`
+   - This follows the Open/Closed Principle - provider-specific logic is encapsulated in drivers
 
 6. **Controller updates database:**
    - Updates `payment_transactions` record
    - Changes status from 'pending' to 'success' or 'failed'
    - Saves payment method, timestamp, etc.
+   - Status is normalized using the StatusNormalizer service
 
 7. **Controller fires Laravel events:**
    - `payments.webhook.paystack` (provider-specific event)
@@ -320,10 +342,55 @@ Configuration is hierarchical:
 
 ### Adding New Providers
 
-1. Create driver class extending `AbstractDriver`
-2. Implement `DriverInterface` methods
-3. Add configuration to `config/payments.php`
-4. Register in PaymentManager's driver map
+The package follows the **Open/Closed Principle (OCP)**, making it easy to add new providers without modifying existing code.
+
+1. **Create driver class extending `AbstractDriver`**
+2. **Implement `DriverInterface` methods:**
+   - `charge()` - Create a payment
+   - `verify()` - Verify payment status
+   - `validateWebhook()` - Validate webhook signatures
+   - `healthCheck()` - Check provider availability
+   - `extractWebhookReference()` - Extract reference from webhook payload
+   - `extractWebhookStatus()` - Extract status from webhook payload
+   - `extractWebhookChannel()` - Extract payment channel from webhook payload
+   - `resolveVerificationId()` - Resolve the ID needed for verification
+3. **Add configuration to `config/payments.php`**
+4. **That's it!** The system automatically uses your driver
+
+**Example:**
+```php
+class SquareDriver extends AbstractDriver
+{
+    // ... implement required methods ...
+    
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['id'] ?? null;
+    }
+    
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['status'] ?? 'unknown';
+    }
+    
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['payment_method'] ?? null;
+    }
+    
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Square uses the provider ID for verification
+        return $providerId;
+    }
+}
+```
+
+**Benefits:**
+- ✅ No need to modify `WebhookController` or `PaymentManager`
+- ✅ Provider-specific logic is encapsulated in the driver
+- ✅ Easy to test and maintain
+- ✅ Follows SOLID principles
 
 ### Custom DTOs
 

@@ -345,4 +345,46 @@ abstract class AbstractDriver implements DriverInterface
         // Drivers can override this behavior if needed
         return null;
     }
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     * Default implementation that can be overridden by specific drivers.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['reference'] ?? $payload['transactionReference'] ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     * The normalizer will take care of converting this to standard format.
+     * Default implementation that can be overridden by specific drivers.
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['status'] ?? $payload['paymentStatus'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel (e.g., 'card', 'bank_transfer') from a raw webhook payload.
+     * Default implementation that can be overridden by specific drivers.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['channel'] ?? $payload['paymentMethod'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification (which may differ from the
+     * internal reference or the provider's Access Code).
+     * Default implementation uses the provider's internal ID.
+     *
+     * @param  string  $reference  The package's unique reference (e.g., PAYSTACK_...)
+     * @param  string  $providerId  The provider's internal ID saved during charge (e.g., Paystack access_code)
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Default: Use the provider's internal ID (e.g., Stripe Session ID)
+        return $providerId;
+    }
 }

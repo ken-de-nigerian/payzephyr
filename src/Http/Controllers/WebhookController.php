@@ -8,6 +8,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use KenDeNigerian\PayZephyr\Constants\PaymentStatus;
+use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
@@ -97,43 +98,33 @@ class WebhookController extends Controller
     /**
      * Find the transaction reference in the webhook data.
      *
-     * Each provider structures their webhook differently, so this method
-     * knows where to look for the reference in each provider's format.
+     * Delegates to the driver to extract the reference according to its webhook format.
      */
     protected function extractReference(string $provider, array $payload): ?string
     {
-        return match ($provider) {
-            'paystack' => $payload['data']['reference'] ?? null,
-            'flutterwave' => $payload['data']['tx_ref'] ?? null,
-            'monnify' => $payload['paymentReference'] ?? $payload['transactionReference'] ?? null,
-            'stripe' => $payload['data']['object']['metadata']['reference'] ??
-                $payload['data']['object']['client_reference_id'] ?? null,
-            'paypal' => $payload['resource']['custom_id'] ??
-                $payload['resource']['purchase_units'][0]['custom_id'] ?? null,
-            default => null,
-        };
+        try {
+            return $this->manager->driver($provider)->extractWebhookReference($payload);
+        } catch (DriverNotFoundException) {
+            // Unknown provider - return null
+            return null;
+        }
     }
 
     /**
      * Figure out the payment status from the webhook data.
      *
-     * Each provider uses different status names (e.g., 'successful', 'succeeded', 'PAID'),
-     * so this converts them all to our standard format: 'success', 'failed', or 'pending'.
+     * Delegates to the driver to extract the status, then normalizes it to standard format.
      */
     protected function determineStatus(string $provider, array $payload): string
     {
-        $status = match ($provider) {
-            'paystack' => $payload['data']['status'] ?? 'unknown',
-            'flutterwave' => $payload['data']['status'] ?? 'unknown',
-            'monnify' => $payload['paymentStatus'] ?? 'unknown',
-            'stripe' => $payload['data']['object']['status'] ??
-                $payload['type'] ?? 'unknown',
-            'paypal' => $payload['resource']['status'] ??
-                $payload['event_type'] ?? 'unknown',
-            default => 'unknown',
-        };
-
-        return $this->statusNormalizer->normalize($status, $provider);
+        try {
+            $status = $this->manager->driver($provider)->extractWebhookStatus($payload);
+            return $this->statusNormalizer->normalize($status, $provider);
+        } catch (DriverNotFoundException) {
+            // Unknown provider - use default extraction
+            $status = $payload['status'] ?? $payload['paymentStatus'] ?? 'unknown';
+            return $this->statusNormalizer->normalize($status, $provider);
+        }
     }
 
     /**
@@ -155,17 +146,13 @@ class WebhookController extends Controller
                 $updateData['paid_at'] = now();
             }
 
-            $channel = match ($provider) {
-                'paystack' => $payload['data']['channel'] ?? null,
-                'flutterwave' => $payload['data']['payment_type'] ?? null,
-                'monnify' => $payload['paymentMethod'] ?? null,
-                'stripe' => $payload['data']['object']['payment_method'] ?? null,
-                'paypal' => 'paypal',
-                default => null,
-            };
-
-            if ($channel) {
-                $updateData['channel'] = $channel;
+            try {
+                $channel = $this->manager->driver($provider)->extractWebhookChannel($payload);
+                if ($channel) {
+                    $updateData['channel'] = $channel;
+                }
+            } catch (DriverNotFoundException) {
+                // Unknown provider - skip channel extraction
             }
 
             PaymentTransaction::where('reference', $reference)->update($updateData);

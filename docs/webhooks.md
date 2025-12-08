@@ -281,18 +281,18 @@ class HandleAnyWebhook
     
     /**
      * Find the payment reference in the webhook data.
-     * Each provider puts it in a different place!
+     * Delegates to the driver to extract the reference according to its webhook format.
+     * This follows the Open/Closed Principle - each driver handles its own data extraction.
      */
     private function extractReference(string $provider, array $payload): ?string
     {
-        return match($provider) {
-            'paystack' => $payload['data']['reference'] ?? null,
-            'flutterwave' => $payload['data']['tx_ref'] ?? null,
-            'monnify' => $payload['paymentReference'] ?? null,
-            'stripe' => $payload['data']['object']['metadata']['reference'] ?? null,
-            'paypal' => $payload['resource']['custom_id'] ?? null,
-            default => null,
-        };
+        try {
+            $driver = Payment::manager()->driver($provider);
+            return $driver->extractWebhookReference($payload);
+        } catch (\KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException $e) {
+            // Unknown provider - return null
+            return null;
+        }
     }
     
     /**

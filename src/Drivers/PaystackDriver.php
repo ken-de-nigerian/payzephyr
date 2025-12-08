@@ -232,4 +232,38 @@ class PaystackDriver extends AbstractDriver
             return false;
         }
     }
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['reference'] ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['status'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['channel'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification.
+     * Paystack verifies by the main transaction reference, not the access code.
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Paystack verifies by the main transaction reference, not the access code
+        return $reference;
+    }
 }

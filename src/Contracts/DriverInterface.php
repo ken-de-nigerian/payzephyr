@@ -54,4 +54,29 @@ interface DriverInterface
      * Get supported currencies
      */
     public function getSupportedCurrencies(): array;
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string;
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     * The normalizer will take care of converting this to standard format.
+     */
+    public function extractWebhookStatus(array $payload): string;
+
+    /**
+     * Get the payment channel (e.g., 'card', 'bank_transfer') from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string;
+
+    /**
+     * Resolve the actual ID needed for verification (which may differ from the
+     * internal reference or the provider's Access Code).
+     *
+     * @param  string  $reference  The package's unique reference (e.g., PAYSTACK_...)
+     * @param  string  $providerId  The provider's internal ID saved during charge (e.g., Paystack access_code)
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string;
 }

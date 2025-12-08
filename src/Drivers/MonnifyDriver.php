@@ -238,4 +238,38 @@ class MonnifyDriver extends AbstractDriver
         }
     }
 
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['paymentReference'] ?? $payload['transactionReference'] ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['paymentStatus'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['paymentMethod'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification.
+     * Monnify can use either reference or provider ID.
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Monnify can use either reference or provider ID
+        return $providerId;
+    }
+
 }

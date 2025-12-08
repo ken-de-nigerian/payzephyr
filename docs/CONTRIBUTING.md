@@ -562,6 +562,44 @@ class NewProviderDriver extends AbstractDriver implements DriverInterface
     {
         // Implementation
     }
+
+    /**
+     * Extract the transaction reference from the provider's webhook payload.
+     * This method is called by WebhookController to get the payment reference.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['data']['reference'] ?? $payload['reference'] ?? null;
+    }
+
+    /**
+     * Extract the payment status from the provider's webhook payload.
+     * Returns the raw status - it will be normalized by StatusNormalizer.
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['data']['status'] ?? $payload['status'] ?? 'unknown';
+    }
+
+    /**
+     * Extract the payment channel from the provider's webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return $payload['data']['channel'] ?? $payload['channel'] ?? null;
+    }
+
+    /**
+     * Resolve the actual ID needed for verification.
+     * Some providers use the reference directly, others need a different ID.
+     * This is used by PaymentManager when resolving verification context.
+     */
+    public function resolveVerificationId(string $reference, string $providerId): string
+    {
+        // Default: Use the provider ID (e.g., access code, session ID)
+        // Override if your provider uses the reference directly
+        return $providerId;
+    }
 }
 ```
 

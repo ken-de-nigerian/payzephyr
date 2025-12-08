@@ -539,6 +539,7 @@ test('webhook controller handles webhook without reference', function () {
     // Mock driver validation
     $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturn(true);
+    $driver->shouldReceive('extractWebhookReference')->andReturn(null);
 
     $manager = Mockery::mock(PaymentManager::class);
     $manager->shouldReceive('driver')->andReturn($driver);

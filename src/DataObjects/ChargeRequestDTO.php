@@ -14,7 +14,7 @@ use InvalidArgumentException;
  *
  * Important: Amount is stored as a float (e.g., 100.00 for $100), but when
  * sending to payment providers, always use getAmountInMinorUnits() which
- * converts it to the smallest currency unit (e.g., 10000 cents for $100).
+ * converts it to the smallest currency unit (e.g., 10,000 cents for $100).
  */
 final readonly class ChargeRequestDTO
 {
@@ -70,8 +70,8 @@ final readonly class ChargeRequestDTO
      * Convert the amount to the smallest currency unit (cents, kobo, etc.).
      *
      * Payment providers need amounts in the smallest unit:
-     * - $100.00 becomes 10000 cents
-     * - ₦100.00 becomes 10000 kobos
+     * - $100.00 becomes 10,000 cents
+     * - ₦100.00 becomes 10,000 kobos
      *
      * This method rounds to avoid floating-point precision issues.
      *

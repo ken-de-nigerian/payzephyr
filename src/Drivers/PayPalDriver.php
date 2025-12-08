@@ -439,4 +439,32 @@ class PayPalDriver extends AbstractDriver
             );
         }
     }
+
+    /**
+     * Get the transaction reference from a raw webhook payload.
+     */
+    public function extractWebhookReference(array $payload): ?string
+    {
+        return $payload['resource']['custom_id']
+            ?? $payload['resource']['purchase_units'][0]['custom_id']
+            ?? null;
+    }
+
+    /**
+     * Get the payment status from a raw webhook payload (in provider-native format).
+     */
+    public function extractWebhookStatus(array $payload): string
+    {
+        return $payload['resource']['status'] ?? $payload['event_type'] ?? 'unknown';
+    }
+
+    /**
+     * Get the payment channel from a raw webhook payload.
+     */
+    public function extractWebhookChannel(array $payload): ?string
+    {
+        return 'paypal';
+    }
+
+    // Inherits resolveVerificationId from AbstractDriver (uses $providerId)
 }

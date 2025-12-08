@@ -10,6 +10,7 @@ use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
 test('webhook controller handles default status in determineStatus', function () {
     $manager = Mockery::mock(PaymentManager::class);
+    $manager->shouldReceive('driver')->with('unknown_provider')->andThrow(new \KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException('Unknown driver'));
     $normalizer = new StatusNormalizer();
     $controller = new WebhookController($manager, $normalizer);
     
@@ -24,6 +25,9 @@ test('webhook controller handles default status in determineStatus', function ()
 
 test('webhook controller handles paypal status from event_type', function () {
     $manager = Mockery::mock(PaymentManager::class);
+    $paypalDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $paypalDriver->shouldReceive('extractWebhookStatus')->andReturn('PAYMENT.CAPTURE.COMPLETED');
+    $manager->shouldReceive('driver')->with('paypal')->andReturn($paypalDriver);
     $normalizer = new StatusNormalizer();
     $controller = new WebhookController($manager, $normalizer);
     
@@ -65,6 +69,9 @@ test('webhook controller handles webhook update with channel', function () {
     // Mock driver
     $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturn(true);
+    $driver->shouldReceive('extractWebhookReference')->andReturn('test_ref');
+    $driver->shouldReceive('extractWebhookStatus')->andReturn('success');
+    $driver->shouldReceive('extractWebhookChannel')->andReturn('card');
     $manager = Mockery::mock(PaymentManager::class);
     $manager->shouldReceive('driver')->andReturn($driver);
     
@@ -95,6 +102,9 @@ test('webhook controller handles database error in updateTransactionFromWebhook'
     // Mock driver
     $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturn(true);
+    $driver->shouldReceive('extractWebhookReference')->andReturn('nonexistent_ref');
+    $driver->shouldReceive('extractWebhookStatus')->andReturn('success');
+    $driver->shouldReceive('extractWebhookChannel')->andReturn(null);
     $manager = Mockery::mock(PaymentManager::class);
     $manager->shouldReceive('driver')->andReturn($driver);
     
@@ -132,6 +142,9 @@ test('webhook controller handles successful status with paid_at', function () {
     // Mock driver
     $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturn(true);
+    $driver->shouldReceive('extractWebhookReference')->andReturn('test_ref');
+    $driver->shouldReceive('extractWebhookStatus')->andReturn('success');
+    $driver->shouldReceive('extractWebhookChannel')->andReturn(null);
     $manager = Mockery::mock(PaymentManager::class);
     $manager->shouldReceive('driver')->andReturn($driver);
     

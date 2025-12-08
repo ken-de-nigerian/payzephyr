@@ -251,9 +251,8 @@ class PaymentManager
         // 1. Check Cache (Fastest & Works without DB)
         $cached = Cache::get("payzephyr_session_$reference");
         if ($cached) {
-            $verificationId = ($cached['provider'] === 'paystack' || $cached['provider'] === 'flutterwave')
-                ? $reference
-                : $cached['id'];
+            $driver = $this->driver($cached['provider']);
+            $verificationId = $driver->resolveVerificationId($reference, $cached['id']);
 
             return [
                 'provider' => $cached['provider'],
@@ -265,18 +264,32 @@ class PaymentManager
         if (config('payments.logging.enabled', true)) {
             $transaction = PaymentTransaction::where('reference', $reference)->first();
             if ($transaction) {
-                $providerId = match ($transaction->provider) {
-                    'paystack', 'flutterwave' => $reference,
-                    default => $transaction->metadata['_provider_id']
+                try {
+                    $driver = $this->driver($transaction->provider);
+
+                    $providerId = $transaction->metadata['_provider_id']
                         ?? $transaction->metadata['session_id']
                         ?? $transaction->metadata['order_id']
-                        ?? $reference,
-                };
+                        ?? $reference;
 
-                return [
-                    'provider' => $transaction->provider,
-                    'id' => $providerId,
-                ];
+                    $verificationId = $driver->resolveVerificationId($reference, $providerId);
+
+                    return [
+                        'provider' => $transaction->provider,
+                        'id' => $verificationId,
+                    ];
+                } catch (DriverNotFoundException) {
+                    // Provider not configured - fall back to using reference
+                    $providerId = $transaction->metadata['_provider_id']
+                        ?? $transaction->metadata['session_id']
+                        ?? $transaction->metadata['order_id']
+                        ?? $reference;
+
+                    return [
+                        'provider' => $transaction->provider,
+                        'id' => $providerId,
+                    ];
+                }
             }
         }
 

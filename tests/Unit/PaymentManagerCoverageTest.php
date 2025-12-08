@@ -71,7 +71,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
     $result = $method->invoke($manager, 'ref_123', null);
 
     expect($result['provider'])->toBe('paystack')
-        ->and($result['id'])->toBe('provider_id_123');
+        ->and($result['id'])->toBe('ref_123'); // Paystack uses reference, not cached id
 });
 
 test('payment manager resolveVerificationContext uses database when cache miss', function () {
@@ -98,7 +98,7 @@ test('payment manager resolveVerificationContext uses database when cache miss',
     $result = $method->invoke($manager, 'ref_123', null);
 
     expect($result['provider'])->toBe('paystack')
-        ->and($result['id'])->toBe('provider_id_123');
+        ->and($result['id'])->toBe('ref_123'); // Paystack uses reference, not database id
 });
 
 test('payment manager resolveVerificationContext uses provider detector when no cache or db', function () {

@@ -33,7 +33,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
 
     expect($result)->toBeArray()
         ->and($result['provider'])->toBe('paystack')
-        ->and($result['id'])->toBe('provider_id');
+        ->and($result['id'])->toBe('test_ref'); // Paystack uses reference, not cached id
 });
 
 test('payment manager resolveVerificationContext uses database second', function () {
@@ -57,7 +57,7 @@ test('payment manager resolveVerificationContext uses database second', function
 
     expect($result)->toBeArray()
         ->and($result['provider'])->toBe('paystack')
-        ->and($result['id'])->toBe('provider_id_from_db');
+        ->and($result['id'])->toBe('db_ref_123'); // Paystack uses reference, not database id
 });
 
 test('payment manager resolveVerificationContext uses provider detector third', function () {

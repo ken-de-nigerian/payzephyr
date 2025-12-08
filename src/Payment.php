@@ -91,7 +91,7 @@ class Payment
      * Set the URL where the customer should be sent after they finish paying.
      * This is where you'll verify the payment status.
      *
-     * **Required:** This method must be called when using the fluent API.
+     * **Required: ** This method must be called when using the fluent API.
      * The payment will fail if the callback URL is not provided.
      */
     public function callback(string $url): static
@@ -192,7 +192,7 @@ class Payment
      * Use this when you want to handle the redirect yourself (e.g., for API responses).
      * For automatic redirects, use redirect() instead.
      *
-     * @throws \KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException If callback URL is not set.
+     * @throws InvalidConfigurationException If callback URL is not set.
      * @throws ProviderException If all payment providers fail.
      */
     public function charge(): ChargeResponseDTO
@@ -219,7 +219,7 @@ class Payment
      *
      * Use this in your controller: return Payment::amount(1000)->email('user@example.com')->redirect();
      *
-     * @throws ProviderException If all payment providers fail.
+     * @throws ProviderException|InvalidConfigurationException If all payment providers fail.
      */
     public function redirect(): RedirectResponse
     {

@@ -41,7 +41,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
 
     expect($result)->toBe([
         'provider' => 'paystack',
-        'id' => 'provider_id_123',
+        'id' => 'test_ref', // Paystack uses reference, not cached id
     ]);
 });
 
@@ -68,7 +68,7 @@ test('payment manager resolveVerificationContext uses database when cache miss',
 
     expect($result)->toBe([
         'provider' => 'flutterwave',
-        'id' => 'flw_id_123',
+        'id' => 'db_ref', // Flutterwave uses reference, not database id
     ]);
 });
 

@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Constants\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use Throwable;
 
 /**
  * ChargeResponseDTO - Payment Initialization Response
@@ -34,12 +35,13 @@ final readonly class ChargeResponseDTO
         try {
             if (function_exists('app')) {
                 $normalizer = app(StatusNormalizer::class);
+
                 return $normalizer->normalize($this->status, $this->provider);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Fall back to static normalization if container unavailable
         }
-        
+
         return StatusNormalizer::normalizeStatic($this->status);
     }
 
@@ -80,6 +82,7 @@ final readonly class ChargeResponseDTO
     {
         $normalizedStatus = $this->getNormalizedStatus();
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isSuccessful() ?? false;
     }
 
@@ -90,6 +93,7 @@ final readonly class ChargeResponseDTO
     {
         $normalizedStatus = $this->getNormalizedStatus();
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isPending() ?? false;
     }
 }

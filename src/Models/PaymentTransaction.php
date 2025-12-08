@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use KenDeNigerian\PayZephyr\Constants\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use Throwable;
 
 /**
  * PaymentTransaction - Database Model for Payment Records
@@ -84,9 +85,6 @@ class PaymentTransaction extends Model
     /**
      * Get only payments that were successful.
      * Usage: PaymentTransaction::successful()->get()
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeSuccessful(Builder $query): Builder
     {
@@ -98,16 +96,13 @@ class PaymentTransaction extends Model
             'successful',
             'paid',
         ];
-        
+
         return $query->whereIn('status', $successStatuses);
     }
 
     /**
      * Get only payments that failed.
      * Usage: PaymentTransaction::failed()->get()
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopeFailed(Builder $query): Builder
     {
@@ -121,16 +116,13 @@ class PaymentTransaction extends Model
             'voided',
             'expired',
         ];
-        
+
         return $query->whereIn('status', $failedStatuses);
     }
 
     /**
      * Get only payments that are still pending (waiting for customer).
      * Usage: PaymentTransaction::pending()->get()
-     *
-     * @param Builder $query
-     * @return Builder
      */
     public function scopePending(Builder $query): Builder
     {
@@ -150,11 +142,12 @@ class PaymentTransaction extends Model
             } else {
                 $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
         }
-        
+
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isSuccessful() ?? false;
     }
 
@@ -171,11 +164,12 @@ class PaymentTransaction extends Model
             } else {
                 $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
         }
-        
+
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isFailed() ?? false;
     }
 
@@ -192,11 +186,12 @@ class PaymentTransaction extends Model
             } else {
                 $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
         }
-        
+
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isPending() ?? false;
     }
 }

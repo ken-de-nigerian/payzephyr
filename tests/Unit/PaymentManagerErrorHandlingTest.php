@@ -30,9 +30,9 @@ test('payment manager handles database error during transaction logging graceful
     // The logTransaction method catches exceptions internally
     try {
         $manager->chargeWithFallback($request, ['paystack']);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Expected to fail due to no actual API, but logging error should be caught
-        expect($e)->not->toBeInstanceOf(\PDOException::class);
+        expect($e)->not->toBeInstanceOf(PDOException::class);
     }
 });
 
@@ -52,9 +52,9 @@ test('payment manager handles database error during verification update graceful
     // Should not throw exception even if database update fails
     try {
         $manager->verify('test_ref', 'paystack');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Expected to fail due to no actual API, but database error should be caught
-        expect($e)->not->toBeInstanceOf(\PDOException::class);
+        expect($e)->not->toBeInstanceOf(PDOException::class);
     }
 });
 
@@ -77,10 +77,10 @@ test('payment manager getDefaultDriver returns first provider when default not s
 test('payment manager getDefaultDriver handles empty providers config', function () {
     // Clear all config to ensure empty providers
     config()->set('payments.providers', []);
-    config()->set('payments.default', null);
+    config()->set('payments.default');
 
     $manager = new PaymentManager;
-    
+
     // When no providers and no default, array_key_first returns null
     // but the method return type is string, so it will cause a type error
     // This tests that the method handles edge cases
@@ -88,9 +88,9 @@ test('payment manager getDefaultDriver handles empty providers config', function
         $default = $manager->getDefaultDriver();
         // If it doesn't throw, it should return a string (even if empty)
         expect($default)->toBeString();
-    } catch (\TypeError $e) {
+    } catch (TypeError $e) {
         // Type error is expected when array_key_first returns null
-        expect($e)->toBeInstanceOf(\TypeError::class);
+        expect($e)->toBeInstanceOf(TypeError::class);
     }
 });
 
@@ -169,9 +169,9 @@ test('payment manager handles logging disabled during charge', function () {
     // Should not attempt to log when logging is disabled
     try {
         $manager->chargeWithFallback($request, ['paystack']);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Expected to fail due to no actual API
-        expect($e)->toBeInstanceOf(\Exception::class);
+        expect($e)->toBeInstanceOf(Exception::class);
     }
 });
 
@@ -191,9 +191,9 @@ test('payment manager handles logging disabled during verification', function ()
     // Should not attempt to update when logging is disabled
     try {
         $manager->verify('test_ref', 'paystack');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Expected to fail due to no actual API
-        expect($e)->toBeInstanceOf(\Exception::class);
+        expect($e)->toBeInstanceOf(Exception::class);
     }
 });
 
@@ -203,15 +203,15 @@ test('payment manager updateTransactionFromVerification handles successful payme
     ]);
 
     // Ensure we're using the testing connection
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+    DB::setDefaultConnection('testing');
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -244,16 +244,15 @@ test('payment manager updateTransactionFromVerification handles successful payme
         amount: 1000,
         currency: 'NGN',
         paidAt: now()->toIso8601String(),
-        channel: 'card',
-        customer: null,
         metadata: [],
-        provider: 'paystack'
+        provider: 'paystack',
+        channel: 'card',
+        customer: null
     );
 
     // Use reflection to call protected method
-    $reflection = new \ReflectionClass($manager);
+    $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    $method->setAccessible(true);
 
     // Should not throw exception
     $method->invoke($manager, 'test_ref_123', $response);
@@ -269,15 +268,15 @@ test('payment manager updateTransactionFromVerification handles failed payment',
     ]);
 
     // Ensure we're using the testing connection
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+    DB::setDefaultConnection('testing');
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -310,16 +309,15 @@ test('payment manager updateTransactionFromVerification handles failed payment',
         amount: 1000,
         currency: 'NGN',
         paidAt: null,
-        channel: null,
-        customer: null,
         metadata: [],
-        provider: 'paystack'
+        provider: 'paystack',
+        channel: null,
+        customer: null
     );
 
     // Use reflection to call protected method
-    $reflection = new \ReflectionClass($manager);
+    $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    $method->setAccessible(true);
 
     // Should not throw exception
     $method->invoke($manager, 'test_ref_failed', $response);
@@ -335,15 +333,15 @@ test('payment manager logTransaction creates transaction with all fields', funct
     ]);
 
     // Ensure we're using the testing connection
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+    DB::setDefaultConnection('testing');
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -379,9 +377,8 @@ test('payment manager logTransaction creates transaction with all fields', funct
     );
 
     // Use reflection to call protected method
-    $reflection = new \ReflectionClass($manager);
+    $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('logTransaction');
-    $method->setAccessible(true);
 
     // Should not throw exception
     $method->invoke($manager, $request, $response, 'paystack');
@@ -393,8 +390,7 @@ test('payment manager logTransaction creates transaction with all fields', funct
         ->and($transaction->email)->toBe('customer@example.com')
         ->and($transaction->metadata)->toBe([
             'order_id' => 123,
-            '_provider_id' => 'access_123'
+            '_provider_id' => 'access_123',
         ])
         ->and($transaction->customer)->toBe(['name' => 'John Doe']);
 });
-

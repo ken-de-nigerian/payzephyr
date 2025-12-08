@@ -124,7 +124,7 @@ class StatusNormalizer
     public static function normalizeStatic(string $status): string
     {
         $status = strtoupper(trim($status));
-        
+
         $defaultMappings = [
             'success' => [
                 'SUCCESS', 'SUCCEEDED', 'COMPLETED', 'SUCCESSFUL', 'PAID', 'OVERPAID', 'CAPTURED',

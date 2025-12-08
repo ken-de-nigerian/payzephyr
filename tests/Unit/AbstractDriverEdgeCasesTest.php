@@ -48,7 +48,7 @@ test('abstract driver handles null currency check', function () {
 
     // Should throw TypeError for null currency (type safety)
     expect(fn () => $driver->isCurrencySupported(null))
-        ->toThrow(\TypeError::class);
+        ->toThrow(TypeError::class);
 });
 
 test('abstract driver reference generation handles custom prefix', function () {
@@ -63,9 +63,8 @@ test('abstract driver reference generation handles custom prefix', function () {
 
     $driver = new PaystackDriver(config('payments.providers.paystack'));
 
-    $reflection = new \ReflectionClass($driver);
+    $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('generateReference');
-    $method->setAccessible(true);
 
     $reference = $method->invoke($driver);
 
@@ -87,9 +86,8 @@ test('abstract driver handles ssl verification in testing mode', function () {
     $driver = new PaystackDriver(config('payments.providers.paystack'));
 
     // Should disable SSL verification in testing mode
-    $reflection = new \ReflectionClass($driver);
+    $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('client');
-    $property->setAccessible(true);
     $client = $property->getValue($driver);
 
     // Client should be initialized
@@ -132,7 +130,7 @@ test('abstract driver handles logging disabled config', function () {
 
     // Should not throw exception when logging is disabled
     $result = $driver->isCurrencySupported('NGN');
-    
+
     expect($result)->toBeBool();
 });
 
@@ -148,9 +146,8 @@ test('abstract driver handles different log levels', function () {
 
     $driver = new PaystackDriver(config('payments.providers.paystack'));
 
-    $reflection = new \ReflectionClass($driver);
+    $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('log');
-    $method->setAccessible(true);
 
     // Should handle different log levels
     $method->invoke($driver, 'info', 'Test message');
@@ -171,11 +168,9 @@ test('abstract driver stores configuration correctly', function () {
 
     $driver = new PaystackDriver($config);
 
-    $reflection = new \ReflectionClass($driver);
+    $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('config');
-    $property->setAccessible(true);
     $storedConfig = $property->getValue($driver);
 
     expect($storedConfig)->toBe($config);
 });
-

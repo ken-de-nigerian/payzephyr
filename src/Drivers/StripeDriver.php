@@ -298,7 +298,7 @@ class StripeDriver extends AbstractDriver
 
     private function mapFromCheckoutSession($session): VerificationResponseDTO
     {
-        $pi = $session->payment_intent;
+        $pi = $session->payment_intent ?? null;
 
         $status = match ($session->payment_status) {
             'paid' => 'success',

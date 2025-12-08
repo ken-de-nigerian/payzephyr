@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Constants\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use Throwable;
 
 /**
  * Class VerificationResponseDTO
@@ -37,12 +38,13 @@ final readonly class VerificationResponseDTO
         try {
             if (function_exists('app')) {
                 $normalizer = app(StatusNormalizer::class);
+
                 return $normalizer->normalize($this->status, $this->provider);
             }
-        } catch (\Throwable $e) {
+        } catch (Throwable) {
             // Fall back to static normalization if container unavailable
         }
-        
+
         return StatusNormalizer::normalizeStatic($this->status);
     }
 
@@ -93,6 +95,7 @@ final readonly class VerificationResponseDTO
     {
         $normalizedStatus = $this->getNormalizedStatus();
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isSuccessful() ?? false;
     }
 
@@ -103,6 +106,7 @@ final readonly class VerificationResponseDTO
     {
         $normalizedStatus = $this->getNormalizedStatus();
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isFailed() ?? false;
     }
 
@@ -113,6 +117,7 @@ final readonly class VerificationResponseDTO
     {
         $normalizedStatus = $this->getNormalizedStatus();
         $status = PaymentStatus::tryFromString($normalizedStatus);
+
         return $status?->isPending() ?? false;
     }
 }

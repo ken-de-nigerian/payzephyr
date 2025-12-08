@@ -224,6 +224,15 @@ class MonnifyDriver extends AbstractDriver
             // 4xx means API is reachable
             return true;
 
+        } catch (ChargeException $e) {
+            // If ChargeException wraps a ClientException, API is reachable
+            $previous = $e->getPrevious();
+            if ($previous instanceof ClientException) {
+                return true;
+            }
+
+            return false;
+
         } catch (Exception) {
             return false;
         }

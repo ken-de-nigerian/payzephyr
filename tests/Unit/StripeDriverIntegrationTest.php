@@ -63,7 +63,7 @@ test('stripe charge succeeds', function () {
 
     $driver = createMockStripeDriver($stripeMock);
 
-    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'stripe_ref_123');
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'stripe_ref_123', 'https://example.com/callback');
     $response = $driver->charge($request);
 
     // Assertions based on the new Checkout Session logic
@@ -103,7 +103,7 @@ test('stripe charge handles api error', function () {
     // Here we simulate Stripe rejecting it.
 
     // We expect a ChargeException (wrapper), not the raw Stripe exception
-    expect(fn () => $driver->charge(new ChargeRequestDTO(100, 'USD', 'test@example.com')))
+    expect(fn () => $driver->charge(new ChargeRequestDTO(100, 'USD', 'test@example.com', null, 'https://example.com/callback')))
         ->toThrow(ChargeException::class);
 });
 

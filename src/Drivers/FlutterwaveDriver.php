@@ -77,7 +77,7 @@ class FlutterwaveDriver extends AbstractDriver
                 'amount' => $request->amount,
                 'currency' => $request->currency,
                 'redirect_url' => $this->appendQueryParam(
-                    $request->callbackUrl ?? $this->config['callback_url'] ?? null,
+                    $request->callbackUrl,
                     'reference',
                     $reference
                 ),

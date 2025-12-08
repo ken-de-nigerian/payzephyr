@@ -101,14 +101,14 @@ class StripeDriver extends AbstractDriver
 
         try {
             $reference = $request->reference ?? $this->generateReference('STRIPE');
-            $callback = $request->callbackUrl ?? $this->config['callback_url'] ?? null;
-
-            if (empty($callback)) {
+            if (empty($request->callbackUrl)) {
                 throw new InvalidConfigurationException(
                     'Stripe requires a callback URL for its redirect flow. '.
-                    'Please set "callback_url" in your config/payments.php or use ->callback() in your payment chain.'
+                    'Please use ->callback() in your payment chain to set the callback URL.'
                 );
             }
+
+            $callback = $request->callbackUrl;
 
             // Build the URLs safely using the helper
             $successUrl = $this->appendQueryParam($callback, 'status', 'success');

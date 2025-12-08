@@ -140,7 +140,14 @@ class PayPalDriver extends AbstractDriver
 
         try {
             $reference = $request->reference ?? $this->generateReference('PAYPAL');
-            $callback = $request->callbackUrl ?? $this->config['callback_url'] ?? null;
+            if (empty($request->callbackUrl)) {
+                throw new InvalidConfigurationException(
+                    'PayPal requires a callback URL for its redirect flow. '.
+                    'Please use ->callback() in your payment chain to set the callback URL.'
+                );
+            }
+
+            $callback = $request->callbackUrl;
 
             $decimals = $this->getCurrencyDecimals($request->currency);
 

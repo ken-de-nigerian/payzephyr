@@ -123,6 +123,20 @@ PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true
 
 **Note:** `base_url` is optional and defaults to production endpoints. Only set it if using custom endpoints.
 
+### Callback URL Configuration
+
+The callback URL determines where customers are redirected after completing payment. **It is required** when using the fluent API.
+
+**Required:** You must call `->callback()` in your payment chain:
+```php
+Payment::amount(10000)
+    ->email('customer@example.com')
+    ->callback(route('payment.callback'))  // Required!
+    ->redirect();
+```
+
+**Note:** The payment will fail with an `InvalidConfigurationException` if the callback URL is not provided.
+
 ---
 
 ## Basic Usage

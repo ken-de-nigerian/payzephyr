@@ -23,7 +23,8 @@ test('payment redirect method returns redirect response', function () {
     $payment = new Payment($manager);
     $payment->amount(10000)
         ->currency('NGN')
-        ->email('test@example.com');
+        ->email('test@example.com')
+        ->callback('https://example.com/callback');
     
     $redirect = $payment->redirect();
     

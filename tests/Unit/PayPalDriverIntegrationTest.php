@@ -56,7 +56,7 @@ test('paypal authenticates and charges successfully', function () {
         ])),
     ]);
 
-    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'pp_ref_123');
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'pp_ref_123', 'https://example.com/callback');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('pp_ref_123')
@@ -72,7 +72,7 @@ test('paypal charge handles authentication failure', function () {
         ])),
     ]);
 
-    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class);
 
 test('paypal charge handles api error', function () {
@@ -88,7 +88,7 @@ test('paypal charge handles api error', function () {
     ]);
 
     // This throws InvalidArgumentException because ChargeRequestDTO validation runs first
-    $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(InvalidArgumentException::class);
 
 test('paypal verify returns success', function () {
@@ -179,5 +179,5 @@ test('paypal handles network error', function () {
     };
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class);

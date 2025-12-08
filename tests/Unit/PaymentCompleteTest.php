@@ -19,7 +19,7 @@ test('payment redirect method returns redirect response', function () {
     $mockManager->shouldReceive('chargeWithFallback')->andReturn($mockResponse);
 
     $payment = new Payment($mockManager);
-    $payment->amount(10000)->currency('NGN')->email('test@example.com');
+    $payment->amount(10000)->currency('NGN')->email('test@example.com')->callback('https://example.com/callback');
 
     $redirect = $payment->redirect();
 

@@ -115,7 +115,7 @@ class MonnifyDriver extends AbstractDriver
                 'currencyCode' => $request->currency,
                 'contractCode' => $this->config['contract_code'],
                 'redirectUrl' => $this->appendQueryParam(
-                    $request->callbackUrl ?? $this->config['callback_url'] ?? null,
+                    $request->callbackUrl,
                     'reference',
                     $reference
                 ),

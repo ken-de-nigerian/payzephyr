@@ -76,7 +76,7 @@ class PaystackDriver extends AbstractDriver
                 'amount' => $request->getAmountInMinorUnits(),
                 'currency' => $request->currency,
                 'reference' => $request->reference ?? $this->generateReference(),
-                'callback_url' => $request->callbackUrl ?? $this->config['callback_url'] ?? null,
+                'callback_url' => $request->callbackUrl,
                 'metadata' => $request->metadata,
             ];
 

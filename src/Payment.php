@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 
 /**
@@ -89,6 +90,9 @@ class Payment
     /**
      * Set the URL where the customer should be sent after they finish paying.
      * This is where you'll verify the payment status.
+     *
+     * **Required:** This method must be called when using the fluent API.
+     * The payment will fail if the callback URL is not provided.
      */
     public function callback(string $url): static
     {
@@ -188,10 +192,17 @@ class Payment
      * Use this when you want to handle the redirect yourself (e.g., for API responses).
      * For automatic redirects, use redirect() instead.
      *
+     * @throws \KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException If callback URL is not set.
      * @throws ProviderException If all payment providers fail.
      */
     public function charge(): ChargeResponseDTO
     {
+        if (empty($this->data['callback_url'] ?? null)) {
+            throw new InvalidConfigurationException(
+                'Callback URL is required. Please use ->callback(url) in your payment chain.'
+            );
+        }
+
         $request = ChargeRequestDTO::fromArray(array_merge([
             'currency' => config('payments.currency.default', 'NGN'),
             'channels' => $this->data['channels'] ?? null,

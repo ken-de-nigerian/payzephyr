@@ -159,9 +159,10 @@ test('square verify by payment ID returns success', function () {
 
 test('square verify by reference_id searches orders', function () {
     $driver = createSquareDriverWithMock([
-        // First call: payment ID lookup fails with 404 (not a payment ID, reference doesn't match pattern)
-        // Since reference doesn't start with 'payment_' and isn't 32 chars, skip payment ID lookup
-        // Second call: order search
+        // First call: payment ID lookup skipped (reference doesn't match pattern)
+        // Second call: payment link lookup returns 404 (not a payment link ID)
+        new Response(404, [], json_encode(['errors' => [['message' => 'Not found']]])),
+        // Third call: order search
         new Response(200, [], json_encode([
             'orders' => [
                 [
@@ -170,7 +171,7 @@ test('square verify by reference_id searches orders', function () {
                 ],
             ],
         ])),
-        // Third call: get order details
+        // Fourth call: get order details
         new Response(200, [], json_encode([
             'order' => [
                 'id' => 'order_456',
@@ -181,7 +182,7 @@ test('square verify by reference_id searches orders', function () {
                 ],
             ],
         ])),
-        // Fourth call: get payment details
+        // Fifth call: get payment details
         new Response(200, [], json_encode([
             'payment' => [
                 'id' => 'payment_789',
@@ -225,7 +226,9 @@ test('square verify returns failed status', function () {
 
 test('square verify handles payment not found', function () {
     $driver = createSquareDriverWithMock([
+        // First call: payment link lookup returns 404
         new Response(404, [], json_encode(['errors' => [['message' => 'Not found']]])),
+        // Second call: order search returns empty orders
         new Response(200, [], json_encode(['orders' => []])),
     ]);
 
@@ -234,7 +237,9 @@ test('square verify handles payment not found', function () {
 
 test('square verify handles order without payment', function () {
     $driver = createSquareDriverWithMock([
-        // Order search succeeds
+        // First call: payment link lookup returns 404 (not a payment link ID)
+        new Response(404, [], json_encode(['errors' => [['message' => 'Not found']]])),
+        // Second call: order search succeeds
         new Response(200, [], json_encode([
             'orders' => [
                 [
@@ -243,7 +248,7 @@ test('square verify handles order without payment', function () {
                 ],
             ],
         ])),
-        // Order details - no tenders (empty array)
+        // Third call: order details - no tenders (empty array)
         new Response(200, [], json_encode([
             'order' => [
                 'id' => 'order_456',

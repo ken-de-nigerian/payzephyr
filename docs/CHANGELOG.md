@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.1.4] - 2025-12-09
+
+### Fixed
+- **Square Driver**: Fixed payment verification flow and improved code quality
+  - Added missing `location_ids` parameter to order search API request (fixes "Must provide at least 1 location_id" error)
+  - Fixed verification to handle `payment_link_id` (providerId) in addition to `reference_id`
+  - Added payment link lookup as a verification strategy before order search fallback
+  - Verification now supports three strategies: payment ID → payment link ID → reference ID order search
+
+### Changed
+- **Square Driver**: Refactored `verify()` method for better maintainability
+  - Extracted verification logic into focused helper methods:
+    - `verifyByPaymentId()` - handles direct payment ID lookup
+    - `verifyByPaymentLinkId()` - handles payment link ID lookup
+    - `verifyByReferenceId()` - handles reference ID order search
+    - `searchOrders()` - encapsulates order search API call
+    - `getOrderById()` - retrieves order by ID
+    - `getPaymentFromOrder()` - extracts payment ID from order tenders
+    - `getPaymentDetails()` - retrieves payment details by ID
+  - Reduced main `verify()` method from ~135 lines to ~27 lines
+  - Eliminated code duplication and improved testability
+  - All 659 tests passing (1,336 assertions)
+
 ## [1.1.3] - 2025-12-09
 
 ### Changed

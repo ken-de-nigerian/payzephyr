@@ -122,90 +122,28 @@ final class SquareDriver extends AbstractDriver
     /**
      * Verify a payment by retrieving the payment details.
      *
-     * Square can verify by payment ID or by searching orders using reference_id.
-     * This method tries payment ID first, then falls back to order search.
+     * Square can verify by payment ID, payment link ID, or by searching orders using reference_id.
+     * This method tries multiple verification strategies in order.
      *
      * @throws VerificationException
      */
     public function verify(string $reference): VerificationResponseDTO
     {
         try {
-            // Try direct payment ID lookup first (if reference is a payment ID)
-            if (str_starts_with($reference, 'payment_') || strlen($reference) === 32) {
-                try {
-                    $response = $this->makeRequest('GET', "/v2/payments/$reference");
-                    $data = $this->parseResponse($response);
-
-                    if (isset($data['payment'])) {
-                        return $this->mapFromPayment($data['payment'], $reference);
-                    }
-                } catch (ClientException $e) {
-                    // If 404, try order search instead
-                    if ($e->getResponse()?->getStatusCode() !== 404) {
-                        throw $e;
-                    }
-                }
+            // Strategy 1: Try direct payment ID lookup
+            $result = $this->verifyByPaymentId($reference);
+            if ($result !== null) {
+                return $result;
             }
 
-            // Fallback: Search orders by reference_id
-            // Square's order search uses POST method
-            try {
-                $response = $this->makeRequest('POST', '/v2/orders/search', [
-                    'json' => [
-                        'query' => [
-                            'filter' => [
-                                'state_filter' => [
-                                    'states' => ['OPEN', 'COMPLETED', 'CANCELED'],
-                                ],
-                            ],
-                        ],
-                    ],
-                ]);
-
-                $data = $this->parseResponse($response);
-            } catch (ClientException $e) {
-                // If order search fails with 404, payment not found
-                if ($e->getResponse()?->getStatusCode() === 404) {
-                    throw new VerificationException("Payment not found for reference [$reference]");
-                }
-                throw $e;
+            // Strategy 2: Try payment link ID lookup
+            $result = $this->verifyByPaymentLinkId($reference);
+            if ($result !== null) {
+                return $result;
             }
 
-            // Find order with matching reference_id
-            $orders = $data['orders'] ?? [];
-            $foundOrder = null;
-
-            foreach ($orders as $order) {
-                if (($order['reference_id'] ?? null) === $reference) {
-                    $foundOrder = $order;
-                    break;
-                }
-            }
-
-            if (! $foundOrder) {
-                throw new VerificationException("Payment not found for reference [$reference]");
-            }
-
-            // Get payment for the order
-            $orderId = $foundOrder['id'];
-            $paymentResponse = $this->makeRequest('GET', "/v2/orders/$orderId");
-            $paymentData = $this->parseResponse($paymentResponse);
-
-            $payments = $paymentData['order']['tenders'] ?? [];
-            if (empty($payments)) {
-                throw new VerificationException("No payment found for order [$orderId]");
-            }
-
-            $payment = $payments[0]['payment_id'] ?? null;
-            if (! $payment) {
-                throw new VerificationException("Payment ID not found for order [$orderId]");
-            }
-
-            // Get payment details
-            $paymentDetailsResponse = $this->makeRequest('GET', "/v2/payments/$payment");
-            $paymentDetails = $this->parseResponse($paymentDetailsResponse);
-
-            return $this->mapFromPayment($paymentDetails['payment'], $reference);
+            // Strategy 3: Fallback to order search by reference_id
+            return $this->verifyByReferenceId($reference);
         } catch (GuzzleException $e) {
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
@@ -217,6 +155,187 @@ final class SquareDriver extends AbstractDriver
                 $e
             );
         }
+    }
+
+    /**
+     * Attempt to verify payment using a direct payment ID.
+     *
+     * @return VerificationResponseDTO|null Returns null if the reference is not a payment ID or payment not found
+     */
+    private function verifyByPaymentId(string $reference): ?VerificationResponseDTO
+    {
+        // Only attempt if reference looks like a payment ID
+        if (! str_starts_with($reference, 'payment_') && strlen($reference) !== 32) {
+            return null;
+        }
+
+        try {
+            $response = $this->makeRequest('GET', "/v2/payments/$reference");
+            $data = $this->parseResponse($response);
+
+            if (isset($data['payment'])) {
+                return $this->mapFromPayment($data['payment'], $reference);
+            }
+        } catch (ClientException $e) {
+            // If 404, payment not found - return null to try other methods
+            if ($e->getResponse()?->getStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+
+        return null;
+    }
+
+    /**
+     * Attempt to verify payment using a payment link ID.
+     *
+     * Payment link IDs are typically alphanumeric strings (e.g., JE6RV44VZEML32Z2).
+     *
+     * @return VerificationResponseDTO|null Returns null if the reference is not a payment link ID or payment not found
+     */
+    private function verifyByPaymentLinkId(string $reference): ?VerificationResponseDTO
+    {
+        try {
+            $paymentLinkResponse = $this->makeRequest('GET', "/v2/online-checkout/payment-links/$reference");
+            $paymentLinkData = $this->parseResponse($paymentLinkResponse);
+
+            $orderId = $paymentLinkData['payment_link']['order_id'] ?? null;
+            if (! $orderId) {
+                return null;
+            }
+
+            $order = $this->getOrderById($orderId);
+            $payment = $this->getPaymentFromOrder($order, $orderId);
+            $paymentDetails = $this->getPaymentDetails($payment);
+
+            // Use the reference_id from the order if available, otherwise use the passed reference
+            $actualReference = $order['reference_id'] ?? $reference;
+
+            return $this->mapFromPayment($paymentDetails['payment'], $actualReference);
+        } catch (ClientException $e) {
+            // If 404, payment link not found - return null to try other methods
+            if ($e->getResponse()?->getStatusCode() === 404) {
+                return null;
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Verify payment by searching orders using reference_id.
+     *
+     * @throws VerificationException
+     */
+    private function verifyByReferenceId(string $reference): VerificationResponseDTO
+    {
+        $orders = $this->searchOrders();
+
+        // Find order with matching reference_id
+        $foundOrder = null;
+        foreach ($orders as $order) {
+            if (($order['reference_id'] ?? null) === $reference) {
+                $foundOrder = $order;
+                break;
+            }
+        }
+
+        if (! $foundOrder) {
+            throw new VerificationException("Payment not found for reference [$reference]");
+        }
+
+        $orderId = $foundOrder['id'];
+        $order = $this->getOrderById($orderId);
+        $payment = $this->getPaymentFromOrder($order, $orderId);
+        $paymentDetails = $this->getPaymentDetails($payment);
+
+        return $this->mapFromPayment($paymentDetails['payment'], $reference);
+    }
+
+    /**
+     * Search orders using Square's order search API.
+     *
+     * @return array List of orders
+     * @throws VerificationException
+     */
+    private function searchOrders(): array
+    {
+        try {
+            $response = $this->makeRequest('POST', '/v2/orders/search', [
+                'json' => [
+                    'location_ids' => [$this->config['location_id']],
+                    'query' => [
+                        'filter' => [
+                            'state_filter' => [
+                                'states' => ['OPEN', 'COMPLETED', 'CANCELED'],
+                            ],
+                        ],
+                    ],
+                ],
+            ]);
+
+            $data = $this->parseResponse($response);
+
+            return $data['orders'] ?? [];
+        } catch (ClientException $e) {
+            if ($e->getResponse()?->getStatusCode() === 404) {
+                throw new VerificationException('Payment not found');
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Retrieve an order by ID.
+     *
+     * @return array Order data
+     * @throws VerificationException
+     */
+    private function getOrderById(string $orderId): array
+    {
+        $response = $this->makeRequest('GET', "/v2/orders/$orderId");
+        $data = $this->parseResponse($response);
+
+        $order = $data['order'] ?? null;
+        if (! $order) {
+            throw new VerificationException("Order not found for ID [$orderId]");
+        }
+
+        return $order;
+    }
+
+    /**
+     * Extract payment ID from an order's tenders.
+     *
+     * @return string Payment ID
+     * @throws VerificationException
+     */
+    private function getPaymentFromOrder(array $order, string $orderId): string
+    {
+        $tenders = $order['tenders'] ?? [];
+        if (empty($tenders)) {
+            throw new VerificationException("No payment found for order [$orderId]");
+        }
+
+        $paymentId = $tenders[0]['payment_id'] ?? null;
+        if (! $paymentId) {
+            throw new VerificationException("Payment ID not found for order [$orderId]");
+        }
+
+        return $paymentId;
+    }
+
+    /**
+     * Retrieve payment details by payment ID.
+     *
+     * @return array Payment data
+     */
+    private function getPaymentDetails(string $paymentId): array
+    {
+        $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+        $data = $this->parseResponse($response);
+
+        return $data;
     }
 
     /**

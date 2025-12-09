@@ -92,6 +92,12 @@ PAYPAL_CLIENT_SECRET=xxxxx
 PAYPAL_MODE=sandbox
 PAYPAL_ENABLED=false
 
+# Square (Required: access_token, location_id)
+SQUARE_ACCESS_TOKEN=EAAAxxx
+SQUARE_LOCATION_ID=location_xxx
+SQUARE_WEBHOOK_SIGNATURE_KEY=xxx
+SQUARE_ENABLED=false
+
 # Optional Settings
 PAYMENTS_DEFAULT_CURRENCY=NGN
 PAYMENTS_LOGGING_ENABLED=true
@@ -273,6 +279,7 @@ Configure these in your provider dashboards:
 - **Monnify**: `https://yourdomain.com/payments/webhook/monnify`
 - **Stripe**: `https://yourdomain.com/payments/webhook/stripe`
 - **PayPal**: `https://yourdomain.com/payments/webhook/paypal`
+- **Square**: `https://yourdomain.com/payments/webhook/square`
 
 ### Listening to Events
 
@@ -333,6 +340,7 @@ class HandlePaystackWebhook
 | **Monnify**     |   ✅    |   ✅    |    ✅     | NGN                               | Bank Transfer, Dynamic Accounts |
 | **Stripe**      |   ✅    |   ✅    |    ✅     | 135+ currencies                   | Apple Pay, Google Pay, SCA      |
 | **PayPal**      |   ✅    |   ✅    |    ✅     | USD, EUR, GBP, CAD, AUD           | PayPal Balance, Credit          |
+| **Square**      |   ✅    |   ✅    |    ✅     | USD, CAD, GBP, AUD                | Online Checkout, Card Payments  |
 
 **📖 For provider-specific details, see [docs/providers.md](docs/providers.md)**
 

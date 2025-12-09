@@ -220,7 +220,6 @@ test('flutterwave has all required config keys', function () {
         'driver',
         'secret_key',
         'public_key',
-        'encryption_key',
         'currencies',
         'enabled',
     ]);

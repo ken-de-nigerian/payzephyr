@@ -26,6 +26,7 @@ class ProviderDetector
         'MON' => 'monnify',
         'STRIPE' => 'stripe',
         'PAYPAL' => 'paypal',
+        'SQUARE' => 'square',
     ];
 
     /**

@@ -129,6 +129,34 @@ test('payment manager resolveVerificationContext uses order_id from metadata', f
     ]);
 });
 
+test('payment manager resolveVerificationContext uses provider_id for square', function () {
+    Cache::flush();
+
+    PaymentTransaction::create([
+        'reference' => 'square_ref',
+        'provider' => 'square',
+        'status' => 'pending',
+        'amount' => 10000,
+        'currency' => 'USD',
+        'email' => 'test@example.com',
+        'metadata' => ['_provider_id' => 'payment_123'],
+    ]);
+
+    $manager = app(PaymentManager::class);
+
+    $reflection = new ReflectionClass($manager);
+    $method = $reflection->getMethod('resolveVerificationContext');
+    
+
+    $result = $method->invoke($manager, 'square_ref', null);
+
+    // Square uses provider ID (payment ID) for verification
+    expect($result)->toBe([
+        'provider' => 'square',
+        'id' => 'payment_123',
+    ]);
+});
+
 test('payment manager resolveVerificationContext falls back to reference when no metadata', function () {
     Cache::flush();
 

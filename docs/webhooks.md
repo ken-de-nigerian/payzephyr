@@ -27,6 +27,7 @@ POST /payments/webhook/flutterwave  ← Flutterwave sends webhooks here
 POST /payments/webhook/monnify      ← Monnify sends webhooks here
 POST /payments/webhook/stripe       ← Stripe sends webhooks here
 POST /payments/webhook/paypal       ← PayPal sends webhooks here
+POST /payments/webhook/square       ← Square sends webhooks here
 ```
 
 **You don't need to create these routes manually - they're already there!**
@@ -86,6 +87,11 @@ You need to tell each payment provider where to send webhooks. Go to each provid
 **PayPal Dashboard:**
 - Go to: Developer Dashboard → Webhooks
 - Add URL: `https://yourdomain.com/payments/webhook/paypal`
+
+**Square Dashboard:**
+- Go to: Developers → Webhooks → Add endpoint
+- Add URL: `https://yourdomain.com/payments/webhook/square`
+- Copy the Signature Key and set it as `SQUARE_WEBHOOK_SIGNATURE_KEY` in your `.env` file
 
 **Important:** 
 - Use `https://` (not `http://`) - most providers require HTTPS
@@ -758,6 +764,12 @@ Different providers send different event types. Here's what to expect:
 - `PAYMENT.CAPTURE.COMPLETED` - Payment completed
 - `PAYMENT.CAPTURE.DENIED` - Payment denied
 - `CHECKOUT.ORDER.APPROVED` - Order approved
+
+### Square Events
+- `payment.created` - Payment created
+- `payment.updated` - Payment status updated
+- `payment.completed` - Payment completed
+- `payment.failed` - Payment failed
 
 ---
 

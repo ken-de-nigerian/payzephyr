@@ -47,7 +47,6 @@ return [
             'driver' => 'flutterwave',
             'secret_key' => env('FLUTTERWAVE_SECRET_KEY'),
             'public_key' => env('FLUTTERWAVE_PUBLIC_KEY'),
-            'encryption_key' => env('FLUTTERWAVE_ENCRYPTION_KEY'),
             'webhook_secret' => env('FLUTTERWAVE_ENCRYPTION_KEY'), // Secret Hash from Flutterwave Dashboard
             'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com/v3/'),
             'currencies' => ['NGN', 'USD', 'EUR', 'GBP', 'KES', 'UGX', 'TZS'],
@@ -83,6 +82,16 @@ return [
             'base_url' => env('PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com'),
             'currencies' => ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
             'enabled' => env('PAYPAL_ENABLED', false),
+        ],
+
+        'square' => [
+            'driver' => 'square',
+            'access_token' => env('SQUARE_ACCESS_TOKEN'),
+            'location_id' => env('SQUARE_LOCATION_ID'),
+            'webhook_signature_key' => env('SQUARE_WEBHOOK_SIGNATURE_KEY'),
+            'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareup.com'),
+            'currencies' => ['USD', 'CAD', 'GBP', 'AUD'],
+            'enabled' => env('SQUARE_ENABLED', false),
         ],
     ],
 

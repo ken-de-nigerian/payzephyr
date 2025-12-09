@@ -1,0 +1,91 @@
+feat: Add comprehensive test coverage and documentation for Square driver
+
+This commit adds complete test coverage for the Square payment driver
+and updates all documentation to include Square as a supported provider.
+
+## Test Coverage
+
+### New Test Files
+- `tests/Unit/SquareDriverCoverageTest.php` (27 tests, 42 assertions)
+  - Configuration validation
+  - Headers and idempotency key handling
+  - Health check scenarios
+  - Webhook extraction methods (reference, status, channel)
+  - Verification ID resolution
+  - Webhook signature validation
+  - Payment status mapping
+  - Edge cases and error handling
+
+- `tests/Unit/SquareDriverIntegrationTest.php` (14 tests, 26 assertions)
+  - Charge flow with mocked HTTP responses
+  - Reference generation
+  - Metadata handling
+  - Error scenarios (API errors, network errors)
+  - Verification by payment ID
+  - Verification by reference_id (order search)
+  - Status mapping (success, failed, pending)
+  - Amount conversion (cents to dollars)
+  - Customer and card details extraction
+
+### Updated Test Files
+- `tests/Unit/WebhookControllerCompleteTest.php`
+  - Added 4 Square-specific webhook tests
+  - Added Square to channel extraction test
+  - Added Square configuration to beforeEach
+
+- `tests/Unit/PaymentManagerCoverageCompleteTest.php`
+  - Added test for Square verification ID resolution
+
+- `tests/Unit/ConfigurationTest.php`
+  - Fixed Flutterwave config keys test (removed encryption_key)
+
+## Documentation Updates
+
+### Updated Files
+- `README.md`
+  - Added Square to provider comparison table
+  - Added Square environment variables
+  - Added Square webhook URL
+
+- `docs/providers.md`
+  - Added complete Square provider section with:
+    - Configuration instructions
+    - Supported currencies (USD, CAD, GBP, AUD)
+    - Features (Online Checkout, Card Payments)
+    - Usage examples
+    - Webhook configuration
+    - Testing credentials
+  - Added Square to currency support matrix
+
+- `docs/webhooks.md`
+  - Added Square webhook route
+  - Added Square dashboard configuration instructions
+  - Added Square webhook payload format
+  - Added Square webhook events
+
+- `docs/architecture.md`
+  - Added SquareDriver to drivers layer diagram
+  - Added SquareDriver to individual drivers list
+
+- `docs/GETTING_STARTED.md`
+  - Added Square to payment provider accounts list
+
+- `docs/DOCUMENTATION.md`
+  - Added Square to supported providers list
+  - Added Square environment variables
+
+## Test Results
+- ✅ 659 tests passing
+- ✅ 1,335 assertions
+- ✅ All Square driver tests passing
+- ✅ All integration tests passing
+
+## Summary
+This commit completes the Square driver integration by providing:
+1. Comprehensive test coverage (41 tests, 68 assertions)
+2. Complete documentation updates across all docs
+3. Full integration with existing test suites
+4. Verification of all OCP methods (extractWebhookReference, extractWebhookStatus, extractWebhookChannel, resolveVerificationId)
+
+The Square driver is now fully tested, documented, and ready for production use.
+

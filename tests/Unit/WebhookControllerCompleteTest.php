@@ -41,6 +41,13 @@ beforeEach(function () {
             'webhook_id' => 'webhook_id',
             'enabled' => true,
         ],
+        'payments.providers.square' => [
+            'driver' => 'square',
+            'access_token' => 'EAAAxxx',
+            'location_id' => 'location_xxx',
+            'webhook_signature_key' => 'test_key',
+            'enabled' => true,
+        ],
     ]);
 });
 
@@ -178,6 +185,42 @@ test('webhook controller extracts paypal reference from purchase_units', functio
     expect($reference)->toBe('paypal_purchase_ref_123');
 });
 
+test('webhook controller extracts square reference from payment object', function () {
+    $controller = app(WebhookController::class);
+    $reflection = new \ReflectionClass($controller);
+    $method = $reflection->getMethod('extractReference');
+    $method->setAccessible(true);
+
+    $payload = [
+        'data' => [
+            'object' => [
+                'payment' => [
+                    'reference_id' => 'SQUARE_1234567890_abc123',
+                ],
+            ],
+        ],
+    ];
+
+    $reference = $method->invoke($controller, 'square', $payload);
+    expect($reference)->toBe('SQUARE_1234567890_abc123');
+});
+
+test('webhook controller extracts square reference from data id', function () {
+    $controller = app(WebhookController::class);
+    $reflection = new \ReflectionClass($controller);
+    $method = $reflection->getMethod('extractReference');
+    $method->setAccessible(true);
+
+    $payload = [
+        'data' => [
+            'id' => 'payment_123',
+        ],
+    ];
+
+    $reference = $method->invoke($controller, 'square', $payload);
+    expect($reference)->toBe('payment_123');
+});
+
 test('webhook controller returns null for unknown provider', function () {
     $controller = app(WebhookController::class);
     $reflection = new \ReflectionClass($controller);
@@ -297,6 +340,41 @@ test('webhook controller determines paypal status from event_type', function () 
 
     $status = $method->invoke($controller, 'paypal', $payload);
     expect($status)->toBe('success');
+});
+
+test('webhook controller determines square status correctly', function () {
+    $controller = app(WebhookController::class);
+    $reflection = new \ReflectionClass($controller);
+    $method = $reflection->getMethod('determineStatus');
+    $method->setAccessible(true);
+
+    $payload = [
+        'data' => [
+            'object' => [
+                'payment' => [
+                    'status' => 'COMPLETED',
+                ],
+            ],
+        ],
+    ];
+
+    $status = $method->invoke($controller, 'square', $payload);
+    expect($status)->toBe('success');
+});
+
+test('webhook controller determines square status from type', function () {
+    $controller = app(WebhookController::class);
+    $reflection = new \ReflectionClass($controller);
+    $method = $reflection->getMethod('determineStatus');
+    $method->setAccessible(true);
+
+    $payload = [
+        'type' => 'payment.created',
+    ];
+
+    $status = $method->invoke($controller, 'square', $payload);
+    // Will be normalized by normalizeStatus method
+    expect($status)->toBeString();
 });
 
 test('webhook controller normalizes status variations to success', function () {
@@ -429,6 +507,7 @@ test('webhook controller updates transaction with provider-specific channels', f
         'monnify' => 'monnify_channel_ref',
         'stripe' => 'stripe_channel_ref',
         'paypal' => 'paypal_channel_ref',
+        'square' => 'square_channel_ref',
     ];
 
     foreach ($references as $provider => $ref) {
@@ -450,6 +529,17 @@ test('webhook controller updates transaction with provider-specific channels', f
     // Test each provider's channel extraction
     $method->invoke($controller, 'paystack', 'paystack_channel_ref', [
         'data' => ['status' => 'success', 'channel' => 'card'],
+    ]);
+    
+    $method->invoke($controller, 'square', 'square_channel_ref', [
+        'data' => [
+            'object' => [
+                'payment' => [
+                    'status' => 'COMPLETED',
+                    'source_type' => 'CARD',
+                ],
+            ],
+        ],
     ]);
 
     $method->invoke($controller, 'flutterwave', 'flutterwave_channel_ref', [
@@ -473,7 +563,8 @@ test('webhook controller updates transaction with provider-specific channels', f
         ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'flutterwave_channel_ref')->first()->channel)->toBe('card')
         ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'monnify_channel_ref')->first()->channel)->toBe('CARD')
         ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'stripe_channel_ref')->first()->channel)->toBe('card')
-        ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'paypal_channel_ref')->first()->channel)->toBe('paypal');
+        ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'paypal_channel_ref')->first()->channel)->toBe('paypal')
+        ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'square_channel_ref')->first()->channel)->toBe('CARD');
 });
 
 test('webhook controller handles database error during update gracefully', function () {

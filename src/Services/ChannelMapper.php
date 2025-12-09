@@ -46,6 +46,7 @@ class ChannelMapper
             'flutterwave' => $this->mapToFlutterwave($channels),
             'stripe' => $this->mapToStripe($channels),
             'paypal' => $this->mapToPayPal(),
+            'square' => $this->mapToSquare($channels),
             default => $channels, // Return as-is for unknown providers
         };
     }
@@ -163,6 +164,30 @@ class ChannelMapper
     }
 
     /**
+     * Map channels to Square format.
+     *
+     * Square accepts: 'CARD', 'CASH', 'OTHER', 'SQUARE_GIFT_CARD', 'NO_SALE'
+     * Square Online Checkout primarily supports card payments.
+     */
+    protected function mapToSquare(array $channels): array
+    {
+        $mapping = [
+            self::CHANNEL_CARD => 'CARD',
+            self::CHANNEL_BANK_TRANSFER => 'OTHER', // Square doesn't have direct bank transfer
+        ];
+
+        $mapped = array_map(
+            fn ($channel) => $mapping[strtolower($channel)] ?? strtoupper($channel),
+            $channels
+        );
+
+        // Square payment methods
+        $validMethods = ['CARD', 'CASH', 'OTHER', 'SQUARE_GIFT_CARD'];
+
+        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+    }
+
+    /**
      * Get default channels for a provider if none are specified.
      *
      * @param  string  $provider  Provider name
@@ -176,6 +201,7 @@ class ChannelMapper
             'flutterwave' => ['card'],
             'stripe' => ['card'],
             'paypal' => [], // PayPal doesn't use channels
+            'square' => ['CARD'], // Square Online Checkout primarily supports cards
             default => ['card'], // Default to card for unknown providers
         };
     }
@@ -220,7 +246,7 @@ class ChannelMapper
     public function supportsChannels(string $provider): bool
     {
         return match ($provider) {
-            'paystack', 'monnify', 'flutterwave', 'stripe' => true,
+            'paystack', 'monnify', 'flutterwave', 'stripe', 'square' => true,
             'paypal' => false, // PayPal doesn't support channel filtering
             default => false,
         };

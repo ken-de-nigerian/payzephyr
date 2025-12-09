@@ -274,6 +274,7 @@ Payment::amount(10000)
 | Monnify     |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  |         -          |
 | Stripe      |  ✅  |  ✅  |  ✅  |  ✅  |  ❌  |        135+        |
 | PayPal      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  |        25+         |
+| Square      |  ❌  |  ✅  |  ❌  |  ✅  |  ❌  |      CAD, AUD       |
 
 ---
 
@@ -297,3 +298,64 @@ Payment::amount(10000)
 ### PayPal
 - Use sandbox accounts
 - Test buyer/seller from PayPal Developer Dashboard
+
+### Square
+- Access Token: Get from Square Dashboard → Applications → Your App
+- Location ID: Get from Square Dashboard → Locations
+- Use Square Sandbox for testing
+
+---
+
+## Square
+
+### Configuration
+
+```env
+SQUARE_ACCESS_TOKEN=EAAAxxx
+SQUARE_LOCATION_ID=location_xxx
+SQUARE_WEBHOOK_SIGNATURE_KEY=xxx
+SQUARE_ENABLED=true
+```
+
+### Supported Currencies
+- USD (US Dollar)
+- CAD (Canadian Dollar)
+- GBP (British Pound)
+- AUD (Australian Dollar)
+
+### Features
+- Online Checkout Payment Links
+- Card payments
+- Secure redirect-based checkout
+- Payment link generation
+- Order management integration
+
+### Usage Example
+
+```php
+// Builder methods can be chained in any order
+// redirect() must be called last to execute
+Payment::amount(100.00)
+    ->currency('USD')
+    ->email('customer@example.com')
+    ->callback(route('payment.callback'))
+    ->with('square') // or ->using('square')
+    ->redirect(); // Must be called last
+```
+
+### Webhook Configuration
+
+URL: `https://yourdomain.com/payments/webhook/square`
+
+**Important:** Set your webhook signature key in `.env`:
+```env
+SQUARE_WEBHOOK_SIGNATURE_KEY=your_signature_key_here
+```
+
+Get the signature key from: Square Dashboard → Developers → Webhooks → Select endpoint → Signature Key
+
+### Testing
+
+- Use Square Sandbox credentials from your Square Developer Dashboard
+- Test cards: See Square's testing documentation
+- Access Token: Get from Square Dashboard → Applications → Your App → Credentials

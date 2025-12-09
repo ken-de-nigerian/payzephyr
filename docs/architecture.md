@@ -35,7 +35,8 @@ The package follows clean architecture principles with clear separation of conce
 │         ├─ FlutterwaveDriver                 │
 │         ├─ MonnifyDriver                     │
 │         ├─ StripeDriver                      │
-│         └─ PayPalDriver                      │
+│         ├─ PayPalDriver                      │
+│         └─ SquareDriver                      │
 └──────────────┬──────────────────────────────┘
                │
 ┌──────────────▼──────────────────────────────┐
@@ -81,6 +82,7 @@ All drivers extend this class. It provides common functionality:
 - **MonnifyDriver**: Handles Monnify payments (Nigerian, uses OAuth2)
 - **StripeDriver**: Handles Stripe payments (Global, uses official SDK)
 - **PayPalDriver**: Handles PayPal payments (Global, uses REST API)
+- **SquareDriver**: Handles Square payments (US/Canada-focused, Online Checkout)
 
 **How They Work:**
 Each driver knows how to:

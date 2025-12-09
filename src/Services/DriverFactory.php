@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
+use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 
@@ -42,6 +43,7 @@ class DriverFactory
         'monnify' => MonnifyDriver::class,
         'stripe' => StripeDriver::class,
         'paypal' => PayPalDriver::class,
+        'square' => SquareDriver::class,
     ];
 
     /**

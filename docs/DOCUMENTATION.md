@@ -28,7 +28,7 @@ It provides a clean, fluent API for processing payments across different provide
 
 ### Key Features
 
-- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, and PayPal
+- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, and Square
 - **Automatic Fallback**: Seamlessly switch to back up providers if primary fails
 - **Fluent API**: Clean, expressive syntax for payment operations
 - **Idempotency Support**: Prevent duplicate charges with unique keys
@@ -112,6 +112,12 @@ PAYPAL_CLIENT_ID=xxxxx
 PAYPAL_CLIENT_SECRET=xxxxx
 PAYPAL_MODE=sandbox
 PAYPAL_ENABLED=false
+
+# Square (Required: access_token, location_id)
+SQUARE_ACCESS_TOKEN=EAAAxxx
+SQUARE_LOCATION_ID=location_xxx
+SQUARE_WEBHOOK_SIGNATURE_KEY=xxx
+SQUARE_ENABLED=false
 
 # Optional Settings
 PAYMENTS_DEFAULT_CURRENCY=NGN

@@ -38,6 +38,7 @@ Before you start, make sure you have:
    - [Flutterwave](https://flutterwave.com)
    - [Monnify](https://monnify.com)
    - [PayPal](https://paypal.com)
+   - [Square](https://squareup.com)
 
 ---
 

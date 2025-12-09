@@ -11,7 +11,7 @@ A unified payment abstraction layer for Laravel that supports multiple payment p
 
 ## 🚀 Features
 
-- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, and PayPal
+- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, Square etc.
 - **Automatic Fallback**: Seamlessly switch to back-up providers if primary fails
 - **Fluent API**: Clean, expressive syntax for payment operations
 - **Idempotency Support**: Prevent duplicate charges with unique keys across supported providers
@@ -22,6 +22,11 @@ A unified payment abstraction layer for Laravel that supports multiple payment p
 - **Production Ready**: Comprehensive error handling and security features
 - **Well Tested**: Full test coverage with Pest PHP
 - **Type Safe**: Strict PHP 8.2+ typing throughout
+
+⚠️ **Provider-Specific:**
+- Currency support (check provider documentation)
+- Payment channels (mapped but not all providers support all channels)
+- Required configuration fields
 
 ---
 
@@ -571,13 +576,16 @@ Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) fo
 
 Please see [CHANGELOG.md](docs/CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.0.9
+### Latest Release: v1.1.2
 
-### Fixed
+### Feature
 
-- **Stripe Webhook Validation**: Enhanced webhook signature validation with improved error messages and troubleshooting hints. Fixed validation failures by ensuring proper webhook secret configuration.
-- **Flutterwave Webhook Validation**: Improved webhook validation with better error handling and logging. Added support for `FLUTTERWAVE_WEBHOOK_SECRET` configuration option.
-- **SQLite Database Locks**: Increased webhook throttle limit from 60 to 120 requests per minute to reduce concurrent database lock issues when using SQLite cache driver. Added documentation note recommending `file` or `array` cache drivers for webhook routes.
+- Integrated Square driver providing:
+- Comprehensive test coverage (41 tests, 68 assertions)
+- Complete documentation updates across all docs
+- Full integration with existing test suites
+- Verification of all OCP methods (extractWebhookReference, extractWebhookStatus, extractWebhookChannel, resolveVerificationId)
+- The Square driver is now fully tested, documented, and ready for production use.
 
 ---
 

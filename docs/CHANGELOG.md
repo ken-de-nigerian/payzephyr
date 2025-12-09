@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+
+## [1.1.2] - 2025-12-09
+
+### Feature
+
+- Integrated Square driver providing:
+- Comprehensive test coverage (41 tests, 68 assertions)
+- Complete documentation updates across all docs
+- Full integration with existing test suites
+- Verification of all OCP methods (extractWebhookReference, extractWebhookStatus, extractWebhookChannel, resolveVerificationId)
+- The Square driver is now fully tested, documented, and ready for production use.
+
+
 ## [1.0.9] - 2025-12-08
 
 ### Fixed

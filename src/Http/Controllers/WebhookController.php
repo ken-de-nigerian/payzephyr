@@ -23,7 +23,7 @@ use Throwable;
  * 2. Updates the payment record in database
  * 3. Fires Laravel events so your app can react (e.g., send email, update order status)
  */
-class WebhookController extends Controller
+final class WebhookController extends Controller
 {
     protected StatusNormalizer $statusNormalizer;
 
@@ -121,10 +121,12 @@ class WebhookController extends Controller
     {
         try {
             $status = $this->manager->driver($provider)->extractWebhookStatus($payload);
+
             return $this->statusNormalizer->normalize($status, $provider);
         } catch (DriverNotFoundException) {
             // Unknown provider - use default extraction
             $status = $payload['status'] ?? $payload['paymentStatus'] ?? 'unknown';
+
             return $this->statusNormalizer->normalize($status, $provider);
         }
     }

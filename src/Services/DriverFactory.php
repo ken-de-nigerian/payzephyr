@@ -22,7 +22,7 @@ use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
  *
  * Single Responsibility: Only handles driver instantiation.
  */
-class DriverFactory
+final class DriverFactory
 {
     /**
      * Registered driver classes.

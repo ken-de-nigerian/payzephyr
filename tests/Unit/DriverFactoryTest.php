@@ -98,16 +98,11 @@ test('driver factory uses fully qualified class name as fallback', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('driver factory create throws exception if class does not implement DriverInterface', function () {
-    // Register a class that doesn't implement DriverInterface
-    $factory = new class extends DriverFactory
-    {
-        protected function resolveDriverClass(string $name): string
-        {
-            return stdClass::class;
-        }
-    };
+test('driver factory register throws exception if class does not implement DriverInterface', function () {
+    // Test that register() validates the class implements DriverInterface
+    $factory = new DriverFactory;
 
-    expect(fn () => $factory->create('test', []))
+    // Try to register a class that doesn't implement DriverInterface
+    expect(fn () => $factory->register('bad', stdClass::class))
         ->toThrow(DriverNotFoundException::class, 'must implement DriverInterface');
 });

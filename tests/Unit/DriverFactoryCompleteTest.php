@@ -96,31 +96,9 @@ test('driver factory uses config driver class if available', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('driver factory uses config driver class over registered driver', function () {
-    // Create a custom factory that checks config before registered
-    $factory = new class extends DriverFactory
-    {
-        protected function resolveDriverClass(string $name): string
-        {
-            // Check config FIRST (before registered)
-            $configDriver = config("payments.providers.$name.driver_class");
-            if ($configDriver && class_exists($configDriver)) {
-                return $configDriver;
-            }
-
-            // Then check registered
-            if (isset($this->drivers[$name])) {
-                return $this->drivers[$name];
-            }
-
-            // Then defaults
-            if (isset($this->defaultDrivers[$name])) {
-                return $this->defaultDrivers[$name];
-            }
-
-            return $name;
-        }
-    };
+test('driver factory uses registered driver over config driver class', function () {
+    // Test the actual behavior: registered -> config -> defaults
+    $factory = new DriverFactory;
 
     $factory->register('paystack', FlutterwaveDriver::class);
     config(['payments.providers.paystack.driver_class' => PaystackDriver::class]);
@@ -131,8 +109,8 @@ test('driver factory uses config driver class over registered driver', function 
         'currencies' => ['NGN'],
     ]);
 
-    // Config should override registered driver
-    expect($driver)->toBeInstanceOf(PaystackDriver::class);
+    // Registered drivers take precedence over config
+    expect($driver)->toBeInstanceOf(FlutterwaveDriver::class);
 });
 
 test('driver factory uses registered driver over default driver', function () {
@@ -167,16 +145,11 @@ test('driver factory create throws exception if class does not exist', function 
         ->toThrow(DriverNotFoundException::class, 'Driver class');
 });
 
-test('driver factory create throws exception if class does not implement DriverInterface', function () {
-    $factory = new class extends DriverFactory
-    {
-        protected function resolveDriverClass(string $name): string
-        {
-            return stdClass::class;
-        }
-    };
+test('driver factory register throws exception if class does not implement DriverInterface', function () {
+    $factory = new DriverFactory;
 
-    expect(fn () => $factory->create('test', []))
+    // Try to register a class that doesn't implement DriverInterface
+    expect(fn () => $factory->register('test', stdClass::class))
         ->toThrow(DriverNotFoundException::class, 'must implement DriverInterface');
 });
 

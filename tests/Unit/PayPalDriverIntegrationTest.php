@@ -25,14 +25,7 @@ function createPayPalDriverWithMock(array $responses): PayPalDriver
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    $driver = new class($config) extends PayPalDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
-
+    $driver = new PayPalDriver($config);
     $driver->setClient($client);
 
     return $driver;
@@ -170,13 +163,7 @@ test('paypal handles network error', function () {
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
     // We add callback_url to config to avoid crash during network error test
-    $driver = new class(['client_id' => 'test', 'client_secret' => 'test', 'mode' => 'sandbox', 'currencies' => ['USD'], 'callback_url' => 'http://test']) extends PayPalDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new PayPalDriver(['client_id' => 'test', 'client_secret' => 'test', 'mode' => 'sandbox', 'currencies' => ['USD'], 'callback_url' => 'http://test']);
     $driver->setClient($client);
 
     $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback'));

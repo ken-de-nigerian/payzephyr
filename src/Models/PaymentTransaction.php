@@ -31,7 +31,7 @@ use Throwable;
  * @method static create(array $array)
  * @method static where(string $string, string $reference)
  */
-class PaymentTransaction extends Model
+final class PaymentTransaction extends Model
 {
     /**
      * The attributes that are mass assignable.

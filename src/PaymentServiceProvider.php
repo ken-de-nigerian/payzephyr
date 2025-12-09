@@ -17,7 +17,7 @@ use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
  * Payment builder, and publishes necessary resources (config, migrations)
  * to the host application.
  */
-class PaymentServiceProvider extends ServiceProvider
+final class PaymentServiceProvider extends ServiceProvider
 {
     /**
      * Register the application services.

@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when payment configuration is invalid
  */
-class InvalidConfigurationException extends PaymentException {}
+final class InvalidConfigurationException extends PaymentException {}

@@ -24,7 +24,7 @@ use Stripe\Webhook;
  * It implements the "Stripe Checkout" flow, where the user is redirected to a Stripe-hosted
  * page to complete the transaction securely.
  */
-class StripeDriver extends AbstractDriver
+final class StripeDriver extends AbstractDriver
 {
     protected string $name = 'stripe';
 

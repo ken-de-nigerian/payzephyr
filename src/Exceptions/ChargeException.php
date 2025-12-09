@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when payment charge fails
  */
-class ChargeException extends PaymentException {}
+final class ChargeException extends PaymentException {}

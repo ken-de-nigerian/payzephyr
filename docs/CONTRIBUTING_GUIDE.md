@@ -298,11 +298,11 @@ class SquareDriver extends AbstractDriver
 
     protected function validateConfig(): void
     {
-        if (empty($this->config['application_id'])) {
-            throw new InvalidConfigurationException('Square application ID is required');
-        }
         if (empty($this->config['access_token'])) {
             throw new InvalidConfigurationException('Square access token is required');
+        }
+        if (empty($this->config['location_id'])) {
+            throw new InvalidConfigurationException('Square location ID is required');
         }
     }
 
@@ -311,6 +311,7 @@ class SquareDriver extends AbstractDriver
         return [
             'Authorization' => 'Bearer ' . $this->config['access_token'],
             'Content-Type' => 'application/json',
+            'Square-Version' => '2024-10-18',
         ];
     }
 
@@ -382,10 +383,11 @@ In `config/payments.php`, add:
 ```php
 'square' => [
     'driver' => 'square',
-    'application_id' => env('SQUARE_APPLICATION_ID'),
     'access_token' => env('SQUARE_ACCESS_TOKEN'),
+    'location_id' => env('SQUARE_LOCATION_ID'),
+    'webhook_signature_key' => env('SQUARE_WEBHOOK_SIGNATURE_KEY'),
     'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareup.com'),
-    'currencies' => ['USD', 'CAD'],
+    'currencies' => ['USD', 'CAD', 'GBP', 'AUD'],
     'enabled' => env('SQUARE_ENABLED', false),
 ],
 ```
@@ -410,8 +412,8 @@ use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
 
 test('square driver initializes correctly', function () {
     $config = [
-        'application_id' => 'test_app_id',
         'access_token' => 'test_token',
+        'location_id' => 'test_location',
         'currencies' => ['USD'],
     ];
 

@@ -12,7 +12,7 @@ namespace KenDeNigerian\PayZephyr\Services;
  *
  * Single Responsibility: Only handles channel name mapping.
  */
-class ChannelMapper
+final class ChannelMapper
 {
     /**
      * Unified channel names used in the package.

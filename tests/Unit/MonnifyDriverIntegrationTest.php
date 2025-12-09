@@ -25,14 +25,7 @@ function createMonnifyDriverWithMock(array $responses): MonnifyDriver
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    $driver = new class($config) extends MonnifyDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
-
+    $driver = new MonnifyDriver($config);
     $driver->setClient($client);
 
     return $driver;
@@ -165,13 +158,7 @@ test('monnify handles network error during charge', function () {
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
-    $driver = new class(['api_key' => 'test', 'secret_key' => 'test', 'contract_code' => 'test', 'currencies' => ['NGN']]) extends MonnifyDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new MonnifyDriver(['api_key' => 'test', 'secret_key' => 'test', 'contract_code' => 'test', 'currencies' => ['NGN']]);
     $driver->setClient($client);
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));

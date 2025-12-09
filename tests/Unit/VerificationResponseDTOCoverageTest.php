@@ -4,9 +4,9 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
 test('verification response getNormalizedStatus uses container when available', function () {
-    $normalizer = new StatusNormalizer();
+    $normalizer = new StatusNormalizer;
     app()->instance(StatusNormalizer::class, $normalizer);
-    
+
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'SUCCEEDED',
@@ -14,7 +14,7 @@ test('verification response getNormalizedStatus uses container when available', 
         currency: 'NGN',
         provider: 'paystack'
     );
-    
+
     expect($response->isSuccessful())->toBeTrue();
 });
 
@@ -25,17 +25,17 @@ test('verification response getNormalizedStatus falls back to static when contai
         amount: 1000.0,
         currency: 'NGN'
     );
-    
+
     expect($response->isSuccessful())->toBeTrue();
 });
 
 test('verification response getNormalizedStatus handles provider-specific normalization', function () {
-    $normalizer = new StatusNormalizer();
+    $normalizer = new StatusNormalizer;
     $normalizer->registerProviderMappings('custom', [
         'failed' => ['CUSTOM_FAILED'],
     ]);
     app()->instance(StatusNormalizer::class, $normalizer);
-    
+
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'CUSTOM_FAILED',
@@ -43,6 +43,6 @@ test('verification response getNormalizedStatus handles provider-specific normal
         currency: 'NGN',
         provider: 'custom'
     );
-    
+
     expect($response->isFailed())->toBeTrue();
 });

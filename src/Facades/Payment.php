@@ -31,7 +31,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
  *
  * @see \KenDeNigerian\PayZephyr\Payment
  */
-class Payment extends Facade
+final class Payment extends Facade
 {
     /**
      * Get the registered name of the component.

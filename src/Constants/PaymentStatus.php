@@ -76,6 +76,7 @@ enum PaymentStatus: string
      *
      * @param  string  $value  The status string value
      * @return self The enum case
+     *
      * @throws ValueError If value is not a valid status
      */
     public static function fromString(string $value): self
@@ -104,6 +105,7 @@ enum PaymentStatus: string
     public static function isSuccessfulString(string $status): bool
     {
         $enum = self::tryFromString($status);
+
         return $enum?->isSuccessful() ?? false;
     }
 
@@ -117,6 +119,7 @@ enum PaymentStatus: string
     public static function isFailedString(string $status): bool
     {
         $enum = self::tryFromString($status);
+
         return $enum?->isFailed() ?? false;
     }
 
@@ -130,6 +133,7 @@ enum PaymentStatus: string
     public static function isPendingString(string $status): bool
     {
         $enum = self::tryFromString($status);
+
         return $enum?->isPending() ?? false;
     }
 }

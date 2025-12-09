@@ -20,7 +20,7 @@ use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
  * This driver handles the specific OAuth2-style authentication flow required
  * by Monnify, where an API Key and Secret are exchanged for a Bearer token.
  */
-class MonnifyDriver extends AbstractDriver
+final class MonnifyDriver extends AbstractDriver
 {
     protected string $name = 'monnify';
 
@@ -271,5 +271,4 @@ class MonnifyDriver extends AbstractDriver
         // Monnify can use either reference or provider ID
         return $providerId;
     }
-
 }

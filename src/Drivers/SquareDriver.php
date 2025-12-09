@@ -14,7 +14,7 @@ use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use Random\RandomException;
 
-class SquareDriver extends AbstractDriver
+final class SquareDriver extends AbstractDriver
 {
     protected string $name = 'square';
 
@@ -33,7 +33,7 @@ class SquareDriver extends AbstractDriver
         return [
             'Authorization' => 'Bearer '.$this->config['access_token'],
             'Content-Type' => 'application/json',
-            'Square-Version' => '2024-01-18', // API version
+            'Square-Version' => '2024-10-18',
         ];
     }
 
@@ -92,18 +92,22 @@ class SquareDriver extends AbstractDriver
                 throw new ChargeException('Failed to create Square payment link');
             }
 
+            $paymentLinkUrl = $data['payment_link']['url'];
+            $isSandbox = str_contains($this->config['base_url'] ?? '', 'squareupsandbox.com');
+
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
             ]);
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: $data['payment_link']['url'],
+                authorizationUrl: $paymentLinkUrl,
                 accessCode: $data['payment_link']['id'],
                 status: 'pending',
                 metadata: [
                     'payment_link_id' => $data['payment_link']['id'],
-                    'order_id' => $data['payment_link']['order_id'],
+                    'order_id' => $data['payment_link']['order_id'] ?? null,
+                    'is_sandbox' => $isSandbox,
                 ],
                 provider: $this->getName(),
             );

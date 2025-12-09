@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when webhook processing fails
  */
-class WebhookException extends PaymentException {}
+final class WebhookException extends PaymentException {}

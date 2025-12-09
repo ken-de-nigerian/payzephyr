@@ -10,7 +10,7 @@ test('verification response getNormalizedStatus uses container when available', 
         currency: 'NGN',
         provider: 'paystack',
     );
-    
+
     // Should normalize 'succeeded' to 'success'
     expect($response->isSuccessful())->toBeTrue();
 });
@@ -24,7 +24,7 @@ test('verification response getNormalizedStatus falls back to static when contai
         'currency' => 'NGN',
         'provider' => 'paystack',
     ]);
-    
+
     // Should still normalize 'completed' to 'success'
     expect($response->isSuccessful())->toBeTrue();
 });
@@ -32,7 +32,7 @@ test('verification response getNormalizedStatus falls back to static when contai
 test('verification response handles all status variations with normalization', function () {
     $successStatuses = ['success', 'succeeded', 'completed', 'successful', 'paid'];
     $failedStatuses = ['failed', 'declined', 'rejected', 'cancelled'];
-    
+
     foreach ($successStatuses as $status) {
         $response = new VerificationResponseDTO(
             reference: 'ref_123',
@@ -40,10 +40,10 @@ test('verification response handles all status variations with normalization', f
             amount: 10000,
             currency: 'NGN',
         );
-        
+
         expect($response->isSuccessful())->toBeTrue("Failed for status: $status");
     }
-    
+
     foreach ($failedStatuses as $status) {
         $response = new VerificationResponseDTO(
             reference: 'ref_123',
@@ -51,7 +51,7 @@ test('verification response handles all status variations with normalization', f
             amount: 10000,
             currency: 'NGN',
         );
-        
+
         expect($response->isFailed())->toBeTrue("Failed for status: $status");
     }
 });

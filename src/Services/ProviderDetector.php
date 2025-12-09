@@ -12,7 +12,7 @@ namespace KenDeNigerian\PayZephyr\Services;
  *
  * Single Responsibility: Only handles provider detection logic.
  */
-class ProviderDetector
+final class ProviderDetector
 {
     /**
      * Provider reference prefixes.

@@ -20,7 +20,7 @@ use Random\RandomException;
  * This driver handles standard payments via the Standard Payment Link (v3) API
  * and verifies transactions using the unique transaction reference (tx_ref).
  */
-class FlutterwaveDriver extends AbstractDriver
+final class FlutterwaveDriver extends AbstractDriver
 {
     protected string $name = 'flutterwave';
 

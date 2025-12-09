@@ -1,4 +1,6 @@
-<?php /** @noinspection ALL */
+<?php
+
+/** @noinspection ALL */
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -46,10 +48,12 @@ test('webhook controller handles valid paystack webhook', function () {
     $request->headers->set('x-paystack-signature', $signature);
 
     // Mock the request content
-    $request = new class($request) extends Request {
+    $request = new class($request) extends Request
+    {
         private $originalRequest;
 
-        public function __construct($request) {
+        public function __construct($request)
+        {
             parent::__construct(
                 $request->query->all(),
                 $request->request->all(),
@@ -87,10 +91,12 @@ test('webhook controller rejects invalid signature', function () {
     $request = Request::create('/payments/webhook/paystack', 'POST', $payload);
     $request->headers->set('x-paystack-signature', 'invalid_signature_here');
 
-    $request = new class($request) extends Request {
+    $request = new class($request) extends Request
+    {
         private $originalRequest;
 
-        public function __construct($request) {
+        public function __construct($request)
+        {
             parent::__construct(
                 $request->query->all(),
                 $request->request->all(),
@@ -193,10 +199,12 @@ test('webhook controller handles flutterwave webhook with valid signature', func
     $request = Request::create('/payments/webhook/flutterwave', 'POST', $payload);
     $request->headers->set('verif-hash', 'webhook_secret');
 
-    $request = new class($request) extends Request {
+    $request = new class($request) extends Request
+    {
         private $originalRequest;
 
-        public function __construct($request) {
+        public function __construct($request)
+        {
             parent::__construct(
                 $request->query->all(),
                 $request->request->all(),

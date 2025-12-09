@@ -35,7 +35,6 @@ test('payment manager resolveVerificationContext uses cache first', function () 
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'test_ref', null);
 
@@ -62,7 +61,6 @@ test('payment manager resolveVerificationContext uses database when cache miss',
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'db_ref', null);
 
@@ -92,7 +90,6 @@ test('payment manager resolveVerificationContext uses session_id from metadata',
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'session_ref', null);
 
@@ -119,7 +116,6 @@ test('payment manager resolveVerificationContext uses order_id from metadata', f
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'order_ref', null);
 
@@ -146,7 +142,6 @@ test('payment manager resolveVerificationContext uses provider_id for square', f
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'square_ref', null);
 
@@ -174,7 +169,6 @@ test('payment manager resolveVerificationContext falls back to reference when no
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'fallback_ref', null);
 
@@ -191,7 +185,6 @@ test('payment manager resolveVerificationContext uses explicit provider when pro
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    
 
     $result = $method->invoke($manager, 'any_ref', 'stripe');
 
@@ -206,7 +199,6 @@ test('payment manager detectProviderFromReference delegates to ProviderDetector'
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('detectProviderFromReference');
-    
 
     expect($method->invoke($manager, 'PAYSTACK_ref_123'))->toBe('paystack')
         ->and($method->invoke($manager, 'FLW_ref_123'))->toBe('flutterwave')
@@ -236,7 +228,6 @@ test('payment manager updateTransactionFromVerification handles successful payme
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    
 
     $method->invoke($manager, 'verify_ref', $response);
 
@@ -268,7 +259,6 @@ test('payment manager updateTransactionFromVerification handles failed payment',
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    
 
     $method->invoke($manager, 'failed_ref', $response);
 

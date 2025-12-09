@@ -14,14 +14,14 @@ use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 beforeEach(function () {
     // Ensure we're using the testing connection
     \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+
     // Always create the table (RefreshDatabase will handle cleanup)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
     } catch (\Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function (Blueprint $table) {
         $table->id();
         $table->string('reference');

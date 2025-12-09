@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when payment verification fails
  */
-class VerificationException extends PaymentException {}
+final class VerificationException extends PaymentException {}

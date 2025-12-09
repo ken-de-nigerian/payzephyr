@@ -125,7 +125,6 @@ test('driver logs info when logging enabled', function () {
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('log');
-    
 
     // Should not throw exception
     $method->invoke($driver, 'info', 'Test log message', ['key' => 'value']);
@@ -140,7 +139,6 @@ test('driver respects logging disabled config', function () {
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('log');
-    
 
     // Should not throw exception
     $method->invoke($driver, 'info', 'Test log message');
@@ -155,7 +153,6 @@ test('driver logs with different levels', function () {
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('log');
-    
 
     $levels = ['debug', 'info', 'warning', 'error', 'critical'];
 
@@ -173,7 +170,6 @@ test('driver logs with context data', function () {
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('log');
-    
 
     $context = [
         'reference' => 'ref_123',
@@ -248,7 +244,6 @@ test('driver initializes http client', function () {
 
     $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('client');
-    
 
     $client = $property->getValue($driver);
 
@@ -263,7 +258,6 @@ test('driver http client has correct base url', function () {
 
     $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('client');
-    
 
     $client = $property->getValue($driver);
 
@@ -278,7 +272,6 @@ test('driver http client has default timeout', function () {
 
     $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('client');
-    
 
     $client = $property->getValue($driver);
 
@@ -293,7 +286,6 @@ test('driver http client disables ssl verification in testing mode', function ()
 
     $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('client');
-    
 
     $client = $property->getValue($driver);
 
@@ -312,7 +304,6 @@ test('driver stores configuration', function () {
 
     $reflection = new ReflectionClass($driver);
     $property = $reflection->getProperty('config');
-    
 
     expect($property->getValue($driver))->toBe($config);
 });
@@ -347,7 +338,6 @@ test('reference generation handles custom prefix', function () {
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('generateReference');
-    
 
     $ref = $method->invoke($driver, 'CUSTOM');
 

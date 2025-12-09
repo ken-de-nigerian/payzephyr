@@ -23,14 +23,7 @@ function createPaystackDriverWithMock(array $responses): PaystackDriver
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    $driver = new class($config) extends PaystackDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
-
+    $driver = new PaystackDriver($config);
     $driver->setClient($client);
 
     return $driver;
@@ -88,13 +81,7 @@ test('paystack charge handles network error', function () {
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
-    $driver = new class(['secret_key' => 'test', 'currencies' => ['NGN']]) extends PaystackDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new PaystackDriver(['secret_key' => 'test', 'currencies' => ['NGN']]);
     $driver->setClient($client);
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));

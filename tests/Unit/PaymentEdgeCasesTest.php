@@ -149,4 +149,3 @@ test('payment idempotency with long key', function () {
 
     expect($result)->toBeInstanceOf(Payment::class);
 });
-

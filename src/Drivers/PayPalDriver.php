@@ -21,7 +21,7 @@ use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
  * This driver utilizes the 'Checkout Orders' API to create and capture payments.
  * It handles the OAuth2 Client Credentials flow for authentication.
  */
-class PayPalDriver extends AbstractDriver
+final class PayPalDriver extends AbstractDriver
 {
     protected string $name = 'paypal';
 
@@ -416,7 +416,6 @@ class PayPalDriver extends AbstractDriver
             return false;
         }
     }
-
 
     private function captureOrder(string $orderId): ?array
     {

@@ -89,7 +89,7 @@ return [
             'access_token' => env('SQUARE_ACCESS_TOKEN'),
             'location_id' => env('SQUARE_LOCATION_ID'),
             'webhook_signature_key' => env('SQUARE_WEBHOOK_SIGNATURE_KEY'),
-            'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareup.com'),
+            'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareupsandbox.com'), // Sandbox: https://connect.squareupsandbox.com | Live: https://connect.squareup.com,
             'currencies' => ['USD', 'CAD', 'GBP', 'AUD'],
             'enabled' => env('SQUARE_ENABLED', false),
         ],

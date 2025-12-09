@@ -12,7 +12,7 @@ test('payment status enum has all cases', function () {
 
 test('payment status all method returns all values', function () {
     $all = PaymentStatus::all();
-    
+
     expect($all)->toHaveCount(4)
         ->and($all)->toContain('success', 'failed', 'pending', 'cancelled');
 });
@@ -25,7 +25,7 @@ test('payment status fromString creates enum from valid string', function () {
 });
 
 test('payment status fromString throws ValueError for invalid string', function () {
-    expect(fn() => PaymentStatus::fromString('invalid'))
+    expect(fn () => PaymentStatus::fromString('invalid'))
         ->toThrow(\ValueError::class);
 });
 

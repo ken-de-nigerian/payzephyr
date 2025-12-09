@@ -21,7 +21,7 @@ use Random\RandomException;
  * When you initialize a payment, it redirects the customer to Paystack's
  * hosted checkout page where they can pay with card, bank transfer, USSD, etc.
  */
-class PaystackDriver extends AbstractDriver
+final class PaystackDriver extends AbstractDriver
 {
     protected string $name = 'paystack';
 

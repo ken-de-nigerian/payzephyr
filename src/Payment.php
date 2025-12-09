@@ -19,7 +19,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
  *
  * Once you call redirect() or charge(), it sends everything to PaymentManager to handle.
  */
-class Payment
+final class Payment
 {
     /**
      * The payment manager that handles all the actual payment processing.

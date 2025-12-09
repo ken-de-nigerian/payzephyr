@@ -2,8 +2,8 @@
 
 namespace KenDeNigerian\PayZephyr\Tests;
 
-use Orchestra\Testbench\TestCase as Orchestra;
 use KenDeNigerian\PayZephyr\PaymentServiceProvider;
+use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class TestCase extends Orchestra
 {
@@ -40,7 +40,7 @@ abstract class TestCase extends Orchestra
 
         // Load migrations from the package
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-        
+
         // Run migrations on the testing connection
         $this->artisan('migrate', ['--database' => 'testing'])->run();
     }

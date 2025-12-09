@@ -7,7 +7,7 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
     ]);
-    
+
     $intent = (object) [
         'id' => 'pi_test_123',
         'status' => 'succeeded',
@@ -18,13 +18,13 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
         'payment_method_types' => ['card'],
         'receipt_email' => 'test@example.com',
     ];
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, $intent);
-    
+
     expect($result->status)->toBe('success')
         ->and($result->amount)->toBe(100.0)
         ->and($result->currency)->toBe('USD')
@@ -36,7 +36,7 @@ test('stripe driver mapFromPaymentIntent handles requires_payment_method status'
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
     ]);
-    
+
     $intent = (object) [
         'id' => 'pi_test_123',
         'status' => 'requires_payment_method',
@@ -47,13 +47,13 @@ test('stripe driver mapFromPaymentIntent handles requires_payment_method status'
         'payment_method_types' => ['card'],
         'receipt_email' => null,
     ];
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, $intent);
-    
+
     expect($result->status)->toBe('pending')
         ->and($result->paidAt)->toBeNull();
 });
@@ -63,7 +63,7 @@ test('stripe driver mapFromPaymentIntent handles canceled status', function () {
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
     ]);
-    
+
     $intent = (object) [
         'id' => 'pi_test_123',
         'status' => 'canceled',
@@ -74,13 +74,13 @@ test('stripe driver mapFromPaymentIntent handles canceled status', function () {
         'payment_method_types' => ['card'],
         'receipt_email' => null,
     ];
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, $intent);
-    
+
     expect($result->status)->toBe('failed')
         ->and($result->paidAt)->toBeNull();
 });
@@ -90,7 +90,7 @@ test('stripe driver mapFromPaymentIntent handles default status', function () {
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
     ]);
-    
+
     $intent = (object) [
         'id' => 'pi_test_123',
         'status' => 'unknown_status',
@@ -101,13 +101,13 @@ test('stripe driver mapFromPaymentIntent handles default status', function () {
         'payment_method_types' => ['card'],
         'receipt_email' => null,
     ];
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, $intent);
-    
+
     // Unknown status normalizes to lowercase
     expect($result->status)->toBe('unknown_status')
         ->and($result->paidAt)->toBeNull();
@@ -118,7 +118,7 @@ test('stripe driver mapFromPaymentIntent extracts customer email', function () {
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
     ]);
-    
+
     $intent = (object) [
         'id' => 'pi_test_123',
         'status' => 'succeeded',
@@ -129,13 +129,13 @@ test('stripe driver mapFromPaymentIntent extracts customer email', function () {
         'payment_method_types' => ['card'],
         'receipt_email' => 'test@example.com',
     ];
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, $intent);
-    
+
     expect($result->customer)->toHaveKey('email')
         ->and($result->customer['email'])->toBe('test@example.com')
         ->and($result->channel)->toBe('card');

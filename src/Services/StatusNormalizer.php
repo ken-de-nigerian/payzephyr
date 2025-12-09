@@ -13,7 +13,7 @@ namespace KenDeNigerian\PayZephyr\Services;
  *
  * Single Responsibility: Only handles status normalization logic.
  */
-class StatusNormalizer
+final class StatusNormalizer
 {
     /**
      * Provider-specific status mappings.

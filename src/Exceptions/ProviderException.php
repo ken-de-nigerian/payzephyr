@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when all payment providers fail
  */
-class ProviderException extends PaymentException {}
+final class ProviderException extends PaymentException {}

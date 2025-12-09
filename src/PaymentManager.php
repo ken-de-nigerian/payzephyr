@@ -27,7 +27,7 @@ use Throwable;
  * - Logs all transactions to the database
  * - Verifies payments across multiple providers
  */
-class PaymentManager
+final class PaymentManager
 {
     /**
      * Cache of payment provider drivers we've already created (so we don't recreate them).
@@ -361,7 +361,6 @@ class PaymentManager
 
         return array_unique(array_filter($chain));
     }
-
 
     /**
      * Get all payment providers that are currently enabled in your config.

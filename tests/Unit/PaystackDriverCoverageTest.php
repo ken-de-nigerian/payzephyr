@@ -8,13 +8,13 @@ test('paystack driver getIdempotencyHeader returns correct header', function () 
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('getIdempotencyHeader');
     $method->setAccessible(true);
-    
+
     $result = $method->invoke($driver, 'test_key');
-    
+
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
@@ -24,17 +24,17 @@ test('paystack driver healthCheck returns true for 4xx errors', function () {
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $client = Mockery::mock(\GuzzleHttp\Client::class);
     $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(404);
-    
+
     $client->shouldReceive('request')
         ->once()
         ->andReturn($response);
-    
+
     $driver->setClient($client);
-    
+
     expect($driver->healthCheck())->toBeTrue();
 });
 
@@ -44,17 +44,17 @@ test('paystack driver healthCheck returns true for 2xx responses', function () {
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $client = Mockery::mock(\GuzzleHttp\Client::class);
     $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(200);
-    
+
     $client->shouldReceive('request')
         ->once()
         ->andReturn($response);
-    
+
     $driver->setClient($client);
-    
+
     expect($driver->healthCheck())->toBeTrue();
 });
 
@@ -64,17 +64,17 @@ test('paystack driver healthCheck returns false for 5xx errors', function () {
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $client = Mockery::mock(\GuzzleHttp\Client::class);
     $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(500);
-    
+
     $client->shouldReceive('request')
         ->once()
         ->andReturn($response);
-    
+
     $driver->setClient($client);
-    
+
     expect($driver->healthCheck())->toBeFalse();
 });
 
@@ -84,14 +84,14 @@ test('paystack driver healthCheck returns false for network errors', function ()
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $client = Mockery::mock(\GuzzleHttp\Client::class);
     $client->shouldReceive('request')
         ->once()
         ->andThrow(new \GuzzleHttp\Exception\ConnectException('Connection timeout', Mockery::mock(\Psr\Http\Message\RequestInterface::class)));
-    
+
     $driver->setClient($client);
-    
+
     expect($driver->healthCheck())->toBeFalse();
 });
 
@@ -101,16 +101,16 @@ test('paystack driver healthCheck handles ClientException with status code', fun
         'public_key' => 'pk_test_xxx',
         'currencies' => ['NGN'],
     ]);
-    
+
     $client = Mockery::mock(\GuzzleHttp\Client::class);
     $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(400);
-    
+
     $client->shouldReceive('request')
         ->once()
         ->andThrow(new \GuzzleHttp\Exception\ClientException('Bad Request', Mockery::mock(\Psr\Http\Message\RequestInterface::class), $response));
-    
+
     $driver->setClient($client);
-    
+
     expect($driver->healthCheck())->toBeTrue();
 });

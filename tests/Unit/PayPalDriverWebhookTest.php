@@ -1,8 +1,6 @@
 <?php
 
-use GuzzleHttp\Exception\GuzzleException;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
-use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 
 test('paypal driver validates webhook with all required headers', function () {
     config([
@@ -210,15 +208,18 @@ test('paypal driver handles api verification failure', function () {
         ],
     ]);
 
-    $driver = Mockery::mock(PayPalDriver::class)->makePartial();
-    $driver->shouldAllowMockingProtectedMethods();
-    
-    // Mock makeRequest to throw exception, which will be caught in validateWebhook
-    $driver->shouldReceive('makeRequest')
+    // Use real driver instance and mock HTTP client
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    // Mock HTTP client to throw exception
+    $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+    $mockClient->shouldReceive('request')
         ->andThrow(new \GuzzleHttp\Exception\RequestException(
             'API Error',
             Mockery::mock(\Psr\Http\Message\RequestInterface::class)
         ));
+
+    $driver->setClient($mockClient);
 
     $headers = [
         'paypal-transmission-id' => ['transmission_123'],
@@ -229,9 +230,8 @@ test('paypal driver handles api verification failure', function () {
     ];
 
     // The validateWebhook method catches exceptions and returns false
-    // The exception is only thrown from verifyWebhookSignatureViaAPI, not from validateWebhook
     $result = $driver->validateWebhook($headers, '{}');
-    
+
     // Should return false when exception occurs
     expect($result)->toBeFalse();
 });
@@ -248,11 +248,23 @@ test('paypal driver handles verification status failure', function () {
         ],
     ]);
 
-    $driver = Mockery::mock(PayPalDriver::class)->makePartial();
-    $driver->shouldAllowMockingProtectedMethods();
-    $driver->shouldReceive('makeRequest')->andReturn([
-        'verification_status' => 'FAILURE',
-    ]);
+    // Use real driver instance and mock HTTP client
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    // Mock HTTP response with FAILURE status
+    $mockStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $mockStream->shouldReceive('__toString')
+        ->andReturn(json_encode(['verification_status' => 'FAILURE']));
+
+    $mockResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
+    $mockResponse->shouldReceive('getBody')
+        ->andReturn($mockStream);
+
+    $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+    $mockClient->shouldReceive('request')
+        ->andReturn($mockResponse);
+
+    $driver->setClient($mockClient);
 
     $headers = [
         'paypal-transmission-id' => ['transmission_123'],
@@ -279,11 +291,23 @@ test('paypal driver handles empty verification status', function () {
         ],
     ]);
 
-    $driver = Mockery::mock(PayPalDriver::class)->makePartial();
-    $driver->shouldAllowMockingProtectedMethods();
-    $driver->shouldReceive('makeRequest')->andReturn([
-        'verification_status' => '',
-    ]);
+    // Use real driver instance and mock HTTP client
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    // Mock HTTP response with empty status
+    $mockStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $mockStream->shouldReceive('__toString')
+        ->andReturn(json_encode(['verification_status' => '']));
+
+    $mockResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
+    $mockResponse->shouldReceive('getBody')
+        ->andReturn($mockStream);
+
+    $mockClient = Mockery::mock(\GuzzleHttp\Client::class);
+    $mockClient->shouldReceive('request')
+        ->andReturn($mockResponse);
+
+    $driver->setClient($mockClient);
 
     $headers = [
         'paypal-transmission-id' => ['transmission_123'],
@@ -297,4 +321,3 @@ test('paypal driver handles empty verification status', function () {
 
     expect($result)->toBeFalse();
 });
-

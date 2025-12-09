@@ -15,15 +15,7 @@ function createMockStripeDriver(object $stripeMock): StripeDriver
         'callback_url' => 'https://example.com/callback',
     ];
 
-    $driver = new class($config) extends StripeDriver
-    {
-        // We override this to avoid constructing the real StripeClient
-        protected function initializeClient(): void
-        {
-            // No-op for the real client
-        }
-    };
-
+    $driver = new StripeDriver($config);
     // Inject our mock
     $driver->setStripeClient($stripeMock);
 

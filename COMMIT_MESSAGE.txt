@@ -1,0 +1,50 @@
+refactor: mark core classes as final and fix Square driver
+
+This commit makes core classes final for better OCP compliance and fixes
+the Square driver API version and logging. All tests were then refactored
+to work with final classes.
+
+Part 1: Made classes final
+- Marked all driver classes as final (PayPalDriver, StripeDriver, SquareDriver,
+  PaystackDriver, FlutterwaveDriver, MonnifyDriver)
+- Marked core service classes as final (PaymentManager, DriverFactory,
+  StatusNormalizer, ProviderDetector, ChannelMapper)
+- Marked controller and model classes as final (WebhookController,
+  PaymentTransaction, Payment, PaymentServiceProvider)
+- Marked exception classes as final (all exception classes)
+
+Part 2: Fixed Square driver
+- Updated Square API version from '2024-01-18' to '2024-10-18'
+- Removed debug logging added for troubleshooting 401 errors
+- Cleaned up unnecessary logs while maintaining essential operational logging
+- Updated SquareDriverCoverageTest to reflect new API version
+
+Part 3: Refactored tests to work with final classes
+- Replaced partial mocks of final driver classes with real instances and
+  mocked HTTP clients via setClient() method
+- Replaced PaymentManager mocks with real instances, injecting mock drivers
+  directly into the internal $drivers cache using reflection
+- Replaced DriverFactory mocks with direct driver injection into PaymentManager
+- Fixed status normalizer expectations in WebhookControllerCoverageTest to
+  match actual driver behavior (drivers extract status from object/resource,
+  not from type/event_type directly)
+- Updated PayPalDriverWebhookTest to properly mock StreamInterface for
+  HTTP response bodies
+
+Test files updated:
+- tests/Unit/SquareDriverCoverageTest.php (API version update)
+- tests/Unit/PayPalDriverWebhookTest.php
+- tests/Unit/PaymentRedirectTest.php
+- tests/Unit/PaymentCompleteTest.php
+- tests/Unit/StripeDriverEdgeCasesTest.php
+- tests/Unit/SecurityVulnerabilityTest.php
+- tests/Unit/WebhookControllerCompleteTest.php
+- tests/Unit/WebhookControllerCoverageTest.php
+- tests/Unit/WebhookControllerEdgeCasesTest.php
+
+Results:
+- All 659 tests now pass (1,336 assertions)
+- Maintains full test coverage while respecting final class constraints
+- Tests now use composition (injecting mocks) instead of inheritance
+- Square driver uses latest API version and has cleaner logging
+

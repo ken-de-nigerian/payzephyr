@@ -2,7 +2,6 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 use KenDeNigerian\PayZephyr\PaymentManager;
@@ -421,14 +420,14 @@ test('webhook controller returns original status for unknown status', function (
 test('webhook controller updates transaction from webhook with success status', function () {
     // Ensure we're using the testing connection
     \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
     } catch (\Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -477,14 +476,14 @@ test('webhook controller updates transaction from webhook with success status', 
 test('webhook controller updates transaction with provider-specific channels', function () {
     // Ensure we're using the testing connection
     \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
     } catch (\Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -530,7 +529,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $method->invoke($controller, 'paystack', 'paystack_channel_ref', [
         'data' => ['status' => 'success', 'channel' => 'card'],
     ]);
-    
+
     $method->invoke($controller, 'square', 'square_channel_ref', [
         'data' => [
             'object' => [
@@ -570,14 +569,14 @@ test('webhook controller updates transaction with provider-specific channels', f
 test('webhook controller handles database error during update gracefully', function () {
     // Ensure we're using the testing connection
     \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
-    
+
     // Create table (drop first to ensure clean state)
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
     } catch (\Exception $e) {
         // Ignore if table doesn't exist
     }
-    
+
     Schema::connection('testing')->create('payment_transactions', function ($table) {
         $table->id();
         $table->string('reference')->unique();
@@ -632,8 +631,13 @@ test('webhook controller handles webhook without reference', function () {
     $driver->shouldReceive('validateWebhook')->andReturn(true);
     $driver->shouldReceive('extractWebhookReference')->andReturn(null);
 
-    $manager = Mockery::mock(PaymentManager::class);
-    $manager->shouldReceive('driver')->andReturn($driver);
+    $manager = new PaymentManager;
+
+    // Inject mock driver directly into PaymentManager's driver cache using reflection
+    $managerReflection = new \ReflectionClass($manager);
+    $driversProperty = $managerReflection->getProperty('drivers');
+    $driversProperty->setAccessible(true);
+    $driversProperty->setValue($manager, ['paystack' => $driver]);
 
     $controller = new \KenDeNigerian\PayZephyr\Http\Controllers\WebhookController($manager);
 
@@ -664,8 +668,18 @@ test('webhook controller handles webhook with signature verification disabled', 
 test('webhook controller handles exception during processing', function () {
     $request = Request::create('/payments/webhook/paystack', 'POST', []);
 
-    $manager = Mockery::mock(PaymentManager::class);
-    $manager->shouldReceive('driver')->andThrow(new \Exception('Driver error'));
+    // Create a mock driver that throws exception during validateWebhook
+    $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $driver->shouldReceive('validateWebhook')
+        ->andThrow(new \Exception('Driver error'));
+
+    $manager = new PaymentManager;
+
+    // Inject mock driver directly into PaymentManager's driver cache using reflection
+    $managerReflection = new \ReflectionClass($manager);
+    $driversProperty = $managerReflection->getProperty('drivers');
+    $driversProperty->setAccessible(true);
+    $driversProperty->setValue($manager, ['paystack' => $driver]);
 
     $controller = new \KenDeNigerian\PayZephyr\Http\Controllers\WebhookController($manager);
     $response = $controller->handle($request, 'paystack');
@@ -673,4 +687,3 @@ test('webhook controller handles exception during processing', function () {
     expect($response->getStatusCode())->toBe(500)
         ->and(json_decode($response->getContent(), true))->toHaveKey('message');
 });
-

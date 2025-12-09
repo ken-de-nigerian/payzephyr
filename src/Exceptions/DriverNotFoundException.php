@@ -9,4 +9,4 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
  *
  * Thrown when a payment driver cannot be found
  */
-class DriverNotFoundException extends PaymentException {}
+final class DriverNotFoundException extends PaymentException {}

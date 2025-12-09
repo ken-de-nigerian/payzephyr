@@ -1,7 +1,6 @@
 <?php
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -25,14 +24,7 @@ function createSquareDriverWithMock(array $responses): SquareDriver
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    $driver = new class($config) extends SquareDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
-
+    $driver = new SquareDriver($config);
     $driver->setClient($client);
 
     return $driver;
@@ -126,13 +118,7 @@ test('square charge handles network error', function () {
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
-    $driver = new class(['access_token' => 'test', 'location_id' => 'test', 'currencies' => ['USD']]) extends SquareDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new SquareDriver(['access_token' => 'test', 'location_id' => 'test', 'currencies' => ['USD']]);
     $driver->setClient($client);
 
     $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback');
@@ -337,4 +323,3 @@ test('square verify includes card brand when available', function () {
     $result = $driver->verify('payment_123');
     expect($result->cardType)->toBe('MASTERCARD');
 });
-

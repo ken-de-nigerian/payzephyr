@@ -24,14 +24,7 @@ function createFlutterwaveDriverWithMock(array $responses): FlutterwaveDriver
     $handlerStack = HandlerStack::create($mock);
     $client = new Client(['handler' => $handlerStack]);
 
-    $driver = new class($config) extends FlutterwaveDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
-
+    $driver = new FlutterwaveDriver($config);
     $driver->setClient($client);
 
     return $driver;
@@ -73,13 +66,7 @@ test('flutterwave charge handles network error', function () {
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
-    $driver = new class(['secret_key' => 'test', 'currencies' => ['NGN'], 'callback_url' => 'http://test']) extends FlutterwaveDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new FlutterwaveDriver(['secret_key' => 'test', 'currencies' => ['NGN'], 'callback_url' => 'http://test']);
     $driver->setClient($client);
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
@@ -142,13 +129,7 @@ test('flutterwave verify handles network error', function () {
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);
-    $driver = new class(['secret_key' => 'test', 'currencies' => ['NGN']]) extends FlutterwaveDriver
-    {
-        public function setClient(Client $client): void
-        {
-            $this->client = $client;
-        }
-    };
+    $driver = new FlutterwaveDriver(['secret_key' => 'test', 'currencies' => ['NGN']]);
     $driver->setClient($client);
 
     $driver->verify('fw_123');

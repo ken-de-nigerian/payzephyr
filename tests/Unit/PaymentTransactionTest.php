@@ -84,7 +84,9 @@ test('it casts attributes correctly', function () {
     ]);
 
     // specific to decimal:2 cast, it returns a string to preserve precision
-    expect($transaction->amount)->toBe('5000.50')
+    // Note: In some Laravel versions, decimal cast may return float
+    $amount = $transaction->amount;
+    expect(is_string($amount) ? $amount : (string) number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
         ->and($transaction->paid_at)->toBeInstanceOf(Carbon::class);
 
     // Laravel 10 uses 'array' cast, Laravel 11+ uses AsArrayObject

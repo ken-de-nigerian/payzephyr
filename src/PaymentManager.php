@@ -261,6 +261,10 @@ class PaymentManager
                     $metadata = $transaction->metadata;
                     if ($metadata instanceof \ArrayObject) {
                         $metadata = $metadata->getArrayCopy();
+                    } elseif (is_string($metadata)) {
+                        // Decode JSON string if cast didn't apply
+                        $decoded = json_decode($metadata, true);
+                        $metadata = is_array($decoded) ? $decoded : [];
                     } elseif (!is_array($metadata)) {
                         $metadata = [];
                     }

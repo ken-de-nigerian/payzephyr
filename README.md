@@ -591,7 +591,29 @@ Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) fo
 
 Please see [CHANGELOG.md](docs/CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.1.6
+### Latest Release: v1.1.7
+
+### Changed
+- **Convention over Configuration**: Refactored core services to eliminate hardcoded provider lists
+  - **DriverFactory**: Now uses Convention over Configuration to automatically resolve driver classes
+  - **ProviderDetector**: Dynamically builds prefix list from all providers in configuration
+  - **ChannelMapper**: Uses dynamic method checking instead of hardcoded provider list
+
+### Improved
+- **Maintainability**: Adding new providers no longer requires updating multiple hardcoded lists
+- **Extensibility**: New providers automatically work if they follow naming conventions
+- **Code Quality**: Reduced code duplication and improved adherence to DRY principles
+
+### Configuration
+- Added `reference_prefix` configuration option for providers that need custom prefixes:
+  - Flutterwave: `'reference_prefix' => 'FLW'` (instead of default `'FLUTTERWAVE'`)
+  - Monnify: `'reference_prefix' => 'MON'` (instead of default `'MONNIFY'`)
+
+### Documentation
+- Updated architecture documentation to reflect Convention over Configuration approach
+- Added required callback URL to API-Only Mode examples
+
+### Previous Release: v1.1.6
 
 ### Added
 - **Install Command**: New `payzephyr:install` artisan command for streamlined package setup

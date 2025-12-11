@@ -244,22 +244,42 @@ final class StatusNormalizer implements StatusNormalizerInterface
 4. Supports static normalization (for use outside Laravel container)
 
 #### ChannelMapper
-Maps unified payment channels to provider-specific formats:
+Maps unified payment channels to provider-specific formats using Convention over Configuration with dynamic method checking:
 
 ```php
 final class ChannelMapper implements ChannelMapperInterface
 {
-    public function mapChannels(?array $channels, string $provider): ?array;
+    public function mapChannels(?array $channels, string $provider): ?array
+    {
+        // Uses dynamic method checking: mapTo{Provider}
+        // Example: 'paystack' → mapToPaystack()
+        // Example: 'flutterwave' → mapToFlutterwave()
+        // Falls back to returning channels as-is if method doesn't exist
+    }
+    
     public function supportsChannels(string $provider): bool;
     public function getDefaultChannels(string $provider): ?array;
     
-    // Provider-specific mapping methods
+    // Provider-specific mapping methods (dynamically called)
     protected function mapToPaystack(array $channels): array;
     protected function mapToMonnify(array $channels): array;
     protected function mapToFlutterwave(array $channels): array;
     protected function mapToStripe(array $channels): array;
+    protected function mapToPayPal(array $channels): ?array; // Returns null (not supported)
 }
 ```
+
+**How it works:**
+- **Dynamic Method Resolution**: Automatically calls `mapTo{Provider}()` method based on provider name
+- **Convention-based**: Provider name is converted to PascalCase (e.g., `'paystack'` → `mapToPaystack()`)
+- **Extensible**: Adding new provider mapping requires only adding a new `mapTo{Provider}()` method
+- **Fallback**: Returns channels as-is if no provider-specific method exists
+- **Null handling**: Returns `null` for providers that don't support channel filtering (e.g., PayPal)
+
+**Benefits:**
+- **No hardcoded provider lists**: Automatically supports new providers via method naming convention
+- **Maintainable**: Each provider's mapping logic is isolated in its own method
+- **Testable**: Easy to test individual provider mappings
 
 **Unified Channels:**
 - `card` - Credit/Debit cards

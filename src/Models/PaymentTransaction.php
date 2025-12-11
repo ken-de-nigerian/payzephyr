@@ -111,6 +111,31 @@ final class PaymentTransaction extends Model
         return parent::setAttribute($key, $value);
     }
 
+    /**
+     * Get a given attribute on the model.
+     * Override to handle JSON string decoding for Laravel 10 compatibility.
+     *
+     * @param  string  $key
+     * @return mixed
+     */
+    public function getAttribute($key)
+    {
+        $value = parent::getAttribute($key);
+        
+        // For Laravel 10, decode JSON strings for metadata and customer if cast didn't apply
+        $laravelVersion = (float) app()->version();
+        if ($laravelVersion < 11.0 && in_array($key, ['metadata', 'customer'], true)) {
+            if (is_string($value) && !empty($value)) {
+                $decoded = json_decode($value, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    return $decoded;
+                }
+            }
+        }
+        
+        return $value;
+    }
+
 
     /**
      * Set table name.

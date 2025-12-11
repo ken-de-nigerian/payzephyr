@@ -82,6 +82,36 @@ final class PaymentTransaction extends Model
     }
 
     /**
+     * Set a given attribute on the model.
+     * Override to handle array encoding for Laravel 10 compatibility.
+     *
+     * @param  string  $key
+     * @param  mixed  $value
+     * @return mixed
+     */
+    public function setAttribute($key, $value)
+    {
+        $laravelVersion = (float) app()->version();
+        
+        // For Laravel 10, ensure arrays are JSON-encoded for metadata and customer
+        // Laravel 11+ uses AsArrayObject which handles this automatically
+        if ($laravelVersion < 11.0 && in_array($key, ['metadata', 'customer'], true)) {
+            if ($value === null) {
+                $this->attributes[$key] = null;
+            } elseif (is_array($value)) {
+                $this->attributes[$key] = json_encode($value);
+            } else {
+                $this->attributes[$key] = $value;
+            }
+            
+            return $this;
+        }
+        
+        // For Laravel 11+ or other attributes, use parent implementation
+        return parent::setAttribute($key, $value);
+    }
+
+    /**
      * Set table name.
      */
     public static function setTableName(string $table): void

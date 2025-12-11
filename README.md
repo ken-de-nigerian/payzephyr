@@ -451,8 +451,10 @@ if ($driver->isCurrencySupported('NGN')) {
 ```php
 // Get payment details without redirecting
 // Use charge() instead of redirect() to get the response object
+// Note: Callback URL is still required for redirect-based providers (Stripe, Square, etc.)
 $response = Payment::amount(10000)
     ->email('customer@example.com')
+    ->callback(route('payment.callback'))  // Required for redirect-based providers
     ->with('stripe') // or ->using('stripe')
     ->charge(); // Must be called last to execute
 

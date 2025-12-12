@@ -62,7 +62,7 @@
     "scripts": {
         "test": "vendor/bin/pest",
         "test-coverage": "vendor/bin/pest --coverage --coverage-clover coverage.xml",
-        "analyse": "vendor/bin/phpstan analyse",
+        "analyse": "vendor/bin/phpstan analyse src",
         "format": "vendor/bin/pint"
     },
     "extra": {

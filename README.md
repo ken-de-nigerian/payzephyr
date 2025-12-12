@@ -742,9 +742,16 @@ Key areas for contribution:
 
 Please see [CHANGELOG.md](docs/CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.2.0
+### Latest Release: v1.2.1
 
-#### 🔒 Security Enhancements
+#### 🔧 Code Quality Improvements
+- Fixed all PHPStan static analysis errors
+- Improved type safety across the codebase
+- Enhanced code quality and maintainability
+- Added comprehensive test coverage improvements (855 tests, 1,707 assertions)
+- Better IDE support with enhanced PHPDoc annotations
+
+#### 🔒 Security Enhancements (v1.2.0)
 - **CRITICAL:** SQL injection prevention in table name validation
 - **CRITICAL:** Webhook replay attack prevention with timestamp validation (all drivers)
 - **CRITICAL:** Multi-tenant cache isolation

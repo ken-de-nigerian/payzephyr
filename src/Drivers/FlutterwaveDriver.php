@@ -85,8 +85,8 @@ final class FlutterwaveDriver extends AbstractDriver
             ];
 
             $channels = $this->mapChannels($request);
-            if (! empty($channels)) {
-                $payload['payment_options'] = implode(',', $channels);
+            if ($channels) {
+                $payload['payment_options'] = $channels;
             }
 
             $response = $this->makeRequest('POST', 'payments', [

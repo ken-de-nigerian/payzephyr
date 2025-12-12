@@ -117,9 +117,13 @@ final class MonnifyDriver extends AbstractDriver
                     'reference',
                     $reference
                 ),
-                'paymentMethods' => $this->mapChannels($request) ?? ['CARD', 'ACCOUNT_TRANSFER'],
                 'metadata' => $request->metadata,
             ];
+
+            $channels = $this->mapChannels($request);
+            if ($channels) {
+                $payload['paymentMethods'] = $channels;
+            }
 
             $response = $this->makeRequest('POST', '/api/v1/merchant/transactions/init-transaction', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],

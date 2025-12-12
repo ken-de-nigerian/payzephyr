@@ -182,12 +182,12 @@ final class ChannelMapper implements ChannelMapperInterface
             PaymentChannel::QR_CODE->value => 'OPAY_QRCODE',
         ];
 
+        $validOptions = ['CARD', 'BANK_ACCOUNT', 'OPAY_ACCOUNT', 'OPAY_QRCODE', 'BALANCE', 'OTHERS'];
+
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? null,
+            fn ($channel) => $mapping[strtolower($channel)] ?? (in_array(strtoupper($channel), $validOptions) ? strtoupper($channel) : null),
             $channels
         );
-
-        $validOptions = ['CARD', 'BANK_ACCOUNT', 'OPAY_ACCOUNT', 'OPAY_QRCODE', 'BALANCE', 'OTHERS'];
 
         return array_filter($mapped, fn ($option) => in_array($option, $validOptions));
     }

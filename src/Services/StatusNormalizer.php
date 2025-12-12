@@ -68,7 +68,7 @@ final class StatusNormalizer implements StatusNormalizerInterface
     /**
      * Get provider mappings.
      *
-     * @return array<string, array<string, array<string>>>
+     * @return array<string, array<string, string>>
      */
     public function getProviderMappings(): array
     {

@@ -284,11 +284,13 @@ class PaymentManager
 
         if ($this->config['logging']['enabled'] ?? true) {
             $transaction = PaymentTransaction::where('reference', $reference)->first();
-            if ($transaction) {
+            if ($transaction instanceof PaymentTransaction) {
                 try {
-                    $driver = $this->driver($transaction->provider);
+                    /** @var string $provider */
+                    $provider = $transaction->getAttribute('provider');
+                    $driver = $this->driver($provider);
 
-                    $metadata = $transaction->metadata;
+                    $metadata = $transaction->getAttribute('metadata');
                     if ($metadata instanceof ArrayObject) {
                         $metadata = $metadata->getArrayCopy();
                     } elseif (! is_array($metadata)) {
@@ -303,11 +305,11 @@ class PaymentManager
                     $verificationId = $driver->resolveVerificationId($reference, $providerId);
 
                     return [
-                        'provider' => $transaction->provider,
+                        'provider' => $provider,
                         'id' => $verificationId,
                     ];
                 } catch (DriverNotFoundException) {
-                    $metadata = $transaction->metadata;
+                    $metadata = $transaction->getAttribute('metadata');
                     if ($metadata instanceof ArrayObject) {
                         $metadata = $metadata->getArrayCopy();
                     } elseif (is_string($metadata)) {
@@ -322,8 +324,11 @@ class PaymentManager
                         ?? $metadata['order_id']
                         ?? $reference;
 
+                    /** @var string $transactionProvider */
+                    $transactionProvider = $transaction->getAttribute('provider');
+
                     return [
-                        'provider' => $transaction->provider,
+                        'provider' => $transactionProvider,
                         'id' => $providerId,
                     ];
                 }

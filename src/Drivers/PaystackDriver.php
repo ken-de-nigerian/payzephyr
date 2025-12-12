@@ -238,7 +238,8 @@ final class PaystackDriver extends AbstractDriver
             }
 
             if ($clientException !== null) {
-                $statusCode = $clientException->getResponse()?->getStatusCode();
+                $response = $clientException->getResponse();
+                $statusCode = $response->getStatusCode();
                 if (in_array($statusCode, [400, 404], true)) {
                     $this->log('info', 'Health check successful (expected 400/404 response)', [
                         'status_code' => $statusCode,

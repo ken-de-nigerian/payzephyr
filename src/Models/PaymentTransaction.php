@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Models;
 
+use ArrayObject;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
@@ -15,8 +17,23 @@ use Throwable;
 /**
  * Payment transaction model.
  *
- * @method static where(string $string, string $reference)
- * @method static create(array $array)
+ * @method static Builder where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static Builder create(array $attributes = [])
+ * @method static Builder first(array|string $columns = ['*'])
+ * @method static Builder lockForUpdate()
+ * @method static Builder update(array $attributes = [])
+ * @method static Builder delete()
+ *
+ * @property string $reference
+ * @property string $provider
+ * @property string $status
+ * @property int $amount
+ * @property string $currency
+ * @property string $email
+ * @property string|null $channel
+ * @property array|ArrayObject|null $metadata
+ * @property array|null $customer
+ * @property Carbon|null $paid_at
  */
 final class PaymentTransaction extends Model
 {
@@ -163,6 +180,9 @@ final class PaymentTransaction extends Model
 
     /**
      * Scope: successful payments.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
      */
     public function scopeSuccessful(Builder $query): Builder
     {
@@ -174,11 +194,15 @@ final class PaymentTransaction extends Model
             'paid',
         ];
 
+        /** @var Builder<self> */
         return $query->whereIn('status', $successStatuses);
     }
 
     /**
      * Scope: failed payments.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
      */
     public function scopeFailed(Builder $query): Builder
     {
@@ -192,6 +216,7 @@ final class PaymentTransaction extends Model
             'expired',
         ];
 
+        /** @var Builder<self> */
         return $query->whereIn('status', $failedStatuses);
     }
 

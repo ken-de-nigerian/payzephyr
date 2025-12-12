@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.2.1] - 2025-12-12
+
+### 🔧 Fixed
+
+- Fixed PHPStan static analysis errors by improving code quality
+  - Replaced nullsafe operators with direct property access where appropriate
+  - Fixed variable scope issues in exception handling
+  - Removed dead catch blocks
+  - Fixed return type annotations in StatusNormalizer
+  - Improved Eloquent model property access using `getAttribute()`
+  - Added proper type hints for scope methods
+  - Fixed ArrayObject import in PaymentTransaction model
+- Improved type safety across the codebase
+- Enhanced code quality and maintainability
+
+### ✅ Added
+
+- Comprehensive test coverage improvements
+  - Added `SquareDriverEdgeCasesTest` for error handling scenarios
+  - Added `HealthEndpointTest` for health check endpoint
+  - Added `ChannelMapperSquareOpayTest` for Square and OPay channel mappings
+  - Added `PaymentManagerEdgeCasesTest` for edge cases
+  - Added `PaymentRateLimitingTest` for rate limiting scenarios
+  - Added `ProcessWebhookJobErrorHandlingTest` for webhook error handling
+- PHPStan configuration file (`phpstan.neon`) for static analysis
+- Enhanced PHPDoc annotations for better IDE support and type safety
+
+### 📊 Test Coverage
+
+- **855 tests passing** with **1,707 assertions**
+- Improved coverage for previously untested code paths
+- All new test files passing successfully
+
+### 🛠️ Developer Experience
+
+- Added `composer analyse` command for PHPStan static analysis
+- Improved code quality and type safety
+- Better IDE support with enhanced PHPDoc annotations
+
+---
 ## [1.2.0] - 2025-12-12
 
 ### 🔒 Security

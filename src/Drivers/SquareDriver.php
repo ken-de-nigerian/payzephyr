@@ -63,8 +63,9 @@ final class SquareDriver extends AbstractDriver
     {
         $this->setCurrentRequest($request);
 
+        $reference = $request->reference ?? $this->generateReference('SQUARE');
+
         try {
-            $reference = $request->reference ?? $this->generateReference('SQUARE');
 
             $payload = [
                 'idempotency_key' => $request->idempotencyKey ?? uniqid('square_', true),
@@ -147,7 +148,7 @@ final class SquareDriver extends AbstractDriver
             }
 
             $this->log('error', 'Charge failed', [
-                'reference' => $reference ?? null,
+                'reference' => $reference,
                 'status_code' => $statusCode,
                 'error' => $errorMessage,
                 'errors' => $responseData['errors'] ?? [],
@@ -157,7 +158,7 @@ final class SquareDriver extends AbstractDriver
             throw new ChargeException('Payment initialization failed: '.$errorMessage, 0, $e);
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
-                'reference' => $reference ?? null,
+                'reference' => $reference,
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),
             ]);
@@ -213,23 +214,6 @@ final class SquareDriver extends AbstractDriver
             }
 
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
-
-            $statusCode = $response->getStatusCode();
-            $responseData = $this->parseResponse($response);
-
-            $errorMessage = $responseData['errors'][0]['detail'] ?? $responseData['errors'][0]['code'] ?? $e->getMessage();
-
-            $this->log('error', 'Verification failed', [
-                'reference' => $reference,
-                'status_code' => $statusCode,
-                'error' => $errorMessage,
-                'errors' => $responseData['errors'] ?? [],
-                'error_class' => get_class($e),
-            ]);
-
-            throw new VerificationException('Payment verification failed: '.$errorMessage, 0, $e);
         } catch (Throwable $e) {
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
@@ -262,12 +246,16 @@ final class SquareDriver extends AbstractDriver
             }
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
-            if ($previous instanceof ClientException && $previous->getResponse()?->getStatusCode() === 404) {
-                return null;
+            if ($previous instanceof ClientException) {
+                $response = $previous->getResponse();
+                if ($response->getStatusCode() === 404) {
+                    return null;
+                }
             }
             throw $e;
         } catch (ClientException $e) {
-            if ($e->getResponse()?->getStatusCode() === 404) {
+            $response = $e->getResponse();
+            if ($response->getStatusCode() === 404) {
                 return null;
             }
             throw $e;
@@ -306,12 +294,16 @@ final class SquareDriver extends AbstractDriver
             return $this->mapFromPayment($paymentDetails['payment'], $actualReference);
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
-            if ($previous instanceof ClientException && $previous->getResponse()?->getStatusCode() === 404) {
-                return null;
+            if ($previous instanceof ClientException) {
+                $response = $previous->getResponse();
+                if ($response->getStatusCode() === 404) {
+                    return null;
+                }
             }
             throw $e;
         } catch (ClientException $e) {
-            if ($e->getResponse()?->getStatusCode() === 404) {
+            $response = $e->getResponse();
+            if ($response->getStatusCode() === 404) {
                 return null;
             }
             throw $e;
@@ -375,12 +367,16 @@ final class SquareDriver extends AbstractDriver
             return $data['orders'] ?? [];
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
-            if ($previous instanceof ClientException && $previous->getResponse()?->getStatusCode() === 404) {
-                throw new VerificationException('Payment not found');
+            if ($previous instanceof ClientException) {
+                $response = $previous->getResponse();
+                if ($response->getStatusCode() === 404) {
+                    throw new VerificationException('Payment not found');
+                }
             }
             throw $e;
         } catch (ClientException $e) {
-            if ($e->getResponse()?->getStatusCode() === 404) {
+            $response = $e->getResponse();
+            if ($response->getStatusCode() === 404) {
                 throw new VerificationException('Payment not found');
             }
             throw $e;

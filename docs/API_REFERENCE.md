@@ -15,6 +15,7 @@ Complete API documentation for PayZephyr package.
 9. [Exceptions](#exceptions)
 10. [Events](#events)
 11. [Jobs](#jobs)
+12. [HTTP Endpoints](#http-endpoints)
 
 ---
 
@@ -1418,6 +1419,95 @@ class CustomNormalizer implements StatusNormalizerInterface
 // Register in service provider
 app()->singleton(StatusNormalizerInterface::class, CustomNormalizer::class);
 ```
+
+---
+
+## HTTP Endpoints
+
+PayZephyr automatically registers HTTP endpoints for webhooks and health checks.
+
+### Health Check Endpoint
+
+**Route:** `GET /payments/health`
+
+**Middleware:** `api`
+
+**Description:** Returns the health status of all enabled payment providers.
+
+**Response:**
+```json
+{
+  "status": "operational",
+  "providers": {
+    "paystack": {
+      "healthy": true,
+      "currencies": ["NGN", "USD", "GHS", "ZAR"]
+    },
+    "stripe": {
+      "healthy": true,
+      "currencies": ["USD", "EUR", "GBP", "CAD", "AUD"]
+    },
+    "flutterwave": {
+      "healthy": false,
+      "currencies": ["NGN", "USD", "EUR", "GBP"],
+      "error": "Connection timeout"
+    }
+  }
+}
+```
+
+**Response Fields:**
+- `status` (string): Always `"operational"` - indicates the endpoint is working
+- `providers` (object): Object keyed by provider name
+  - `healthy` (boolean): Whether the provider is currently available
+  - `currencies` (array): List of supported currency codes
+  - `error` (string, optional): Error message if provider is unhealthy
+
+**Usage:**
+```bash
+# Using curl
+curl https://your-app.com/payments/health
+
+# Using Laravel HTTP client
+$response = Http::get(url('/payments/health'));
+$data = $response->json();
+
+# Check specific provider
+if ($data['providers']['paystack']['healthy']) {
+    // Provider is available
+}
+```
+
+**Caching:**
+- Health checks are cached to avoid excessive API calls
+- Default cache TTL: 5 minutes (300 seconds)
+- Configure via `PAYMENTS_HEALTH_CHECK_CACHE_TTL` environment variable
+
+**Note:** Only enabled providers are included in the response.
+
+### Webhook Endpoint
+
+**Route:** `POST /payments/webhook/{provider}`
+
+**Middleware:** `api`, `throttle:120,1` (120 requests per minute)
+
+**Description:** Receives webhook notifications from payment providers.
+
+**Parameters:**
+- `provider` (string): Provider name (e.g., `paystack`, `stripe`, `flutterwave`)
+
+**Example:**
+```
+POST /payments/webhook/paystack
+POST /payments/webhook/stripe
+POST /payments/webhook/flutterwave
+```
+
+**Configuration:**
+- Webhook path can be customized via `PAYMENTS_WEBHOOK_PATH` environment variable
+- Rate limiting can be adjusted via `PAYMENTS_WEBHOOK_RATE_LIMIT` environment variable
+
+For complete webhook documentation, see [Webhook Guide](webhooks.md).
 
 ---
 

@@ -603,6 +603,93 @@ try {
 
 ---
 
+## Monitoring & Health Checks
+
+### Health Check Endpoint
+
+PayZephyr provides a built-in health check endpoint to monitor provider availability and status.
+
+**Endpoint:** `GET /payments/health`
+
+**Response Format:**
+```json
+{
+  "status": "operational",
+  "providers": {
+    "paystack": {
+      "healthy": true,
+      "currencies": ["NGN", "USD", "GHS", "ZAR"]
+    },
+    "stripe": {
+      "healthy": true,
+      "currencies": ["USD", "EUR", "GBP", "CAD", "AUD"]
+    },
+    "flutterwave": {
+      "healthy": false,
+      "currencies": ["NGN", "USD", "EUR", "GBP"]
+    },
+    "monnify": {
+      "healthy": true,
+      "currencies": ["NGN"]
+    }
+  }
+}
+```
+
+**Response Fields:**
+- `status`: Overall system status (`"operational"`)
+- `providers`: Object containing each enabled provider's status
+  - `healthy`: Boolean indicating if the provider is currently available
+  - `currencies`: Array of supported currency codes
+  - `error`: Error message (only present if `healthy` is `false`)
+
+**Usage Examples:**
+
+1. **Monitor in Your Application:**
+```php
+// Check health before processing payment
+$response = Http::get(url('/payments/health'));
+$data = $response->json();
+
+if ($data['providers']['paystack']['healthy']) {
+    // Proceed with payment
+} else {
+    // Use fallback provider or show error
+}
+```
+
+2. **Set Up Uptime Monitoring:**
+   - Use services like UptimeRobot, Pingdom, or StatusCake
+   - Monitor `GET /payments/health`
+   - Set alerts if any provider becomes unhealthy
+
+3. **Health Check Caching:**
+   - Health checks are cached to avoid excessive API calls
+   - Default cache TTL: 5 minutes (300 seconds)
+   - Configure in `.env`:
+   ```env
+   PAYMENTS_HEALTH_CHECK_CACHE_TTL=300
+   ```
+
+4. **Programmatic Health Check:**
+```php
+use KenDeNigerian\PayZephyr\PaymentManager;
+
+$manager = app(PaymentManager::class);
+$driver = $manager->driver('paystack');
+
+// Check cached health status
+$isHealthy = $driver->getCachedHealthCheck();
+
+// Force fresh health check (bypasses cache)
+Cache::forget('payments.health.paystack');
+$isHealthy = $driver->healthCheck();
+```
+
+**Note:** The health endpoint uses the `api` middleware and is automatically registered when the package is installed.
+
+---
+
 ## Security
 
 ### Best Practices

@@ -619,7 +619,46 @@ RateLimiter::clear('payment_charge:user_1');
 ],
 ```
 
-#### 5. Webhook Signature Validation Failing
+#### 5. Health Check Endpoint
+
+PayZephyr provides a built-in health check endpoint to monitor provider availability:
+
+**Endpoint:** `GET /payments/health`
+
+**Response:**
+```json
+{
+  "status": "operational",
+  "providers": {
+    "paystack": {
+      "healthy": true,
+      "currencies": ["NGN", "USD", "GHS", "ZAR"]
+    },
+    "stripe": {
+      "healthy": true,
+      "currencies": ["USD", "EUR", "GBP", "CAD", "AUD"]
+    },
+    "flutterwave": {
+      "healthy": false,
+      "currencies": ["NGN", "USD", "EUR", "GBP"]
+    }
+  }
+}
+```
+
+**Usage:**
+- Monitor provider health in your application
+- Set up uptime monitoring (e.g., UptimeRobot, Pingdom)
+- Check provider availability before processing payments
+- Health checks are cached (default: 5 minutes) to avoid excessive API calls
+
+**Configuration:**
+```env
+# Adjust cache TTL (in seconds)
+PAYMENTS_HEALTH_CHECK_CACHE_TTL=300
+```
+
+#### 6. Webhook Signature Validation Failing
 
 **Symptoms:** Webhooks return 403 Unauthorized
 

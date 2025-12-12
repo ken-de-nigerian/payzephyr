@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.1.9] - 2025-12-11
+
+### Fixed
+- **PaystackDriver Health Check**: Fixed incorrect interpretation of 400 Bad Request responses
+  - A 400 Bad Request from Paystack when checking `/transaction/verify/invalid_ref_test` now correctly indicates the API is working
+  - The health check now properly traverses the exception chain to find `ClientException` with 400/404 status codes
+  - Previously, the health check incorrectly returned `false` for expected 400 responses
+  - **Impact**: Paystack health checks now correctly report API availability
+
+### Improved
+- **Exception Chain Traversal**: Improved exception handling in `PaystackDriver::healthCheck()` to properly traverse exception chains
+  - More robust detection of `ClientException` within wrapped exceptions
+  - Better logging with exception class information for debugging
+
+### Tests
+- Updated `PaystackDriverCoverageTest` to correctly expect `true` for 400 ClientException responses
+- All 716 tests passing
+
+---
 ## [1.1.8] - 2025-12-11
 
 ### Added

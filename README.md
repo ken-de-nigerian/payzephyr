@@ -591,7 +591,14 @@ Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) fo
 
 Please see [CHANGELOG.md](docs/CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.1.8
+### Latest Release: v1.1.9
+
+### Fixed
+- **PaystackDriver Health Check**: Fixed incorrect interpretation of 400 Bad Request responses
+  - A 400 Bad Request from Paystack now correctly indicates the API is working
+  - Health checks now properly handle expected 400/404 responses
+
+### Previous Release: v1.1.8
 
 ### Added
 - **Application-Originating Payment Events**: New events for payment lifecycle hooks

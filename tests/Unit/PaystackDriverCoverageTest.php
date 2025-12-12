@@ -112,5 +112,7 @@ test('paystack driver healthCheck handles ClientException with status code', fun
 
     $driver->setClient($client);
 
-    expect($driver->healthCheck())->toBeFalse();
+    // A 400 Bad Request from Paystack when checking invalid_ref_test means the API is working correctly
+    // The API is responding as expected (transaction not found), which indicates it's operational
+    expect($driver->healthCheck())->toBeTrue();
 });

@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [1.3.0] - 2025-01-XX
+
+### ✅ Added
+
+- **Mollie Payment Provider Support**
+  - Full integration with Mollie payment gateway
+  - Support for EUR, USD, GBP, and other Mollie-supported currencies
+  - Redirect-based payment flow with hosted payment page
+  - Webhook validation via API (Mollie doesn't use signature-based validation)
+  - Automatic payment verification on webhook receipt
+  - Comprehensive test coverage with 53 tests (96 assertions)
+  - Edge case handling for network errors and missing data
+  - Health check support with proper error handling
+  - Idempotency key support for duplicate prevention
+  - Status normalization for Mollie payment states
+  - Customer data extraction from payment responses
+  - Metadata support for custom payment information
+
+### 📊 Test Coverage
+
+- Added `MollieDriverTest.php` with 28 comprehensive tests
+- Added `MollieDriverCoverageTest.php` with 11 coverage tests
+- Added `MollieDriverEdgeCasesTest.php` with 14 edge case tests
+- All tests passing with proper mocking and assertions
+
+### 🔧 Technical Details
+
+- Mollie webhook validation fetches payment details from API instead of signature verification
+- Proper error handling for 404, network timeouts, and API failures
+- Timestamp validation to prevent replay attacks
+- Currency formatting with proper decimal handling
+- Channel mapping support for payment methods
+
+### 📝 Documentation
+
+- Added Mollie configuration guide
+- Updated provider documentation
+- Added usage examples
+- Webhook setup instructions
+
+---
 ## [1.2.1] - 2025-12-12
 
 ### 🔧 Fixed

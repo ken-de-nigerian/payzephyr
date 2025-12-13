@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use Random\RandomException;
 use Throwable;
 
 /**
@@ -57,7 +58,7 @@ final class SquareDriver extends AbstractDriver
     /**
      * Create a new payment link on Square.
      *
-     * @throws ChargeException
+     * @throws ChargeException|RandomException
      */
     public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {

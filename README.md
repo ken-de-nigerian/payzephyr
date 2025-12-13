@@ -11,7 +11,7 @@ A unified payment abstraction layer for Laravel that supports multiple payment p
 
 ## 🚀 Features
 
-- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, Square, OPay
+- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, Square, OPay, Mollie
 - **Automatic Fallback**: Seamlessly switch to back-up providers if primary fails
 - **Fluent API**: Clean, expressive syntax for payment operations
 - **Idempotency Support**: Prevent duplicate charges with unique keys across supported providers

@@ -28,7 +28,7 @@ It provides a clean, fluent API for processing payments across different provide
 
 ### Key Features
 
-- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, and Square
+- **Multiple Payment Providers**: Paystack, Flutterwave, Monnify, Stripe, PayPal, Square, OPay, and Mollie
 - **Automatic Fallback**: Seamlessly switch to back up providers if primary fails
 - **Fluent API**: Clean, expressive syntax for payment operations
 - **Idempotency Support**: Prevent duplicate charges with unique keys

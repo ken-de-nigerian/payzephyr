@@ -193,6 +193,35 @@ final class ChannelMapper implements ChannelMapperInterface
     }
 
     /**
+     * Map channels to Mollie format.
+     *
+     * Mollie accepts: creditcard, ideal, bancontact, sofort, giropay,
+     * eps, klarnapaylater, klarnasliceit, paypal, applepay, etc.
+     */
+    protected function mapToMollie(array $channels): array
+    {
+        $mapping = [
+            PaymentChannel::CARD->value => 'creditcard',
+            PaymentChannel::BANK_TRANSFER->value => 'banktransfer',
+            PaymentChannel::MOBILE_MONEY->value => 'paypal',
+        ];
+
+        $mapped = array_map(
+            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            $channels
+        );
+
+        $validMethods = [
+            'creditcard', 'ideal', 'bancontact', 'sofort', 'giropay',
+            'eps', 'klarnapaylater', 'klarnasliceit', 'paypal',
+            'applepay', 'banktransfer', 'giftcard', 'przelewy24',
+            'kbc', 'belfius', 'mybank', 'in3',
+        ];
+
+        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+    }
+
+    /**
      * Get default channels for provider.
      *
      * @return array<string>

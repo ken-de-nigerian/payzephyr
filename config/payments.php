@@ -105,6 +105,16 @@ return [
             'currencies' => ['NGN'],
             'enabled' => env('OPAY_ENABLED', false),
         ],
+
+        'mollie' => [
+            'driver' => 'mollie',
+            'reference_prefix' => 'MOLLIE',
+            'api_key' => env('MOLLIE_API_KEY'),
+            'webhook_url' => env('APP_URL'), // Base URL for webhooks
+            'base_url' => env('MOLLIE_BASE_URL', 'https://api.mollie.com'),
+            'currencies' => ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'],
+            'enabled' => env('MOLLIE_ENABLED', false),
+        ],
     ],
 
     /*

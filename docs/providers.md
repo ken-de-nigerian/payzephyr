@@ -443,3 +443,71 @@ Get the signature key from: Square Dashboard → Developers → Webhooks → Sel
 - Use Square Sandbox credentials from your Square Developer Dashboard
 - Test cards: See Square's testing documentation
 - Access Token: Get from Square Dashboard → Applications → Your App → Credentials
+
+---
+
+## Mollie
+
+### Configuration
+
+```env
+MOLLIE_API_KEY=test_xxx
+MOLLIE_WEBHOOK_URL=https://yourdomain.com
+MOLLIE_ENABLED=true
+```
+
+### Supported Currencies
+
+- EUR (Euro)
+- USD (US Dollar)
+- GBP (British Pound)
+- And 30+ other currencies supported by Mollie
+
+### Features
+
+- Redirect-based checkout with hosted payment page
+- Multiple payment methods (iDEAL, Credit Card, Bank Transfer, etc.)
+- Recurring payments support
+- Refunds support
+- Multi-currency support
+
+### Usage Example
+
+```php
+Payment::amount(10.00)
+    ->currency('EUR')
+    ->email('customer@example.com')
+    ->description('Order #123')
+    ->callback(route('payment.callback'))
+    ->with('mollie')
+    ->redirect();
+```
+
+### Webhook Configuration
+
+URL: `https://yourdomain.com/payments/webhook/mollie`
+
+**Important:** Mollie doesn't use signature-based webhook validation. Instead, PayZephyr automatically fetches payment details from the Mollie API when receiving webhooks to verify their authenticity.
+
+Configure your webhook URL in your Mollie Dashboard:
+1. Go to Developers → Webhooks
+2. Add webhook URL: `https://yourdomain.com/payments/webhook/mollie`
+3. Select payment events you want to receive
+
+**Security Note:** For production, consider whitelisting Mollie's IP addresses for additional security.
+
+### Testing
+
+- Use Mollie test API keys (starts with `test_`)
+- Test payment methods are available in the Mollie test environment
+- API Key: Get from Mollie Dashboard → Developers → API Keys
+
+### Webhook Validation
+
+Unlike other providers, Mollie doesn't use HMAC signatures for webhook validation. PayZephyr handles this by:
+1. Receiving the webhook with payment ID
+2. Fetching payment details from Mollie API using the payment ID
+3. Verifying the payment exists and matches the webhook data
+4. Validating timestamp to prevent replay attacks
+
+This ensures webhook authenticity without requiring signature validation.

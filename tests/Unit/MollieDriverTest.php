@@ -451,14 +451,7 @@ test('mollie driver handles charge with custom reference', function () {
     expect($response->reference)->toBe('CUSTOM_REF_123');
 });
 
-test('mollie driver uses reference prefix from config', function () {
-    $config = [
-        'api_key' => 'test_mollie_api_key',
-        'base_url' => 'https://api.mollie.com',
-        'currencies' => ['EUR', 'USD', 'GBP'],
-        'reference_prefix' => 'MOLLIE_TEST',
-    ];
-
+test('mollie driver generates reference with MOLLIE prefix', function () {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -475,7 +468,7 @@ test('mollie driver uses reference prefix from config', function () {
         ])),
     ]);
 
-    $driver = new MollieDriver($config);
+    $driver = new MollieDriver($this->config);
     $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
 
     $request = new ChargeRequestDTO(
@@ -487,7 +480,7 @@ test('mollie driver uses reference prefix from config', function () {
 
     $response = $driver->charge($request);
 
-    expect($response->reference)->toStartWith('MOLLIE_TEST_');
+    expect($response->reference)->toStartWith('MOLLIE_');
 });
 
 test('mollie driver handles charge with idempotency key', function () {

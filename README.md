@@ -281,6 +281,7 @@ Configure these in your provider dashboards:
 - **Stripe**: `https://yourdomain.com/payments/webhook/stripe`
 - **PayPal**: `https://yourdomain.com/payments/webhook/paypal`
 - **Square**: `https://yourdomain.com/payments/webhook/square`
+- **Mollie**: `https://yourdomain.com/payments/webhook/mollie`
 
 ### Listening to Events
 
@@ -348,6 +349,7 @@ class HandlePaystackWebhook
 | **PayPal**      |   ✅    |   ✅    |    ✅     |      ❌      |    1     | USD, EUR, GBP, CAD, AUD           |
 | **Square**      |   ✅    |   ✅    |    ✅     |      ✅      |    4     | USD, CAD, GBP, AUD                |
 | **OPay**        |   ✅    |   ✅    |    ✅     |      ✅      |    5     | NGN                               |
+| **Mollie**      |   ✅    |   ✅    |    ✅     |      ✅      |    10+   | EUR, USD, GBP, 30+ currencies    |
 
 **Notes:**
 - ✅ = Fully supported
@@ -742,7 +744,7 @@ Key areas for contribution:
 
 Please see [CHANGELOG.md](docs/CHANGELOG.md) for recent changes.
 
-### Latest Release: v1.2.1
+### Latest Release: v1.3.0
 
 #### 🔧 Code Quality Improvements
 - Fixed all PHPStan static analysis errors

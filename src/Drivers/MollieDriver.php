@@ -380,25 +380,4 @@ final class MollieDriver extends AbstractDriver
 
         return rtrim($baseUrl, '/').rtrim($webhookPath, '/').'/'.$providerName;
     }
-
-    /**
-     * Override status normalization for Mollie-specific statuses.
-     *
-     * Mollie statuses: open, pending, authorized, expired, failed, canceled, paid
-     *
-     * @param  string  $status  Provider-specific status
-     * @return string Normalized status
-     */
-    protected function normalizeStatus(string $status): string
-    {
-        $statusUpper = strtoupper(trim($status));
-
-        return match ($statusUpper) {
-            'PAID' => 'success',
-            'AUTHORIZED' => 'success',
-            'FAILED', 'CANCELED', 'EXPIRED' => 'failed',
-            'OPEN', 'PENDING' => 'pending',
-            default => parent::normalizeStatus($status),
-        };
-    }
 }

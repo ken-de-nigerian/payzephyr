@@ -148,5 +148,10 @@ final class PaymentServiceProvider extends ServiceProvider
             'success' => ['PAYMENT.CAPTURE.COMPLETED', 'COMPLETED'],
             'failed' => ['PAYMENT.CAPTURE.DENIED'],
         ]);
+        $normalizer->registerProviderMappings('mollie', [
+            'success' => ['PAID', 'AUTHORIZED'],
+            'failed' => ['FAILED', 'CANCELED', 'EXPIRED'],
+            'pending' => ['OPEN', 'PENDING'],
+        ]);
     }
 }

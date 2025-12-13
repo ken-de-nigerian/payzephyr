@@ -134,6 +134,11 @@ OPAY_SECRET_KEY=your_secret_key  # Required for status API authentication and we
 OPAY_BASE_URL=https://liveapi.opaycheckout.com
 OPAY_ENABLED=false
 
+# Mollie (Required: api_key)
+MOLLIE_API_KEY=test_xxx
+MOLLIE_WEBHOOK_URL=https://yourdomain.com
+MOLLIE_ENABLED=false
+
 # Optional Settings
 PAYMENTS_DEFAULT_CURRENCY=NGN
 PAYMENTS_LOGGING_ENABLED=true
@@ -335,6 +340,9 @@ If no channels are specified, each provider uses its default payment methods.
 | **Monnify**     |   ✅    |   ✅    |    ✅     | NGN                               | Bank Transfer, Dynamic Accounts |
 | **Stripe**      |   ✅    |   ✅    |    ✅     | 135+ currencies                   | Apple Pay, Google Pay, SCA      |
 | **PayPal**      |   ✅    |   ✅    |    ✅     | USD, EUR, GBP, CAD, AUD           | PayPal Balance, Credit          |
+| **Square**      |   ✅    |   ✅    |    ✅     | USD, CAD, GBP, AUD                | Online Checkout, Payment Links  |
+| **OPay**        |   ✅    |   ✅    |    ✅     | NGN                               | Card, Bank Transfer, USSD       |
+| **Mollie**      |   ✅    |   ✅    |    ✅     | EUR, USD, GBP, 30+ currencies     | iDEAL, Card, Bank Transfer      |
 
 ### Provider-Specific Configuration
 
@@ -355,6 +363,9 @@ Configure these in your provider dashboards:
 - **Monnify**: `https://yourdomain.com/payments/webhook/monnify`
 - **Stripe**: `https://yourdomain.com/payments/webhook/stripe`
 - **PayPal**: `https://yourdomain.com/payments/webhook/paypal`
+- **Square**: `https://yourdomain.com/payments/webhook/square`
+- **OPay**: `https://yourdomain.com/payments/webhook/opay`
+- **Mollie**: `https://yourdomain.com/payments/webhook/mollie`
 
 ### Listening to Events
 

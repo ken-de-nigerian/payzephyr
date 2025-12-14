@@ -196,6 +196,50 @@ test('mollie driver rejects webhook without signature when webhook secret is con
     expect($isValid)->toBeFalse();
 });
 
+test('mollie driver accepts hook.ping test events with valid signature', function () {
+    $config = array_merge($this->config, [
+        'webhook_secret' => '4Js3DqVSKFMUvkbGzcvjuA5GcHG3MVBM',
+    ]);
+
+    $driver = new MollieDriver($config);
+
+    $payload = json_encode([
+        'resource' => 'event',
+        'id' => 'event_HXpCDZRutNP923WZH2KJJ',
+        'type' => 'hook.ping',
+        'entityId' => 'hook_maMfxMEpntWV5J6V92KJJ',
+        'createdAt' => '2025-12-14T00:36:23.0Z',
+    ]);
+
+    // Generate correct signature
+    $signature = hash_hmac('sha256', $payload, $config['webhook_secret']);
+
+    $headers = [
+        'X-Mollie-Signature' => [$signature],
+    ];
+
+    $isValid = $driver->validateWebhook($headers, $payload);
+
+    expect($isValid)->toBeTrue();
+});
+
+test('mollie driver accepts hook.ping test events without webhook secret (API fallback)', function () {
+    $driver = new MollieDriver($this->config);
+
+    $payload = json_encode([
+        'resource' => 'event',
+        'id' => 'event_HXpCDZRutNP923WZH2KJJ',
+        'type' => 'hook.ping',
+        'entityId' => 'hook_maMfxMEpntWV5J6V92KJJ',
+        'createdAt' => '2025-12-14T00:36:23.0Z',
+    ]);
+
+    // hook.ping events should be accepted even without payment ID
+    $isValid = $driver->validateWebhook([], $payload);
+
+    expect($isValid)->toBeTrue();
+});
+
 test('mollie driver rejects webhook without payment id', function () {
     $driver = new MollieDriver($this->config);
 

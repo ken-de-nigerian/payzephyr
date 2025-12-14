@@ -191,24 +191,16 @@ final class MollieDriver extends AbstractDriver
     /**
      * Validate Mollie webhook.
      *
-     * Mollie supports two validation methods:
-     * 1. Signature-based validation (recommended): Uses HMAC SHA-256 with webhook secret
-     *    to verify the X-Mollie-Signature header. This is the preferred method.
-     * 2. API verification (fallback): If webhook_secret is not configured, falls back to
-     *    fetching payment details from the API to verify the webhook is legitimate.
-     *
      * @param  array<string, array<string>>  $headers  Request headers
      * @param  string  $body  Raw request body
      * @return bool True if webhook is valid
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        // If webhook secret is configured, use signature-based validation (recommended)
         if (! empty($this->config['webhook_secret'])) {
             return $this->validateWebhookSignature($headers, $body);
         }
 
-        // Fallback to API verification if webhook secret is not configured
         return $this->validateWebhookViaAPI($body);
     }
 
@@ -217,6 +209,9 @@ final class MollieDriver extends AbstractDriver
      *
      * Mollie signs webhooks using HMAC SHA-256 with the webhook secret.
      * The signature comes in the 'X-Mollie-Signature' header.
+     *
+     * Note: For hook.ping events (test events), we only validate the signature.
+     * For payment events, we also validate the timestamp.
      *
      * @param  array<string, array<string>>  $headers  Request headers
      * @param  string  $body  Raw request body
@@ -248,13 +243,27 @@ final class MollieDriver extends AbstractDriver
         }
 
         $payload = json_decode($body, true) ?? [];
+        
+        // hook.ping events are test events - just validate signature and accept
+        $eventType = $payload['type'] ?? null;
+        if ($eventType === 'hook.ping') {
+            $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
+                'event_id' => $payload['id'] ?? null,
+            ]);
+
+            return true;
+        }
+
+        // For payment events, also validate timestamp
         if (! $this->validateWebhookTimestamp($payload)) {
             $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 
             return false;
         }
 
-        $this->log('info', 'Webhook validated successfully via signature verification');
+        $this->log('info', 'Webhook validated successfully via signature verification', [
+            'event_type' => $eventType,
+        ]);
 
         return true;
     }
@@ -265,6 +274,9 @@ final class MollieDriver extends AbstractDriver
      * This method is used when webhook_secret is not configured.
      * It fetches the payment from Mollie's API to verify it exists and is legitimate.
      *
+     * Note: hook.ping events (test events) are accepted without API verification
+     * since they don't contain payment information.
+     *
      * @param  string  $body  Raw request body
      * @return bool True if webhook is valid
      */
@@ -273,7 +285,25 @@ final class MollieDriver extends AbstractDriver
         try {
             $payload = json_decode($body, true);
 
-            if (! $payload || ! isset($payload['id'])) {
+            if (! $payload) {
+                $this->log('warning', 'Webhook payload is invalid JSON');
+
+                return false;
+            }
+
+            // hook.ping events are test events - accept them without API verification
+            $eventType = $payload['type'] ?? null;
+            if ($eventType === 'hook.ping') {
+                $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
+                    'event_id' => $payload['id'] ?? null,
+                    'hint' => 'Consider configuring MOLLIE_WEBHOOK_SECRET for more secure signature-based validation',
+                ]);
+
+                return true;
+            }
+
+            // For payment events, require payment ID
+            if (! isset($payload['id'])) {
                 $this->log('warning', 'Webhook missing payment ID');
 
                 return false;

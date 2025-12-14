@@ -142,8 +142,8 @@ test('mollie driver validates webhook using signature when webhook secret is con
         'createdAt' => date('c'),
     ]);
 
-    // Generate correct signature
-    $signature = hash_hmac('sha256', $payload, $config['webhook_secret']);
+    // Generate correct signature - Mollie sends it with sha256= prefix
+    $signature = 'sha256='.hash_hmac('sha256', $payload, $config['webhook_secret']);
 
     $headers = [
         'X-Mollie-Signature' => [$signature],
@@ -211,8 +211,8 @@ test('mollie driver accepts hook.ping test events with valid signature', functio
         'createdAt' => '2025-12-14T00:36:23.0Z',
     ]);
 
-    // Generate correct signature
-    $signature = hash_hmac('sha256', $payload, $config['webhook_secret']);
+    // Generate correct signature - Mollie sends it with sha256= prefix
+    $signature = 'sha256='.hash_hmac('sha256', $payload, $config['webhook_secret']);
 
     $headers = [
         'X-Mollie-Signature' => [$signature],

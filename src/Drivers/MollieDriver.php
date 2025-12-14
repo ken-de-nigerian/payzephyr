@@ -210,9 +210,6 @@ final class MollieDriver extends AbstractDriver
      * Mollie signs webhooks using HMAC SHA-256 with the webhook secret.
      * The signature comes in the 'X-Mollie-Signature' header.
      *
-     * Note: For hook.ping events (test events), we only validate the signature.
-     * For payment events, we also validate the timestamp.
-     *
      * @param  array<string, array<string>>  $headers  Request headers
      * @param  string  $body  Raw request body
      * @return bool True if signature is valid
@@ -231,6 +228,7 @@ final class MollieDriver extends AbstractDriver
             return false;
         }
 
+        $signature = str_replace('sha256=', '', $signature);
         $expectedSignature = hash_hmac('sha256', $body, $this->config['webhook_secret']);
         $isValid = hash_equals($signature, $expectedSignature);
 
@@ -243,8 +241,7 @@ final class MollieDriver extends AbstractDriver
         }
 
         $payload = json_decode($body, true) ?? [];
-        
-        // hook.ping events are test events - just validate signature and accept
+
         $eventType = $payload['type'] ?? null;
         if ($eventType === 'hook.ping') {
             $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
@@ -254,7 +251,6 @@ final class MollieDriver extends AbstractDriver
             return true;
         }
 
-        // For payment events, also validate timestamp
         if (! $this->validateWebhookTimestamp($payload)) {
             $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 
@@ -274,9 +270,6 @@ final class MollieDriver extends AbstractDriver
      * This method is used when webhook_secret is not configured.
      * It fetches the payment from Mollie's API to verify it exists and is legitimate.
      *
-     * Note: hook.ping events (test events) are accepted without API verification
-     * since they don't contain payment information.
-     *
      * @param  string  $body  Raw request body
      * @return bool True if webhook is valid
      */
@@ -291,7 +284,6 @@ final class MollieDriver extends AbstractDriver
                 return false;
             }
 
-            // hook.ping events are test events - accept them without API verification
             $eventType = $payload['type'] ?? null;
             if ($eventType === 'hook.ping') {
                 $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
@@ -302,7 +294,6 @@ final class MollieDriver extends AbstractDriver
                 return true;
             }
 
-            // For payment events, require payment ID
             if (! isset($payload['id'])) {
                 $this->log('warning', 'Webhook missing payment ID');
 

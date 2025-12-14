@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Events\WebhookReceived;
@@ -53,12 +54,12 @@ class ProcessWebhook implements ShouldQueue
 
             WebhookReceived::dispatch($this->provider, $this->payload, $reference);
 
-            Log::channel('payments')->info("Webhook processed for $this->provider", [
+            $this->log('info', "Webhook processed for $this->provider", [
                 'reference' => $reference,
                 'event' => $this->payload['event'] ?? $this->payload['eventType'] ?? $this->payload['event_type'] ?? 'unknown',
             ]);
         } catch (Throwable $e) {
-            Log::channel('payments')->error('Webhook processing failed', [
+            $this->log('error', 'Webhook processing failed', [
                 'provider' => $this->provider,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -116,14 +117,14 @@ class ProcessWebhook implements ShouldQueue
 
                 $transaction->update($updateData);
 
-                Log::channel('payments')->info('Transaction updated from webhook', [
+                $this->log('info', 'Transaction updated from webhook', [
                     'reference' => $reference,
                     'status' => $status,
                     'provider' => $this->provider,
                 ]);
             });
         } catch (Throwable $e) {
-            Log::channel('payments')->error('Failed to update transaction from webhook', [
+            $this->log('error', 'Failed to update transaction from webhook', [
                 'error' => $e->getMessage(),
                 'reference' => $reference,
                 'provider' => $this->provider,
@@ -147,6 +148,18 @@ class ProcessWebhook implements ShouldQueue
                 ?? 'unknown';
 
             return $statusNormalizer->normalize($status, $this->provider);
+        }
+    }
+
+    /**
+     * Log message, using payments channel if available, otherwise default channel.
+     */
+    protected function log(string $level, string $message, array $context = []): void
+    {
+        try {
+            Log::channel('payments')->{$level}($message, $context);
+        } catch (InvalidArgumentException) {
+            Log::{$level}($message, $context);
         }
     }
 }

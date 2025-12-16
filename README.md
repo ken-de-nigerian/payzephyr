@@ -159,6 +159,7 @@ See [Webhook Guide](docs/webhooks.md) for complete setup.
 | Square      |   ✅    |   ✅    |    ✅     |      ✅      |    4     | USD, CAD, GBP, AUD                                    |
 | OPay        |   ✅    |   ✅    |    ✅     |      ✅      |    5     | NGN                                                   |
 | Mollie      |   ✅    |   ✅    |    ✅     |      ✅      |   10+    | EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+ |
+| NOWPayments |   ✅    |   ✅    |    ✅     |      ✅      |   100+   | USD, NGN, EUR, GBP, BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies |
 
 **Notes:**
 - ✅ = Fully supported

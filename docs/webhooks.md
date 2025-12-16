@@ -13,6 +13,7 @@ Routes are automatically created:
 - `POST /payments/webhook/square`
 - `POST /payments/webhook/opay`
 - `POST /payments/webhook/mollie`
+- `POST /payments/webhook/nowpayments`
 
 ## Flow
 
@@ -27,6 +28,7 @@ Routes are automatically created:
 Add webhook URLs in provider dashboards:
 - Paystack: `https://yourdomain.com/payments/webhook/paystack`
 - Stripe: `https://yourdomain.com/payments/webhook/stripe`
+- NOWPayments: `https://yourdomain.com/payments/webhook/nowpayments`
 - See routes above for all providers
 
 ```php
@@ -776,6 +778,21 @@ Different providers send different event types. Here's what to expect:
 - `payment.expired` - Payment expired
 - `payment.authorized` - Payment authorized (for certain payment methods)
 - `hook.ping` - Test webhook event (automatically accepted)
+
+### NOWPayments Events
+NOWPayments sends Instant Payment Notifications (IPN) for payment status changes:
+- Payment status updates with the following statuses:
+  - `waiting` - Payment is waiting for customer action
+  - `confirming` - Payment is being confirmed on blockchain
+  - `sending` - Payment is being sent
+  - `partially_paid` - Partial payment received
+  - `finished` - Payment completed successfully
+  - `confirmed` - Payment confirmed on blockchain
+  - `failed` - Payment failed
+  - `refunded` - Payment was refunded
+  - `expired` - Payment expired
+
+**Note:** Webhooks are validated using HMAC SHA-512 signature with your IPN secret key.
 
 ---
 

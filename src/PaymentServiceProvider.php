@@ -145,5 +145,10 @@ final class PaymentServiceProvider extends ServiceProvider
             'failed' => ['FAILED', 'CANCELED', 'EXPIRED'],
             'pending' => ['OPEN', 'PENDING'],
         ]);
+        $normalizer->registerProviderMappings('nowpayments', [
+            'success' => ['FINISHED', 'CONFIRMED'],
+            'failed' => ['FAILED', 'REFUNDED', 'EXPIRED'],
+            'pending' => ['WAITING', 'CONFIRMING', 'SENDING', 'PARTIALLY_PAID'],
+        ]);
     }
 }

@@ -115,6 +115,15 @@ return [
             'currencies' => ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'],
             'enabled' => env('MOLLIE_ENABLED', false),
         ],
+
+        'nowpayments' => [
+            'driver' => 'nowpayments',
+            'api_key' => env('NOWPAYMENTS_API_KEY'),
+            'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'), // IPN secret key for webhook validation
+            'base_url' => env('NOWPAYMENTS_BASE_URL', 'https://api.nowpayments.io'),
+            'currencies' => ['USD', 'NGN', 'EUR', 'GBP', 'BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'ADA', 'DOT', 'MATIC', 'SOL'],
+            'enabled' => env('NOWPAYMENTS_ENABLED', false),
+        ],
     ],
 
     /*

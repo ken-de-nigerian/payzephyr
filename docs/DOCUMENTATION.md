@@ -82,6 +82,11 @@ MOLLIE_API_KEY=test_xxx
 MOLLIE_WEBHOOK_SECRET=xxxxx
 MOLLIE_ENABLED=false
 
+# NOWPayments (Required: api_key, ipn_secret)
+NOWPAYMENTS_API_KEY=xxxxx
+NOWPAYMENTS_IPN_SECRET=xxxxx
+NOWPAYMENTS_ENABLED=false
+
 # Optional Settings
 PAYMENTS_DEFAULT_CURRENCY=NGN
 PAYMENTS_LOGGING_ENABLED=true
@@ -289,6 +294,7 @@ If no channels are specified, each provider uses its default payment methods.
 | Square      |   ✅    |   ✅    |    ✅     | USD, CAD, GBP, AUD                                    | Online Checkout, Payment Links  |
 | OPay        |   ✅    |   ✅    |    ✅     | NGN                                                   | Card, Bank Transfer, USSD       |
 | Mollie      |   ✅    |   ✅    |    ✅     | EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+ | iDEAL, Card, Bank Transfer      |
+| NOWPayments |   ✅    |   ✅    |    ✅     | USD, NGN, EUR, GBP, BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies | Cryptocurrency payments         |
 
 ### Provider-Specific Configuration
 

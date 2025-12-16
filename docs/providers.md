@@ -279,6 +279,7 @@ Payment::amount(100.00)
 | Square      |  ❌  |  ✅  |  ❌  |  ✅  |  ❌  | CAD, AUD                               |
 | OPay        |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  | -                                      |
 | Mollie      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+ |
+| NOWPayments |  ✅  |  ✅  |  ✅  |  ✅  |  ❌  | BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies |
 
 ---
 
@@ -526,3 +527,100 @@ Mollie supports two validation methods:
 - Test payment methods are available in the Mollie test environment
 - API Key: Get from Mollie Dashboard → Developers → API Keys
 - Webhook Secret: Get from Mollie Dashboard → Developers → Webhooks → Your webhook → Secret
+
+---
+
+## NOWPayments
+
+### Configuration
+
+```env
+NOWPAYMENTS_API_KEY=xxxxx
+NOWPAYMENTS_IPN_SECRET=xxxxx
+NOWPAYMENTS_BASE_URL=https://api.nowpayments.io
+NOWPAYMENTS_ENABLED=true
+```
+
+### Supported Currencies
+
+NOWPayments supports 100+ cryptocurrencies and major fiat currencies:
+
+**Fiat Currencies:**
+- USD (US Dollar)
+- NGN (Nigerian Naira)
+- EUR (Euro)
+- GBP (British Pound)
+- And more...
+
+**Cryptocurrencies:**
+- BTC (Bitcoin)
+- ETH (Ethereum)
+- USDT (Tether)
+- USDC (USD Coin)
+- BNB (Binance Coin)
+- ADA (Cardano)
+- DOT (Polkadot)
+- MATIC (Polygon)
+- SOL (Solana)
+- And 100+ more cryptocurrencies
+
+See [NOWPayments documentation](https://nowpayments.io/help/api) for the complete list of supported cryptocurrencies.
+
+### Features
+
+- Cryptocurrency payments support
+- Instant Payment Notifications (IPN)
+- Automatic currency conversion
+- Redirect-based checkout (uses `/v1/invoice` endpoint - customer redirects to payment page)
+- Multiple payment statuses (waiting, confirming, sending, finished, failed, etc.)
+- Support for both fiat and cryptocurrency payments
+- Payment verification via `/v1/payment/{payment_id}` endpoint
+
+### Usage Example
+
+```php
+// Builder methods can be chained in any order
+// redirect() must be called last to execute
+// NOWPayments uses invoice endpoint for redirect-based payments
+// Customer will be redirected to NOWPayments payment page to complete payment
+Payment::amount(100.00)
+    ->currency('USD')
+    ->email('customer@example.com')
+    ->description('Order #123')
+    ->callback(route('payment.callback'))
+    ->with('nowpayments') // or ->using('nowpayments')
+    ->redirect(); // Must be called last
+```
+
+**Note:** NOWPayments uses the `/v1/invoice` endpoint for creating payments. This generates an invoice URL that customers follow to complete payment. After payment, customers are redirected back to your callback URL for verification.
+
+### Webhook Configuration
+
+URL: `https://yourdomain.com/payments/webhook/nowpayments`
+
+**Setup Instructions:**
+1. Go to NOWPayments Dashboard → Settings → Payments → Instant payment notifications
+2. Generate and save your IPN Secret key
+3. Add webhook URL: `https://yourdomain.com/payments/webhook/nowpayments`
+4. Set `NOWPAYMENTS_IPN_SECRET` in your `.env` file
+
+### Webhook Validation
+
+NOWPayments uses HMAC SHA-512 signature validation:
+- Webhook signature header: `x-nowpayments-sig`
+- Signature is computed using your IPN secret key and the request body
+- PayZephyr automatically validates the signature for security
+
+### Payment Statuses
+
+NOWPayments payment statuses are automatically normalized:
+- **Success:** `finished`, `confirmed`
+- **Failed:** `failed`, `refunded`, `expired`
+- **Pending:** `waiting`, `confirming`, `sending`, `partially_paid`
+
+### Testing
+
+- Use NOWPayments sandbox/test API keys for testing
+- Request sandbox API key from [NOWPayments](https://nowpayments.io/help/api)
+- API Key: Get from NOWPayments Dashboard → Settings → Payments → API keys
+- IPN Secret: Get from NOWPayments Dashboard → Settings → Payments → Instant payment notifications

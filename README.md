@@ -222,30 +222,6 @@ DB::table('subscriptions')->insert([
 
 ---
 
-## Supported Providers
-
-| Provider    | Charge | Verify | Webhooks | Idempotency | Channels | Currencies                                                                                 |
-|-------------|:------:|:------:|:--------:|:-----------:|:--------:|--------------------------------------------------------------------------------------------|
-| Paystack    |   ✅    |   ✅    |    ✅     |      ✅      |    5     | NGN, GHS, ZAR, USD                                                                         |
-| Flutterwave |   ✅    |   ✅    |    ✅     |      ✅      |   10+    | NGN, USD, EUR, GBP, KES, UGX, TZS                                                          |
-| Monnify     |   ✅    |   ✅    |    ✅     |      ✅      |    4     | NGN                                                                                        |
-| Stripe      |   ✅    |   ✅    |    ✅     |      ✅      |    6+    | 135+ currencies                                                                            |
-| PayPal      |   ✅    |   ✅    |    ✅     |      ✅      |    1     | USD, EUR, GBP, CAD, AUD                                                                    |
-| Square      |   ✅    |   ✅    |    ✅     |      ✅      |    4     | USD, CAD, GBP, AUD                                                                         |
-| OPay        |   ✅    |   ✅    |    ✅     |      ✅      |    5     | NGN                                                                                        |
-| Mollie      |   ✅    |   ✅    |    ✅     |      ✅      |   10+    | EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+                                      |
-| NOWPayments |   ✅    |   ✅    |    ✅     |      ✅      |   100+   | USD, NGN, EUR, GBP, BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies |
-
-**Notes:**
-- ✅ = Fully supported
-- ❌ = Not supported
-- **Channels**: Number of payment methods (card, bank transfer, USSD, etc.)
-- **Idempotency**: Prevents duplicate charges with unique keys
-
-**📖 For provider-specific details, see [docs/providers.md](docs/providers.md)**
-
----
-
 ## Transaction Logging
 
 All payment and subscription transactions are automatically logged:

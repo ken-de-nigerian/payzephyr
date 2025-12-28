@@ -295,16 +295,16 @@ If no channels are specified, each provider uses its default payment methods.
 
 ### Supported Providers
 
-| Provider    | Charge | Verify | Webhooks | Currencies                                            | Features                        |
-|-------------|:------:|:------:|:--------:|-------------------------------------------------------|---------------------------------|
-| Paystack    |   ✅    |   ✅    |    ✅     | NGN, GHS, ZAR, USD                                    | USSD, Bank Transfer             |
-| Flutterwave |   ✅    |   ✅    |    ✅     | NGN, USD, EUR, GBP, KES, UGX, TZS                     | Mobile Money, MPESA             |
-| Monnify     |   ✅    |   ✅    |    ✅     | NGN                                                   | Bank Transfer, Dynamic Accounts |
-| Stripe      |   ✅    |   ✅    |    ✅     | 135+ currencies                                       | Apple Pay, Google Pay, SCA      |
-| PayPal      |   ✅    |   ✅    |    ✅     | USD, EUR, GBP, CAD, AUD                               | PayPal Balance, Credit          |
-| Square      |   ✅    |   ✅    |    ✅     | USD, CAD, GBP, AUD                                    | Online Checkout, Payment Links  |
-| OPay        |   ✅    |   ✅    |    ✅     | NGN                                                   | Card, Bank Transfer, USSD       |
-| Mollie      |   ✅    |   ✅    |    ✅     | EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+ | iDEAL, Card, Bank Transfer      |
+| Provider    | Charge | Verify | Webhooks | Currencies                                                                                 | Features                        |
+|-------------|:------:|:------:|:--------:|--------------------------------------------------------------------------------------------|---------------------------------|
+| Paystack    |   ✅    |   ✅    |    ✅     | NGN, GHS, ZAR, USD                                                                         | USSD, Bank Transfer             |
+| Flutterwave |   ✅    |   ✅    |    ✅     | NGN, USD, EUR, GBP, KES, UGX, TZS                                                          | Mobile Money, MPESA             |
+| Monnify     |   ✅    |   ✅    |    ✅     | NGN                                                                                        | Bank Transfer, Dynamic Accounts |
+| Stripe      |   ✅    |   ✅    |    ✅     | 135+ currencies                                                                            | Apple Pay, Google Pay, SCA      |
+| PayPal      |   ✅    |   ✅    |    ✅     | USD, EUR, GBP, CAD, AUD                                                                    | PayPal Balance, Credit          |
+| Square      |   ✅    |   ✅    |    ✅     | USD, CAD, GBP, AUD                                                                         | Online Checkout, Payment Links  |
+| OPay        |   ✅    |   ✅    |    ✅     | NGN                                                                                        | Card, Bank Transfer, USSD       |
+| Mollie      |   ✅    |   ✅    |    ✅     | EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+                                      | iDEAL, Card, Bank Transfer      |
 | NOWPayments |   ✅    |   ✅    |    ✅     | USD, NGN, EUR, GBP, BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies | Cryptocurrency payments         |
 
 ### Provider-Specific Configuration

@@ -942,12 +942,12 @@ curl -X POST http://localhost:8000/payments/webhook/paystack \
 
 ### Subscription Event Reference
 
-| Event | When It Fires | Event Class | Properties |
-|-------|---------------|-------------|------------|
-| `subscription.create` | New subscription created | `SubscriptionCreated` | `subscriptionCode`, `provider`, `data` |
-| `invoice.payment_success` | Subscription renewed | `SubscriptionRenewed` | `subscriptionCode`, `provider`, `invoiceReference`, `data` |
-| `subscription.disable` | Subscription cancelled | `SubscriptionCancelled` | `subscriptionCode`, `provider`, `data` |
-| `invoice.payment_failed` | Payment failed | `SubscriptionPaymentFailed` | `subscriptionCode`, `provider`, `reason`, `data` |
+| Event                     | When It Fires            | Event Class                 | Properties                                                 |
+|---------------------------|--------------------------|-----------------------------|------------------------------------------------------------|
+| `subscription.create`     | New subscription created | `SubscriptionCreated`       | `subscriptionCode`, `provider`, `data`                     |
+| `invoice.payment_success` | Subscription renewed     | `SubscriptionRenewed`       | `subscriptionCode`, `provider`, `invoiceReference`, `data` |
+| `subscription.disable`    | Subscription cancelled   | `SubscriptionCancelled`     | `subscriptionCode`, `provider`, `data`                     |
+| `invoice.payment_failed`  | Payment failed           | `SubscriptionPaymentFailed` | `subscriptionCode`, `provider`, `reason`, `data`           |
 
 ---
 

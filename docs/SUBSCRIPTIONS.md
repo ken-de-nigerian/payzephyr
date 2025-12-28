@@ -577,13 +577,13 @@ try {
 
 ### Common Validation Errors
 
-| Error Message | Cause | Solution |
-|--------------|-------|----------|
-| `Plan PLN_xxx is not active` | Plan is disabled or doesn't exist | Verify plan code and status |
-| `Customer already has an active subscription` | Duplicate prevention enabled | Cancel existing subscription first |
-| `Invalid authorization code format` | Authorization code too short | Use valid authorization code from payment |
-| `Cannot cancel subscription: subscription is already in terminal state` | Trying to cancel already cancelled subscription | Check subscription status first |
-| `Invalid email token format` | Email token too short or invalid | Use token from subscription email |
+| Error Message                                                           | Cause                                           | Solution                                  |
+|-------------------------------------------------------------------------|-------------------------------------------------|-------------------------------------------|
+| `Plan PLN_xxx is not active`                                            | Plan is disabled or doesn't exist               | Verify plan code and status               |
+| `Customer already has an active subscription`                           | Duplicate prevention enabled                    | Cancel existing subscription first        |
+| `Invalid authorization code format`                                     | Authorization code too short                    | Use valid authorization code from payment |
+| `Cannot cancel subscription: subscription is already in terminal state` | Trying to cancel already cancelled subscription | Check subscription status first           |
+| `Invalid email token format`                                            | Email token too short or invalid                | Use token from subscription email         |
 
 ### Customizing Validation
 
@@ -1055,17 +1055,17 @@ All subscription settings are in `config/payments.php` under the `subscriptions`
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PAYMENTS_SUBSCRIPTIONS_PREVENT_DUPLICATES` | `false` | Prevent duplicate active subscriptions |
-| `PAYMENTS_SUBSCRIPTIONS_VALIDATION_ENABLED` | `true` | Enable business logic validation |
-| `PAYMENTS_SUBSCRIPTIONS_LOGGING_ENABLED` | `true` | Enable transaction logging |
-| `PAYMENTS_SUBSCRIPTIONS_LOGGING_TABLE` | `subscription_transactions` | Custom table name for logging |
-| `PAYMENTS_SUBSCRIPTIONS_RETRY_ENABLED` | `false` | Enable automatic retry for failed payments |
-| `PAYMENTS_SUBSCRIPTIONS_RETRY_MAX_ATTEMPTS` | `3` | Maximum retry attempts |
-| `PAYMENTS_SUBSCRIPTIONS_RETRY_DELAY_HOURS` | `24` | Hours between retry attempts |
-| `PAYMENTS_SUBSCRIPTIONS_GRACE_PERIOD` | `7` | Grace period in days for failed payments |
-| `PAYMENTS_SUBSCRIPTIONS_NOTIFICATIONS_ENABLED` | `false` | Enable email notifications |
+| Variable                                       | Default                     | Description                                |
+|------------------------------------------------|-----------------------------|--------------------------------------------|
+| `PAYMENTS_SUBSCRIPTIONS_PREVENT_DUPLICATES`    | `false`                     | Prevent duplicate active subscriptions     |
+| `PAYMENTS_SUBSCRIPTIONS_VALIDATION_ENABLED`    | `true`                      | Enable business logic validation           |
+| `PAYMENTS_SUBSCRIPTIONS_LOGGING_ENABLED`       | `true`                      | Enable transaction logging                 |
+| `PAYMENTS_SUBSCRIPTIONS_LOGGING_TABLE`         | `subscription_transactions` | Custom table name for logging              |
+| `PAYMENTS_SUBSCRIPTIONS_RETRY_ENABLED`         | `false`                     | Enable automatic retry for failed payments |
+| `PAYMENTS_SUBSCRIPTIONS_RETRY_MAX_ATTEMPTS`    | `3`                         | Maximum retry attempts                     |
+| `PAYMENTS_SUBSCRIPTIONS_RETRY_DELAY_HOURS`     | `24`                        | Hours between retry attempts               |
+| `PAYMENTS_SUBSCRIPTIONS_GRACE_PERIOD`          | `7`                         | Grace period in days for failed payments   |
+| `PAYMENTS_SUBSCRIPTIONS_NOTIFICATIONS_ENABLED` | `false`                     | Enable email notifications                 |
 
 ### Configuration Precedence
 

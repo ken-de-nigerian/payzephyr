@@ -288,16 +288,16 @@ Payment::amount(100.00)
 
 ## Currency Support Matrix
 
-| Provider    | NGN | USD | EUR | GBP | KES | Other Currencies                       |
-|-------------|:---:|:---:|:---:|:---:|:---:|----------------------------------------|
-| Paystack    |  ✅  |  ✅  |  ❌  |  ❌  |  ❌  | GHS, ZAR                               |
-| Flutterwave |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  | UGX, TZS, GHS, ZAR                     |
-| Monnify     |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  | -                                      |
-| Stripe      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | 135+ currencies                        |
-| PayPal      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | CAD, AUD                               |
-| Square      |  ❌  |  ✅  |  ❌  |  ✅  |  ❌  | CAD, AUD                               |
-| OPay        |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  | -                                      |
-| Mollie      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+ |
+| Provider    | NGN | USD | EUR | GBP | KES | Other Currencies                                                       |
+|-------------|:---:|:---:|:---:|:---:|:---:|------------------------------------------------------------------------|
+| Paystack    |  ✅  |  ✅  |  ❌  |  ❌  |  ❌  | GHS, ZAR                                                               |
+| Flutterwave |  ✅  |  ✅  |  ✅  |  ✅  |  ✅  | UGX, TZS, GHS, ZAR                                                     |
+| Monnify     |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  | -                                                                      |
+| Stripe      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | 135+ currencies                                                        |
+| PayPal      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | CAD, AUD                                                               |
+| Square      |  ❌  |  ✅  |  ❌  |  ✅  |  ❌  | CAD, AUD                                                               |
+| OPay        |  ✅  |  ❌  |  ❌  |  ❌  |  ❌  | -                                                                      |
+| Mollie      |  ❌  |  ✅  |  ✅  |  ✅  |  ❌  | CHF, SEK, NOK, DKK, PLN, CZK, HUF, 30+                                 |
 | NOWPayments |  ✅  |  ✅  |  ✅  |  ✅  |  ❌  | BTC, ETH, USDT, USDC, BNB, ADA, DOT, MATIC, SOL, 100+ cryptocurrencies |
 
 ---
@@ -306,15 +306,15 @@ Payment::amount(100.00)
 
 | Provider    | Charge | Verify | Webhooks | Idempotency | Subscriptions | Channels | Currencies |
 |-------------|:------:|:------:|:--------:|:-----------:|:-------------:|:--------:|:----------:|
-| Paystack    |   ✅    |   ✅    |    ✅     |      ✅      |      ✅        |    5     |     4      |
-| Flutterwave |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |   10+    |     7+     |
-| Monnify     |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |    4     |     1      |
-| Stripe      |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |    6+    |    135+    |
-| PayPal      |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |    1     |     5+     |
-| Square      |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |    4     |     4      |
-| OPay        |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |    5     |     1      |
-| Mollie      |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |   10+    |    30+     |
-| NOWPayments |   ✅    |   ✅    |    ✅     |      ✅      |      ❌        |   100+   |    100+    |
+| Paystack    |   ✅    |   ✅    |    ✅     |      ✅      |       ✅       |    5     |     4      |
+| Flutterwave |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |   10+    |     7+     |
+| Monnify     |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |    4     |     1      |
+| Stripe      |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |    6+    |    135+    |
+| PayPal      |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |    1     |     5+     |
+| Square      |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |    4     |     4      |
+| OPay        |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |    5     |     1      |
+| Mollie      |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |   10+    |    30+     |
+| NOWPayments |   ✅    |   ✅    |    ✅     |      ✅      |       ❌       |   100+   |    100+    |
 
 **Legend:**
 - ✅ = Fully supported

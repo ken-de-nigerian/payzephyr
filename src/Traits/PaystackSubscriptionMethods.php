@@ -34,9 +34,6 @@ trait PaystackSubscriptionMethods
     public function createPlan(SubscriptionPlanDTO $plan): PlanResponseDTO
     {
         try {
-            // Paystack only accepts: name, interval, amount, currency, description,
-            // invoice_limit, send_invoices, send_sms (metadata is NOT supported)
-            // Filter only null values to preserve boolean false for send_invoices/send_sms
             $payload = array_filter([
                 'name' => $plan->name,
                 'interval' => $plan->interval,

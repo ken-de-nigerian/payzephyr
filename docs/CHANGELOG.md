@@ -1404,7 +1404,7 @@ composer update kendenigerian/payzephyr
    $transactions = PaymentTransaction::successful()->get();
    ```
 
-3. Enhanced security—ensure webhook verification is enabled:
+3. Enhanced security: ensure webhook verification is enabled:
    ```env
    PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true
    ```

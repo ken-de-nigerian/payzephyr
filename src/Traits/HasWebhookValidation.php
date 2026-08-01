@@ -54,7 +54,7 @@ trait HasWebhookValidation
      * Monnify's nested eventData once unwrapped by a driver
      * override). Providers that nest the timestamp inside a sub-object
      * (Paystack/Flutterwave under `data`, OPay under `payload`, Monnify under
-     * `eventData`) must override this method — see extractWebhookTimestampFrom().
+     * `eventData`) must override this method: see extractWebhookTimestampFrom().
      *
      * @param  array<string, mixed>  $payload
      * @return int|null Unix timestamp

@@ -1,10 +1,10 @@
 # Custom Drivers
 
-PayZephyr supports eight providers out of the box, but you're not limited to them. Every provider PayZephyr ships with is built the same way you'd build your own — a "driver" class that translates PayZephyr's unified API into that specific provider's HTTP API. This chapter walks through building one.
+PayZephyr supports eight providers out of the box, but you're not limited to them. Every provider PayZephyr ships with is built the same way you'd build your own: a "driver" class that translates PayZephyr's unified API into that specific provider's HTTP API. This chapter walks through building one.
 
 ## When you'd actually need this
 
-Only if you need a payment provider PayZephyr doesn't already support (see [Multiple Providers](providers.md) for the current list). If you're just trying to customize behavior *within* an existing provider, you probably don't need a custom driver — check [Advanced Usage](advanced-usage.md) first.
+Only if you need a payment provider PayZephyr doesn't already support (see [Multiple Providers](providers.md) for the current list). If you're just trying to customize behavior *within* an existing provider, you probably don't need a custom driver; check [Advanced Usage](advanced-usage.md) first.
 
 ## The contract every driver fulfills
 
@@ -64,7 +64,7 @@ final class AcmepayDriver extends AbstractDriver
 }
 ```
 
-`$this->config` is whatever array you configure for this provider in `config/payments.php` (see step 5) — `validateConfig()` runs automatically before any request, so a missing key fails fast with a clear message rather than surfacing as a confusing API error later.
+`$this->config` is whatever array you configure for this provider in `config/payments.php` (see step 5). `validateConfig()` runs automatically before any request, so a missing key fails fast with a clear message rather than surfacing as a confusing API error later.
 
 ### 2. Charging
 
@@ -114,7 +114,7 @@ public function charge(ChargeRequestDTO $request): ChargeResponseDTO
 }
 ```
 
-`makeRequest()` and `parseResponse()` are helpers `AbstractDriver` gives you — `makeRequest()` wraps Guzzle, automatically attaches an idempotency header if one was set via `->idempotency()`, and wraps network failures in a `ChargeException` with useful context; `parseResponse()` just JSON-decodes the response body. `generateReference()` produces a reasonably unique reference string if the caller didn't supply their own.
+`makeRequest()` and `parseResponse()` are helpers `AbstractDriver` gives you: `makeRequest()` wraps Guzzle, automatically attaches an idempotency header if one was set via `->idempotency()`, and wraps network failures in a `ChargeException` with useful context; `parseResponse()` just JSON-decodes the response body. `generateReference()` produces a reasonably unique reference string if the caller didn't supply their own.
 
 ### 3. Verification
 
@@ -142,7 +142,7 @@ public function verify(string $reference): VerificationResponseDTO
 }
 ```
 
-`normalizeStatus()` (provided by `AbstractDriver`) is what turns a provider's own status vocabulary into PayZephyr's normalized `success`/`failed`/`pending`/`cancelled` set — see [Payment Verification](verification.md#why-status-is-a-normalized-string-not-each-providers-raw-value). Override it if Acmepay's status words don't map cleanly onto the defaults.
+`normalizeStatus()` (provided by `AbstractDriver`) is what turns a provider's own status vocabulary into PayZephyr's normalized `success`/`failed`/`pending`/`cancelled` set; see [Payment Verification](verification.md#why-status-is-a-normalized-string-not-each-providers-raw-value). Override it if Acmepay's status words don't map cleanly onto the defaults.
 
 ### 4. Webhook validation
 
@@ -168,7 +168,7 @@ public function validateWebhook(array $headers, string $body): bool
 }
 ```
 
-Always use `hash_equals()` for the comparison, never `===` — see [Security](security.md#webhook-signature-verification) for why. `validateWebhookTimestamp()` is inherited from a shared trait and handles replay protection automatically, provided your payload has a recognizable timestamp field — check `AbstractDriver`'s existing drivers in PayZephyr's source for the exact field names it checks by default, and override `extractWebhookTimestamp()` if Acmepay nests its timestamp somewhere non-standard.
+Always use `hash_equals()` for the comparison, never `===`; see [Security](security.md#webhook-signature-verification) for why. `validateWebhookTimestamp()` is inherited from a shared trait and handles replay protection automatically, provided your payload has a recognizable timestamp field. Check `AbstractDriver`'s existing drivers in PayZephyr's source for the exact field names it checks by default, and override `extractWebhookTimestamp()` if Acmepay nests its timestamp somewhere non-standard.
 
 ### 5. Registering the driver
 
@@ -198,13 +198,13 @@ Payment::amount(50.00)->email('customer@example.com')->with('acmepay')->redirect
 
 ## Testing your driver
 
-Exactly the same technique as testing anything else built on PayZephyr — see [Testing](testing.md#the-actual-mechanism-inject-a-mock-guzzle-client). Inject a mocked Guzzle client via `setClient()` and assert your driver builds the right request and correctly interprets the provider's response shape.
+Exactly the same technique as testing anything else built on PayZephyr; see [Testing](testing.md#the-actual-mechanism-inject-a-mock-guzzle-client). Inject a mocked Guzzle client via `setClient()` and assert your driver builds the right request and correctly interprets the provider's response shape.
 
 ## Adding subscription support (optional)
 
-If Acmepay has its own subscription/recurring-billing API, you can additionally implement `SupportsSubscriptionsInterface`. This is meaningfully more work than charge/verify — read [Subscriptions](subscriptions.md) first to understand the shape PayZephyr expects (plans, subscription lifecycle, the provider-specific quirks other drivers deal with), then look at one of the existing subscription-capable drivers in PayZephyr's source (Stripe's is a reasonably clean reference) as a template.
+If Acmepay has its own subscription/recurring-billing API, you can additionally implement `SupportsSubscriptionsInterface`. This is meaningfully more work than charge/verify; read [Subscriptions](subscriptions.md) first to understand the shape PayZephyr expects (plans, subscription lifecycle, the provider-specific quirks other drivers deal with), then look at one of the existing subscription-capable drivers in PayZephyr's source (Stripe's is a reasonably clean reference) as a template.
 
 ## Next steps
 
-- [Advanced Usage](advanced-usage.md) — direct driver access, useful while debugging a custom driver
-- [Architecture](architecture.md) — how drivers fit into PayZephyr's layers overall
+- [Advanced Usage](advanced-usage.md): direct driver access, useful while debugging a custom driver
+- [Architecture](architecture.md): how drivers fit into PayZephyr's layers overall

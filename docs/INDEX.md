@@ -1,6 +1,6 @@
 # PayZephyr Documentation
 
-New here? Start with the [README](../README.md), then work through the chapters below roughly in order — each builds on the last. Already know what you're looking for? Jump straight there.
+New here? Start with the [README](../README.md), then work through the chapters below roughly in order: each builds on the last. Already know what you're looking for? Jump straight there.
 
 ## Getting started
 
@@ -46,5 +46,5 @@ New here? Start with the [README](../README.md), then work through the chapters 
 
 ## Other
 
-- [Logging](logging.md) — more detail on the transaction-logging tables, if [Configuration](configuration.md#transaction-logging) and [Advanced Usage](advanced-usage.md#reading-transaction-history-directly) left you wanting more
-- [Architecture Decision Records](architecture/adr/) — the historical record of *why* specific internal design decisions were made
+- [Logging](logging.md): more detail on the transaction-logging tables, if [Configuration](configuration.md#transaction-logging) and [Advanced Usage](advanced-usage.md#reading-transaction-history-directly) left you wanting more
+- [Architecture Decision Records](architecture/adr/): the historical record of *why* specific internal design decisions were made

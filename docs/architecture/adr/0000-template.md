@@ -9,9 +9,9 @@ What forced this decision? What breaks, is unsafe, or is unmaintainable without 
 
 ## Options Considered
 
-1. **Option A** — description, trade-offs.
-2. **Option B** — description, trade-offs.
-3. **Option C** — description, trade-offs.
+1. **Option A**: description, trade-offs.
+2. **Option B**: description, trade-offs.
+3. **Option C**: description, trade-offs.
 
 ## Decision
 
@@ -19,7 +19,7 @@ Which option was chosen, stated as a single unambiguous sentence.
 
 ## Why
 
-The specific evidence that ruled out the alternatives — benchmarks, verified provider
+The specific evidence that ruled out the alternatives: benchmarks, verified provider
 payloads, existing test assertions, etc. Prefer citing exact files/lines over prose.
 
 ## Trade-offs

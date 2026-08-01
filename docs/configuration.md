@@ -1,8 +1,8 @@
 # Configuration
 
-Everything PayZephyr does is controlled from one file: `config/payments.php` (published during [installation](installation.md)). This chapter goes through every section of it — not just what each key does, but why it's there.
+Everything PayZephyr does is controlled from one file: `config/payments.php` (published during [installation](installation.md)). This chapter goes through every section of it: not just what each key does, but why it's there.
 
-Most values in the config file are read from environment variables via `env(...)`, so day-to-day you'll mostly be editing `.env`, not the config file itself. The config file is where you'd change *structural* things — like which providers exist at all, or their currency lists.
+Most values in the config file are read from environment variables via `env(...)`, so day-to-day you'll mostly be editing `.env`, not the config file itself. The config file is where you'd change *structural* things: like which providers exist at all, or their currency lists.
 
 ## Default and fallback providers
 
@@ -11,22 +11,22 @@ Most values in the config file are read from environment variables via `env(...)
 'fallback' => env('PAYMENTS_FALLBACK_PROVIDER', 'stripe'),
 ```
 
-`default` is which provider gets used when you don't explicitly pick one — for example, plain `Payment::amount(100)->email(...)->charge()` with no `->with('stripe')` call uses this provider.
+`default` is which provider gets used when you don't explicitly pick one: for example, plain `Payment::amount(100)->email(...)->charge()` with no `->with('stripe')` call uses this provider.
 
-`fallback` is what PayZephyr tries if the default provider's request fails (network error, the provider's API being down, and similar). This is the "automatic fallback" feature mentioned in the README — you don't have to write any retry logic yourself. Set it to `null` if you'd rather a failure just fail, with no fallback attempt.
+`fallback` is what PayZephyr tries if the default provider's request fails (network error, the provider's API being down, and similar). This is the "automatic fallback" feature mentioned in the README. You don't have to write any retry logic yourself. Set it to `null` if you'd rather a failure just fail, with no fallback attempt.
 
 ```env
 PAYMENTS_DEFAULT_PROVIDER=paystack
 PAYMENTS_FALLBACK_PROVIDER=stripe
 ```
 
-You can also override which provider(s) to use for a single call, without touching config at all — see [Multiple Providers](providers.md#fallback-chains-per-call).
+You can also override which provider(s) to use for a single call, without touching config at all: see [Multiple Providers](providers.md#fallback-chains-per-call).
 
 ## Provider credentials
 
-Each provider has its own block under `'providers'`. Every provider needs `enabled` set to `true` before PayZephyr will use it — this exists so you can keep credentials for a provider in `.env` (for example, ready for later) without PayZephyr trying to route traffic to it yet.
+Each provider has its own block under `'providers'`. Every provider needs `enabled` set to `true` before PayZephyr will use it; this exists so you can keep credentials for a provider in `.env` (for example, ready for later) without PayZephyr trying to route traffic to it yet.
 
-Here's exactly what each provider requires — these are the keys PayZephyr's own validation checks for; if any are missing, you'll get an `InvalidConfigurationException` the moment PayZephyr tries to use that provider, with a message telling you which key is missing.
+Here's exactly what each provider requires: these are the keys PayZephyr's own validation checks for; if any are missing, you'll get an `InvalidConfigurationException` the moment PayZephyr tries to use that provider, with a message telling you which key is missing.
 
 | Provider | `.env` prefix | Required keys | Enable flag |
 |---|---|---|---|
@@ -41,9 +41,9 @@ Here's exactly what each provider requires — these are the keys PayZephyr's ow
 
 A couple of things worth calling out that aren't obvious from the table:
 
-- **Webhook secrets aren't in the "required" list above** because PayZephyr will still *work* without them — but it can't verify that an incoming webhook is genuinely from your provider without one. Set them anyway; see [Security](security.md) for exactly what goes wrong if you don't.
-- **PayPal needs a `webhook_id`** (`PAYPAL_WEBHOOK_ID`) specifically for webhook validation — PayPal's webhook verification works differently from every other provider (it calls PayPal's own verification API rather than checking an HMAC signature locally), and that API call needs to know which webhook subscription to check against.
-- **`base_url` is provided with sensible defaults for every provider** (pointing at each provider's sandbox by default, where the provider has one) — you generally don't need to touch it unless you're pointing at a specific region or switching to a provider's live endpoint manually.
+- **Webhook secrets aren't in the "required" list above** because PayZephyr will still *work* without them, but it can't verify that an incoming webhook is genuinely from your provider without one. Set them anyway; see [Security](security.md) for exactly what goes wrong if you don't.
+- **PayPal needs a `webhook_id`** (`PAYPAL_WEBHOOK_ID`) specifically for webhook validation: PayPal's webhook verification works differently from every other provider (it calls PayPal's own verification API rather than checking an HMAC signature locally), and that API call needs to know which webhook subscription to check against.
+- **`base_url` is provided with sensible defaults for every provider** (pointing at each provider's sandbox by default, where the provider has one), so you generally don't need to touch it unless you're pointing at a specific region or switching to a provider's live endpoint manually.
 
 Example `.env` block for Paystack and Stripe both enabled (Paystack as default, Stripe as fallback):
 
@@ -71,7 +71,7 @@ Full per-provider setup, including currencies each one supports, is in [Multiple
 ],
 ```
 
-The currency used when you don't specify one on a charge (`->currency('USD')`). If you don't set `PAYMENTS_DEFAULT_CURRENCY`, PayZephyr defaults to Nigerian Naira — change this if your app's primary currency is something else.
+The currency used when you don't specify one on a charge (`->currency('USD')`). If you don't set `PAYMENTS_DEFAULT_CURRENCY`, PayZephyr defaults to Nigerian Naira; change this if your app's primary currency is something else.
 
 ## Webhook settings
 
@@ -89,13 +89,13 @@ The currency used when you don't specify one on a charge (`->currency('USD')`). 
 ],
 ```
 
-These control the endpoint PayZephyr registers to receive webhook deliveries from your providers (`/payments/webhook/{provider}` by default — `path` is the base, the provider name is appended automatically). The full explanation of what a webhook even is and why you need one lives in [Webhooks](webhooks.md); this section is just the dial-by-dial reference:
+These control the endpoint PayZephyr registers to receive webhook deliveries from your providers (`/payments/webhook/{provider}` by default: `path` is the base, the provider name is appended automatically). The full explanation of what a webhook even is and why you need one lives in [Webhooks](webhooks.md); this section is just the dial-by-dial reference:
 
-- **`verify_signature`** — whether PayZephyr checks that an incoming webhook is genuinely signed by your provider before trusting it. Leave this `true` in every environment that has real credentials. It exists as a toggle mainly for local development against providers whose sandbox doesn't send correctly-signed test webhooks.
-- **`rate_limit`** — protects the webhook endpoint from being flooded; format is `"attempts,minutes"`.
-- **`max_payload_size`** — webhooks larger than this (in bytes) are rejected before PayZephyr even tries to parse them, as a defense against oversized payloads.
-- **`max_retries` / `retry_backoff`** — if processing a webhook fails (a transient database error, for instance), PayZephyr retries it this many times, waiting `retry_backoff` seconds between attempts, using Laravel's queue retry mechanism.
-- **`events.table`** — the database table PayZephyr uses to remember which webhook deliveries it's already processed, so a provider re-sending the same webhook (which every provider does as normal behavior, not a bug) doesn't get handled twice. See [Webhooks](webhooks.md#duplicate-deliveries) for why this matters.
+- **`verify_signature`**: whether PayZephyr checks that an incoming webhook is genuinely signed by your provider before trusting it. Leave this `true` in every environment that has real credentials. It exists as a toggle mainly for local development against providers whose sandbox doesn't send correctly-signed test webhooks.
+- **`rate_limit`**: protects the webhook endpoint from being flooded; format is `"attempts,minutes"`.
+- **`max_payload_size`**: webhooks larger than this (in bytes) are rejected before PayZephyr even tries to parse them, as a defense against oversized payloads.
+- **`max_retries` / `retry_backoff`**: if processing a webhook fails (a transient database error, for instance), PayZephyr retries it this many times, waiting `retry_backoff` seconds between attempts, using Laravel's queue retry mechanism.
+- **`events.table`**: the database table PayZephyr uses to remember which webhook deliveries it's already processed, so a provider re-sending the same webhook (which every provider does as normal behavior, not a bug) doesn't get handled twice. See [Webhooks](webhooks.md#duplicate-deliveries) for why this matters.
 
 ## Health check
 
@@ -108,9 +108,9 @@ These control the endpoint PayZephyr registers to receive webhook deliveries fro
 ],
 ```
 
-PayZephyr exposes `/payments/health`, which reports whether it can currently reach each enabled provider — useful for uptime monitoring. Checking a provider's health means making a real HTTP request to it, which is slow to do on every hit, so results are cached for `cache_ttl` seconds.
+PayZephyr exposes `/payments/health`, which reports whether it can currently reach each enabled provider, useful for uptime monitoring. Checking a provider's health means making a real HTTP request to it, which is slow to do on every hit, so results are cached for `cache_ttl` seconds.
 
-`require_auth` is `false` by default so the endpoint works immediately in local development with zero setup. **You should turn this on before deploying**, along with either `allowed_ips` (a comma-separated allowlist) or `allowed_tokens` (bearer tokens callers must present) — otherwise anyone on the internet can hit this endpoint. See the [Production Checklist](production-checklist.md) and [Security](security.md#health-endpoint).
+`require_auth` is `false` by default so the endpoint works immediately in local development with zero setup. **You should turn this on before deploying**, along with either `allowed_ips` (a comma-separated allowlist) or `allowed_tokens` (bearer tokens callers must present); otherwise anyone on the internet can hit this endpoint. See the [Production Checklist](production-checklist.md) and [Security](security.md#health-endpoint).
 
 ## Transaction logging
 
@@ -122,7 +122,7 @@ PayZephyr exposes `/payments/health`, which reports whether it can currently rea
 ],
 ```
 
-Every charge you initiate through PayZephyr gets a row written to `payment_transactions` (the table created by the migration you ran during installation) — this is how you query "what did this customer pay for" later, without keeping your own duplicate bookkeeping. `channel` is which [Laravel log channel](https://laravel.com/docs/logging) PayZephyr's own diagnostic logging (API errors, webhook validation failures, and so on) writes to — pointing it at its own channel keeps payment-related log noise separate from your app's general logs.
+Every charge you initiate through PayZephyr gets a row written to `payment_transactions` (the table created by the migration you ran during installation): this is how you query "what did this customer pay for" later, without keeping your own duplicate bookkeeping. `channel` is which [Laravel log channel](https://laravel.com/docs/logging) PayZephyr's own diagnostic logging (API errors, webhook validation failures, and so on) writes to, pointing it at its own channel to keep payment-related log noise separate from your app's general logs.
 
 ## Subscriptions
 

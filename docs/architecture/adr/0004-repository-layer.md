@@ -14,7 +14,7 @@ static Eloquent calls
 [ProcessWebhook.php:96-132](../../../src/Jobs/ProcessWebhook.php)). Two consequences:
 
 1. **DIP violation / untestable in isolation.** Neither class can be unit-tested against
-   the persistence layer without a real (or in-memory sqlite) database — there is no seam
+   the persistence layer without a real (or in-memory sqlite) database: there is no seam
    to substitute a fake.
 2. **The correct concurrency pattern exists in exactly one place and wasn't reused.**
    `PaymentTransaction` updates are correctly guarded (`DB::transaction` +
@@ -28,7 +28,7 @@ static Eloquent calls
      *same* new `subscription_code` can both pass `updateOrCreate`'s internal
      not-found check before either commits. The second `INSERT` hits the table's unique
      index on `subscription_code` and throws a `QueryException`, which the surrounding
-     `catch (Throwable $e)` swallows as a logged error — that event's data is silently
+     `catch (Throwable $e)` swallows as a logged error: that event's data is silently
      dropped, no retry.
    - **Unordered concurrent updates**: with no lock, two events for the same subscription
      (e.g. a `renewed` event that started earlier but finishes later, racing a `cancelled`
@@ -40,10 +40,10 @@ the correct pattern lived to be reused from.
 ## Options Considered
 
 1. **Copy the `PaymentTransaction` lock+guard pattern inline into
-   `PaystackSubscriptionMethods`.** Rejected — duplicates the exact logic a repository
+   `PaystackSubscriptionMethods`.** Rejected: duplicates the exact logic a repository
    should own, and does nothing for testability of `PaymentManager`/`ProcessWebhook`.
 2. **Full persistence-ignorant DTO layer (repository returns value objects, not Eloquent
-   models).** Rejected for this pass — bigger surface, and the calling code already treats
+   models).** Rejected for this pass: bigger surface, and the calling code already treats
    the model fairly generically via `getAttribute()`. The DIP problem being fixed here is
    "business logic is hard-wired to static Eloquent calls," not "Eloquent must never be
    visible anywhere." Revisit only if a second persistence backend is ever actually needed
@@ -57,7 +57,7 @@ the correct pattern lived to be reused from.
 - `Contracts\TransactionRepositoryInterface`: `create()`, `findByReference()`,
   `updateIfNotSuccessful()` (encapsulates the existing lock+guard pattern verbatim - no
   behavior change for `PaymentTransaction`).
-- `Contracts\SubscriptionRepositoryInterface`: `updateOrCreateAtomic()` — applies the same
+- `Contracts\SubscriptionRepositoryInterface`: `updateOrCreateAtomic()` applies the same
   lock+guard shape to `SubscriptionTransaction`, plus a catch-and-retry around the unique
   constraint race on create (lock a nonexistent row locks nothing; the fix is to attempt
   the insert, and on a caught unique-violation, re-select-and-lock-and-update instead of
@@ -65,7 +65,7 @@ the correct pattern lived to be reused from.
 - Both bound as singletons to Eloquent implementations in `PaymentServiceProvider`.
 - `PaymentManager` takes `TransactionRepositoryInterface` via constructor (same optional
   + `app()`-fallback pattern already used for its other three collaborators).
-  `ProcessWebhook` takes both repositories via `handle()` method injection — Laravel's
+  `ProcessWebhook` takes both repositories via `handle()` method injection: Laravel's
   documented pattern for queued jobs, since job instances are serialized and a
   constructor-injected service wouldn't survive that; method injection resolves fresh from
   the container when the job actually runs.

@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.0.1] - 2026-08-01
+
+### BREAKING
+
+- **Dropped support for Laravel 10.x and 11.x.** PayZephyr now requires Laravel 12.x or
+  13.x. Both dropped majors are now past their upstream security-fix window (Laravel 10:
+  ended 2025-02-04; Laravel 11: ended 2026-03-12), meaning every version in those ranges
+  has at least one permanently-unpatched security advisory - Composer's advisory-blocking
+  policy was refusing to install them in CI at all. `illuminate/database`,
+  `illuminate/http`, and `illuminate/support` now require `^12.0|^13.0`;
+  `orchestra/testbench` requires `^10.0|^11.0`; `pestphp/pest` and
+  `pestphp/pest-plugin-laravel` require `^3.0|^5.0`. CI's test matrix no longer runs
+  Laravel 10.*/11.* jobs. See [Upgrade Guide](../docs/upgrade-guide.md#laravel-10x-and-11x-are-no-longer-supported).
+
+### Fixed
+
+- **`SubscriptionQuery`'s filter methods (`whereStatus()`, `active()`, `cancelled()`,
+  `forPlan()`, `createdAfter()`, `createdBefore()`) crashed with a fatal
+  `Error: Cannot use object ... as array` for every subscription-capable provider except
+  Paystack.** Paystack's `listSubscriptions()` returns raw provider arrays, but the five
+  other subscription-capable drivers added in v2.0.0 (Stripe, PayPal, Flutterwave, Square,
+  Mollie) return `SubscriptionResponseDTO` objects - `applyFilters()` was written only
+  against the Paystack shape and array-indexed every result unconditionally. Fixed by
+  normalizing both shapes to a common view before filtering; `createdAfter()`/
+  `createdBefore()` are now a documented no-op against DTO-shaped results (the DTO carries
+  no creation timestamp) rather than crashing.
+
+### Coverage
+
+- Added regression tests for the `SubscriptionQuery` fix above, plus tests for the five
+  subscription lifecycle event classes and `SubscriptionValidator`'s duplicate-prevention,
+  terminal-state, and authorization-code-format branches - all previously untested.
+
+---
 ## [2.0.0] - 2026-08-01
 
 ### Added

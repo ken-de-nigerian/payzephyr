@@ -235,33 +235,28 @@ final class SubscriptionQuery
         $filtered = [];
 
         foreach ($subscriptions as $subscription) {
+            // Paystack's listSubscriptions() returns raw provider arrays;
+            // every other subscription-capable driver (Stripe, PayPal,
+            // Flutterwave, Square, Mollie) returns SubscriptionResponseDTO
+            // objects. Array-indexing a DTO directly fatals ("Cannot use
+            // object ... as array"), so both shapes are normalized to a
+            // common array view before filtering.
+            $normalized = $this->normalizeForFiltering($subscription);
 
-            if ($this->planCode !== null) {
-                $subPlanCode = $subscription['plan']['plan_code'] ?? $subscription['plan_code'] ?? null;
-                if ($subPlanCode !== $this->planCode) {
-                    continue;
-                }
+            if ($this->planCode !== null && $normalized['plan_code'] !== $this->planCode) {
+                continue;
             }
 
-            if ($this->status !== null) {
-                $subStatus = strtolower($subscription['status'] ?? '');
-                if ($subStatus !== strtolower($this->status)) {
-                    continue;
-                }
+            if ($this->status !== null && strtolower($normalized['status']) !== strtolower($this->status)) {
+                continue;
             }
 
-            if ($this->createdAfter !== null) {
-                $createdAt = $subscription['created_at'] ?? $subscription['createdAt'] ?? null;
-                if ($createdAt && strtotime($createdAt) < strtotime($this->createdAfter)) {
-                    continue;
-                }
+            if ($this->createdAfter !== null && $normalized['created_at'] && strtotime($normalized['created_at']) < strtotime($this->createdAfter)) {
+                continue;
             }
 
-            if ($this->createdBefore !== null) {
-                $createdAt = $subscription['created_at'] ?? $subscription['createdAt'] ?? null;
-                if ($createdAt && strtotime($createdAt) > strtotime($this->createdBefore)) {
-                    continue;
-                }
+            if ($this->createdBefore !== null && $normalized['created_at'] && strtotime($normalized['created_at']) > strtotime($this->createdBefore)) {
+                continue;
             }
 
             $filtered[] = $subscription;
@@ -277,6 +272,36 @@ final class SubscriptionQuery
 
         /** @var array<string, mixed> $filtered */
         return $filtered;
+    }
+
+    /**
+     * Normalize a single subscription entry - either a raw provider array
+     * (Paystack) or a SubscriptionResponseDTO object (every other
+     * subscription-capable driver) - into a common shape the filters above
+     * can read uniformly.
+     *
+     * @param  SubscriptionResponseDTO|array<string, mixed>  $subscription
+     * @return array{plan_code: ?string, status: string, created_at: ?string}
+     */
+    private function normalizeForFiltering(SubscriptionResponseDTO|array $subscription): array
+    {
+        if ($subscription instanceof SubscriptionResponseDTO) {
+            return [
+                'plan_code' => $subscription->plan,
+                'status' => $subscription->status,
+                // SubscriptionResponseDTO does not carry a creation
+                // timestamp, so createdAfter()/createdBefore() are a
+                // no-op against DTO-shaped results rather than crashing -
+                // there is nothing on the DTO to compare against.
+                'created_at' => null,
+            ];
+        }
+
+        return [
+            'plan_code' => $subscription['plan']['plan_code'] ?? $subscription['plan_code'] ?? null,
+            'status' => (string) ($subscription['status'] ?? ''),
+            'created_at' => $subscription['created_at'] ?? $subscription['createdAt'] ?? null,
+        ];
     }
 
     protected function getDriver(): Contracts\DriverInterface

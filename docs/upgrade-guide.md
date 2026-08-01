@@ -6,6 +6,12 @@ This chapter walks through what changes when you move between PayZephyr's major 
 
 v2.0.0 contains real breaking changes. Read this whole section before running `composer update` on a production app.
 
+### Laravel 10.x and 11.x are no longer supported
+
+PayZephyr now requires Laravel 12.x or 13.x. This isn't a preference — both Laravel 10 (security fixes ended 2025-02-04) and Laravel 11 (security fixes ended 2026-03-12) are now past their upstream security-fix window, meaning Composer's advisory-blocking policy refuses to install them at all once every version in the range has at least one permanently-unpatched advisory. Continuing to claim support for versions that can't receive security patches isn't defensible for a payments package.
+
+**What to do:** upgrade your application to Laravel 12.x or 13.x before upgrading PayZephyr to v2.0.0. If you're not ready to move off Laravel 10/11, stay on PayZephyr v1.x — it will keep working, just without v2.0.0's new features.
+
 ### NOWPayments has been removed entirely
 
 If you were using the `nowpayments` provider, it's gone — not deprecated, not soft-disabled, removed: the driver class, its config block, and everything referencing it. This was a deliberate product decision (crypto payment support is no longer in scope for PayZephyr), not a technical migration with a drop-in replacement.

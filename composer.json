@@ -35,18 +35,18 @@
     "require": {
         "php": "^8.2",
         "guzzlehttp/guzzle": "^7.8",
-        "illuminate/database": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/http": "^10.0|^11.0|^12.0|^13.0",
-        "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
         "stripe/stripe-php": "^13.0"
     },
     "require-dev": {
         "ext-pdo": "*",
         "laravel/pint": "1.26.0",
         "mockery/mockery": "^1.6",
-        "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
-        "pestphp/pest": "^2.34|^3.0|^5.0",
-        "pestphp/pest-plugin-laravel": "^2.3|^3.0|^5.0",
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^3.0|^5.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^5.0",
         "phpstan/phpstan": "^1.10"
     },
     "autoload": {

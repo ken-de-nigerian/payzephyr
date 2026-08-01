@@ -34,7 +34,7 @@ Nothing bad — this is normal provider behavior (a retry after a slow response,
 
 **Which PHP and Laravel versions are supported?**
 
-PHP 8.2+ and Laravel 10, 11, 12, or 13. See [Installation](installation.md#before-you-start).
+PHP 8.2+ and Laravel 12 or 13. Laravel 10 and 11 are no longer supported — both are past their upstream security-fix window. See [Installation](installation.md#before-you-start) and [Upgrade Guide](upgrade-guide.md).
 
 **Is PayZephyr PCI compliant?**
 

@@ -37,3 +37,17 @@ test('install command publishes migrations', function () {
 
     expect($migrationFiles)->not->toBeEmpty();
 });
+
+test('install command runs migrations when the user confirms the interactive prompt', function () {
+    // Covers the elseif ($this->confirm(...)) branch, which the other tests
+    // never reach because they always pass --no-interaction.
+    $this->artisan('payzephyr:install')
+        ->expectsConfirmation('Run migrations now?', 'yes')
+        ->assertExitCode(0);
+});
+
+test('install command skips migrations when the user declines the interactive prompt', function () {
+    $this->artisan('payzephyr:install')
+        ->expectsConfirmation('Run migrations now?', 'no')
+        ->assertExitCode(0);
+});

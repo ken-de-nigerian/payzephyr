@@ -63,52 +63,13 @@ final class SubscriptionTransaction extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        $laravelVersion = (float) app()->version();
-        $arrayCast = $laravelVersion >= 11.0 ? AsArrayObject::class : 'array';
-
         return [
             'amount' => 'decimal:2',
-            'metadata' => $arrayCast,
+            'metadata' => AsArrayObject::class,
             'next_payment_date' => 'date',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
-    }
-
-    public function setAttribute($key, $value): self
-    {
-        $laravelVersion = (float) app()->version();
-
-        if ($laravelVersion < 11.0 && $key === 'metadata') {
-            if ($value === null) {
-                $this->attributes[$key] = null;
-            } elseif (is_array($value)) {
-                $this->attributes[$key] = json_encode($value);
-            } else {
-                $this->attributes[$key] = $value;
-            }
-
-            return $this;
-        }
-
-        return parent::setAttribute($key, $value);
-    }
-
-    public function getAttribute($key): mixed
-    {
-        $value = parent::getAttribute($key);
-
-        $laravelVersion = (float) app()->version();
-        if ($laravelVersion < 11.0 && $key === 'metadata') {
-            if (is_string($value) && ! empty($value)) {
-                $decoded = json_decode($value, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return $decoded;
-                }
-            }
-        }
-
-        return $value;
     }
 
     public function getConnectionName(): ?string

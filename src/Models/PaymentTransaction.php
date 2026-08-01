@@ -64,53 +64,14 @@ final class PaymentTransaction extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        $laravelVersion = (float) app()->version();
-        $arrayCast = $laravelVersion >= 11.0 ? AsArrayObject::class : 'array';
-
         return [
             'amount' => 'decimal:2',
-            'metadata' => $arrayCast,
-            'customer' => $arrayCast,
+            'metadata' => AsArrayObject::class,
+            'customer' => AsArrayObject::class,
             'paid_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
-    }
-
-    public function setAttribute($key, $value): self
-    {
-        $laravelVersion = (float) app()->version();
-
-        if ($laravelVersion < 11.0 && in_array($key, ['metadata', 'customer'], true)) {
-            if ($value === null) {
-                $this->attributes[$key] = null;
-            } elseif (is_array($value)) {
-                $this->attributes[$key] = json_encode($value);
-            } else {
-                $this->attributes[$key] = $value;
-            }
-
-            return $this;
-        }
-
-        return parent::setAttribute($key, $value);
-    }
-
-    public function getAttribute($key): mixed
-    {
-        $value = parent::getAttribute($key);
-
-        $laravelVersion = (float) app()->version();
-        if ($laravelVersion < 11.0 && in_array($key, ['metadata', 'customer'], true)) {
-            if (is_string($value) && ! empty($value)) {
-                $decoded = json_decode($value, true);
-                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                    return $decoded;
-                }
-            }
-        }
-
-        return $value;
     }
 
     public static function setTableName(string $table): void

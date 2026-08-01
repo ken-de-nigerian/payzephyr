@@ -389,11 +389,18 @@ test('subscription cancel requires subscription code', function () {
     $subscription->cancel();
 })->throws(PaymentException::class, 'Subscription code is required');
 
-test('subscription cancel requires email token', function () {
-    $subscription = SubscriptionTestHelper::createWithMock([]);
+test('subscription cancel without a token fails at the paystack driver, not the fluent API', function () {
+    // Whether a token is required is a Paystack-specific rule (see
+    // ADR-0006), so the generic Subscription::cancel() no longer gates on
+    // it upfront - the provider-agnostic terminal-state validation still
+    // runs (hence the fetchSubscription mock below), and the token
+    // requirement surfaces from PaystackDriver::cancelSubscription() itself.
+    $subscription = SubscriptionTestHelper::createWithMock([
+        SubscriptionTestHelper::subscriptionMock('SUB_123'),
+    ]);
 
     $subscription->code('SUB_123')->cancel();
-})->throws(PaymentException::class, 'Email token is required');
+})->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
 test('subscription cancel accepts token as parameter', function () {
     // Disable validation to avoid extra HTTP calls
@@ -478,11 +485,13 @@ test('subscription enable requires subscription code', function () {
     $subscription->enable();
 })->throws(PaymentException::class, 'Subscription code is required');
 
-test('subscription enable requires email token', function () {
+test('subscription enable without a token fails at the paystack driver, not the fluent API', function () {
+    // enable() calls no validator (unlike cancel()), so this fails directly
+    // inside PaystackDriver::enableSubscription() with no HTTP call made.
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->code('SUB_123')->enable();
-})->throws(PaymentException::class, 'Email token is required');
+})->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
 test('subscription enable handles invalid token', function () {
     $subscription = SubscriptionTestHelper::createWithMock([

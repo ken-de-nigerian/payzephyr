@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Http\Requests;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use Throwable;
@@ -55,6 +56,13 @@ class WebhookRequest extends FormRequest
         try {
             $manager = app(PaymentManager::class);
             $driver = $manager->driver($provider);
+
+            if ($driver instanceof RequiresAsyncWebhookVerification && $driver->requiresAsyncVerification()) {
+                // Deferred to ProcessWebhook - see ADR-0007/ADR-0008. The
+                // payload-size cap above still applies; only the (I/O-bound)
+                // signature check itself is skipped here.
+                return true;
+            }
 
             return $driver->validateWebhook(
                 $this->headers->all(),

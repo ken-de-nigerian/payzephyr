@@ -123,16 +123,6 @@ return [
             'currencies' => ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'],
             'enabled' => env('MOLLIE_ENABLED', false),
         ],
-
-        'nowpayments' => [
-            'driver' => 'nowpayments',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\NowPaymentsDriver::class,
-            'api_key' => env('NOWPAYMENTS_API_KEY'),
-            'ipn_secret' => env('NOWPAYMENTS_IPN_SECRET'),
-            'base_url' => env('NOWPAYMENTS_BASE_URL', 'https://api.nowpayments.io'),
-            'currencies' => ['USD', 'NGN', 'EUR', 'GBP', 'BTC', 'ETH', 'USDT', 'USDC', 'BNB', 'ADA', 'DOT', 'MATIC', 'SOL'],
-            'enabled' => env('NOWPAYMENTS_ENABLED', false),
-        ],
     ],
 
     /*
@@ -162,6 +152,12 @@ return [
         'max_payload_size' => env('PAYMENTS_WEBHOOK_MAX_PAYLOAD_SIZE', 1048576), // 1MB in bytes
         'max_retries' => env('PAYMENTS_WEBHOOK_MAX_RETRIES', 3),
         'retry_backoff' => env('PAYMENTS_WEBHOOK_RETRY_BACKOFF', 60), // seconds
+        'events' => [
+            // Event-level idempotency (ADR-0005): dedupes duplicate webhook
+            // deliveries before any side effect (transaction update, event
+            // dispatch) runs, not just at the transaction-status level.
+            'table' => env('PAYMENTS_WEBHOOK_EVENTS_TABLE', 'webhook_events'),
+        ],
     ],
 
     /*
@@ -264,14 +260,4 @@ return [
         'sanitize_logs' => env('PAYMENTS_SANITIZE_LOGS', true),
         'cache_isolation' => env('PAYMENTS_CACHE_ISOLATION', true),
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Testing Mode
-    |--------------------------------------------------------------------------
-    |
-    | Enable testing mode to disable SSL verification (for local development only).
-    |
-    */
-    'testing_mode' => env('PAYMENTS_TESTING_MODE', false),
 ];

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
@@ -359,7 +360,7 @@ test('paystack cancelSubscription succeeds', function () {
         ])),
     ]);
 
-    $result = $driver->cancelSubscription('SUB_test123', 'token_abc123');
+    $result = $driver->cancelSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'token_abc123']));
 
     expect($result->subscriptionCode)->toBe('SUB_test123')
         ->and($result->status)->toBe('cancelled')
@@ -374,7 +375,7 @@ test('paystack cancelSubscription throws exception on error', function () {
         ])),
     ]);
 
-    $driver->cancelSubscription('SUB_test123', 'invalid_token');
+    $driver->cancelSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'invalid_token']));
 })->throws(SubscriptionException::class, 'Invalid token');
 
 test('paystack enableSubscription succeeds', function () {
@@ -400,7 +401,7 @@ test('paystack enableSubscription succeeds', function () {
         ])),
     ]);
 
-    $result = $driver->enableSubscription('SUB_test123', 'token_abc123');
+    $result = $driver->enableSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'token_abc123']));
 
     expect($result->subscriptionCode)->toBe('SUB_test123')
         ->and($result->status)->toBe('active')
@@ -415,7 +416,7 @@ test('paystack enableSubscription throws exception on error', function () {
         ])),
     ]);
 
-    $driver->enableSubscription('SUB_test123', 'invalid_token');
+    $driver->enableSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'invalid_token']));
 })->throws(SubscriptionException::class);
 
 test('paystack listSubscriptions succeeds', function () {

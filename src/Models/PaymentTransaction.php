@@ -12,16 +12,17 @@ use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Traits\HasConfigurableTableName;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use Throwable;
 
 /**
- * @method static Builder where(string $column, mixed $operator = null, mixed $value = null)
- * @method static Builder create(array $attributes = [])
- * @method static Builder first(array|string $columns = ['*'])
- * @method static Builder lockForUpdate()
- * @method static Builder update(array $attributes = [])
- * @method static Builder delete()
+ * @method static Builder<PaymentTransaction> where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static PaymentTransaction create(array $attributes = [])
+ * @method static PaymentTransaction|null first(array|string $columns = ['*'])
+ * @method static Builder<PaymentTransaction> lockForUpdate()
+ * @method static Builder<PaymentTransaction> update(array $attributes = [])
+ * @method static Builder<PaymentTransaction> delete()
  *
  * @property string $reference
  * @property string $provider
@@ -36,6 +37,7 @@ use Throwable;
  */
 final class PaymentTransaction extends Model
 {
+    use HasConfigurableTableName;
     use LogsToPaymentChannel;
 
     /** @var array<int, string> */
@@ -54,33 +56,9 @@ final class PaymentTransaction extends Model
 
     protected $table = 'payment_transactions';
 
-    public function getTable(): string
+    protected function configuredTableNameKey(): string
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $tableName = $config['logging']['table'] ?? $this->table;
-
-        if (! $this->isValidTableName($tableName)) {
-            $this->log('warning', 'Invalid table name in config, using default', [
-                'attempted_table' => $tableName,
-            ]);
-
-            return $this->table;
-        }
-
-        return $tableName;
-    }
-
-    protected function isValidTableName(string $tableName): bool
-    {
-        if (preg_match('/^[a-zA-Z0-9_]{1,64}$/', $tableName) !== 1) {
-            return false;
-        }
-
-        if (preg_match('/^\d/', $tableName) === 1) {
-            return false;
-        }
-
-        return true;
+        return 'logging.table';
     }
 
     /** @return array<string, string> */

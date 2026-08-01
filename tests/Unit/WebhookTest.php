@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Event;
+use KenDeNigerian\PayZephyr\Events\WebhookReceived;
+use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
 beforeEach(function () {
@@ -30,31 +32,30 @@ test('webhook route is registered', function () {
     expect($routes->contains('payments/webhook/{provider}'))->toBeTrue();
 });
 
-test('webhook dispatches provider-specific event', function () {
-    Event::fake();
+test('webhook dispatches WebhookReceived through the real ProcessWebhook job', function () {
+    // The package has no 'payments.webhook.{provider}' string event -
+    // WebhookReceived (a real event class) is the only thing it actually
+    // dispatches (see Jobs\ProcessWebhook::handle()). Driving this through
+    // the real job - rather than manually firing an event() the test itself
+    // invented - is what actually exercises package behavior.
+    Event::fake([WebhookReceived::class]);
 
-    $payload = ['event' => 'charge.success', 'data' => ['reference' => 'ref_123']];
+    $payload = ['event' => 'charge.success', 'data' => ['reference' => 'ref_123', 'status' => 'success']];
+    $job = new ProcessWebhook('paystack', $payload);
 
-    event('payments.webhook.paystack', [$payload]);
+    app()->call([$job, 'handle']);
 
-    Event::assertDispatched('payments.webhook.paystack');
-});
-
-test('webhook dispatches general event', function () {
-    Event::fake();
-
-    $payload = ['event' => 'charge.success'];
-
-    event('payments.webhook', ['paystack', $payload]);
-
-    Event::assertDispatched('payments.webhook');
+    Event::assertDispatched(WebhookReceived::class, function (WebhookReceived $event) {
+        return $event->provider === 'paystack' && $event->reference === 'ref_123';
+    });
 });
 
 test('webhook validation works with correct paystack signature', function () {
     $manager = new PaymentManager;
     $driver = $manager->driver('paystack');
 
-    $body = '{"event":"charge.success"}';
+    // Real Paystack payloads carry the timestamp under data.paid_at - see ADR-0001.
+    $body = json_encode(['event' => 'charge.success', 'data' => ['paid_at' => now()->toIso8601String()]]);
     $signature = hash_hmac('sha512', $body, 'test_secret');
 
     $headers = ['x-paystack-signature' => [$signature]];
@@ -76,7 +77,8 @@ test('webhook validation works with correct flutterwave signature', function () 
     $manager = new PaymentManager;
     $driver = $manager->driver('flutterwave');
 
-    $body = '{"event":"charge.completed"}';
+    // Real Flutterwave payloads carry 'created_at' under 'data' - see ADR-0001.
+    $body = json_encode(['event' => 'charge.completed', 'data' => ['created_at' => now()->toIso8601String()]]);
     $headers = ['verif-hash' => ['webhook_secret']];
 
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
@@ -110,29 +112,33 @@ test('webhook middleware can be customized', function () {
     expect(config('payments.webhook.middleware'))->toBe(['api', 'throttle']);
 });
 
-test('webhook handles multiple providers', function () {
-    Event::fake();
+test('webhook dispatches WebhookReceived for every provider independently', function () {
+    Event::fake([WebhookReceived::class]);
 
-    $providers = ['paystack', 'flutterwave', 'stripe', 'monnify', 'paypal'];
+    $job = new ProcessWebhook('paystack', [
+        'event' => 'charge.success',
+        'data' => ['reference' => 'ref_paystack', 'status' => 'success'],
+    ]);
+    app()->call([$job, 'handle']);
 
-    foreach ($providers as $provider) {
-        event("payments.webhook.$provider", [['event' => 'test']]);
-    }
+    $job = new ProcessWebhook('flutterwave', [
+        'event' => 'charge.completed',
+        'data' => ['tx_ref' => 'ref_flutterwave', 'status' => 'successful'],
+    ]);
+    app()->call([$job, 'handle']);
 
-    Event::assertDispatched('payments.webhook.paystack');
-    Event::assertDispatched('payments.webhook.flutterwave');
-    Event::assertDispatched('payments.webhook.stripe');
-    Event::assertDispatched('payments.webhook.monnify');
-    Event::assertDispatched('payments.webhook.paypal');
+    Event::assertDispatched(WebhookReceived::class, fn (WebhookReceived $e) => $e->provider === 'paystack' && $e->reference === 'ref_paystack');
+    Event::assertDispatched(WebhookReceived::class, fn (WebhookReceived $e) => $e->provider === 'flutterwave' && $e->reference === 'ref_flutterwave');
 });
 
-test('webhook payload can be complex json', function () {
-    Event::fake();
+test('webhook payload survives complex nested json through to WebhookReceived', function () {
+    Event::fake([WebhookReceived::class]);
 
     $payload = [
         'event' => 'charge.success',
         'data' => [
             'reference' => 'ref_123',
+            'status' => 'success',
             'amount' => 10000,
             'currency' => 'NGN',
             'customer' => [
@@ -148,20 +154,29 @@ test('webhook payload can be complex json', function () {
         ],
     ];
 
-    event('payments.webhook.paystack', [$payload]);
+    $job = new ProcessWebhook('paystack', $payload);
+    app()->call([$job, 'handle']);
 
-    Event::assertDispatched('payments.webhook.paystack', function ($event, $data) {
-        return $data[0]['data']['reference'] === 'ref_123';
+    Event::assertDispatched(WebhookReceived::class, function (WebhookReceived $event) use ($payload) {
+        return $event->payload === $payload
+            && $event->payload['data']['metadata']['items'][0]['name'] === 'Item 1';
     });
 });
 
-test('webhook events can have listeners', function () {
-    Event::fake();
+test('a real Laravel listener registered for WebhookReceived is actually invoked', function () {
+    $received = null;
 
-    Event::listen('payments.webhook.paystack', function ($payload) {});
+    Event::listen(WebhookReceived::class, function (WebhookReceived $event) use (&$received) {
+        $received = $event;
+    });
 
-    event('payments.webhook.paystack', [['event' => 'charge.success']]);
+    $job = new ProcessWebhook('paystack', [
+        'event' => 'charge.success',
+        'data' => ['reference' => 'ref_123', 'status' => 'success'],
+    ]);
+    app()->call([$job, 'handle']);
 
-    Event::assertDispatched('payments.webhook.paystack');
-    Event::assertListening('payments.webhook.paystack', Closure::class);
+    expect($received)->toBeInstanceOf(WebhookReceived::class)
+        ->and($received->provider)->toBe('paystack')
+        ->and($received->reference)->toBe('ref_123');
 });

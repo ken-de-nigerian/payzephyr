@@ -262,6 +262,103 @@ test('paypal driver handles verification status failure', function () {
     expect($result)->toBeFalse();
 });
 
+test('paypal driver accepts webhook with valid create_time within tolerance (ADR-0001)', function () {
+    config([
+        'payments.providers.paypal' => [
+            'driver' => 'paypal',
+            'client_id' => 'test_client_id',
+            'client_secret' => 'test_secret',
+            'webhook_id' => 'test_webhook_id',
+            'mode' => 'sandbox',
+            'enabled' => true,
+        ],
+    ]);
+
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    // verifyWebhookSignatureViaAPI() makes two real HTTP calls in sequence:
+    // an OAuth token request, then the verify-webhook-signature call. A
+    // single unconditional mock (as other tests in this file use to test the
+    // *failure* path) would make the OAuth step itself fail first and never
+    // reach the verification-status check - so this needs an ordered queue.
+    $mock = new \GuzzleHttp\Handler\MockHandler([
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'access_token' => 'A21AA_test_token',
+            'token_type' => 'Bearer',
+            'expires_in' => 32400,
+        ])),
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'verification_status' => 'SUCCESS',
+        ])),
+    ]);
+    $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
+    $driver->setClient(new \GuzzleHttp\Client(['handler' => $handlerStack]));
+
+    $headers = [
+        'paypal-transmission-id' => ['transmission_123'],
+        'paypal-transmission-time' => [now()->toIso8601String()],
+        'paypal-cert-url' => ['https://api.paypal.com/cert'],
+        'paypal-auth-algo' => ['SHA256withRSA'],
+        'paypal-transmission-sig' => ['signature_123'],
+    ];
+
+    // create_time is PayPal's real top-level field name (not our old
+    // 'timestamp'/'created_at' fallback list) - see ADR-0001.
+    $body = json_encode([
+        'id' => 'WH-123',
+        'event_type' => 'PAYMENT.CAPTURE.COMPLETED',
+        'create_time' => now()->toIso8601String(),
+    ]);
+
+    $result = $driver->validateWebhook($headers, $body);
+
+    expect($result)->toBeTrue();
+});
+
+test('paypal driver rejects webhook with no recognizable create_time despite valid signature (ADR-0001)', function () {
+    config([
+        'payments.providers.paypal' => [
+            'driver' => 'paypal',
+            'client_id' => 'test_client_id',
+            'client_secret' => 'test_secret',
+            'webhook_id' => 'test_webhook_id',
+            'mode' => 'sandbox',
+            'enabled' => true,
+        ],
+    ]);
+
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    // Verification itself succeeds (see the ordered-mock note in the test
+    // above) - the false result must come solely from the missing create_time.
+    $mock = new \GuzzleHttp\Handler\MockHandler([
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'access_token' => 'A21AA_test_token',
+            'token_type' => 'Bearer',
+            'expires_in' => 32400,
+        ])),
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'verification_status' => 'SUCCESS',
+        ])),
+    ]);
+    $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
+    $driver->setClient(new \GuzzleHttp\Client(['handler' => $handlerStack]));
+
+    $headers = [
+        'paypal-transmission-id' => ['transmission_123'],
+        'paypal-transmission-time' => [now()->toIso8601String()],
+        'paypal-cert-url' => ['https://api.paypal.com/cert'],
+        'paypal-auth-algo' => ['SHA256withRSA'],
+        'paypal-transmission-sig' => ['signature_123'],
+    ];
+
+    $body = json_encode(['id' => 'WH-123', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED']);
+
+    $result = $driver->validateWebhook($headers, $body);
+
+    expect($result)->toBeFalse();
+});
+
 test('paypal driver handles empty verification status', function () {
     config([
         'payments.providers.paypal' => [

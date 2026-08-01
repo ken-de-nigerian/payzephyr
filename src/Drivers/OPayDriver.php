@@ -277,6 +277,31 @@ final class OPayDriver extends AbstractDriver
     }
 
     /**
+     * OPay nests transaction data (including `timestamp`) under `payload`,
+     * not at the top level of the webhook body. See ADR-0001.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function extractWebhookTimestamp(array $payload): ?int
+    {
+        return $this->extractWebhookTimestampFrom($payload, 'payload');
+    }
+
+    /**
+     * OPay nests the transaction id (used for event-level idempotency) under
+     * `payload`. See ADR-0005.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractWebhookEventId(array $payload): ?string
+    {
+        $inner = $payload['payload'] ?? [];
+        $id = $inner['transactionId'] ?? $inner['reference'] ?? null;
+
+        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+    }
+
+    /**
      * Check if OPay's API is working.
      */
     public function healthCheck(): bool
@@ -287,8 +312,6 @@ final class OPayDriver extends AbstractDriver
 
             return ! HttpStatusCodes::isServerError($statusCode);
         } catch (Throwable $e) {
-            $previous = $e->getPrevious();
-
             $clientException = null;
             $current = $e;
             while ($current !== null) {

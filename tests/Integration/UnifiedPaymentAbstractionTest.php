@@ -49,7 +49,6 @@ class UnifiedPaymentAbstractionTest extends TestCase
             ['square'],
             ['opay'],
             ['mollie'],
-            ['nowpayments'],
         ];
     }
 
@@ -165,11 +164,6 @@ class UnifiedPaymentAbstractionTest extends TestCase
                     'checkout' => ['href' => $authUrl],
                 ],
             ])),
-            'nowpayments' => new Response(200, [], json_encode([
-                'id' => $reference,
-                'invoice_url' => $authUrl,
-                'payment_status' => 'waiting',
-            ])),
             'paypal' => new Response(201, [], json_encode([
                 'id' => 'ORDER_ID_123',
                 'status' => 'CREATED',
@@ -276,12 +270,6 @@ class UnifiedPaymentAbstractionTest extends TestCase
                 'id' => $reference,
                 'status' => 'paid',
                 'amount' => ['value' => '100.00', 'currency' => 'EUR'],
-            ])),
-            'nowpayments' => new Response(200, [], json_encode([
-                'payment_id' => $reference,
-                'payment_status' => 'finished',
-                'price_amount' => 100,
-                'price_currency' => 'USD',
             ])),
             default => new Response(200, [], json_encode([
                 'status' => true,

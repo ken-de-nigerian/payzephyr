@@ -238,6 +238,32 @@ final class MonnifyDriver extends AbstractDriver
     }
 
     /**
+     * Monnify nests event data (including `paidOn` / `completedOn`) under
+     * `eventData`, not at the top level of the webhook body.
+     *  See ADR-0001.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function extractWebhookTimestamp(array $payload): ?int
+    {
+        return $this->extractWebhookTimestampFrom($payload, 'eventData');
+    }
+
+    /**
+     * Monnify nests the transaction/disbursement reference (used for
+     * event-level idempotency) under `eventData`. See ADR-0005.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractWebhookEventId(array $payload): ?string
+    {
+        $eventData = $payload['eventData'] ?? [];
+        $id = $eventData['transactionReference'] ?? $eventData['reference'] ?? null;
+
+        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+    }
+
+    /**
      * Check if the driver can successfully authenticate with the API.
      */
     public function healthCheck(): bool

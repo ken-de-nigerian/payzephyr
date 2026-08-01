@@ -71,14 +71,17 @@ class SubscriptionValidator
     }
 
     /**
-     * Validate subscription cancellation
+     * Validate subscription cancellation.
+     *
+     * Only the provider-agnostic terminal-state check lives here. Provider-
+     * specific requirements (e.g. Paystack's email token format) are the
+     * driver's responsibility - see ADR-0006 on why that validation moved
+     * out of this generic validator.
      */
     public function validateCancellation(
         string $subscriptionCode,
-        string $token,
         SupportsSubscriptionsInterface $driver
     ): void {
-
         $subscription = $driver->fetchSubscription($subscriptionCode);
 
         $status = strtolower($subscription->status);
@@ -88,13 +91,6 @@ class SubscriptionValidator
             throw new SubscriptionException(
                 "Cannot cancel subscription $subscriptionCode: subscription is already in terminal state '$status'. ".
                 'Terminal states cannot be modified.'
-            );
-        }
-
-        if (strlen($token) < 10) {
-            throw new SubscriptionException(
-                'Invalid email token format. Email tokens must be at least 10 characters long. '.
-                'Please use the token provided in the subscription email.'
             );
         }
     }

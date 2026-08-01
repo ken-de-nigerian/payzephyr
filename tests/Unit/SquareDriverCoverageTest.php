@@ -303,7 +303,8 @@ test('square driver validateWebhook validates correct signature', function () {
         'currencies' => ['USD'],
     ]);
 
-    $body = '{"test": "data"}';
+    // Real Square envelopes carry a top-level 'created_at' - see ADR-0001.
+    $body = json_encode(['test' => 'data', 'created_at' => now()->toIso8601String()]);
     $expectedSignature = base64_encode(hash_hmac('sha256', $body, 'test_secret_key', true));
 
     $result = $driver->validateWebhook(['x-square-signature' => [$expectedSignature]], $body);
@@ -335,7 +336,7 @@ test('square driver validateWebhook handles case-insensitive header', function (
         'currencies' => ['USD'],
     ]);
 
-    $body = '{"test": "data"}';
+    $body = json_encode(['test' => 'data', 'created_at' => now()->toIso8601String()]);
     $expectedSignature = base64_encode(hash_hmac('sha256', $body, 'test_secret_key', true));
 
     $result = $driver->validateWebhook(['X-Square-Signature' => [$expectedSignature]], $body);

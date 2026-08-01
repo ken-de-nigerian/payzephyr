@@ -58,9 +58,10 @@ test('webhook request validates payload structure', function () {
 });
 
 test('webhook request authorizes valid signature', function () {
+    // Real Paystack payloads carry the timestamp under data.paid_at - see ADR-0001.
     $payload = [
         'event' => 'charge.success',
-        'data' => ['reference' => 'ref_123'],
+        'data' => ['reference' => 'ref_123', 'paid_at' => now()->toIso8601String()],
     ];
 
     $body = json_encode($payload);

@@ -38,11 +38,19 @@ test('subscription prevents XSS in metadata', function () {
                 'plan' => ['name' => 'Test'],
                 'amount' => 500000,
                 'currency' => 'NGN',
+                // Real providers echo back whatever metadata you sent when
+                // creating the subscription - the mock must actually include
+                // it, otherwise this test would pass identically whether or
+                // not sanitization ever ran (SubscriptionResponseDTO::$metadata
+                // would just default to [] either way).
+                'metadata' => [
+                    'xss' => '<script>alert("xss")</script>',
+                    'html' => '<img src=x onerror=alert(1)>',
+                ],
             ],
         ])),
     ]);
 
-    // Metadata should be sanitized by the driver
     $result = $subscription->customer('test@example.com')
         ->plan('PLN_123')
         ->metadata([
@@ -52,6 +60,20 @@ test('subscription prevents XSS in metadata', function () {
         ->create();
 
     expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+
+    // The actual assertion: what landed in subscription_transactions.metadata
+    // must be sanitized, exactly like payment_transactions.metadata already
+    // is via MetadataSanitizer in PaymentManager::charge(). Without that same
+    // sanitization applied on the subscription-logging path, this column
+    // stores raw attacker-influenced markup verbatim - a stored-XSS vector
+    // for any admin panel that renders it without independently escaping.
+    $logged = \KenDeNigerian\PayZephyr\Models\SubscriptionTransaction::where('subscription_code', 'SUB_123')->first();
+
+    expect($logged)->not->toBeNull();
+    $metadata = $logged->metadata instanceof \ArrayObject ? $logged->metadata->getArrayCopy() : (array) $logged->metadata;
+
+    expect($metadata['xss'] ?? '')->not->toContain('<script>')
+        ->and($metadata['html'] ?? '')->not->toContain('onerror=');
 });
 
 test('subscription prevents path traversal in plan code', function () {
@@ -245,16 +267,27 @@ test('subscription validates currency consistency', function () {
 // ==================== Token Security Tests ====================
 
 test('subscription token cannot be empty string', function () {
+    // Whether a token is required is Paystack-specific (ADR-0006), so this
+    // is now enforced by PaystackDriver rather than the generic Subscription
+    // fluent API. Validation is disabled here to isolate that check from the
+    // (separately-tested) terminal-state validation, which would otherwise
+    // need its own mocked fetchSubscription() call.
+    config(['payments.subscriptions.validation.enabled' => false]);
+    app()->forgetInstance('payments.config');
+
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->code('SUB_123')->token('')->cancel();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\PaymentException::class);
+})->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
 test('subscription token cannot be null', function () {
+    config(['payments.subscriptions.validation.enabled' => false]);
+    app()->forgetInstance('payments.config');
+
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->code('SUB_123')->cancel(null);
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\PaymentException::class);
+})->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
 test('subscription validates token format', function () {
     $subscription = SubscriptionTestHelper::createWithMock([

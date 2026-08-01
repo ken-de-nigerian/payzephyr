@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr;
 use ArrayObject;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\DB;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
+use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
@@ -41,17 +41,21 @@ final class PaymentManager
 
     protected MetadataSanitizer $metadataSanitizer;
 
+    protected TransactionRepositoryInterface $transactionRepository;
+
     protected ?string $cachedContext = null;
 
     public function __construct(
         ?ProviderDetectorInterface $providerDetector = null,
         ?DriverFactory $driverFactory = null,
-        ?MetadataSanitizer $metadataSanitizer = null
+        ?MetadataSanitizer $metadataSanitizer = null,
+        ?TransactionRepositoryInterface $transactionRepository = null
     ) {
         $this->config = app('payments.config') ?? Config::get('payments', []);
         $this->providerDetector = $providerDetector ?? app(ProviderDetectorInterface::class);
         $this->driverFactory = $driverFactory ?? app(DriverFactory::class);
         $this->metadataSanitizer = $metadataSanitizer ?? app(MetadataSanitizer::class);
+        $this->transactionRepository = $transactionRepository ?? app(TransactionRepositoryInterface::class);
     }
 
     /**
@@ -156,7 +160,7 @@ final class PaymentManager
             $metadata = $this->metadataSanitizer->sanitize($rawMetadata);
             $customer = $request->customer ? $this->metadataSanitizer->sanitize($request->customer) : null;
 
-            PaymentTransaction::create([
+            $this->transactionRepository->create([
                 'reference' => $response->reference,
                 'provider' => $provider,
                 'status' => $response->status,
@@ -305,7 +309,7 @@ final class PaymentManager
         }
 
         if ($this->config['logging']['enabled'] ?? true) {
-            $transaction = PaymentTransaction::where('reference', $reference)->first();
+            $transaction = $this->transactionRepository->findByReference($reference);
             if ($transaction instanceof PaymentTransaction) {
                 try {
                     /** @var string $provider */
@@ -377,26 +381,13 @@ final class PaymentManager
         }
 
         try {
-            DB::transaction(function () use ($reference, $response) {
-                $transaction = PaymentTransaction::where('reference', $reference)
-                    ->lockForUpdate()
-                    ->first();
+            $statusEnum = PaymentStatus::tryFromString($response->status);
 
-                if (! $transaction) {
-                    return;
-                }
-
-                if ($transaction->isSuccessful()) {
-                    return;
-                }
-
-                $statusEnum = PaymentStatus::tryFromString($response->status);
-                $transaction->update([
-                    'status' => $response->status,
-                    'channel' => $response->channel,
-                    'paid_at' => $statusEnum?->isSuccessful() ? ($response->paidAt ?? now()) : null,
-                ]);
-            });
+            $this->transactionRepository->updateIfNotSuccessful($reference, [
+                'status' => $response->status,
+                'channel' => $response->channel,
+                'paid_at' => $statusEnum?->isSuccessful() ? ($response->paidAt ?? now()) : null,
+            ]);
         } catch (Throwable $e) {
             $this->log('error', 'Failed to update transaction from verification', [
                 'error' => $e->getMessage(),

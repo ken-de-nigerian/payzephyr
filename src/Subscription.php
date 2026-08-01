@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
@@ -28,7 +29,8 @@ final class Subscription
 
     protected ?string $planCode = null;
 
-    protected ?string $emailToken = null;
+    /** @var array<string, mixed> Provider-specific options for cancel/enable actions. */
+    protected array $actionOptions = [];
 
     public function __construct(PaymentManager $manager)
     {
@@ -129,6 +131,18 @@ final class Subscription
     }
 
     /**
+     * Set the callback/return URL for providers whose subscription creation
+     * requires a customer approval redirect (e.g. PayPal). Ignored by
+     * providers that don't need one.
+     */
+    public function callbackUrl(string $callbackUrl): self
+    {
+        $this->data['callback_url'] = $callbackUrl;
+
+        return $this;
+    }
+
+    /**
      * Set metadata
      *
      * @param  array<string, mixed>  $metadata
@@ -215,27 +229,39 @@ final class Subscription
     }
 
     /**
-     * Set email token for cancel/enable operations
+     * Set the email token for cancel/enable operations (Paystack-specific;
+     * ignored by providers that don't require one). Shorthand for
+     * ->option('token', $token).
      */
     public function token(string $token): self
     {
-        $this->emailToken = $token;
+        return $this->option('token', $token);
+    }
+
+    /**
+     * Set a provider-specific option for cancel/enable operations (see
+     * DataObjects\SubscriptionActionDTO / ADR-0006). Use this for anything a
+     * given provider needs beyond the subscription code - e.g. a future
+     * PayPal driver's cancellation reason.
+     */
+    public function option(string $key, mixed $value): self
+    {
+        $this->actionOptions[$key] = $value;
 
         return $this;
     }
 
     /**
-     * Cancel the subscription
+     * Cancel the subscription.
+     *
+     * $token is a convenience shorthand for Paystack's required email
+     * confirmation token; providers that don't need one simply ignore it.
+     * Use ->option() for other providers' requirements.
      */
     public function cancel(?string $token = null): SubscriptionResponseDTO
     {
         if (! $this->subscriptionCode) {
             throw new PaymentException('Subscription code is required. Use ->code($code)');
-        }
-
-        $token = $token ?? $this->emailToken;
-        if (! $token) {
-            throw new PaymentException('Email token is required. Use ->token($token) or pass as parameter');
         }
 
         $driver = $this->getDriver();
@@ -253,10 +279,10 @@ final class Subscription
         $config = app('payments.config') ?? config('payments', []);
         if ($config['subscriptions']['validation']['enabled'] ?? true) {
             $validator = app(SubscriptionValidator::class);
-            $validator->validateCancellation($this->subscriptionCode, $token, $driver);
+            $validator->validateCancellation($this->subscriptionCode, $driver);
         }
 
-        $response = $driver->cancelSubscription($this->subscriptionCode, $token);
+        $response = $driver->cancelSubscription($this->buildAction($this->subscriptionCode, $token));
 
         if ($driver instanceof SubscriptionLifecycleHooks) {
             $driver->afterSubscriptionCancel($response);
@@ -266,17 +292,12 @@ final class Subscription
     }
 
     /**
-     * Enable a cancelled subscription
+     * Enable a cancelled subscription. See cancel() - same $token shorthand.
      */
     public function enable(?string $token = null): SubscriptionResponseDTO
     {
         if (! $this->subscriptionCode) {
             throw new PaymentException('Subscription code is required. Use ->code($code)');
-        }
-
-        $token = $token ?? $this->emailToken;
-        if (! $token) {
-            throw new PaymentException('Email token is required. Use ->token($token) or pass as parameter');
         }
 
         $driver = $this->getDriver();
@@ -287,7 +308,22 @@ final class Subscription
             );
         }
 
-        return $driver->enableSubscription($this->subscriptionCode, $token);
+        return $driver->enableSubscription($this->buildAction($this->subscriptionCode, $token));
+    }
+
+    /**
+     * Build the SubscriptionActionDTO for cancel()/enable(), merging any
+     * options set via ->option()/->token() with an inline $token argument
+     * (the inline argument wins, matching the pre-v2.0 calling convention).
+     */
+    private function buildAction(string $subscriptionCode, ?string $token): SubscriptionActionDTO
+    {
+        $options = $this->actionOptions;
+        if ($token !== null) {
+            $options['token'] = $token;
+        }
+
+        return new SubscriptionActionDTO($subscriptionCode, $options);
     }
 
     /**

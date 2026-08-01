@@ -6,12 +6,14 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Exception;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\StripeSubscriptionMethods;
 use Random\RandomException;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\AuthenticationException;
@@ -22,8 +24,10 @@ use Stripe\Webhook;
 /**
  * Driver implementation for the Stripe payment gateway.
  */
-final class StripeDriver extends AbstractDriver
+final class StripeDriver extends AbstractDriver implements SupportsSubscriptionsInterface
 {
+    use StripeSubscriptionMethods;
+
     protected string $name = 'stripe';
 
     /**

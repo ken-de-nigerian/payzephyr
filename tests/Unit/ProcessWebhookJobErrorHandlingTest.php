@@ -22,10 +22,7 @@ test('process webhook job handles database error during transaction update', fun
         'email' => 'test@example.com',
     ]);
 
-    $job->handle(
-        app(PaymentManager::class),
-        app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class)
-    );
+    app()->call([$job, 'handle']);
 
     $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
     expect($transaction)->not->toBeNull();
@@ -64,6 +61,7 @@ test('process webhook job handles driver not found exception in updateTransactio
             $job,
             app(PaymentManager::class),
             app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class),
+            app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class),
             'TEST_123'
         );
     } catch (\KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException $e) {
@@ -94,10 +92,7 @@ test('process webhook job logs error when exception occurs', function () {
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    expect(fn () => $job->handle(
-        $manager,
-        app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class)
-    ))->toThrow(\Exception::class);
+    expect(fn () => app()->call([$job, 'handle']))->toThrow(\Exception::class);
 });
 
 test('process webhook job handles missing transaction gracefully', function () {
@@ -111,6 +106,7 @@ test('process webhook job handles missing transaction gracefully', function () {
         $job,
         app(PaymentManager::class),
         app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class),
+        app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class),
         'NONEXISTENT'
     );
 
@@ -138,10 +134,7 @@ test('process webhook job updates transaction with channel when available', func
         'email' => 'test@example.com',
     ]);
 
-    $job->handle(
-        app(PaymentManager::class),
-        app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class)
-    );
+    app()->call([$job, 'handle']);
 
     $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
 
@@ -167,10 +160,7 @@ test('process webhook job sets paid_at for successful status', function () {
         'email' => 'test@example.com',
     ]);
 
-    $job->handle(
-        app(PaymentManager::class),
-        app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class)
-    );
+    app()->call([$job, 'handle']);
 
     $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
 

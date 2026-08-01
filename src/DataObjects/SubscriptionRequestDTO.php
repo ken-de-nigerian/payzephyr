@@ -21,6 +21,7 @@ final readonly class SubscriptionRequestDTO
         public array $metadata = [],
         public ?string $authorization = null,
         public ?string $idempotencyKey = null,
+        public ?string $callbackUrl = null,
     ) {
         $this->validate();
     }
@@ -58,6 +59,7 @@ final readonly class SubscriptionRequestDTO
             metadata: $data['metadata'] ?? [],
             authorization: $data['authorization'] ?? null,
             idempotencyKey: $data['idempotency_key'] ?? self::generateIdempotencyKey(),
+            callbackUrl: $data['callback_url'] ?? null,
         );
     }
 
@@ -74,6 +76,7 @@ final readonly class SubscriptionRequestDTO
             'trial_days' => $this->trialDays,
             'metadata' => $this->metadata,
             'authorization' => $this->authorization,
+            'callback_url' => $this->callbackUrl,
         ], fn ($value) => $value !== null);
     }
 

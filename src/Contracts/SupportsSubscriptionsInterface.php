@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Contracts;
 
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
@@ -52,16 +53,19 @@ interface SupportsSubscriptionsInterface
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO;
 
     /**
-     * Cancel a subscription
+     * Cancel a subscription.
      *
-     * @param  string  $token  Email token (Paystack specific)
+     * Provider-specific requirements (e.g. Paystack's email confirmation
+     * token) are read from $action->option() by the implementing driver, not
+     * fixed in this signature - see ADR-0006.
      */
-    public function cancelSubscription(string $subscriptionCode, string $token): SubscriptionResponseDTO;
+    public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO;
 
     /**
-     * Enable a disabled subscription
+     * Enable a disabled subscription. See cancelSubscription() - same
+     * provider-specific-options pattern.
      */
-    public function enableSubscription(string $subscriptionCode, string $token): SubscriptionResponseDTO;
+    public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO;
 
     /**
      * List customer subscriptions

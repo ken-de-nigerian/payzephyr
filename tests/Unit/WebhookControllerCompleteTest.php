@@ -644,7 +644,7 @@ test('webhook controller updates transaction from webhook with success status', 
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'webhook_ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'webhook_ref_123');
 
     $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'webhook_ref_123')->first();
     expect($transaction->status)->toBe('success')
@@ -690,7 +690,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'paystack_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'paystack_channel_ref');
 
     $job = new ProcessWebhook('square', [
         'data' => [
@@ -714,7 +714,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'square_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'square_channel_ref');
 
     $job = new ProcessWebhook('flutterwave', [
         'data' => ['status' => 'success', 'payment_type' => 'card'],
@@ -731,7 +731,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'flutterwave_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'flutterwave_channel_ref');
 
     $job = new ProcessWebhook('monnify', [
         'paymentStatus' => 'PAID',
@@ -749,7 +749,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'monnify_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'monnify_channel_ref');
 
     $job = new ProcessWebhook('stripe', [
         'data' => ['object' => ['status' => 'succeeded', 'payment_method' => 'card']],
@@ -766,7 +766,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'stripe_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'stripe_channel_ref');
 
     $job = new ProcessWebhook('paypal', [
         'resource' => ['status' => 'COMPLETED'],
@@ -783,7 +783,7 @@ test('webhook controller updates transaction with provider-specific channels', f
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
-    $method->invoke($job, $manager, $statusNormalizer, 'paypal_channel_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'paypal_channel_ref');
 
     expect(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'paystack_channel_ref')->first()->channel)->toBe('card')
         ->and(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'flutterwave_channel_ref')->first()->channel)->toBe('card')
@@ -824,7 +824,7 @@ test('webhook controller handles database error during update gracefully', funct
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'error_ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'error_ref_123');
 
     expect(true)->toBeTrue();
 });

@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
-use Carbon\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
-use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 use Throwable;
 
 /**
@@ -19,6 +18,8 @@ use Throwable;
  */
 trait PaystackSubscriptionMethods
 {
+    use LogsSubscriptionTransactions;
+
     /**
      * The subscription request currently being processed.
      * Used for idempotency key handling and request tracking.
@@ -338,12 +339,17 @@ trait PaystackSubscriptionMethods
     }
 
     /**
-     * Cancel a subscription
+     * Cancel a subscription. Requires $action->option('token') - Paystack's
+     * email confirmation token; see ADR-0006.
      *
-     * @throws SubscriptionException If subscription cancellation fails
+     * @throws SubscriptionException If subscription cancellation fails, or
+     *                               the required token is missing/invalid
      */
-    public function cancelSubscription(string $subscriptionCode, string $token): SubscriptionResponseDTO
+    public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
+        $subscriptionCode = $action->subscriptionCode;
+        $token = $this->requirePaystackToken($action);
+
         try {
             $response = $this->makeRequest('POST', '/subscription/disable', [
                 'json' => [
@@ -385,12 +391,17 @@ trait PaystackSubscriptionMethods
     }
 
     /**
-     * Enable a disabled subscription
+     * Enable a disabled subscription. Requires $action->option('token') -
+     * Paystack's email confirmation token; see ADR-0006.
      *
-     * @throws SubscriptionException If subscription enabling fails
+     * @throws SubscriptionException If subscription enabling fails, or the
+     *                               required token is missing/invalid
      */
-    public function enableSubscription(string $subscriptionCode, string $token): SubscriptionResponseDTO
+    public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
+        $subscriptionCode = $action->subscriptionCode;
+        $token = $this->requirePaystackToken($action);
+
         try {
             $response = $this->makeRequest('POST', '/subscription/enable', [
                 'json' => [
@@ -429,6 +440,27 @@ trait PaystackSubscriptionMethods
                 $e
             );
         }
+    }
+
+    /**
+     * Paystack's cancel/enable endpoints require the email confirmation
+     * token sent to the customer - this validation used to live generically
+     * in SubscriptionValidator, which wrongly asserted it for every
+     * provider. It belongs here: only Paystack actually needs it.
+     */
+    private function requirePaystackToken(SubscriptionActionDTO $action): string
+    {
+        $token = $action->option('token');
+
+        if (! is_string($token) || strlen($token) < 10) {
+            throw new SubscriptionException(
+                'Paystack requires a valid email confirmation token (at least 10 characters) '.
+                "to cancel or enable a subscription. Pass it via ->option('token', \$token) ".
+                'or the Subscription::token() fluent helper.'
+            );
+        }
+
+        return $token;
     }
 
     /**
@@ -472,68 +504,6 @@ trait PaystackSubscriptionMethods
                 0,
                 $e
             );
-        }
-    }
-
-    /**
-     * Log subscription transaction to database.
-     *
-     * This method respects the config('payments.subscriptions.logging.enabled') setting
-     * and handles errors gracefully to prevent breaking subscription operations.
-     * It will create a new record or update an existing one if the subscription_code already exists.
-     */
-    protected function logSubscription(
-        SubscriptionRequestDTO $request,
-        SubscriptionResponseDTO $response
-    ): void {
-        $this->logSubscriptionFromResponse($response, $request->plan, $request->customer);
-    }
-
-    /**
-     * Log subscription transaction from response DTO.
-     *
-     * This method can be used when we don't have the original request DTO,
-     * such as when updating subscription status from webhooks or after fetch operations.
-     */
-    protected function logSubscriptionFromResponse(
-        SubscriptionResponseDTO $response,
-        ?string $planCode = null,
-        ?string $customerEmail = null
-    ): void {
-        $config = app('payments.config') ?? config('payments', []);
-        $loggingEnabled = $config['subscriptions']['logging']['enabled'] ?? ($config['logging']['enabled'] ?? true);
-
-        if (! $loggingEnabled) {
-            return;
-        }
-
-        try {
-
-            $planCode = $planCode ?? $response->metadata['plan_code'] ?? $response->plan;
-            $customerEmail = $customerEmail ?? $response->customer;
-
-            /** @phpstan-ignore-next-line */
-            SubscriptionTransaction::updateOrCreate(
-                [
-                    'subscription_code' => $response->subscriptionCode,
-                ],
-                [
-                    'provider' => $this->getName(),
-                    'status' => $response->status,
-                    'plan_code' => $planCode,
-                    'customer_email' => $customerEmail,
-                    'amount' => $response->amount,
-                    'currency' => $response->currency,
-                    'next_payment_date' => $response->nextPaymentDate ? Carbon::parse($response->nextPaymentDate)->format('Y-m-d') : null,
-                    'metadata' => $response->metadata,
-                ]
-            );
-        } catch (Throwable $e) {
-            $this->log('error', 'Failed to log subscription transaction', [
-                'error' => $e->getMessage(),
-                'subscription_code' => $response->subscriptionCode,
-                'trace' => $e->getTraceAsString(),
-            ]);
         }
     }
 }

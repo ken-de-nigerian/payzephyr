@@ -53,7 +53,6 @@ class ChannelMappingConsistencyTest extends TestCase
             ['square'],
             ['opay'],
             ['mollie'],
-            ['nowpayments'],
         ];
     }
 
@@ -234,10 +233,6 @@ class ChannelMappingConsistencyTest extends TestCase
                 'links' => [
                     ['rel' => 'approve', 'href' => "https://checkout.{$provider}.com/abc123"],
                 ],
-            ])),
-            'nowpayments' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
-                'id' => "ref_{$provider}_123",
-                'invoice_url' => "https://checkout.{$provider}.com/abc123",
             ])),
             default => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
                 'status' => true,

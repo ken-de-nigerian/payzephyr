@@ -65,10 +65,11 @@ test('it rejects table names with special characters', function () {
 test('it rejects webhooks with old timestamps', function () {
     $driver = app(PaymentManager::class)->driver('paystack');
 
+    // Real Paystack payloads carry the timestamp under data.paid_at, not a
+    // top-level 'timestamp' field - see ADR-0001.
     $oldPayload = [
         'event' => 'charge.success',
-        'data' => ['reference' => 'TEST_123'],
-        'timestamp' => time() - 360,
+        'data' => ['reference' => 'TEST_123', 'paid_at' => date(DATE_ATOM, time() - 360)],
     ];
 
     $signature = hash_hmac('sha512', json_encode($oldPayload), config('payments.providers.paystack.secret_key'));
@@ -86,8 +87,7 @@ test('it accepts webhooks with recent timestamps', function () {
 
     $recentPayload = [
         'event' => 'charge.success',
-        'data' => ['reference' => 'TEST_123'],
-        'timestamp' => time() - 60,
+        'data' => ['reference' => 'TEST_123', 'paid_at' => date(DATE_ATOM, time() - 60)],
     ];
 
     $signature = hash_hmac('sha512', json_encode($recentPayload), config('payments.providers.paystack.secret_key'));
@@ -100,7 +100,10 @@ test('it accepts webhooks with recent timestamps', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it accepts webhooks without timestamps for backward compatibility', function () {
+test('it rejects validly-signed webhooks with no recognizable timestamp (ADR-0001)', function () {
+    // Prior to ADR-0001 this was treated as valid ("missing timestamp =
+    // backward compatible"), which was the replay-window bypass the ADR
+    // fixes. It must now be rejected even with a genuinely valid signature.
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -115,7 +118,7 @@ test('it accepts webhooks without timestamps for backward compatibility', functi
         json_encode($payload)
     );
 
-    expect($isValid)->toBeTrue();
+    expect($isValid)->toBeFalse();
 });
 
 test('it isolates cache keys per user', function () {
@@ -208,6 +211,54 @@ test('it sanitizes nested sensitive data', function () {
     expect($sanitized['config']['api_key'])->toBe('[REDACTED]')
         ->and($sanitized['user']['password'])->toBe('[REDACTED]')
         ->and($sanitized['user']['email'])->toBe('user@example.com');
+});
+
+test('it caps recursion depth in log sanitization (ADR-0002)', function () {
+    $driver = app(PaymentManager::class)->driver('paystack');
+
+    $reflection = new ReflectionClass($driver);
+    $method = $reflection->getMethod('sanitizeLogContext');
+    $method->setAccessible(true);
+
+    // Build a structure deeper than LOG_SANITIZATION_MAX_DEPTH (10).
+    $deeplyNested = 'leaf';
+    for ($i = 0; $i < 20; $i++) {
+        $deeplyNested = ['level' => $deeplyNested];
+    }
+
+    // This must not exhaust the stack; a depth cap should short-circuit it.
+    $sanitized = $method->invoke($driver, ['data' => $deeplyNested]);
+
+    $cursor = $sanitized['data'];
+    $depth = 0;
+    while (is_array($cursor) && isset($cursor['level'])) {
+        $cursor = $cursor['level'];
+        $depth++;
+    }
+
+    expect($depth)->toBeLessThanOrEqual(11) // LOG_SANITIZATION_MAX_DEPTH + 1
+        ->and($cursor)->toBe('[MAX_DEPTH_EXCEEDED]');
+});
+
+test('it sanitizes log context containing plain (numeric-keyed) lists without a TypeError', function () {
+    // isSensitiveKey() expects a string; under declare(strict_types=1), a
+    // numeric array key (any plain list) previously caused a fatal TypeError
+    // the moment anything tried to log it.
+    $driver = app(PaymentManager::class)->driver('paystack');
+
+    $reflection = new ReflectionClass($driver);
+    $method = $reflection->getMethod('sanitizeLogContext');
+    $method->setAccessible(true);
+
+    $context = [
+        'items' => ['a', 'b', 'c'],
+        'nested' => [['id' => 1], ['id' => 2]],
+    ];
+
+    $sanitized = $method->invoke($driver, $context);
+
+    expect($sanitized['items'])->toBe(['a', 'b', 'c'])
+        ->and($sanitized['nested'][0]['id'])->toBe(1);
 });
 
 test('it rate limits payment initialization', function () {

@@ -9,16 +9,18 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use KenDeNigerian\PayZephyr\Traits\HasConfigurableTableName;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 
 /**
- * @method static Builder where(string $column, mixed $operator = null, mixed $value = null)
- * @method static Builder create(array $attributes = [])
- * @method static Builder first(array|string $columns = ['*'])
- * @method static Builder lockForUpdate()
- * @method static Builder update(array $attributes = [])
- * @method static Builder delete()
- * @method static updateOrCreate(array $array, array $array1)
+ * @method static Builder<SubscriptionTransaction> where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static SubscriptionTransaction create(array $attributes = [])
+ * @method static SubscriptionTransaction|null first(array|string $columns = ['*'])
+ * @method static SubscriptionTransaction firstOrFail(array|string $columns = ['*'])
+ * @method static Builder<SubscriptionTransaction> lockForUpdate()
+ * @method static Builder<SubscriptionTransaction> update(array $attributes = [])
+ * @method static Builder<SubscriptionTransaction> delete()
+ * @method static SubscriptionTransaction updateOrCreate(array $attributes, array $values = [])
  *
  * @property int $id
  * @property string $subscription_code
@@ -35,6 +37,7 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
  */
 final class SubscriptionTransaction extends Model
 {
+    use HasConfigurableTableName;
     use LogsToPaymentChannel;
 
     /** @var array<int, string> */
@@ -52,33 +55,9 @@ final class SubscriptionTransaction extends Model
 
     protected $table = 'subscription_transactions';
 
-    public function getTable(): string
+    protected function configuredTableNameKey(): string
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $tableName = $config['subscriptions']['logging']['table'] ?? $this->table;
-
-        if (! $this->isValidTableName($tableName)) {
-            $this->log('warning', 'Invalid table name in config, using default', [
-                'attempted_table' => $tableName,
-            ]);
-
-            return $this->table;
-        }
-
-        return $tableName;
-    }
-
-    protected function isValidTableName(string $tableName): bool
-    {
-        if (preg_match('/^[a-zA-Z0-9_]{1,64}$/', $tableName) !== 1) {
-            return false;
-        }
-
-        if (preg_match('/^\d/', $tableName) === 1) {
-            return false;
-        }
-
-        return true;
+        return 'subscriptions.logging.table';
     }
 
     /** @return array<string, string> */
@@ -150,7 +129,7 @@ final class SubscriptionTransaction extends Model
     }
 
     /**
-     * Scope to filter cancelled subscriptions.
+     * Scope to filter canceled subscriptions.
      *
      * @param  Builder<SubscriptionTransaction>  $query
      * @return Builder<SubscriptionTransaction>

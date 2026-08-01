@@ -147,7 +147,7 @@ test('webhook controller updateTransactionFromWebhook updates with channel', fun
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
@@ -178,7 +178,7 @@ test('webhook controller updateTransactionFromWebhook handles database error gra
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'nonexistent_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'nonexistent_ref');
 
     expect(true)->toBeTrue();
 });
@@ -214,7 +214,7 @@ test('webhook controller updateTransactionFromWebhook handles different provider
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
@@ -253,7 +253,7 @@ test('webhook controller updateTransactionFromWebhook handles monnify channel', 
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
@@ -296,7 +296,7 @@ test('webhook controller updateTransactionFromWebhook handles stripe channel', f
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
@@ -334,7 +334,7 @@ test('webhook controller updateTransactionFromWebhook handles paypal channel', f
     $method = $reflection->getMethod('updateTransactionFromWebhook');
     $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 

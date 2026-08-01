@@ -99,14 +99,6 @@ abstract class TestCase extends Orchestra
             'currencies' => ['EUR', 'USD'],
         ]);
 
-        $app['config']->set('payments.providers.nowpayments', [
-            'driver' => 'nowpayments',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\NowPaymentsDriver::class,
-            'api_key' => 'test_api_key',
-            'enabled' => true,
-            'currencies' => ['USD'],
-        ]);
-
         // Keep validation enabled for comprehensive testing
         // Tests should provide proper mocks for plan validation
 
@@ -114,7 +106,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('payments.health_check.enabled', false);
 
         // Ensure all providers have proper currency support configured
-        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie', 'nowpayments'] as $provider) {
+        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie'] as $provider) {
             $providerConfig = $app['config']->get("payments.providers.{$provider}", []);
             if (empty($providerConfig['currencies'])) {
                 $app['config']->set("payments.providers.{$provider}.currencies", match ($provider) {

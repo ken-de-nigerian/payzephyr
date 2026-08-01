@@ -31,6 +31,23 @@ jobs:
             pest: ^3.0
             pest-plugin: ^3.0
 
+          # Laravel 13 requires PHP 8.3+, but its test tooling (Pest 5 /
+          # PHPUnit 13) requires PHP 8.4+ specifically - so this is a
+          # standalone combination rather than a cross-product entry against
+          # the php/laravel arrays above (which would also generate invalid
+          # php-8.2+laravel-13 and php-8.3+laravel-13 pairs).
+          - php: 8.4
+            laravel: 13.*
+            testbench: 11.*
+            pest: ^5.0
+            pest-plugin: ^5.0
+
+          - php: 8.5
+            laravel: 13.*
+            testbench: 11.*
+            pest: ^5.0
+            pest-plugin: ^5.0
+
     name: PHP ${{ matrix.php }} - Laravel ${{ matrix.laravel }}
 
     steps:
@@ -113,7 +130,7 @@ jobs:
           mkdir -p build/logs
 
       - name: Execute tests with coverage
-        run: vendor/bin/pest --coverage --min=80
+        run: vendor/bin/pest --coverage --min=80 --coverage-clover=build/logs/clover.xml --coverage-html=build/coverage --coverage-text=build/coverage.txt
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3

@@ -105,10 +105,14 @@ test('mollie driver verifies payment successfully', function () {
 });
 
 test('mollie driver validates webhook by fetching payment from API', function () {
+    // The freshness check is against the fetched Payment resource's
+    // `createdAt`, not the incoming ping's body (which never carries a
+    // timestamp) - see ADR-0001.
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
             'status' => 'paid',
+            'createdAt' => date('c'),
             'amount' => [
                 'value' => '10.00',
                 'currency' => 'EUR',
@@ -121,7 +125,6 @@ test('mollie driver validates webhook by fetching payment from API', function ()
 
     $payload = json_encode([
         'id' => 'tr_WDqYK6vllg',
-        'createdAt' => date('c'),
     ]);
 
     $isValid = $driver->validateWebhook([], $payload);
@@ -506,22 +509,24 @@ test('mollie driver handles webhook with invalid json', function () {
 });
 
 test('mollie driver handles webhook timestamp validation', function () {
+    // Test with the fetched Payment's createdAt outside tolerance (1 hour
+    // ago) - checked against $paymentData (the API response), not the
+    // incoming ping body. See ADR-0001.
+    $oldTimestamp = date('c', time() - 3600);
+
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
             'status' => 'paid',
+            'createdAt' => $oldTimestamp,
         ])),
     ]);
 
     $driver = new MollieDriver($this->config);
     $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
 
-    // Test with timestamp outside tolerance (1 hour ago)
-    $oldTimestamp = date('c', time() - 3600);
-
     $payload = json_encode([
         'id' => 'tr_WDqYK6vllg',
-        'createdAt' => $oldTimestamp,
     ]);
 
     $isValid = $driver->validateWebhook([], $payload);

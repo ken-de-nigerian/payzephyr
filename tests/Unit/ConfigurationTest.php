@@ -45,7 +45,6 @@ test('config has all required keys', function () {
         'webhook',
         'health_check',
         'logging',
-        'testing_mode',
     ]);
 });
 
@@ -121,10 +120,12 @@ test('currency settings are configurable', function () {
         ->and(config('payments.currency.converter'))->toBe('custom');
 });
 
-test('testing mode is configurable', function () {
-    config(['payments.testing_mode' => true]);
-
-    expect(config('payments.testing_mode'))->toBeTrue();
+test('testing_mode config key was removed (ADR-0002)', function () {
+    // testing_mode used to disable Guzzle TLS verification globally, which was
+    // an unsafe default footgun. It is no longer read anywhere - drivers
+    // always verify TLS certs. Tests inject a mock client via setClient()
+    // instead. This test guards against the key silently being reintroduced.
+    expect(config('payments.testing_mode'))->toBeNull();
 });
 
 test('provider can be enabled/disabled', function () {

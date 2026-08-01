@@ -222,6 +222,31 @@ final class PaystackDriver extends AbstractDriver implements SupportsSubscriptio
     }
 
     /**
+     * Paystack nests event data (including `paid_at` / `created_at`) under
+     * `data`, not at the top level of the webhook body.
+     *  See ADR-0001.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function extractWebhookTimestamp(array $payload): ?int
+    {
+        return $this->extractWebhookTimestampFrom($payload, 'data');
+    }
+
+    /**
+     * Paystack nests the transaction id (used for event-level idempotency)
+     * under `data`, not at the top level. See ADR-0005.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractWebhookEventId(array $payload): ?string
+    {
+        $id = $payload['data']['id'] ?? null;
+
+        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+    }
+
+    /**
      * Check if Paystack's API is working.
      *
      * Uses an invalid reference to test the API. A 400 Bad Request response

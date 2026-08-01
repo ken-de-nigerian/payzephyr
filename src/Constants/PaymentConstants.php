@@ -48,4 +48,13 @@ final class PaymentConstants
      * Maximum array size for metadata arrays.
      */
     public const METADATA_MAX_ARRAY_SIZE = 100;
+
+    /**
+     * Maximum recursion depth for log context sanitization.
+     *
+     * Kept distinct from METADATA_MAX_DEPTH: log context (error contexts, raw
+     * provider responses) and persisted transaction metadata are different
+     * shapes with independently-tunable limits.
+     */
+    public const LOG_SANITIZATION_MAX_DEPTH = 10;
 }

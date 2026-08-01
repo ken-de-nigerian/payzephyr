@@ -38,8 +38,13 @@ class UnifiedSubscriptionAbstractionTest extends TestCase
     public static function subscriptionProviders(): array
     {
         return [
-            ['paystack'], // Currently only Paystack supports subscriptions
-            // Add more as they're implemented
+            ['paystack'],
+            // Stripe and PayPal also implement SupportsSubscriptionsInterface as of
+            // ADR-0009 (see tests/Unit/StripeSubscriptionTest.php and
+            // tests/Unit/PayPalSubscriptionTest.php for their dedicated coverage) -
+            // not added here because every mocked HTTP response in this file is
+            // shaped for Paystack's API; adding them would need provider-specific
+            // response fixtures throughout, not just this list.
         ];
     }
 
@@ -257,8 +262,16 @@ class UnifiedSubscriptionAbstractionTest extends TestCase
      */
     public function test_providers_without_subscription_support_fail_gracefully(): void
     {
-        // Test with a provider that doesn't support subscriptions (e.g., if we add one)
-        $nonSubscriptionProviders = ['stripe']; // Example - adjust based on actual support
+        // 'monnify' and 'opay' are the only two providers confirmed to lack a
+        // provider-managed subscription API at all - see ADR-0010's research
+        // findings. Every other provider now implements
+        // SupportsSubscriptionsInterface (Paystack, Stripe, PayPal per
+        // ADR-0009; Flutterwave, Square, Mollie per ADR-0010). If that
+        // changes, point this at another provider that genuinely lacks
+        // support rather than let providerSupportsSubscriptions() silently
+        // skip every provider in this list and leave this test asserting
+        // nothing.
+        $nonSubscriptionProviders = ['monnify', 'opay'];
 
         foreach ($nonSubscriptionProviders as $provider) {
             if (! $this->isProviderEnabled($provider)) {

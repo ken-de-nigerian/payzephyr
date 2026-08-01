@@ -50,7 +50,7 @@ test('process webhook job dispatches webhook received event', function () {
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $job->handle($manager, app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class));
+    app()->call([$job, 'handle']);
 
     Event::assertDispatched(WebhookReceived::class, function ($event) {
         return $event->provider === 'paystack'
@@ -87,7 +87,7 @@ test('process webhook job updates transaction when reference exists', function (
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $job->handle($manager, app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class));
+    app()->call([$job, 'handle']);
 
     $transaction->refresh();
 
@@ -112,7 +112,7 @@ test('process webhook job handles missing reference gracefully', function () {
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $job->handle($manager, app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class));
+    app()->call([$job, 'handle']);
 
     Event::assertDispatched(WebhookReceived::class);
 });
@@ -144,7 +144,7 @@ test('process webhook job logs processing', function () {
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    expect(fn () => $job->handle($manager, app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class)))
+    expect(fn () => app()->call([$job, 'handle']))
         ->not->toThrow(\Exception::class);
 
     Event::assertDispatched(WebhookReceived::class, function ($event) {
@@ -182,7 +182,7 @@ test('process webhook job uses database transactions', function () {
     $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $job->handle($manager, app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class));
+    app()->call([$job, 'handle']);
 
     $transaction->refresh();
     expect($transaction->status)->toBe('success');

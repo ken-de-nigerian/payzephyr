@@ -6,7 +6,155 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [Unreleased]
+## [2.0.0] - 2026-08-01
+
+### Added
+
+- **Laravel 13 support.** `illuminate/database`, `illuminate/http`, and `illuminate/support`
+  now accept `^13.0`; `orchestra/testbench` accepts `^11.0`; `pestphp/pest` and
+  `pestphp/pest-plugin-laravel` accept `^5.0` (required to test against Laravel 13 - its
+  test tooling needs PHP 8.4+, one version ahead of Laravel 13's own PHP 8.3+ minimum).
+  Verified empirically, not just by resolving dependencies: the full test suite (1275
+  tests) was run against a real Laravel 13.23.0 / Pest 5.0.2 / PHPUnit 13.2.6 install and
+  passes cleanly. CI's matrix now includes two dedicated Laravel 13 entries (PHP 8.4 and
+  8.5).
+
+### Fixed
+
+- **`phpunit.xml`'s `<coverage>` block silently zeroed out every test run under PHPUnit
+  13** (bundled with Pest 5, required for Laravel 13 testing). When no coverage driver
+  (Xdebug/PCOV) is installed, PHPUnit 13 doesn't just warn about the missing driver the
+  way 10.5/11.x did - it aborts before executing a single test, while still exiting `0`
+  as if the run succeeded. Confirmed via a real regression: a trivial test writing a
+  marker file never ran, despite `pest` reporting no visible failure at all. Fixed by
+  removing the always-on `<coverage>` block from `phpunit.xml` and generating coverage
+  reports via CLI flags instead (`--coverage-clover`, `--coverage-html`, etc.), which is
+  what the dedicated CI coverage job and the `composer test-coverage` script already used
+  underneath the XML config. This would have silently broken CI's main test job the
+  moment it picked up a Laravel 13 combination, independent of anything else in this
+  entry - worth knowing if any other Laravel package sees tests "pass" with suspiciously
+  little output after a PHPUnit 13 upgrade.
+
+### Known gaps
+
+- **PHPStan 1.x cannot fully analyze this codebase against `illuminate/http` ^13.0.**
+  Locally installing Laravel 13 surfaces 8 PHPStan errors in `WebhookRequest`,
+  `WebhookController`, `HealthEndpointMiddleware`, and `Console\InstallCommand` -
+  `getContent()`/`$headers` reported as undefined, a `JsonResponse`-vs-`Response` return
+  mismatch, an undefined `Command::SUCCESS` constant. All four are PHPStan 1.x's bundled
+  Symfony/Console stubs failing to resolve Symfony 8.x's actual class hierarchy (which
+  Laravel 13 pulls in) - not real defects: all 1275 tests exercise exactly these
+  methods/properties and pass. PHPStan 2.x resolves this but introduces 29 unrelated,
+  stricter-analysis findings across the codebase - deliberately left as a separate,
+  future PHPStan-2.x migration rather than bundled into Laravel 13 support. PHPStan is
+  not part of CI (`composer analyse` is a local/manual gate only), so this doesn't affect
+  automated verification - only local `composer analyse` runs against a Laravel-13-only
+  install.
+
+Architecture decisions behind every entry below are recorded in `docs/architecture/adr/`.
+
+### BREAKING
+
+- **`Contracts\SupportsSubscriptionsInterface::cancelSubscription()` /
+  `enableSubscription()`** now take a single `DataObjects\SubscriptionActionDTO $action`
+  instead of `(string $subscriptionCode, string $token)`. `$token` was Paystack-specific
+  and forced every other provider's driver to accept a parameter it couldn't use. Read
+  provider-specific parameters via `$action->option('token')`. See ADR-0006.
+  - **Not affected**: the public fluent API (`Subscription::cancel(?string $token =
+    null)`, `->enable()`, `->token()`) keeps its exact existing signature - only direct
+    callers of the driver interface, or custom driver implementations, need to update.
+- **`Services\SubscriptionValidator::validateCancellation()`** dropped its `string $token`
+  parameter - it now only performs the provider-agnostic terminal-state check. Token
+  format validation moved into `PaystackSubscriptionMethods`, where it actually belongs.
+- **PayPal webhook signature verification is now asynchronous.** A request with an
+  invalid PayPal webhook signature now receives `202` (queued) instead of a synchronous
+  rejection status - verification happens inside the `ProcessWebhook` job and invalid
+  deliveries are silently discarded there. This removes two outbound HTTP calls
+  (OAuth token fetch + PayPal's verify-webhook-signature API) from the request/response
+  cycle. See ADR-0007.
+- **NOWPayments support removed entirely** - not deprecated, not soft-disabled.
+  `NowPaymentsDriver`, the `payments.providers.nowpayments` config block, and all
+  provider-mapping registrations are gone. Any application with
+  `PAYMENTS_DEFAULT_PROVIDER=nowpayments` or `PAYMENTS_FALLBACK_PROVIDER=nowpayments`,
+  or code calling `Payment::with('nowpayments')`, breaks on upgrade. This is an
+  intentional product decision to drop crypto payment support, not a technical
+  deprecation with a replacement - remove NOWPayments usage before upgrading. See
+  ADR-0010.
+
+### Added
+
+- **Stripe and PayPal subscription support** (`SupportsSubscriptionsInterface` was
+  previously only implemented by `PaystackDriver`). See ADR-0009 for the full set of
+  API-mapping decisions - Stripe Prices as plans (immutable amount/interval, so
+  `updatePlan()` creates a new Price when either changes), Stripe's terminal `canceled`
+  status being unrecoverable (`enableSubscription()` throws rather than approximating),
+  PayPal's `/suspend`+`/activate` pair mapped to `cancelSubscription()`/`enableSubscription()`
+  (reversible, matching Paystack's semantics - permanent cancellation via
+  `$action->option('permanent', true)`), and why PayPal's `listSubscriptions()` throws
+  (no such endpoint exists in PayPal's REST API).
+  - `SubscriptionRequestDTO` gained an optional `callbackUrl` field (PayPal's
+    subscription approval redirect requires one); `Subscription::callbackUrl()` sets it
+    fluently. Additive, defaults to `null` - no existing call site changes.
+- **Flutterwave, Square, and Mollie subscription support**, bringing subscription
+  support to every driver whose provider actually offers a recurring-billing API. See
+  ADR-0010 for full API-mapping decisions and disclosed limitations:
+  - **Flutterwave**: plans via `payment-plans`; subscribing is a side effect of a
+    tokenized charge carrying `payment_plan` (requires `->authorization()` with a saved
+    card token); cancel/enable map to confirmed `/cancel` and `/activate` endpoints.
+    `updatePlan()` and single-subscription `fetchSubscription()` are pattern-matched
+    from confirmed sibling endpoints, not independently verified - flagged for sandbox
+    testing before production use.
+  - **Square**: plans are a `SUBSCRIPTION_PLAN` + `SUBSCRIPTION_PLAN_VARIATION` Catalog
+    object pair created via `/v2/catalog/batch-upsert`; subscribing requires
+    `->authorization()` with a Square card-on-file ID; cancel/enable map to Square's
+    reversible `/pause` and `/resume` endpoints, not the permanent `/cancel`.
+  - **Mollie**: has no server-side plan resource at all, so `createPlan()` encodes the
+    plan client-side into an opaque `planCode` and `listPlans()` throws; subscribing
+    requires `->authorization()` with an existing mandate ID; `enableSubscription()`
+    always throws (Mollie has no merchant-triggered resume); `listSubscriptions()`
+    requires `$customer` (Mollie's list endpoint is customer-scoped). Subscription
+    codes are encoded as `"{customerId}:{subscriptionId}"` since Mollie requires both
+    IDs for every operation.
+  - `MonnifyDriver` and `OPayDriver` remain unimplemented - neither provider exposes a
+    provider-managed subscription API today (ADR-0010 documents the research behind
+    this).
+- **Event-level webhook idempotency** (`webhook_events` table): duplicate webhook
+  deliveries - which gateways send routinely as part of retry/at-least-once semantics -
+  are now deduped before any side effect runs, including subscription lifecycle event
+  dispatch (`SubscriptionCreated`, `SubscriptionRenewed`, etc.), not just the
+  transaction-status update. See ADR-0005. New migration:
+  `2024_01_01_000002_create_webhook_events_table.php`.
+- **Repository layer** (`TransactionRepositoryInterface`, `SubscriptionRepositoryInterface`,
+  `WebhookEventRepositoryInterface`): `PaymentManager` and `ProcessWebhook` no longer call
+  Eloquent statics directly, closing the DIP gap that made them hard to unit test. See
+  ADR-0004.
+- **`DataObjects\SubscriptionActionDTO`**: generic carrier for subscription action
+  parameters (see BREAKING above).
+- **`Contracts\RequiresAsyncWebhookVerification`**: interface for drivers whose webhook
+  verification requires an outbound API call. `PayPalDriver` always defers;
+  `MollieDriver` defers only when no `webhook_secret` is configured (its API-fallback
+  path) - see ADR-0007/ADR-0008.
+
+### Fixed
+
+- **Replay-window bypass**: a webhook with no recognizable timestamp field used to be
+  treated as valid ("missing = trust it"). It's now rejected. This required fixing
+  timestamp *extraction* itself first - the previous implementation never actually found
+  a timestamp for 5 of 9 providers, because it only checked the wrong (flat, top-level)
+  location in the payload. See ADR-0001.
+- **`SubscriptionTransaction` race condition**: concurrent webhook deliveries for a
+  brand-new `subscription_code` could silently drop one delivery's data (unique
+  constraint violation swallowed by a broad catch block). Now uses the same lock +
+  create-race retry pattern already proven correct for `PaymentTransaction`. See ADR-0004.
+- **TLS verification could be disabled via config** (`testing_mode`). Removed entirely -
+  outbound requests to payment providers always verify certificates. Tests use
+  `AbstractDriver::setClient()` to inject a mock HTTP client instead. See ADR-0002.
+- **Unbounded recursion in log sanitization** could exhaust memory on deeply nested,
+  attacker-influenced log context. Depth-capped, matching the limit already applied to
+  persisted transaction metadata. See ADR-0002.
+- **`TypeError` on logging a plain array**: `HasLogSanitization` called a
+  string-typed method with a numeric array key under `declare(strict_types=1)`,
+  crashing the log call itself for any context containing a plain list.
 
 ### Changed
 
@@ -23,6 +171,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OCP Compliance**: No code changes needed when adding new providers
 - **Clarity**: Explicit `driver_class` makes driver resolution clear and self-documenting
 - **Extensibility**: New providers can be added via config only
+
+### Migration guide (v1.x -> v2.0.0)
+
+1. If you call `$driver->cancelSubscription()` / `enableSubscription()` directly (not via
+   the `Subscription` fluent API): wrap your arguments in a `SubscriptionActionDTO`:
+   ```diff
+   - $driver->cancelSubscription($code, $token);
+   + $driver->cancelSubscription(new SubscriptionActionDTO($code, ['token' => $token]));
+   ```
+2. If you have a custom driver implementing `SupportsSubscriptionsInterface`: update
+   `cancelSubscription()`/`enableSubscription()` to the new signature (see ADR-0006 for a
+   worked example).
+3. If you call `SubscriptionValidator::validateCancellation()` directly: drop the
+   `$token` argument.
+4. Run the new migration: `php artisan migrate` (adds `webhook_events`).
+5. Remove any `PAYMENTS_TESTING_MODE` / `testing_mode` config entry - it's inert and will
+   be silently ignored either way.
+6. If you monitor PayPal webhook response codes for signature-rejection: that signal has
+   moved to the `payments` log channel (see ADR-0007) - the HTTP response is now always
+   `202` regardless of signature validity.
+
+Everything else in this release is additive or internal and requires no changes.
 
 ---
 ## [1.8.0] - 2025-12-27
@@ -1217,5 +1387,5 @@ composer update kendenigerian/payzephyr
 ## Links
 
 - [Documentation](https://github.com/ken-de-nigerian/payzephyr/wiki)
-- [Contributing Guide](CONTRIBUTING.md)
+- [Contributing Guide](contributing.md)
 - [License](/LICENSE)

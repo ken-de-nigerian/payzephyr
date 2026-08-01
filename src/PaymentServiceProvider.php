@@ -10,9 +10,15 @@ use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Contracts\ChannelMapperInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
+use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
+use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
+use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 use KenDeNigerian\PayZephyr\Http\Middleware\HealthEndpointMiddleware;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
+use KenDeNigerian\PayZephyr\Repositories\EloquentTransactionRepository;
+use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
@@ -39,10 +45,16 @@ final class PaymentServiceProvider extends ServiceProvider
 
         $this->app->singleton(DriverFactory::class);
 
+        $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
+        $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);
+        $this->app->singleton(WebhookEventRepositoryInterface::class, EloquentWebhookEventRepository::class);
+
         $this->app->singleton(PaymentManager::class, function ($app) {
             return new PaymentManager(
                 $app->make(ProviderDetectorInterface::class),
-                $app->make(DriverFactory::class)
+                $app->make(DriverFactory::class),
+                $app->make(MetadataSanitizer::class),
+                $app->make(TransactionRepositoryInterface::class)
             );
         });
 
@@ -153,11 +165,6 @@ final class PaymentServiceProvider extends ServiceProvider
             'success' => ['PAID', 'AUTHORIZED', 'PAIDOUT'],
             'failed' => ['FAILED', 'CANCELED', 'EXPIRED'],
             'pending' => ['OPEN', 'PENDING'],
-        ]);
-        $normalizer->registerProviderMappings('nowpayments', [
-            'success' => ['FINISHED', 'CONFIRMED'],
-            'failed' => ['FAILED', 'REFUNDED', 'EXPIRED'],
-            'pending' => ['WAITING', 'CONFIRMING', 'SENDING', 'PARTIALLY_PAID'],
         ]);
     }
 }

@@ -6,6 +6,8 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Exception;
 use GuzzleHttp\Exception\ClientException;
+use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
@@ -13,13 +15,21 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
+use KenDeNigerian\PayZephyr\Traits\PayPalSubscriptionMethods;
 use Throwable;
 
 /**
  * Driver implementation for the PayPal REST API (V2).
+ *
+ * Implements RequiresAsyncWebhookVerification: signature verification calls
+ * PayPal's own API (two outbound HTTP calls - an OAuth token fetch, then the
+ * verify-webhook-signature call), so it's deferred to the queued webhook job
+ * instead of running synchronously in the request cycle. See ADR-0007.
  */
-final class PayPalDriver extends AbstractDriver
+final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsSubscriptionsInterface
 {
+    use PayPalSubscriptionMethods;
+
     protected string $name = 'paypal';
 
     /**
@@ -31,6 +41,15 @@ final class PayPalDriver extends AbstractDriver
      * Timestamp when the current access token expires.
      */
     private ?int $tokenExpiry = null;
+
+    /**
+     * PayPal verification always calls PayPal's API - no local-only path
+     * exists. See ADR-0007/ADR-0008.
+     */
+    public function requiresAsyncVerification(): bool
+    {
+        return true;
+    }
 
     /**
      * Ensure the configuration contains the Client ID and Secret.

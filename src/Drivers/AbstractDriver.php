@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -61,6 +62,12 @@ abstract class AbstractDriver implements DriverInterface
     protected ?ChannelMapper $channelMapper = null;
 
     /**
+     * Subscription repository instance.
+     * Can be injected for testing or to use a custom repository.
+     */
+    protected ?SubscriptionRepositoryInterface $subscriptionRepository = null;
+
+    /**
      * Create a new payment driver instance.
      *
      * @param  array<string, mixed>  $config
@@ -90,7 +97,7 @@ abstract class AbstractDriver implements DriverInterface
         $this->client = new Client([
             'base_uri' => $this->config['base_url'] ?? '',
             'timeout' => $this->config['timeout'] ?? 30,
-            'verify' => ! ($this->config['testing_mode'] ?? false),
+            'verify' => true,
             'headers' => $this->getDefaultHeaders(),
         ]);
     }
@@ -372,6 +379,31 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * Get the subscription repository instance.
+     * Uses dependency injection if available, otherwise resolves from the container.
+     */
+    protected function getSubscriptionRepository(): SubscriptionRepositoryInterface
+    {
+        if ($this->subscriptionRepository === null) {
+            $this->subscriptionRepository = app(SubscriptionRepositoryInterface::class);
+        }
+
+        return $this->subscriptionRepository;
+    }
+
+    /**
+     * Set a custom subscription repository (mainly for testing).
+     *
+     * @return $this
+     */
+    public function setSubscriptionRepository(SubscriptionRepositoryInterface $repository): self
+    {
+        $this->subscriptionRepository = $repository;
+
+        return $this;
+    }
+
+    /**
      * Map unified channels to a provider-specific format.
      * If no channels are provided, returns null (provider uses its defaults).
      * Only returns default channels if explicitly needed by the provider.
@@ -429,6 +461,30 @@ abstract class AbstractDriver implements DriverInterface
     public function extractWebhookChannel(array $payload): ?string
     {
         return $payload['channel'] ?? $payload['paymentMethod'] ?? null;
+    }
+
+    /**
+     * Extract a provider-native event identifier from a raw webhook payload,
+     * for event-level idempotency (see ADR-0005).
+     *
+     * Deliberately not part of DriverInterface - a driver implementing that
+     * interface directly (rather than extending this class) isn't required
+     * to define it; callers check method_exists() and fall back to a
+     * content-hash key when absent, so this stays fully backward compatible.
+     *
+     * Checks common top-level field names (works as-is for Stripe, PayPal,
+     * Square, Mollie). Providers that nest their event data
+     * under a sub-object (Paystack, Flutterwave, Monnify, OPay) override this
+     * - see ADR-0001's identical nested-field precedent for
+     * extractWebhookTimestamp().
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function extractWebhookEventId(array $payload): ?string
+    {
+        $value = $payload['id'] ?? $payload['event_id'] ?? $payload['payment_id'] ?? null;
+
+        return $value !== null ? (string) $value : null;
     }
 
     /**

@@ -36,7 +36,8 @@ test('flutterwave driver validates webhook with correct signature', function () 
 
     $driver = new FlutterwaveDriver($config);
     $headers = ['verif-hash' => ['webhook_secret']];
-    $body = '{"event":"charge.completed"}';
+    // Real Flutterwave payloads carry 'created_at' under 'data' - see ADR-0001.
+    $body = json_encode(['event' => 'charge.completed', 'data' => ['created_at' => now()->toIso8601String()]]);
 
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
@@ -108,7 +109,8 @@ test('monnify driver validates webhook signature', function () {
     ];
 
     $driver = new MonnifyDriver($config);
-    $body = '{"eventType":"SUCCESSFUL_TRANSACTION"}';
+    // Real Monnify payloads carry 'paidOn' under 'eventData' - see ADR-0001.
+    $body = json_encode(['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => ['paidOn' => now()->format('Y-m-d H:i:s')]]);
     $signature = hash_hmac('sha512', $body, 'test_secret');
     $headers = ['monnify-signature' => [$signature]];
 
@@ -138,7 +140,8 @@ test('paystack driver validates correct webhook signature', function () {
     $config = ['secret_key' => 'test_secret'];
     $driver = new PaystackDriver($config);
 
-    $body = '{"event":"charge.success"}';
+    // Real Paystack payloads carry 'paid_at' under 'data' - see ADR-0001.
+    $body = json_encode(['event' => 'charge.success', 'data' => ['paid_at' => now()->toIso8601String()]]);
     $signature = hash_hmac('sha512', $body, 'test_secret');
 
     $headers = ['x-paystack-signature' => [$signature]];

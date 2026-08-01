@@ -269,7 +269,12 @@ test('driver http client has default timeout', function () {
     expect($client)->toBeInstanceOf(Client::class);
 });
 
-test('driver http client disables ssl verification in testing mode', function () {
+test('driver http client always verifies TLS certificates, regardless of config (ADR-0002)', function () {
+    // testing_mode used to be able to disable Guzzle's cert verification via
+    // config, which was a production MITM risk if ever misconfigured. It was
+    // removed entirely - 'verify' is now hardcoded true. Passing the old key
+    // must have no effect. Tests that need to mock HTTP responses should use
+    // AbstractDriver::setClient() instead, as this suite already does.
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'testing_mode' => true,
@@ -280,7 +285,8 @@ test('driver http client disables ssl verification in testing mode', function ()
 
     $client = $property->getValue($driver);
 
-    expect($client)->toBeInstanceOf(Client::class);
+    expect($client)->toBeInstanceOf(Client::class)
+        ->and($client->getConfig('verify'))->toBeTrue();
 });
 
 test('driver stores configuration', function () {

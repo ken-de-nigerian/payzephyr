@@ -1,5 +1,8 @@
 <?php
 
+$paymentsHealthCheckAllowedIps = env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS');
+$paymentsHealthCheckAllowedTokens = env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS');
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -172,8 +175,8 @@ return [
     'health_check' => [
         'cache_ttl' => env('PAYMENTS_HEALTH_CHECK_CACHE_TTL', 300), // 5 minutes
         'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', false),
-        'allowed_ips' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS')) : [],
-        'allowed_tokens' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS')) : [],
+        'allowed_ips' => $paymentsHealthCheckAllowedIps ? explode(',', $paymentsHealthCheckAllowedIps) : [],
+        'allowed_tokens' => $paymentsHealthCheckAllowedTokens ? explode(',', $paymentsHealthCheckAllowedTokens) : [],
     ],
 
     /*

@@ -324,48 +324,35 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $paymentId = $payload['id'];
 
-            try {
-                $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
-                $paymentData = $this->parseResponse($response);
+            $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+            $paymentData = $this->parseResponse($response);
 
-                if (! isset($paymentData['id']) || $paymentData['id'] !== $paymentId) {
-                    $this->log('warning', 'Payment verification failed - payment ID mismatch', [
-                        'expected' => $paymentId,
-                        'received' => $paymentData['id'] ?? null,
-                    ]);
-
-                    return false;
-                }
-
-                // Checked against $paymentData (the freshly-fetched Payment
-                // resource, which carries `createdAt`), not $payload (the
-                // minimal incoming ping, which does not).
-                // See ADR-0001.
-                if (! $this->validateWebhookTimestamp($paymentData)) {
-                    $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-                    return false;
-                }
-
-                $this->log('info', 'Webhook validated successfully via API verification', [
-                    'payment_id' => $paymentId,
-                    'payment_status' => $paymentData['status'] ?? 'unknown',
-                    'hint' => 'Consider configuring MOLLIE_WEBHOOK_SECRET for more secure signature-based validation',
-                ]);
-
-                return true;
-            } catch (ClientException $e) {
-                $response = $e->getResponse();
-
-                $statusCode = $response->getStatusCode();
-                $this->log('warning', 'Webhook validation API call failed', [
-                    'payment_id' => $paymentId,
-                    'status_code' => $statusCode,
-                    'error' => $e->getMessage(),
+            if (! isset($paymentData['id']) || $paymentData['id'] !== $paymentId) {
+                $this->log('warning', 'Payment verification failed - payment ID mismatch', [
+                    'expected' => $paymentId,
+                    'received' => $paymentData['id'] ?? null,
                 ]);
 
                 return false;
             }
+
+            // Checked against $paymentData (the freshly-fetched Payment
+            // resource, which carries `createdAt`), not $payload (the
+            // minimal incoming ping, which does not).
+            // See ADR-0001.
+            if (! $this->validateWebhookTimestamp($paymentData)) {
+                $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
+
+                return false;
+            }
+
+            $this->log('info', 'Webhook validated successfully via API verification', [
+                'payment_id' => $paymentId,
+                'payment_status' => $paymentData['status'] ?? 'unknown',
+                'hint' => 'Consider configuring MOLLIE_WEBHOOK_SECRET for more secure signature-based validation',
+            ]);
+
+            return true;
         } catch (Throwable $e) {
             $this->log('error', 'Webhook validation failed', [
                 'error' => $e->getMessage(),

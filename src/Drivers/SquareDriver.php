@@ -135,13 +135,17 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
                 provider: $this->getName(),
             );
         } catch (ChargeException $e) {
-            throw $e;
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
+            $previous = $e->getPrevious();
+
+            if (! $previous instanceof ClientException) {
+                throw $e;
+            }
+
+            $response = $previous->getResponse();
 
             $statusCode = $response->getStatusCode();
             $responseData = $this->parseResponse($response);
-            $errorMessage = $responseData['errors'][0]['detail'] ?? $responseData['errors'][0]['code'] ?? $e->getMessage();
+            $errorMessage = $responseData['errors'][0]['detail'] ?? $responseData['errors'][0]['code'] ?? $previous->getMessage();
 
             $baseUrl = $this->config['base_url'] ?? '';
             $isSandboxUrl = str_contains($baseUrl, 'squareupsandbox.com');
@@ -162,10 +166,10 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
                 'status_code' => $statusCode,
                 'error' => $errorMessage,
                 'errors' => $responseData['errors'] ?? [],
-                'error_class' => get_class($e),
+                'error_class' => get_class($previous),
             ]);
 
-            throw new ChargeException('Payment initialization failed: '.$errorMessage, 0, $e);
+            throw new ChargeException('Payment initialization failed: '.$errorMessage, 0, $previous);
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'reference' => $reference,
@@ -263,12 +267,6 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
                 }
             }
             throw $e;
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
-            if ($response->getStatusCode() === 404) {
-                return null;
-            }
-            throw $e;
         }
 
         return null;
@@ -309,12 +307,6 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
                 if ($response->getStatusCode() === HttpStatusCodes::NOT_FOUND) {
                     return null;
                 }
-            }
-            throw $e;
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
-            if ($response->getStatusCode() === 404) {
-                return null;
             }
             throw $e;
         }
@@ -382,12 +374,6 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
                 if ($response->getStatusCode() === HttpStatusCodes::NOT_FOUND) {
                     throw new VerificationException('Payment not found');
                 }
-            }
-            throw $e;
-        } catch (ClientException $e) {
-            $response = $e->getResponse();
-            if ($response->getStatusCode() === 404) {
-                throw new VerificationException('Payment not found');
             }
             throw $e;
         }
@@ -563,10 +549,6 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
             }
 
             return true;
-        } catch (ClientException) {
-            return true;
-        } catch (ConnectException) {
-            return false;
         }
     }
 

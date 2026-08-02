@@ -273,13 +273,16 @@ final class MonnifyDriver extends AbstractDriver
 
             return true;
 
-        } catch (ClientException) {
-            return true;
-
         } catch (ChargeException $e) {
-            $previous = $e->getPrevious();
-            if ($previous instanceof ClientException) {
-                return true;
+            // getAccessToken() wraps makeRequest()'s own ChargeException in a
+            // second ChargeException, so a ClientException (API reachable,
+            // credentials rejected) sits two levels down getPrevious(), not
+            // one - walk the full chain rather than checking a single level.
+            $previous = $e;
+            while ($previous = $previous->getPrevious()) {
+                if ($previous instanceof ClientException) {
+                    return true;
+                }
             }
 
             return false;

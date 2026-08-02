@@ -53,7 +53,18 @@ test('monnify driver healthCheck returns true for successful authentication', fu
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('monnify driver healthCheck returns false for 4xx errors', function () {
+test('monnify driver healthCheck returns true for 4xx errors', function () {
+    // A 4xx means Monnify's API answered (just rejected these credentials),
+    // matching the same "reachable but misconfigured" contract every other
+    // driver's healthCheck() follows (see e.g. SquareDriver/PaystackDriver/
+    // OPayDriver/FlutterwaveDriver's own "returns true for 4xx errors" tests).
+    //
+    // Regression: healthCheck() -> getAccessToken() double-wraps
+    // makeRequest()'s own ChargeException in a second ChargeException, so
+    // the real ClientException sits two levels down getPrevious(), not one.
+    // A single-level getPrevious() check (the pattern this test used to pass
+    // against) can never reach it, making the ClientException branch dead
+    // and silently falling through to a generic `false`.
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -73,7 +84,7 @@ test('monnify driver healthCheck returns false for 4xx errors', function () {
 
     $driver->setClient($client);
 
-    expect($driver->healthCheck())->toBeFalse();
+    expect($driver->healthCheck())->toBeTrue();
 });
 
 test('monnify driver healthCheck returns false for network errors', function () {

@@ -41,7 +41,10 @@ test('square driver charge handles 401 error with sandbox hint', function () {
 
     $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback');
 
-    expect(fn () => $driver->charge($request))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+    // Regression: charge() previously rethrew AbstractDriver::makeRequest()'s
+    // wrapped ChargeException verbatim without inspecting getPrevious(), so
+    // this sandbox-credential hint was silently unreachable dead code.
+    expect(fn () => $driver->charge($request))->toThrow(ChargeException::class, 'sandbox access token');
 });
 
 test('square driver charge handles 403 error with production hint', function () {
@@ -55,7 +58,9 @@ test('square driver charge handles 403 error with production hint', function () 
 
     $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback');
 
-    expect(fn () => $driver->charge($request))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+    // Regression: see note above - this production-credential hint was
+    // equally unreachable before the fix.
+    expect(fn () => $driver->charge($request))->toThrow(ChargeException::class, 'production access token');
 });
 
 test('square driver charge handles generic throwable errors', function () {

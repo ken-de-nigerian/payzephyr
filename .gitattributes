@@ -5,15 +5,12 @@
 /.vscode export-ignore
 /tests export-ignore
 /examples export-ignore
-/docs export-ignore
 /.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
 /phpunit.xml.dist export-ignore
 /phpstan.neon export-ignore
 /pint.json export-ignore
-/CHANGELOG.md export-ignore
-/README.md export-ignore
 /DEPLOYMENT_CHECKLIST.md export-ignore
 /PROJECT_SUMMARY.md export-ignore
 /QUICK_REFERENCE.md export-ignore

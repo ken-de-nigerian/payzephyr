@@ -4,6 +4,17 @@ Everything PayZephyr does is controlled from one file: `config/payments.php` (pu
 
 Most values in the config file are read from environment variables via `env(...)`, so day-to-day you'll mostly be editing `.env`, not the config file itself. The config file is where you'd change *structural* things: like which providers exist at all, or their currency lists.
 
+## Installed features
+
+```php
+'features' => [
+    'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
+    'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+],
+```
+
+Set by `php artisan payzephyr:install` the first time it publishes that feature's migration - see [Installation: core vs. optional features](installation.md#core-vs-optional-features) for what's core (always available, not listed here) versus optional. This is purely informational bookkeeping for your own code (`config('payments.features.refunds')`); it does not gate `Payment::subscription()`/`Payment::refund()` at runtime, which work based on whatever the provider driver you called `->with()` actually supports.
+
 ## Default and fallback providers
 
 ```php

@@ -6,6 +6,24 @@ $paymentsHealthCheckAllowedTokens = env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS');
 return [
     /*
     |--------------------------------------------------------------------------
+    | Installed Features
+    |--------------------------------------------------------------------------
+    |
+    | Tracks which optional PayZephyr features `php artisan payzephyr:install`
+    | has enabled for this app (payment logging and webhook processing are
+    | core and always available, not listed here). This is informational -
+    | set by the installer, readable by your own code - and does not gate
+    | Payment::subscription()/Payment::refund() at runtime; see
+    | docs/installation.md#core-vs-optional-features.
+    |
+    */
+    'features' => [
+        'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
+        'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Payment Provider
     |--------------------------------------------------------------------------
     |

@@ -58,7 +58,7 @@ composer require kendenigerian/payzephyr
 php artisan payzephyr:install
 ```
 
-`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the database migrations it needs (for transaction logging), and offers to run them for you. See [Installation](docs/installation.md) if you'd rather do each step by hand.
+`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the core database migrations it always needs (for transaction logging), asks whether you also want Subscriptions and/or Refunds, and offers to run the migrations for you. See [Installation](docs/installation.md#core-vs-optional-features) for exactly which tables are core vs. optional, and how to select features non-interactively with `--all`/`--features=`.
 
 **2. Add your provider's credentials to `.env`.** Paystack is enabled by default. Grab your test keys from your Paystack dashboard:
 

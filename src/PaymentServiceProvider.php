@@ -73,9 +73,30 @@ final class PaymentServiceProvider extends ServiceProvider
                 __DIR__.'/../config/payments.php' => config_path('payments.php'),
             ], 'payments-config');
 
+            // Kept publishing the whole directory under the original tag for
+            // backward compatibility with any existing script/documentation
+            // that runs `vendor:publish --tag=payments-migrations` directly.
             $this->publishes([
                 __DIR__.'/../database/migrations' => database_path('migrations'),
             ], 'payments-migrations');
+
+            // Granular per-feature tags, so InstallCommand can publish only
+            // what the developer actually selected (see Console\Features).
+            // Core: payment_transactions (payment logging is on by default)
+            // and webhook_events (webhook idempotency runs for every
+            // provider unconditionally) - neither is optional.
+            $this->publishes([
+                __DIR__.'/../database/migrations/2024_01_01_000000_create_payment_transactions_table.php' => database_path('migrations/2024_01_01_000000_create_payment_transactions_table.php'),
+                __DIR__.'/../database/migrations/2024_01_01_000002_create_webhook_events_table.php' => database_path('migrations/2024_01_01_000002_create_webhook_events_table.php'),
+            ], 'payzephyr-migrations-core');
+
+            $this->publishes([
+                __DIR__.'/../database/migrations/2024_01_01_000001_create_subscription_transactions_table.php' => database_path('migrations/2024_01_01_000001_create_subscription_transactions_table.php'),
+            ], 'payzephyr-migrations-subscriptions');
+
+            $this->publishes([
+                __DIR__.'/../database/migrations/2024_01_02_000000_create_refund_transactions_table.php' => database_path('migrations/2024_01_02_000000_create_refund_transactions_table.php'),
+            ], 'payzephyr-migrations-refunds');
 
             $this->commands([
                 InstallCommand::class,

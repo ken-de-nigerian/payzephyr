@@ -10,7 +10,7 @@ A minimal checklist of what needs to exist per enabled provider is in the [Confi
 
 ## Migrations
 
-PayZephyr's three tables (`payment_transactions`, `subscription_transactions`, `webhook_events`) need to exist before your app can log anything. If your deployment pipeline runs `php artisan migrate` as a standard step (most do), nothing special is needed: the migrations were copied into your app's own `database/migrations` directory during [installation](installation.md), so they run alongside your app's other migrations automatically.
+PayZephyr's core tables (`payment_transactions`, `webhook_events`) - plus `subscription_transactions`/`refund_transactions` if you selected those features (see [Installation: core vs. optional features](installation.md#core-vs-optional-features)) - need to exist before your app can log anything. If your deployment pipeline runs `php artisan migrate` as a standard step (most do), nothing special is needed: the migrations were copied into your app's own `database/migrations` directory during [installation](installation.md), so they run alongside your app's other migrations automatically.
 
 If you're deploying for the first time and skipped running migrations during installation, run them now:
 

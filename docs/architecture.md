@@ -27,7 +27,7 @@ flowchart TD
 
 **Webhook processing** is a separate path: `WebhookController` receives the raw HTTP request, `WebhookRequest` (a Laravel form request) handles synchronous signature verification where the provider supports it, and the actual processing (deduplication, transaction updates, event dispatch) happens inside `ProcessWebhook`, a queued job. See [Webhooks](webhooks.md) and [Queues](queues.md) for why this is split this way.
 
-**Repositories** (`src/Repositories/`) sit between the webhook job and the database, handling concurrency-safe reads/writes to `payment_transactions`, `subscription_transactions`, and `webhook_events`: this is where duplicate-webhook detection and race-condition-safe updates are implemented (see the [ADRs](#why-things-are-built-this-way) below for the reasoning).
+**Repositories** (`src/Repositories/`) sit between the webhook job and the database, handling concurrency-safe reads/writes to `payment_transactions`, `webhook_events`, and (if installed - see [Installation: core vs. optional features](installation.md#core-vs-optional-features)) `subscription_transactions` and `refund_transactions`: this is where duplicate-webhook detection and race-condition-safe updates are implemented (see the [ADRs](#why-things-are-built-this-way) below for the reasoning).
 
 ## Directory structure
 

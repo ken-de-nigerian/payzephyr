@@ -13,7 +13,7 @@ A concrete list to work through before you point PayZephyr at real payment provi
 - [ ] `PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=true` (this is the default; confirm it hasn't been overridden anywhere). Never `false` with real credentials. See [Security](security.md#never-disable-this-with-real-credentials).
 - [ ] Each provider's dashboard has the correct live webhook URL configured: see the table in [Webhooks](webhooks.md#setting-it-up-in-your-providers-dashboard).
 - [ ] A queue worker is actually running in production, supervised so it restarts if it crashes (Supervisor, systemd, or your platform's equivalent). This is the single most common thing people forget; see [Queues](queues.md) for exactly what breaks if you skip it.
-- [ ] Migrations have been run in production, so `payment_transactions`, `subscription_transactions`, and `webhook_events` all exist.
+- [ ] Migrations have been run in production, so `payment_transactions` and `webhook_events` exist (core), plus `subscription_transactions`/`refund_transactions` if you use those features - see [Installation: core vs. optional features](installation.md#core-vs-optional-features).
 
 ## Health endpoint
 

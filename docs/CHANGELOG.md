@@ -34,6 +34,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     providers (Paystack, Square, Monnify, OPay, and some Stripe/Mollie payment methods) that confirm refunds
     asynchronously rather than in the initial API response.
   - New documentation: [docs/refunds.md](refunds.md).
+- **Feature-selective installation.** `php artisan payzephyr:install` previously published and offered to run
+  migrations for every table unconditionally, forcing `subscription_transactions`/`refund_transactions` onto
+  every install regardless of whether the app uses those features. The installer now distinguishes core
+  (`payment_transactions`, `webhook_events` - both depended on unconditionally by default config) from
+  optional (Subscriptions, Refunds - neither depends on the other), and only installs what's selected.
+  - Interactive: one confirmation per optional feature, pre-selected based on what's already installed.
+  - Non-interactive: `--all` installs every optional feature; `--features=subscriptions,refunds` installs
+    exactly the named ones (case-insensitive, rejects unknown names clearly); `--no-interaction` alone with
+    neither flag installs core only - "install everything" is never the silent non-interactive default.
+  - Re-running the installer is always safe and strictly additive: already-installed features are left alone,
+    a feature can be added later without touching existing tables or data, and declining an already-installed
+    feature never removes it. New selections are recorded in `.env` (`PAYZEPHYR_FEATURE_SUBSCRIPTIONS`/
+    `PAYZEPHYR_FEATURE_REFUNDS`) and exposed via the new `config('payments.features')` (informational only -
+    doesn't gate the fluent API at runtime).
+  - New granular `vendor:publish` tags (`payzephyr-migrations-core`/`-subscriptions`/`-refunds`); the original
+    `payments-migrations` tag (publishes everything) is unchanged for backward compatibility.
+  - New single source of truth: `Console\Features` registry (also resolves feature dependencies, though none
+    exist between Subscriptions and Refunds today).
+  - See [Installation: core vs. optional features](installation.md#core-vs-optional-features).
 
 ### Fixed
 

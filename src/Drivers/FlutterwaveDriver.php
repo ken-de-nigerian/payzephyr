@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -14,14 +15,16 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\FlutterwaveRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\FlutterwaveSubscriptionMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Flutterwave payment gateway.
  */
-final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use FlutterwaveRefundMethods;
     use FlutterwaveSubscriptionMethods;
 
     protected string $name = 'flutterwave';

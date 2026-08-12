@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
@@ -66,6 +67,12 @@ abstract class AbstractDriver implements DriverInterface
      * Can be injected for testing or to use a custom repository.
      */
     protected ?SubscriptionRepositoryInterface $subscriptionRepository = null;
+
+    /**
+     * Refund repository instance.
+     * Can be injected for testing or to use a custom repository.
+     */
+    protected ?RefundRepositoryInterface $refundRepository = null;
 
     /**
      * Create a new payment driver instance.
@@ -399,6 +406,31 @@ abstract class AbstractDriver implements DriverInterface
     public function setSubscriptionRepository(SubscriptionRepositoryInterface $repository): self
     {
         $this->subscriptionRepository = $repository;
+
+        return $this;
+    }
+
+    /**
+     * Get the refund repository instance.
+     * Uses dependency injection if available, otherwise resolves from the container.
+     */
+    protected function getRefundRepository(): RefundRepositoryInterface
+    {
+        if ($this->refundRepository === null) {
+            $this->refundRepository = app(RefundRepositoryInterface::class);
+        }
+
+        return $this->refundRepository;
+    }
+
+    /**
+     * Set a custom refund repository (mainly for testing).
+     *
+     * @return $this
+     */
+    public function setRefundRepository(RefundRepositoryInterface $repository): self
+    {
+        $this->refundRepository = $repository;
 
         return $this;
     }

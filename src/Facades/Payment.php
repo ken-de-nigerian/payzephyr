@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Facade;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Refund;
 use KenDeNigerian\PayZephyr\Subscription;
 use KenDeNigerian\PayZephyr\SubscriptionQuery;
 
@@ -33,6 +34,7 @@ use KenDeNigerian\PayZephyr\SubscriptionQuery;
  * @method static VerificationResponseDTO verify(string $reference, ?string $provider = null)
  * @method static Subscription subscription(?string $code = null)
  * @method static SubscriptionQuery subscriptions()
+ * @method static Refund refund(?string $transactionReference = null)
  *
  * @see \KenDeNigerian\PayZephyr\Payment
  */

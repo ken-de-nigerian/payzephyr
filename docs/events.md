@@ -16,6 +16,9 @@ If you haven't used Laravel's event system before: an event is just a plain PHP 
 | `SubscriptionRenewed` | A subscription-renewal webhook was processed | `KenDeNigerian\PayZephyr\Events` |
 | `SubscriptionCancelled` | A subscription-cancelled webhook was processed | `KenDeNigerian\PayZephyr\Events` |
 | `SubscriptionPaymentFailed` | A subscription renewal payment failed | `KenDeNigerian\PayZephyr\Events` |
+| `RefundCreated` | A refund webhook was processed and the refund is still pending/processing | `KenDeNigerian\PayZephyr\Events` |
+| `RefundCompleted` | A refund webhook confirmed the refund completed | `KenDeNigerian\PayZephyr\Events` |
+| `RefundFailed` | A refund webhook reported the refund failed | `KenDeNigerian\PayZephyr\Events` |
 
 ## Payment events
 
@@ -150,6 +153,69 @@ protected $listen = [
 ];
 ```
 
+## Refund events
+
+These three fire from inside PayZephyr's webhook processing, for the providers that confirm refunds asynchronously (see [Refunds](refunds.md#sync-vs-async-confirmation)) - a refund you issued a moment ago finally settles, and these events are how your app finds out without polling.
+
+**`RefundCreated`** fires when a refund webhook arrives while the refund is still pending or processing (no completed/failed status yet):
+
+```php
+public readonly string $refundReference;
+public readonly string $transactionReference;
+public readonly string $provider;
+public readonly array $data;  // raw event data from the provider
+```
+
+**`RefundCompleted`**
+
+```php
+public readonly string $refundReference;
+public readonly string $transactionReference;
+public readonly string $provider;
+public readonly array $data;
+```
+
+**`RefundFailed`**
+
+```php
+public readonly string $refundReference;
+public readonly string $transactionReference;
+public readonly string $provider;
+public readonly string $reason;
+public readonly array $data;
+```
+
+A realistic example: crediting a customer's account balance once a refund is confirmed, rather than assuming `refund()`'s initial response was final:
+
+```php
+// app/Listeners/SyncRefundStatus.php
+
+namespace App\Listeners;
+
+use App\Models\Order;
+use KenDeNigerian\PayZephyr\Events\RefundCompleted;
+use KenDeNigerian\PayZephyr\Events\RefundFailed;
+
+class SyncRefundStatus
+{
+    public function handle(RefundCompleted|RefundFailed $event): void
+    {
+        $order = Order::where('transaction_reference', $event->transactionReference)->first();
+
+        if (! $order) {
+            return;
+        }
+
+        if ($event instanceof RefundCompleted) {
+            $order->update(['refund_status' => 'completed']);
+        } else {
+            $order->update(['refund_status' => 'failed']);
+            // Consider alerting an admin - a failed refund usually needs manual follow-up.
+        }
+    }
+}
+```
+
 ## A note on listener execution
 
 By default, Laravel listeners run synchronously, in the same request (or job) that dispatched the event. Since `WebhookReceived` and the subscription events are already dispatched from inside a queued job (see [Queues](queues.md)), your listener code runs on the queue too, which is good, since it means a slow listener (sending an email, for instance) doesn't block webhook processing for other requests. If a listener needs to do something slow and you want extra isolation, you can still make the listener itself implement `ShouldQueue` for its own dedicated job; see the [Laravel queued listeners documentation](https://laravel.com/docs/events#queued-event-listeners).
@@ -158,3 +224,4 @@ By default, Laravel listeners run synchronously, in the same request (or job) th
 
 - [Webhooks](webhooks.md): how these events get dispatched in the first place
 - [Subscriptions](subscriptions.md): the full subscription lifecycle these events track
+- [Refunds](refunds.md): the full refund lifecycle these events track

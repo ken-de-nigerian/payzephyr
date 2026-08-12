@@ -214,4 +214,15 @@ final class Payment
     {
         return new SubscriptionQuery($this->manager);
     }
+
+    public function refund(?string $transactionReference = null): Refund
+    {
+        $refund = new Refund($this->manager);
+
+        if ($transactionReference) {
+            $refund->transaction($transactionReference);
+        }
+
+        return $refund;
+    }
 }

@@ -6,6 +6,51 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.1.0] - 2026-08-12
+
+### Added
+
+- **Refund support across all 8 providers** (Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify,
+  OPay). Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so this shipped
+  in one release rather than rolling out incrementally - see [ADR-0011](architecture/adr/0011-refund-driver-mapping.md)
+  for the per-provider mapping decisions (sync vs. async confirmation, endpoint/event names, reference
+  formats).
+  - New fluent API: `Payment::refund($transactionReference)->amount(...)->currency(...)->reason(...)->with($provider)->refund()`,
+    plus `->fetch($refundReference)`. Supports full and partial refunds. `->currency()` is required for
+    multi-currency merchants on Square, PayPal, Mollie, and OPay, whose refund APIs need it specified
+    explicitly rather than inferring it from the original charge.
+  - New `SupportsRefundsInterface` (opt-in, following the same pattern as `SupportsSubscriptionsInterface`),
+    `RefundRequestDTO`/`RefundResponseDTO`, `RefundException`, `RefundStatus` enum.
+  - Refunds are automatically logged to a new `refund_transactions` table (see
+    [Configuration](configuration.md#refunds)), with both metadata and the `->reason()` value sanitized
+    before persisting.
+  - Refund validation (`payments.refunds.validation.enabled`, on by default) runs two checks before calling
+    the provider: an in-flight duplicate guard (`payments.refunds.prevent_duplicates`, on by default) that
+    rejects a second refund attempt while an earlier one on the same transaction is still pending/processing,
+    without blocking legitimate sequential partial refunds once it resolves; and an over-refund check that
+    validates a refund's amount against the original transaction's remaining refundable balance when the
+    original charge was logged locally (best-effort).
+  - New `RefundCreated`/`RefundCompleted`/`RefundFailed` events, dispatched from webhook processing for the
+    providers (Paystack, Square, Monnify, OPay, and some Stripe/Mollie payment methods) that confirm refunds
+    asynchronously rather than in the initial API response.
+  - New documentation: [docs/refunds.md](refunds.md).
+
+### Fixed
+
+- **Webhook signature verification narrowed its `catch` to `Exception` instead of `Throwable` in four sites**
+  (`StripeDriver::validateWebhook()`, two in `PayPalDriver`, `MonnifyDriver::healthCheck()`) - a latent gap
+  flagged in the pre-2.0.0 release audit (M-2): not currently exploitable (an outer `catch (Throwable)` at
+  every call site already covered it), but a trap for a future refactor. All four now catch `Throwable`.
+- **`HasWebhookValidation`'s webhook-timestamp field matching accepted any numeric value under a matched
+  field name** (including the generic `"time"`), with no check that the value was plausible as an actual
+  Unix timestamp - flagged in the pre-2.0.0 audit (M-4). A future payload with an unrelated small numeric
+  field (a counter, a duration) under an earlier-matched name like `created` could have both misreported a
+  bogus timestamp and caused a legitimate webhook's real timestamp (in a later field) to be ignored,
+  producing a false-positive rejection. Fixed by requiring a matched value to fall within a plausible
+  calendar-year range (2000-2100) before accepting it, otherwise the matcher keeps checking later field
+  names.
+
+---
 ## [2.0.1] - 2026-08-01
 
 ### BREAKING

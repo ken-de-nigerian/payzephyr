@@ -15,6 +15,9 @@ use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
+use KenDeNigerian\PayZephyr\Events\RefundCompleted;
+use KenDeNigerian\PayZephyr\Events\RefundCreated;
+use KenDeNigerian\PayZephyr\Events\RefundFailed;
 use KenDeNigerian\PayZephyr\Events\SubscriptionCancelled;
 use KenDeNigerian\PayZephyr\Events\SubscriptionCreated;
 use KenDeNigerian\PayZephyr\Events\SubscriptionPaymentFailed;
@@ -87,6 +90,10 @@ final class ProcessWebhook implements ShouldQueue
 
             if ($this->isSubscriptionWebhook($this->payload)) {
                 $this->processSubscriptionWebhook($this->payload, $this->provider, $manager);
+            }
+
+            if ($this->isRefundWebhook($this->payload)) {
+                $this->processRefundWebhook($this->payload, $this->provider);
             }
 
             WebhookReceived::dispatch($this->provider, $this->payload, $reference);
@@ -337,6 +344,99 @@ final class ProcessWebhook implements ShouldQueue
             'provider' => $provider,
             'event' => $eventType,
             'subscription_code' => $subscriptionCode,
+        ]);
+    }
+
+    /**
+     * Check if the webhook payload is refund-related.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function isRefundWebhook(array $payload): bool
+    {
+        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+
+        return str_contains($eventType, 'refund') || str_contains($eventType, 'charge.refunded');
+    }
+
+    /**
+     * Process refund-related webhook events.
+     *
+     * Several providers (Paystack, PayPal, Square) confirm refunds
+     * asynchronously - the initial refund() response is only "pending", and
+     * this is where the terminal RefundCompleted/RefundFailed event actually
+     * fires. Reference field names vary widely across providers' refund
+     * webhook shapes, so this resolves the refund/transaction reference from
+     * every known field rather than a single fixed path - see ADR-0011.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function processRefundWebhook(array $payload, string $provider): void
+    {
+        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+        $data = $payload['data'] ?? $payload['resource'] ?? $payload;
+        $object = $data['object'] ?? $data;
+
+        $refundReference = $object['id']
+            ?? $object['refund_reference']
+            ?? $data['refundReference']
+            ?? null;
+
+        $transactionReference = $object['transaction_reference']
+            ?? $object['payment_intent']
+            ?? $data['transactionReference']
+            ?? (is_array($object['transaction'] ?? null) ? ($object['transaction']['reference'] ?? null) : null)
+            ?? null;
+
+        if (! $refundReference) {
+            $this->log('warning', 'Refund webhook missing refund reference', [
+                'provider' => $provider,
+                'event' => $eventType,
+            ]);
+
+            return;
+        }
+
+        $status = strtolower((string) ($object['status'] ?? $data['status'] ?? ''));
+
+        if (
+            str_contains($eventType, 'failed') ||
+            in_array($status, ['failed', 'declined', 'error'], true)
+        ) {
+            $reason = $object['reason'] ?? $object['message'] ?? $data['reason'] ?? 'Refund failed';
+
+            RefundFailed::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                (string) $reason,
+                $data
+            );
+        } elseif (
+            str_contains($eventType, 'processed') ||
+            str_contains($eventType, 'refunded') ||
+            str_contains($eventType, 'completed') ||
+            in_array($status, ['completed', 'succeeded', 'success', 'processed', 'refunded'], true)
+        ) {
+            RefundCompleted::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                $data
+            );
+        } else {
+            RefundCreated::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                $data
+            );
+        }
+
+        $this->log('info', 'Refund webhook event processed', [
+            'provider' => $provider,
+            'event' => $eventType,
+            'refund_reference' => $refundReference,
         ]);
     }
 }

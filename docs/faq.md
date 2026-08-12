@@ -2,7 +2,7 @@
 
 **Does PayZephyr support refunds?**
 
-Not yet. There's no `refund()` method or refund tracking in the current version: this is a real gap, not an oversight we're hiding. If you need to issue a refund today, you'll need to call your provider's refund API directly using their own SDK, outside of PayZephyr, and record it in your own application. Refund support is a reasonable thing to want from a package like this, and it's on the radar for a future release.
+Yes, across all eight providers: `Payment::refund($transactionReference)->with('stripe')->refund()`, full or partial, with automatic tracking to a `refund_transactions` table and events for async confirmation. See [Refunds](refunds.md).
 
 **Can I use more than one provider at the same time?**
 

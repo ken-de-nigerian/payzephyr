@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
-use Exception;
 use GuzzleHttp\Exception\ClientException;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\MonnifyRefundMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Monnify payment gateway.
  */
-final class MonnifyDriver extends AbstractDriver
+final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInterface
 {
+    use MonnifyRefundMethods;
+
     protected string $name = 'monnify';
 
     /**
@@ -287,7 +290,7 @@ final class MonnifyDriver extends AbstractDriver
 
             return false;
 
-        } catch (Exception) {
+        } catch (Throwable) {
             return false;
         }
     }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
-use Exception;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -13,6 +13,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\StripeRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\StripeSubscriptionMethods;
 use Random\RandomException;
 use Stripe\Exception\ApiErrorException;
@@ -20,12 +21,14 @@ use Stripe\Exception\AuthenticationException;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\StripeClient;
 use Stripe\Webhook;
+use Throwable;
 
 /**
  * Driver implementation for the Stripe payment gateway.
  */
-final class StripeDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class StripeDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use StripeRefundMethods;
     use StripeSubscriptionMethods;
 
     protected string $name = 'stripe';
@@ -296,7 +299,7 @@ final class StripeDriver extends AbstractDriver implements SupportsSubscriptions
             ]);
 
             return false;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->log('warning', 'Webhook validation failed', [
                 'error' => $e->getMessage(),
                 'exception_type' => get_class($e),

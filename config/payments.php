@@ -237,6 +237,40 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Refund Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure refund-specific settings including logging, webhooks,
+    | and business logic rules.
+    |
+    */
+    'refunds' => [
+        'prevent_duplicates' => env('PAYMENTS_REFUNDS_PREVENT_DUPLICATES', true),
+        'validation' => [
+            'enabled' => env('PAYMENTS_REFUNDS_VALIDATION_ENABLED', true),
+        ],
+        'logging' => [
+            'enabled' => env('PAYMENTS_REFUNDS_LOGGING_ENABLED', true),
+            'table' => env('PAYMENTS_REFUNDS_LOGGING_TABLE', 'refund_transactions'),
+        ],
+        'webhook_events' => [
+            'refund.processed',
+            'refund.failed',
+            'charge.refunded',
+            'refund.updated',
+        ],
+        'notifications' => [
+            'enabled' => env('PAYMENTS_REFUNDS_NOTIFICATIONS_ENABLED', false),
+            'events' => [
+                'created',
+                'completed',
+                'failed',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Configuration
     |--------------------------------------------------------------------------
     |

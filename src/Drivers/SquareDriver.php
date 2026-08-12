@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -14,6 +15,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\SquareRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\SquareSubscriptionMethods;
 use Random\RandomException;
 use Throwable;
@@ -21,8 +23,9 @@ use Throwable;
 /**
  * Driver implementation for the Square payment gateway.
  */
-final class SquareDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class SquareDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use SquareRefundMethods;
     use SquareSubscriptionMethods;
 
     protected string $name = 'square';

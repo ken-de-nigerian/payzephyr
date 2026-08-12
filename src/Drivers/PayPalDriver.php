@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
-use Exception;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
+use KenDeNigerian\PayZephyr\Traits\PayPalRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\PayPalSubscriptionMethods;
 use Throwable;
 
@@ -26,8 +27,9 @@ use Throwable;
  * verify-webhook-signature call), so it's deferred to the queued webhook job
  * instead of running synchronously in the request cycle. See ADR-0007.
  */
-final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsSubscriptionsInterface
+final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use PayPalRefundMethods;
     use PayPalSubscriptionMethods;
 
     protected string $name = 'paypal';
@@ -366,7 +368,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             }
 
             return true;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->log('error', 'PayPal webhook validation failed', [
                 'error' => $e->getMessage(),
             ]);
@@ -452,7 +454,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return false;
 
-        } catch (Exception) {
+        } catch (Throwable) {
             return false;
         }
     }

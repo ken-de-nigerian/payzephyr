@@ -48,6 +48,9 @@ Starts a subscription fluent builder; see the `Subscription` class below. Pass a
 **`subscriptions(): SubscriptionQuery`**
 Starts a query builder for finding existing subscriptions; see `SubscriptionQuery` below.
 
+**`refund(?string $transactionReference = null): Refund`**
+Starts a refund fluent builder; see the `Refund` class below. Pass the original charge's reference if you're about to issue a refund against it; omit it (and use `->transaction(...)` instead) or call `->fetch()` to look up an existing refund.
+
 ## `Subscription` (returned by `Payment::subscription()`)
 
 See [Subscriptions](subscriptions.md) for full context and examples.
@@ -103,6 +106,28 @@ See [Subscriptions](subscriptions.md#finding-subscriptions).
 
 Terminal: **`get(): array`** (of `SubscriptionResponseDTO`), **`first(): ?SubscriptionResponseDTO`**, **`count(): int`**, **`exists(): bool`**.
 
+## `Refund` (returned by `Payment::refund()`)
+
+See [Refunds](refunds.md) for full context and examples.
+
+### Building
+
+| Method | Purpose |
+|---|---|
+| `transaction(string $transactionReference)` | The original charge's reference to refund |
+| `amount(float $amount)` | Amount to refund; omit for a full refund |
+| `currency(string $currency)` | Explicit refund currency; required by Square/PayPal/Mollie/OPay for multi-currency merchants (see [Refunds](refunds.md#issuing-a-refund)) |
+| `reason(string $reason)` | Free-text reason, stored alongside the refund (sanitized before storage; see [Security](security.md#metadata-sanitization)) |
+| `metadata(array $metadata)` | Arbitrary data attached to the refund (sanitized before storage; see [Security](security.md#metadata-sanitization)) |
+| `idempotency(?string $key = null)` | Auto-generates a UUID if no key given |
+| `with(string\|array $providers)` / `using(...)` | Which provider to use |
+
+### Executing (terminal)
+
+**`refund(): RefundResponseDTO`**: issue the refund. *Throws:* `RefundException`, `PaymentException` (if the provider doesn't implement `SupportsRefundsInterface`).
+
+**`fetch(string $refundReference): RefundResponseDTO`**: retrieve an existing refund by reference. *Throws:* `RefundException`.
+
 ## Data objects
 
 These are the typed objects PayZephyr's methods return: **always objects, accessed with `->property`, never arrays.**
@@ -113,6 +138,8 @@ These are the typed objects PayZephyr's methods return: **always objects, access
 **`VerificationResponseDTO`** (from `verify()`); see [Payment Verification](verification.md#what-you-get-back) for the full field list and usage guidance.
 
 **`SubscriptionResponseDTO`** (from subscription operations); see [Subscriptions](subscriptions.md#what-you-get-back).
+
+**`RefundResponseDTO`** (from refund operations); see [Refunds](refunds.md#what-you-get-back).
 
 **`PlanResponseDTO`** (from plan operations)
 `planCode`, `name`, `amount`, `interval`, `currency`, `description`, `invoiceLimit`, `metadata`, `provider`.
@@ -142,18 +169,21 @@ Full explanation and handling patterns in [Error Handling](error-handling.md). E
 | `VerificationException` | `verify()` |
 | `SubscriptionException` | Subscription create/cancel/enable/fetch/list |
 | `PlanException` | Plan create/update/fetch/list |
+| `RefundException` | Refund create/fetch |
 | `InvalidConfigurationException` | Any operation on a misconfigured provider |
 | `DriverNotFoundException` | Referencing an unknown or disabled provider |
 
 ## Events
 
-Full catalog and examples in [Events](events.md). All under `KenDeNigerian\PayZephyr\Events`: `PaymentInitiated`, `PaymentVerificationSuccess`, `PaymentVerificationFailed`, `WebhookReceived`, `SubscriptionCreated`, `SubscriptionRenewed`, `SubscriptionCancelled`, `SubscriptionPaymentFailed`.
+Full catalog and examples in [Events](events.md). All under `KenDeNigerian\PayZephyr\Events`: `PaymentInitiated`, `PaymentVerificationSuccess`, `PaymentVerificationFailed`, `WebhookReceived`, `SubscriptionCreated`, `SubscriptionRenewed`, `SubscriptionCancelled`, `SubscriptionPaymentFailed`, `RefundCreated`, `RefundCompleted`, `RefundFailed`.
 
 ## Models
 
 **`KenDeNigerian\PayZephyr\Models\PaymentTransaction`**: ordinary Eloquent model over the `payment_transactions` table. Scopes: `successful()`, `failed()`.
 
 **`KenDeNigerian\PayZephyr\Models\SubscriptionTransaction`**: over `subscription_transactions`. Scopes: `active()`, `cancelled()`, `forCustomer()`, `forPlan()`.
+
+**`KenDeNigerian\PayZephyr\Models\RefundTransaction`**: over `refund_transactions`. Scopes: `pending()`, `completed()`, `forTransaction()`.
 
 See [Advanced Usage](advanced-usage.md#reading-transaction-history-directly).
 

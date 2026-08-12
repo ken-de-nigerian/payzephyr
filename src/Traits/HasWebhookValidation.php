@@ -117,17 +117,41 @@ trait HasWebhookValidation
         foreach ($timestampFields as $field) {
             if (isset($payload[$field])) {
                 $value = $payload[$field];
+                $candidate = null;
 
                 if (is_string($value) && strtotime($value) !== false) {
-                    return strtotime($value);
+                    $candidate = strtotime($value);
+                } elseif (is_numeric($value)) {
+                    $candidate = (int) $value;
                 }
 
-                if (is_numeric($value)) {
-                    return (int) $value;
+                // A matched field name is necessary but not sufficient -
+                // "time" in particular is generic enough that an unrelated
+                // numeric field (a duration, a counter) could match it. Only
+                // accept a candidate that falls within a plausible calendar
+                // range for a real Unix timestamp; otherwise keep checking
+                // the remaining field names instead of either misreporting a
+                // bogus timestamp or falsely rejecting a legitimate webhook
+                // whose actual timestamp field appears later in the list.
+                // See RELEASE_AUDIT_2026-07-31.md M-4.
+                if ($candidate !== null && $this->isPlausibleUnixTimestamp($candidate)) {
+                    return $candidate;
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether $candidate falls within a sane calendar-year range for a real
+     * Unix timestamp (2000-01-01 through 2100-01-01), wide enough to never
+     * reject a genuine provider timestamp but narrow enough to reject
+     * small non-timestamp values (durations, counters) that a generically
+     * named field like "time" could otherwise pick up.
+     */
+    private function isPlausibleUnixTimestamp(int $candidate): bool
+    {
+        return $candidate >= 946684800 && $candidate < 4102444800;
     }
 }

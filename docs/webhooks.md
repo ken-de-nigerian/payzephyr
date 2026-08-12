@@ -14,7 +14,7 @@ There's a second reason webhooks matter beyond one-time payments: **subscription
 
 ## When webhooks are triggered
 
-Whenever something changes on the provider's side that your app would want to know about: not just "payment succeeded." Depending on the provider and what you're using PayZephyr for, that includes: a payment succeeding or failing, a subscription being created, renewing, or being cancelled, and a subscription's renewal payment failing.
+Whenever something changes on the provider's side that your app would want to know about: not just "payment succeeded." Depending on the provider and what you're using PayZephyr for, that includes: a payment succeeding or failing, a subscription being created, renewing, or being cancelled, a subscription's renewal payment failing, and - for the providers that confirm refunds asynchronously rather than in the initial `refund()` response - a refund settling or failing (see [Refunds: sync vs. async confirmation](refunds.md#sync-vs-async-confirmation) and [Events: refund events](events.md#refund-events)).
 
 ## What happens internally when one arrives
 

@@ -6,19 +6,23 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\OPayRefundMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Opay payment gateway.
  */
-final class OPayDriver extends AbstractDriver
+final class OPayDriver extends AbstractDriver implements SupportsRefundsInterface
 {
+    use OPayRefundMethods;
+
     protected string $name = 'opay';
 
     /**

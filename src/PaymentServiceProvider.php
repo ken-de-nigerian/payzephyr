@@ -9,6 +9,7 @@ use Illuminate\Support\ServiceProvider;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Contracts\ChannelMapperInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
+use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
@@ -16,6 +17,7 @@ use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 use KenDeNigerian\PayZephyr\Http\Middleware\HealthEndpointMiddleware;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use KenDeNigerian\PayZephyr\Repositories\EloquentRefundRepository;
 use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
 use KenDeNigerian\PayZephyr\Repositories\EloquentTransactionRepository;
 use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
@@ -47,6 +49,7 @@ final class PaymentServiceProvider extends ServiceProvider
 
         $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
         $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);
+        $this->app->singleton(RefundRepositoryInterface::class, EloquentRefundRepository::class);
         $this->app->singleton(WebhookEventRepositoryInterface::class, EloquentWebhookEventRepository::class);
 
         $this->app->singleton(PaymentManager::class, function ($app) {

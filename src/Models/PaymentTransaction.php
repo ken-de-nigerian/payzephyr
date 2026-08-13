@@ -18,10 +18,10 @@ use Throwable;
 
 /**
  * @method static Builder<PaymentTransaction> where(string $column, mixed $operator = null, mixed $value = null)
- * @method static PaymentTransaction create(array $attributes = [])
- * @method static PaymentTransaction|null first(array|string $columns = ['*'])
+ * @method static PaymentTransaction create(array<string, mixed> $attributes = [])
+ * @method static PaymentTransaction|null first(array<int, string>|string $columns = ['*'])
  * @method static Builder<PaymentTransaction> lockForUpdate()
- * @method static Builder<PaymentTransaction> update(array $attributes = [])
+ * @method static Builder<PaymentTransaction> update(array<string, mixed> $attributes = [])
  * @method static Builder<PaymentTransaction> delete()
  *
  * @property string $reference
@@ -31,8 +31,8 @@ use Throwable;
  * @property string $currency
  * @property string $email
  * @property string|null $channel
- * @property array|ArrayObject|null $metadata
- * @property array|null $customer
+ * @property array<string, mixed>|ArrayObject<string, mixed>|null $metadata
+ * @property array<string, mixed>|null $customer
  * @property Carbon|null $paid_at
  */
 final class PaymentTransaction extends Model

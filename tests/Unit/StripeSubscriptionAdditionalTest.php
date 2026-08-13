@@ -235,6 +235,64 @@ test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in
         ->and($result->metadata)->toBe(['foo' => 'bar']);
 });
 
+test('stripe updatePlan casts non-string metadata values before sending them to Stripe', function () {
+    // Regression: Stripe's metadata parameter is documented as
+    // array<string, string>. This package's own DTOs/consumer input declare
+    // metadata as array<string, mixed> (a general-purpose bag), so a
+    // non-string value (e.g. an int passed by a careless caller) must be
+    // cast rather than sent as-is.
+    $pricesResource = new class
+    {
+        public array $updateCalls = [];
+
+        public function retrieve($id, $params = [])
+        {
+            return stripeObj2([
+                'id' => $id,
+                'unit_amount' => 1000,
+                'currency' => 'usd',
+                'recurring' => ['interval' => 'month'],
+                'metadata' => [],
+                'product' => ['id' => 'prod_123', 'name' => 'Product'],
+            ]);
+        }
+
+        public function update($id, array $params)
+        {
+            $this->updateCalls[] = [$id, $params];
+
+            return stripeObj2([
+                'id' => $id,
+                'unit_amount' => 1000,
+                'currency' => 'usd',
+                'recurring' => ['interval' => 'month'],
+                'metadata' => $params['metadata'] ?? [],
+            ]);
+        }
+    };
+    $productsResource = new class
+    {
+        public function retrieve($id)
+        {
+            return stripeObj2(['id' => $id, 'name' => 'Product']);
+        }
+    };
+
+    $client = new class($productsResource, $pricesResource)
+    {
+        public function __construct(public object $products, public object $prices) {}
+    };
+
+    $driver = makeStripeDriverWithClient2($client);
+    $driver->updatePlan('price_abc', ['metadata' => ['count' => 5, 'active_flag' => true]]);
+
+    expect($pricesResource->updateCalls)->toHaveCount(1);
+    $sentMetadata = $pricesResource->updateCalls[0][1]['metadata'];
+
+    expect($sentMetadata['count'])->toBe('5')
+        ->and($sentMetadata['active_flag'])->toBe('1');
+});
+
 test('stripe updatePlan returns the existing price unchanged when no mutable attributes are given', function () {
     $pricesResource = new class
     {

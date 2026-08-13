@@ -30,4 +30,11 @@ final class EloquentWebhookEventRepository implements WebhookEventRepositoryInte
             throw $e;
         }
     }
+
+    public function forget(string $provider, string $eventKey): void
+    {
+        WebhookEvent::where('provider', $provider)
+            ->where('event_key', $eventKey)
+            ->delete();
+    }
 }

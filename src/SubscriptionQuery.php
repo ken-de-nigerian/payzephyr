@@ -86,7 +86,7 @@ final class SubscriptionQuery
     }
 
     /**
-     * Filter for cancelled subscriptions (shorthand).
+     * Filter for canceled subscriptions (shorthand).
      */
     public function cancelled(): self
     {
@@ -221,8 +221,12 @@ final class SubscriptionQuery
     /**
      * Apply filters that aren't supported by the provider API in memory.
      *
+     * Returns the same shape it was given: a paginated ['data' => ..., 'meta'
+     * => ...] envelope when $results had a 'data' key, otherwise the plain
+     * filtered list.
+     *
      * @param  array<string, mixed>  $results
-     * @return array<string, mixed>
+     * @return array<string, mixed>|list<mixed>
      */
     protected function applyFilters(array $results): array
     {
@@ -235,12 +239,6 @@ final class SubscriptionQuery
         $filtered = [];
 
         foreach ($subscriptions as $subscription) {
-            // Paystack's listSubscriptions() returns raw provider arrays;
-            // every other subscription-capable driver (Stripe, PayPal,
-            // Flutterwave, Square, Mollie) returns SubscriptionResponseDTO
-            // objects. Array-indexing a DTO directly fatals ("Cannot use
-            // object ... as array"), so both shapes are normalized to a
-            // common array view before filtering.
             $normalized = $this->normalizeForFiltering($subscription);
 
             if ($this->planCode !== null && $normalized['plan_code'] !== $this->planCode) {
@@ -270,7 +268,6 @@ final class SubscriptionQuery
             return $results;
         }
 
-        /** @var array<string, mixed> $filtered */
         return $filtered;
     }
 
@@ -289,10 +286,6 @@ final class SubscriptionQuery
             return [
                 'plan_code' => $subscription->plan,
                 'status' => $subscription->status,
-                // SubscriptionResponseDTO does not carry a creation
-                // timestamp, so createdAfter()/createdBefore() are a
-                // no-op against DTO-shaped results rather than crashing -
-                // there is nothing on the DTO to compare against.
                 'created_at' => null,
             ];
         }

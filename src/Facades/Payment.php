@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Facade;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Refund;
 use KenDeNigerian\PayZephyr\Subscription;
 use KenDeNigerian\PayZephyr\SubscriptionQuery;
 
@@ -23,16 +24,17 @@ use KenDeNigerian\PayZephyr\SubscriptionQuery;
  * @method static \KenDeNigerian\PayZephyr\Payment email(string $email)
  * @method static \KenDeNigerian\PayZephyr\Payment reference(string $reference)
  * @method static \KenDeNigerian\PayZephyr\Payment callback(string $url)
- * @method static \KenDeNigerian\PayZephyr\Payment metadata(array $metadata)
+ * @method static \KenDeNigerian\PayZephyr\Payment metadata(array<string, mixed> $metadata)
  * @method static \KenDeNigerian\PayZephyr\Payment description(string $description)
- * @method static \KenDeNigerian\PayZephyr\Payment customer(array $customer)
- * @method static \KenDeNigerian\PayZephyr\Payment with(string|array $providers)
- * @method static \KenDeNigerian\PayZephyr\Payment using(string|array $providers)
+ * @method static \KenDeNigerian\PayZephyr\Payment customer(array<string, mixed> $customer)
+ * @method static \KenDeNigerian\PayZephyr\Payment with(string|array<int, string> $providers)
+ * @method static \KenDeNigerian\PayZephyr\Payment using(string|array<int, string> $providers)
  * @method static ChargeResponseDTO charge()
  * @method static RedirectResponse redirect()
  * @method static VerificationResponseDTO verify(string $reference, ?string $provider = null)
  * @method static Subscription subscription(?string $code = null)
  * @method static SubscriptionQuery subscriptions()
+ * @method static Refund refund(?string $transactionReference = null)
  *
  * @see \KenDeNigerian\PayZephyr\Payment
  */

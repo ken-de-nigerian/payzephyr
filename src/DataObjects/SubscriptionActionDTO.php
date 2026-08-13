@@ -8,7 +8,7 @@ use InvalidArgumentException;
 
 /**
  * Carries a subscription code plus an open bag of provider-specific
- * parameters for cancel/enable-style actions - see ADR-0006.
+ * parameters for cancel/enable-style actions.
  *
  * Different providers require different things to authorize these actions
  * (Paystack: an email confirmation token; PayPal: an optional cancellation

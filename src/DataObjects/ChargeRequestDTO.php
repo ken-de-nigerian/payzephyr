@@ -135,8 +135,7 @@ final readonly class ChargeRequestDTO
     public static function fromArray(array $data): ChargeRequestDTO
     {
         $amount = isset($data['amount']) ? round((float) $data['amount'], 2) : 0.0;
-
-        $idempotencyKey = $data['idempotency_key'] ?? self::generateIdempotencyKey();
+        $reference = $data['reference'] ?? null;
 
         if (isset($data['idempotency_key'])) {
             $key = $data['idempotency_key'];
@@ -144,6 +143,10 @@ final readonly class ChargeRequestDTO
                 throw new InvalidArgumentException('Invalid idempotency key format. Must be alphanumeric with dashes/underscores and max '.PaymentConstants::MAX_REFERENCE_LENGTH.' characters.');
             }
             $idempotencyKey = $key;
+        } elseif (is_string($reference) && $reference !== '') {
+            $idempotencyKey = $reference;
+        } else {
+            $idempotencyKey = self::generateIdempotencyKey();
         }
 
         return new self(

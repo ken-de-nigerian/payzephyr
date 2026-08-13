@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
 final class VerificationResource extends JsonResource
@@ -17,18 +18,20 @@ final class VerificationResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        /** @var VerificationResponseDTO $this */
+        /** @var VerificationResponseDTO $resource */
+        $resource = $this->resource;
+
         return [
-            'reference' => $this->reference,
-            'status' => $this->status,
-            'provider' => $this->provider ?? null,
-            'channel' => $this->channel,
+            'reference' => $resource->reference,
+            'status' => $resource->status,
+            'provider' => $resource->provider ?? null,
+            'channel' => $resource->channel,
             'amount' => [
-                'value' => $this->amount,
-                'currency' => $this->currency,
+                'value' => $resource->amount,
+                'currency' => $resource->currency,
             ],
-            'paid_at' => $this->paidAt ? (is_string($this->paidAt) ? $this->paidAt : $this->paidAt->toIso8601String()) : null,
-            'metadata' => $this->metadata,
+            'paid_at' => $resource->paidAt ? Carbon::parse($resource->paidAt)->toIso8601String() : null,
+            'metadata' => $resource->metadata,
             'verified_at' => now()->toIso8601String(),
         ];
     }

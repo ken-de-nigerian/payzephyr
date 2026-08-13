@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Throwable;
@@ -16,8 +17,7 @@ use Throwable;
 /**
  * Trait providing Mollie subscription functionality.
  *
- * See ADR-0010 for the API-mapping decisions this trait makes. Two
- * structural differences from every other subscription-capable driver:
+ * Two structural differences from every other subscription-capable driver:
  *
  * 1. Mollie has no server-side "plan" resource at all - a subscription
  *    carries its own amount/interval/description directly. createPlan()
@@ -131,9 +131,9 @@ trait MollieSubscriptionMethods
      * Create a subscription.
      *
      * Requires $request->authorization as an existing Mollie mandate ID
-     * (obtained from a prior recurring-eligible payment). See ADR-0010.
+     * (obtained from a prior recurring-eligible payment).
      *
-     * @throws SubscriptionException
+     * @throws SubscriptionException|PlanException
      */
     public function createSubscription(SubscriptionRequestDTO $request): SubscriptionResponseDTO
     {
@@ -238,17 +238,17 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * Mollie has no merchant-triggered resume - a cancelled subscription is
+     * Mollie has no merchant-triggered resume - a canceled subscription is
      * terminal, and `suspended` (an invalid-mandate state) is system-driven,
      * not something this action can clear. Throws rather than silently
-     * no-op'ing. See ADR-0010.
+     * no-op'ing.
      *
      * @throws SubscriptionException
      */
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         throw new SubscriptionException(
-            "Subscription {$action->subscriptionCode} cannot be re-enabled on Mollie - a cancelled ".
+            "Subscription $action->subscriptionCode cannot be re-enabled on Mollie - a cancelled ".
             'subscription is terminal and a suspended one requires the customer to provide a new valid '.
             'mandate. Create a new subscription instead.'
         );
@@ -258,7 +258,7 @@ trait MollieSubscriptionMethods
      * List customer subscriptions.
      *
      * Mollie's list endpoint is customer-scoped, not global - $customer is
-     * required, unlike every other driver's optional filter. See ADR-0010.
+     * required, unlike every other driver's optional filter.
      *
      * @return array<string, mixed>
      *
@@ -329,6 +329,8 @@ trait MollieSubscriptionMethods
 
     /**
      * @return array<string, mixed>|null
+     *
+     * @throws ChargeException
      */
     private function findMollieCustomerByEmail(string $email): ?array
     {
@@ -351,6 +353,8 @@ trait MollieSubscriptionMethods
 
     /**
      * @return array<string, mixed>
+     *
+     * @throws ChargeException
      */
     private function findOrCreateMollieCustomer(string $email): array
     {
@@ -359,6 +363,8 @@ trait MollieSubscriptionMethods
 
     /**
      * @return array<string, mixed>
+     *
+     * @throws ChargeException
      */
     private function createMollieCustomer(string $email): array
     {

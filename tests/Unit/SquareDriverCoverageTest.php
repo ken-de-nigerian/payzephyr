@@ -244,18 +244,41 @@ test('square driver extractWebhookChannel extracts source_type', function () {
     expect($result)->toBe('CARD');
 });
 
-test('square driver extractWebhookChannel defaults to card', function () {
+test('square driver extractWebhookChannel returns null when source_type is absent', function () {
+    // Previously defaulted to 'card', which recorded a card payment for
+    // instruments that were never cards (wallet, bank transfer, gift card).
+    // An absent source_type is an unknown channel, not a card one.
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
         'currencies' => ['USD'],
     ]);
 
-    $payload = ['data' => ['object' => []]];
+    expect($driver->extractWebhookChannel(['data' => ['object' => []]]))->toBeNull();
+});
 
-    $result = $driver->extractWebhookChannel($payload);
+test('square driver extractWebhookChannel returns the reported source_type', function () {
+    $driver = new SquareDriver([
+        'access_token' => 'EAAAxxx',
+        'location_id' => 'location_xxx',
+        'currencies' => ['USD'],
+    ]);
 
-    expect($result)->toBe('card');
+    $payload = ['data' => ['object' => ['payment' => ['source_type' => 'BANK_ACCOUNT']]]];
+
+    expect($driver->extractWebhookChannel($payload))->toBe('BANK_ACCOUNT');
+});
+
+test('square driver extractWebhookChannel treats an empty source_type as unknown', function () {
+    $driver = new SquareDriver([
+        'access_token' => 'EAAAxxx',
+        'location_id' => 'location_xxx',
+        'currencies' => ['USD'],
+    ]);
+
+    $payload = ['data' => ['object' => ['payment' => ['source_type' => '']]]];
+
+    expect($driver->extractWebhookChannel($payload))->toBeNull();
 });
 
 test('square driver resolveVerificationId returns providerId', function () {

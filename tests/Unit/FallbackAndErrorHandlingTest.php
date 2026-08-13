@@ -5,6 +5,16 @@ use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
+beforeEach(function () {
+    // PaymentServiceProvider registers 'payments.config' as a singleton
+    // snapshotting config('payments') the first time it's resolved. Without
+    // forgetting it, a fresh PaymentManager() built after this file's own
+    // config() calls would silently keep using whatever was cached first
+    // (e.g. TestCase's base provider setup) instead of each test's
+    // intended override - including real, unmocked provider credentials.
+    app()->forgetInstance('payments.config');
+});
+
 test('falls back to secondary provider when primary fails', function () {
     config([
         'payments.default' => 'paystack',

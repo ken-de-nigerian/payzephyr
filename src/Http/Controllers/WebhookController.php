@@ -21,10 +21,6 @@ final class WebhookController extends Controller
         try {
             $payload = $request->all();
 
-            // Headers are only actually needed by drivers implementing
-            // RequiresAsyncWebhookVerification (see ADR-0007); passed
-            // through for every provider for simplicity rather than
-            // conditionally checking driver type in the controller.
             ProcessWebhook::dispatch($provider, $payload, $request->headers->all());
 
             $this->log('info', 'Webhook queued for processing', [

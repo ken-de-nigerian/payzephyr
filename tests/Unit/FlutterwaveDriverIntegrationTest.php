@@ -41,12 +41,21 @@ test('flutterwave charge succeeds', function () {
         ])),
     ]);
 
-    $request = new ChargeRequestDTO(15000, 'NGN', 'test@example.com', 'fw_ref_123');
+    $request = new ChargeRequestDTO(15000, 'NGN', 'test@example.com', 'fw_ref_123', 'https://example.com/callback');
     $response = $driver->charge($request);
 
     expect($response->reference)->toBe('fw_ref_123')
         ->and($response->authorizationUrl)->toBe('https://checkout.flutterwave.com/xyz789')
         ->and($response->status)->toBe('pending');
+});
+
+test('flutterwave charge throws InvalidConfigurationException when no callback URL is set', function () {
+    $driver = createFlutterwaveDriverWithMock([]);
+
+    $request = new ChargeRequestDTO(15000, 'NGN', 'test@example.com', 'fw_ref_123');
+
+    expect(fn () => $driver->charge($request))
+        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class);
 });
 
 test('flutterwave charge throws exception on error', function () {
@@ -69,7 +78,7 @@ test('flutterwave charge handles network error', function () {
     $driver = new FlutterwaveDriver(['secret_key' => 'test', 'currencies' => ['NGN'], 'callback_url' => 'http://test']);
     $driver->setClient($client);
 
-    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class);
 
 test('flutterwave verify returns success', function () {

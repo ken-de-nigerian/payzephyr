@@ -27,7 +27,7 @@ PayZephyr is a good fit if:
 - You want to support more than one payment provider (or might in the future) without duplicating your checkout logic.
 - You want webhook signature verification, replay-attack protection, and transaction logging handled for you instead of hand-rolled per provider.
 
-It's **not** trying to be a full accounting or invoicing system; it's a payment abstraction layer. If you need refund processing today, that's not built in yet (see the [FAQ](docs/faq.md)).
+It's **not** trying to be a full accounting or invoicing system; it's a payment abstraction layer. Refunds are supported (see [Refunds](docs/refunds.md)), but full accounting/ledger reconciliation is out of scope.
 
 ## How it fits together
 
@@ -58,7 +58,7 @@ composer require kendenigerian/payzephyr
 php artisan payzephyr:install
 ```
 
-`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the database migrations it needs (for transaction logging), and offers to run them for you. See [Installation](docs/installation.md) if you'd rather do each step by hand.
+`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the core database migrations it always needs (for transaction logging), asks whether you also want Subscriptions and/or Refunds, and offers to run the migrations for you. See [Installation](docs/installation.md#core-vs-optional-features) for exactly which tables are core vs. optional, and how to select features non-interactively with `--all`/`--features=`. A matching `php artisan payzephyr:uninstall` removes what PayZephyr installed - see [Uninstalling PayZephyr](docs/installation.md#uninstalling-payzephyr).
 
 **2. Add your provider's credentials to `.env`.** Paystack is enabled by default. Grab your test keys from your Paystack dashboard:
 
@@ -113,36 +113,37 @@ The chapters below are written to be read roughly in order if you're new to PayZ
 
 **Core features**
 
-6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on 6 of the 8 providers
-7. [Webhooks](docs/webhooks.md): why they exist and how to handle them
-8. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
-9. [Testing](docs/testing.md): testing code that charges money, without charging money
-10. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
-11. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
-12. [Queues](docs/queues.md): why a queue worker is required, not optional
+6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on most bundled providers
+7. [Refunds](docs/refunds.md): full and partial refunds, supported on every bundled provider
+8. [Webhooks](docs/webhooks.md): why they exist and how to handle them
+9. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
+10. [Testing](docs/testing.md): testing code that charges money, without charging money
+11. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
+12. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
+13. [Queues](docs/queues.md): why a queue worker is required, not optional
 
 **Going further**
 
-13. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
-14. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
-15. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
+14. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
+15. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
+16. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
 
 **Shipping it**
 
-16. [Production Checklist](docs/production-checklist.md): what to double-check before going live
-17. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
-18. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
+17. [Production Checklist](docs/production-checklist.md): what to double-check before going live
+18. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
+19. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
 
 **When things go wrong**
 
-19. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
-20. [FAQ](docs/faq.md)
+20. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
+21. [FAQ](docs/faq.md)
 
 **Reference**
 
-21. [API Reference](docs/api-reference.md): every public method, documented
-22. [Architecture](docs/architecture.md): how the package is put together internally
-23. [Contributing](docs/contributing.md)
+22. [API Reference](docs/api-reference.md): every public method, documented
+23. [Architecture](docs/architecture.md): how the package is put together internally
+24. [Contributing](docs/contributing.md)
 
 The full table of contents, if you'd rather browse than read linearly, is in [docs/INDEX.md](docs/INDEX.md).
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
-use Exception;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -13,6 +13,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\StripeRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\StripeSubscriptionMethods;
 use Random\RandomException;
 use Stripe\Exception\ApiErrorException;
@@ -20,12 +21,14 @@ use Stripe\Exception\AuthenticationException;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\StripeClient;
 use Stripe\Webhook;
+use Throwable;
 
 /**
  * Driver implementation for the Stripe payment gateway.
  */
-final class StripeDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class StripeDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use StripeRefundMethods;
     use StripeSubscriptionMethods;
 
     protected string $name = 'stripe';
@@ -169,8 +172,13 @@ final class StripeDriver extends AbstractDriver implements SupportsSubscriptions
                 ],
                 provider: $this->getName(),
             );
+        } catch (InvalidConfigurationException $e) {
+            throw $e;
         } catch (ApiErrorException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
+            throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
+        } catch (Throwable $e) {
+            $this->log('error', 'Charge failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
         } finally {
             $this->clearCurrentRequest();
@@ -234,7 +242,15 @@ final class StripeDriver extends AbstractDriver implements SupportsSubscriptions
             }
 
             throw new VerificationException("Payment not found for reference [$reference]");
+        } catch (VerificationException $e) {
+            throw $e;
         } catch (ApiErrorException $e) {
+            throw new VerificationException(
+                'Stripe verification failed: '.$e->getMessage(),
+                0,
+                $e
+            );
+        } catch (Throwable $e) {
             throw new VerificationException(
                 'Stripe verification failed: '.$e->getMessage(),
                 0,
@@ -296,7 +312,7 @@ final class StripeDriver extends AbstractDriver implements SupportsSubscriptions
             ]);
 
             return false;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->log('warning', 'Webhook validation failed', [
                 'error' => $e->getMessage(),
                 'exception_type' => get_class($e),
@@ -338,7 +354,7 @@ final class StripeDriver extends AbstractDriver implements SupportsSubscriptions
     private function mapFromCheckoutSession(object $session): VerificationResponseDTO
     {
         $pi = $session->payment_intent ?? null;
-        $piAmount = isset($pi->amount) && is_object($pi) ? $pi->amount : null;
+        $piAmount = $pi?->amount;
 
         $status = match ($session->payment_status) {
             'paid' => 'success',

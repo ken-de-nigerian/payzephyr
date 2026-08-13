@@ -48,7 +48,7 @@ A request with an invalid PayPal webhook signature now receives `202 Accepted` (
 
 1. **Read the [CHANGELOG.md](CHANGELOG.md) entry for the version you're upgrading to, in full**, before running `composer update`: breaking changes are always called out explicitly at the top of each version's entry.
 2. **Run `composer update kendenigerian/payzephyr`** (or update your `composer.json` constraint and run `composer update`).
-3. **Run any new migrations**: `php artisan vendor:publish --tag=payments-migrations` followed by `php artisan migrate` picks up any new tables a version introduced, without overwriting migrations you've already run.
+3. **Run any new migrations**: `php artisan payzephyr:install` picks up any new tables a version introduced for the features you already have installed, without overwriting migrations you've already run or installing a feature you never selected. (The old `php artisan vendor:publish --tag=payments-migrations` still works too and still publishes every table at once, unchanged, if you'd rather use that directly - see [Installation: core vs. optional features](installation.md#core-vs-optional-features).)
 4. **Run your own test suite.** If you've followed [Testing](testing.md) and have coverage around your checkout and webhook handling, this is exactly what catches an upgrade-related regression before your customers do.
 5. **Deploy to staging first if you have one**, and specifically exercise a real (sandbox) payment and webhook delivery before promoting to production.
 

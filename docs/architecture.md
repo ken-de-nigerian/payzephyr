@@ -27,7 +27,7 @@ flowchart TD
 
 **Webhook processing** is a separate path: `WebhookController` receives the raw HTTP request, `WebhookRequest` (a Laravel form request) handles synchronous signature verification where the provider supports it, and the actual processing (deduplication, transaction updates, event dispatch) happens inside `ProcessWebhook`, a queued job. See [Webhooks](webhooks.md) and [Queues](queues.md) for why this is split this way.
 
-**Repositories** (`src/Repositories/`) sit between the webhook job and the database, handling concurrency-safe reads/writes to `payment_transactions`, `subscription_transactions`, and `webhook_events`: this is where duplicate-webhook detection and race-condition-safe updates are implemented (see the [ADRs](#why-things-are-built-this-way) below for the reasoning).
+**Repositories** (`src/Repositories/`) sit between the webhook job and the database, handling concurrency-safe reads/writes to `payment_transactions`, `webhook_events`, and (if installed - see [Installation: core vs. optional features](installation.md#core-vs-optional-features)) `subscription_transactions` and `refund_transactions`: this is where duplicate-webhook detection and race-condition-safe updates are implemented (see the [ADRs](#why-things-are-built-this-way) below for the reasoning).
 
 ## Directory structure
 
@@ -54,12 +54,14 @@ src/
 ├── Services/                  ← StatusNormalizer, MetadataSanitizer, ChannelMapper, ...
 ├── Traits/                    ← shared behavior mixed into drivers (webhook validation, log sanitization, ...)
 └── Console/
-    └── InstallCommand.php    ← php artisan payzephyr:install
+    ├── InstallCommand.php     ← php artisan payzephyr:install
+    ├── UninstallCommand.php   ← php artisan payzephyr:uninstall
+    └── Features.php           ← single source of truth for core/optional features
 ```
 
 ## Why a fluent builder instead of passing arrays or DTOs directly
 
-`Payment::amount(100)->email('a@b.com')->redirect()` reads close to plain English, and (more importantly for a package with eight providers) the builder methods are the same regardless of which provider ends up handling the request. If PayZephyr instead required you to construct a `ChargeRequestDTO` by hand and pass it to a provider-specific method, adding a ninth provider (or your own [custom driver](custom-drivers.md)) would mean learning a new call shape rather than reusing muscle memory you already have.
+`Payment::amount(100)->email('a@b.com')->redirect()` reads close to plain English, and (more importantly for a package with many providers) the builder methods are the same regardless of which provider ends up handling the request. If PayZephyr instead required you to construct a `ChargeRequestDTO` by hand and pass it to a provider-specific method, adding a ninth provider (or your own [custom driver](custom-drivers.md)) would mean learning a new call shape rather than reusing muscle memory you already have.
 
 ## Why drivers extend an abstract base rather than each being fully independent
 

@@ -13,36 +13,37 @@ New here? Start with the [README](../README.md), then work through the chapters 
 ## Core features
 
 6. [Subscriptions](subscriptions.md)
-7. [Webhooks](webhooks.md)
-8. [Events](events.md)
-9. [Testing](testing.md)
-10. [Error Handling](error-handling.md)
-11. [Security](security.md)
-12. [Queues](queues.md)
+7. [Refunds](refunds.md)
+8. [Webhooks](webhooks.md)
+9. [Events](events.md)
+10. [Testing](testing.md)
+11. [Error Handling](error-handling.md)
+12. [Security](security.md)
+13. [Queues](queues.md)
 
 ## Going further
 
-13. [Multiple Providers](providers.md)
-14. [Custom Drivers](custom-drivers.md)
-15. [Advanced Usage](advanced-usage.md)
+14. [Multiple Providers](providers.md)
+15. [Custom Drivers](custom-drivers.md)
+16. [Advanced Usage](advanced-usage.md)
 
 ## Shipping it
 
-16. [Production Checklist](production-checklist.md)
-17. [Deployment](deployment.md)
-18. [Upgrade Guide](upgrade-guide.md)
+17. [Production Checklist](production-checklist.md)
+18. [Deployment](deployment.md)
+19. [Upgrade Guide](upgrade-guide.md)
 
 ## When things go wrong
 
-19. [Troubleshooting](troubleshooting.md)
-20. [FAQ](faq.md)
+20. [Troubleshooting](troubleshooting.md)
+21. [FAQ](faq.md)
 
 ## Reference
 
-21. [API Reference](api-reference.md)
-22. [Architecture](architecture.md)
-23. [Contributing](contributing.md)
-24. [Changelog](CHANGELOG.md)
+22. [API Reference](api-reference.md)
+23. [Architecture](architecture.md)
+24. [Contributing](contributing.md)
+25. [Changelog](CHANGELOG.md)
 
 ## Other
 

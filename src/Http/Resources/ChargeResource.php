@@ -17,17 +17,19 @@ final class ChargeResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        /** @var ChargeResponseDTO $this */
+        /** @var ChargeResponseDTO $resource */
+        $resource = $this->resource;
+
         return [
-            'reference' => $this->reference,
-            'authorization_url' => $this->authorizationUrl,
-            'status' => $this->status,
-            'provider' => $this->provider ?? null,
+            'reference' => $resource->reference,
+            'authorization_url' => $resource->authorizationUrl,
+            'status' => $resource->status,
+            'provider' => $resource->provider ?? null,
             'amount' => [
-                'value' => $this->metadata['amount'] ?? null,
-                'currency' => $this->metadata['currency'] ?? null,
+                'value' => $resource->metadata['amount'] ?? null,
+                'currency' => $resource->metadata['currency'] ?? null,
             ],
-            'metadata' => $this->metadata,
+            'metadata' => $resource->metadata,
             'created_at' => now()->toIso8601String(),
         ];
     }

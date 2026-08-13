@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -14,14 +15,16 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\FlutterwaveRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\FlutterwaveSubscriptionMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Flutterwave payment gateway.
  */
-final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use FlutterwaveRefundMethods;
     use FlutterwaveSubscriptionMethods;
 
     protected string $name = 'flutterwave';
@@ -62,7 +65,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscrip
     /**
      * Initialize a charge using the Flutterwave Standard Payment Link.
      *
-     * @throws ChargeException If the API request fails or returns an error status.
+     * @throws ChargeException|InvalidConfigurationException If the API request fails or returns an error status.
      */
     public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
@@ -70,6 +73,13 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscrip
 
         try {
             $reference = $request->reference ?? $this->generateReference('FLW');
+
+            if (empty($request->callbackUrl)) {
+                throw new InvalidConfigurationException(
+                    'Flutterwave requires a callback URL for its redirect flow. '.
+                    'Please use ->callback() in your payment chain to set the callback URL.'
+                );
+            }
 
             $payload = [
                 'tx_ref' => $reference,
@@ -123,7 +133,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscrip
                 metadata: $request->metadata,
                 provider: $this->getName(),
             );
-        } catch (ChargeException $e) {
+        } catch (InvalidConfigurationException|ChargeException $e) {
             throw $e;
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
@@ -255,7 +265,6 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscrip
     /**
      * Flutterwave nests event data (including `created_at`) under `data`,
      * not at the top level of the webhook body.
-     * See ADR-0001.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -266,7 +275,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsSubscrip
 
     /**
      * Flutterwave nests the transaction id (used for event-level
-     * idempotency) under `data`, not at the top level. See ADR-0005.
+     * idempotency) under `data`, not at the top level.
      *
      * @param  array<string, mixed>  $payload
      */

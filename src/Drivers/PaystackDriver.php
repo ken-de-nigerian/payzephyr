@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -13,14 +14,16 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\PaystackRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\PaystackSubscriptionMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Paystack payment gateway.
  */
-final class PaystackDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class PaystackDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use PaystackRefundMethods;
     use PaystackSubscriptionMethods;
 
     protected string $name = 'paystack';
@@ -224,7 +227,6 @@ final class PaystackDriver extends AbstractDriver implements SupportsSubscriptio
     /**
      * Paystack nests event data (including `paid_at` / `created_at`) under
      * `data`, not at the top level of the webhook body.
-     *  See ADR-0001.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -235,7 +237,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsSubscriptio
 
     /**
      * Paystack nests the transaction id (used for event-level idempotency)
-     * under `data`, not at the top level. See ADR-0005.
+     * under `data`, not at the top level.
      *
      * @param  array<string, mixed>  $payload
      */

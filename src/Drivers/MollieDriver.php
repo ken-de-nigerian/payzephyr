@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -15,6 +16,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\MollieRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\MollieSubscriptionMethods;
 use Throwable;
 
@@ -24,17 +26,18 @@ use Throwable;
  * Implements RequiresAsyncWebhookVerification conditionally: when no
  * webhook_secret is configured, validateWebhook() falls back to an
  * outbound API call (validateWebhookViaAPI()) and must be deferred to the
- * queued webhook job. See ADR-0008.
+ * queued webhook job.
  */
-final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsSubscriptionsInterface
+final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use MollieRefundMethods;
     use MollieSubscriptionMethods;
 
     protected string $name = 'mollie';
 
     /**
      * Only the no-webhook_secret (API-fallback) configuration performs
-     * synchronous I/O during verification. See ADR-0008.
+     * synchronous I/O during verification.
      */
     public function requiresAsyncVerification(): bool
     {
@@ -271,14 +274,6 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return true;
         }
 
-        // No timestamp check here: Mollie's webhook body is always a minimal
-        // {"id": "...", "type": "..."} ping by design - it never carries a
-        // timestamp to check.
-        // Replaying an old ping only causes a redundant
-        // re-sync to Mollie's *current* state via the API, not processing of
-        // stale/forged data, so a body-level replay window is architecturally
-        // meaningless here.
-        // See ADR-0001.
         $this->log('info', 'Webhook validated successfully via signature verification', [
             'event_type' => $eventType,
         ]);
@@ -336,10 +331,6 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 return false;
             }
 
-            // Checked against $paymentData (the freshly-fetched Payment
-            // resource, which carries `createdAt`), not $payload (the
-            // minimal incoming ping, which does not).
-            // See ADR-0001.
             if (! $this->validateWebhookTimestamp($paymentData)) {
                 $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 

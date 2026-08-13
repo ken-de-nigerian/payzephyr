@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
+use Throwable;
 
 final class Payment
 {
@@ -127,7 +128,7 @@ final class Payment
 
     /**
      * @throws InvalidConfigurationException
-     * @throws ProviderException|ChargeException
+     * @throws ProviderException|ChargeException|Throwable
      */
     public function charge(): ChargeResponseDTO
     {
@@ -162,8 +163,10 @@ final class Payment
 
     protected function getRateLimitKey(): string
     {
-        if (function_exists('auth') && auth()->check()) {
-            return 'payment_charge:user_'.auth()->id();
+        // auth() returns the Auth Factory, which only exposes guard()/
+        // shouldUse() - check()/id() live on the Guard the factory resolves.
+        if (function_exists('auth') && auth()->guard()->check()) {
+            return 'payment_charge:user_'.auth()->guard()->id();
         }
 
         if (! empty($this->data['email'])) {
@@ -179,7 +182,7 @@ final class Payment
 
     /**
      * @throws ProviderException
-     * @throws InvalidConfigurationException|ChargeException
+     * @throws InvalidConfigurationException|ChargeException|Throwable
      */
     public function redirect(): RedirectResponse
     {
@@ -213,5 +216,16 @@ final class Payment
     public function subscriptions(): SubscriptionQuery
     {
         return new SubscriptionQuery($this->manager);
+    }
+
+    public function refund(?string $transactionReference = null): Refund
+    {
+        $refund = new Refund($this->manager);
+
+        if ($transactionReference) {
+            $refund->transaction($transactionReference);
+        }
+
+        return $refund;
     }
 }

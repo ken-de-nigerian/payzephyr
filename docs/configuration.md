@@ -4,6 +4,17 @@ Everything PayZephyr does is controlled from one file: `config/payments.php` (pu
 
 Most values in the config file are read from environment variables via `env(...)`, so day-to-day you'll mostly be editing `.env`, not the config file itself. The config file is where you'd change *structural* things: like which providers exist at all, or their currency lists.
 
+## Installed features
+
+```php
+'features' => [
+    'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
+    'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+],
+```
+
+Set by `php artisan payzephyr:install` the first time it publishes that feature's migration, and reset back to `false` by `php artisan payzephyr:uninstall` if that feature is later removed - see [Installation: core vs. optional features](installation.md#core-vs-optional-features) and [Uninstalling PayZephyr](installation.md#uninstalling-payzephyr) for what's core (always available, not listed here) versus optional. This is purely informational bookkeeping for your own code (`config('payments.features.refunds')`); it does not gate `Payment::subscription()`/`Payment::refund()` at runtime, which work based on whatever the provider driver you called `->with()` actually supports.
+
 ## Default and fallback providers
 
 ```php
@@ -141,6 +152,24 @@ Every charge you initiate through PayZephyr gets a row written to `payment_trans
 ```
 
 Covered in full in [Subscriptions](subscriptions.md), since it needs the context of how subscriptions actually work to make sense. Quick summary: `prevent_duplicates` stops the same customer from being subscribed to the same plan twice by mistake; `validation.enabled` runs sanity checks (does this plan exist, is this customer eligible) before making an API call rather than after; `logging` mirrors the payment-transaction logging above, but for subscriptions.
+
+## Refunds
+
+```php
+'refunds' => [
+    'prevent_duplicates' => env('PAYMENTS_REFUNDS_PREVENT_DUPLICATES', true),
+    'validation' => [
+        'enabled' => env('PAYMENTS_REFUNDS_VALIDATION_ENABLED', true),
+    ],
+    'logging' => [
+        'enabled' => env('PAYMENTS_REFUNDS_LOGGING_ENABLED', true),
+        'table' => env('PAYMENTS_REFUNDS_LOGGING_TABLE', 'refund_transactions'),
+    ],
+    // ...
+],
+```
+
+Covered in full in [Refunds](refunds.md). Quick summary: when `validation.enabled`, PayZephyr checks (both best-effort, gated by `validation.enabled` as a whole) that a refund's amount doesn't exceed the original transaction's remaining refundable balance, and - separately, gated by `prevent_duplicates` - rejects a second refund attempt while an earlier one on the same transaction is still pending/processing, to guard against accidental double-submission without blocking legitimate sequential partial refunds once the earlier one resolves (see [Preventing over-refunds and duplicates](refunds.md#preventing-over-refunds-and-duplicates)); `logging` mirrors the payment-transaction logging above, but for refunds.
 
 ## Cache
 

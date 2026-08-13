@@ -38,7 +38,7 @@
         "illuminate/database": "^12.0|^13.0",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "stripe/stripe-php": "^13.0"
+        "stripe/stripe-php": "^21.0"
     },
     "require-dev": {
         "ext-pdo": "*",
@@ -47,7 +47,7 @@
         "orchestra/testbench": "^10.0|^11.0",
         "pestphp/pest": "^3.0|^5.0",
         "pestphp/pest-plugin-laravel": "^3.0|^5.0",
-        "phpstan/phpstan": "^1.10"
+        "phpstan/phpstan": "^2.2"
     },
     "autoload": {
         "psr-4": {

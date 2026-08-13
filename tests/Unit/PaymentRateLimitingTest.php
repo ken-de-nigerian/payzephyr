@@ -12,10 +12,7 @@ test('payment rate limits by user when authenticated', function () {
         }
     };
 
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(true);
-    \Illuminate\Support\Facades\Auth::shouldReceive('id')
-        ->andReturn(123);
+    mockAuthGuard(check: true, id: 123);
 
     $key = 'payment_charge:user_123';
     RateLimiter::clear($key);
@@ -34,8 +31,7 @@ test('payment rate limits by user when authenticated', function () {
 });
 
 test('payment rate limits by email when not authenticated', function () {
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(false);
+    mockAuthGuard(check: false);
 
     $email = 'test@example.com';
     $key = 'payment_charge:email_'.hash('sha256', $email);
@@ -55,8 +51,7 @@ test('payment rate limits by email when not authenticated', function () {
 });
 
 test('payment rate limits by IP when no email provided', function () {
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(false);
+    mockAuthGuard(check: false);
 
     $request = new \Illuminate\Http\Request;
     $request->server->set('REMOTE_ADDR', '192.168.1.1');
@@ -74,8 +69,7 @@ test('payment rate limits by IP when no email provided', function () {
 });
 
 test('payment rate limits fallback to global when no request available', function () {
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(false);
+    mockAuthGuard(check: false);
 
     if (app()->bound('request')) {
         app()->forgetInstance('request');
@@ -92,8 +86,7 @@ test('payment rate limits fallback to global when no request available', functio
 });
 
 test('payment allows requests within rate limit', function () {
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(false);
+    mockAuthGuard(check: false);
 
     $email = 'test@example.com';
     $key = 'payment_charge:email_'.hash('sha256', $email);

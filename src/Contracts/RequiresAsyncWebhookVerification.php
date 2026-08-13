@@ -10,9 +10,9 @@ namespace KenDeNigerian\PayZephyr\Contracts;
  *
  * A driver implementing this is verified inside the queued ProcessWebhook
  * job instead of synchronously in WebhookRequest::authorize() whenever
- * requiresAsyncVerification() returns true for its current configuration -
- * see ADR-0007 and ADR-0008 (some drivers, like Mollie, only need this for
- * one of their possible configurations, not universally).
+ * requiresAsyncVerification() returns true for its current configuration
+ * (some drivers, like Mollie, only need this for one of their possible
+ * configurations, not universally).
  */
 interface RequiresAsyncWebhookVerification
 {

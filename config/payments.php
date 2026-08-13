@@ -6,6 +6,24 @@ $paymentsHealthCheckAllowedTokens = env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS');
 return [
     /*
     |--------------------------------------------------------------------------
+    | Installed Features
+    |--------------------------------------------------------------------------
+    |
+    | Tracks which optional PayZephyr features `php artisan payzephyr:install`
+    | has enabled for this app (payment logging and webhook processing are
+    | core and always available, not listed here). This is informational -
+    | set by the installer, readable by your own code - and does not gate
+    | Payment::subscription()/Payment::refund() at runtime; see
+    | docs/installation.md#core-vs-optional-features.
+    |
+    */
+    'features' => [
+        'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
+        'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Default Payment Provider
     |--------------------------------------------------------------------------
     |
@@ -156,9 +174,6 @@ return [
         'max_retries' => env('PAYMENTS_WEBHOOK_MAX_RETRIES', 3),
         'retry_backoff' => env('PAYMENTS_WEBHOOK_RETRY_BACKOFF', 60), // seconds
         'events' => [
-            // Event-level idempotency (ADR-0005): dedupes duplicate webhook
-            // deliveries before any side effect (transaction update, event
-            // dispatch) runs, not just at the transaction-status level.
             'table' => env('PAYMENTS_WEBHOOK_EVENTS_TABLE', 'webhook_events'),
         ],
     ],
@@ -231,6 +246,40 @@ return [
                 'cancelled',
                 'renewed',
                 'payment_failed',
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Refund Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configure refund-specific settings including logging, webhooks,
+    | and business logic rules.
+    |
+    */
+    'refunds' => [
+        'prevent_duplicates' => env('PAYMENTS_REFUNDS_PREVENT_DUPLICATES', true),
+        'validation' => [
+            'enabled' => env('PAYMENTS_REFUNDS_VALIDATION_ENABLED', true),
+        ],
+        'logging' => [
+            'enabled' => env('PAYMENTS_REFUNDS_LOGGING_ENABLED', true),
+            'table' => env('PAYMENTS_REFUNDS_LOGGING_TABLE', 'refund_transactions'),
+        ],
+        'webhook_events' => [
+            'refund.processed',
+            'refund.failed',
+            'charge.refunded',
+            'refund.updated',
+        ],
+        'notifications' => [
+            'enabled' => env('PAYMENTS_REFUNDS_NOTIFICATIONS_ENABLED', false),
+            'events' => [
+                'created',
+                'completed',
+                'failed',
             ],
         ],
     ],

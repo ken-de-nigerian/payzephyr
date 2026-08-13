@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
@@ -66,6 +67,12 @@ abstract class AbstractDriver implements DriverInterface
      * Can be injected for testing or to use a custom repository.
      */
     protected ?SubscriptionRepositoryInterface $subscriptionRepository = null;
+
+    /**
+     * Refund repository instance.
+     * Can be injected for testing or to use a custom repository.
+     */
+    protected ?RefundRepositoryInterface $refundRepository = null;
 
     /**
      * Create a new payment driver instance.
@@ -404,6 +411,31 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * Get the refund repository instance.
+     * Uses dependency injection if available, otherwise resolves from the container.
+     */
+    protected function getRefundRepository(): RefundRepositoryInterface
+    {
+        if ($this->refundRepository === null) {
+            $this->refundRepository = app(RefundRepositoryInterface::class);
+        }
+
+        return $this->refundRepository;
+    }
+
+    /**
+     * Set a custom refund repository (mainly for testing).
+     *
+     * @return $this
+     */
+    public function setRefundRepository(RefundRepositoryInterface $repository): self
+    {
+        $this->refundRepository = $repository;
+
+        return $this;
+    }
+
+    /**
      * Map unified channels to a provider-specific format.
      * If no channels are provided, returns null (provider uses its defaults).
      * Only returns default channels if explicitly needed by the provider.
@@ -465,7 +497,7 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Extract a provider-native event identifier from a raw webhook payload,
-     * for event-level idempotency (see ADR-0005).
+     * for event-level idempotency.
      *
      * Deliberately not part of DriverInterface - a driver implementing that
      * interface directly (rather than extending this class) isn't required
@@ -473,10 +505,9 @@ abstract class AbstractDriver implements DriverInterface
      * content-hash key when absent, so this stays fully backward compatible.
      *
      * Checks common top-level field names (works as-is for Stripe, PayPal,
-     * Square, Mollie). Providers that nest their event data
-     * under a sub-object (Paystack, Flutterwave, Monnify, OPay) override this
-     * - see ADR-0001's identical nested-field precedent for
-     * extractWebhookTimestamp().
+     * Square, Mollie). Providers that nest their event data under a
+     * sub-object (Paystack, Flutterwave, Monnify, OPay) override this, the
+     * same way they override extractWebhookTimestamp().
      *
      * @param  array<string, mixed>  $payload
      */

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
-use Exception;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
+use KenDeNigerian\PayZephyr\Traits\PayPalRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\PayPalSubscriptionMethods;
 use Throwable;
 
@@ -24,10 +25,11 @@ use Throwable;
  * Implements RequiresAsyncWebhookVerification: signature verification calls
  * PayPal's own API (two outbound HTTP calls - an OAuth token fetch, then the
  * verify-webhook-signature call), so it's deferred to the queued webhook job
- * instead of running synchronously in the request cycle. See ADR-0007.
+ * instead of running synchronously in the request cycle.
  */
-final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsSubscriptionsInterface
+final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use PayPalRefundMethods;
     use PayPalSubscriptionMethods;
 
     protected string $name = 'paypal';
@@ -44,7 +46,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
     /**
      * PayPal verification always calls PayPal's API - no local-only path
-     * exists. See ADR-0007/ADR-0008.
+     * exists.
      */
     public function requiresAsyncVerification(): bool
     {
@@ -366,7 +368,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             }
 
             return true;
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             $this->log('error', 'PayPal webhook validation failed', [
                 'error' => $e->getMessage(),
             ]);
@@ -439,10 +441,6 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return true;
 
         } catch (ChargeException $e) {
-            // getAccessToken() wraps makeRequest()'s own ChargeException in a
-            // second ChargeException, so a ClientException (API reachable,
-            // credentials rejected) sits two levels down getPrevious(), not
-            // one - walk the full chain rather than checking a single level.
             $previous = $e;
             while ($previous = $previous->getPrevious()) {
                 if ($previous instanceof ClientException) {
@@ -452,13 +450,15 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return false;
 
-        } catch (Exception) {
+        } catch (Throwable) {
             return false;
         }
     }
 
     /**
      * @return array<string, mixed>|null
+     *
+     * @throws VerificationException
      */
     private function captureOrder(string $orderId): ?array
     {
@@ -504,6 +504,23 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return 'paypal';
+        // PayPal reports the instrument the payer actually used under
+        // resource.payment_source, keyed by type ({"card": {...}},
+        // {"paypal": {...}}, {"venmo": {...}}, ...). This previously returned
+        // a hardcoded 'paypal' without reading the payload at all, which both
+        // duplicated the provider name and erased which instrument was used.
+        //
+        // Null when the field is absent: the channel is genuinely unknown
+        // then, and inventing one would record a funding source PayPal never
+        // reported.
+        $paymentSource = $payload['resource']['payment_source'] ?? null;
+
+        if (! is_array($paymentSource) || $paymentSource === []) {
+            return null;
+        }
+
+        $type = array_key_first($paymentSource);
+
+        return is_string($type) ? $type : null;
     }
 }

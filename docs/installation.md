@@ -29,18 +29,78 @@ php artisan payzephyr:install
 Here's exactly what this does, in order:
 
 1. **Publishes the configuration file** to `config/payments.php`. This is your copy: PayZephyr ships with sensible defaults baked into the package, but publishing the file lets you see every option and change what you need to. Nothing works without this file existing in your app; PayZephyr reads its settings from `config/payments.php`, not from inside the package itself.
-2. **Publishes the database migrations** PayZephyr needs. Three tables get created: `payment_transactions` (a log of every payment you initiate), `subscription_transactions` (the same, for subscriptions), and `webhook_events` (used internally to make sure a webhook delivered twice by a provider only gets processed once; more on that in [Webhooks](webhooks.md)).
-3. **Asks if you want to run the migrations now.** Say yes unless you have a reason to run them separately later (for example, if your deployment pipeline runs migrations as its own step).
+2. **Publishes the core database migrations.** `payment_transactions` (a log of every payment you initiate) and `webhook_events` (used internally to make sure a webhook delivered twice by a provider only gets processed once; more on that in [Webhooks](webhooks.md)) are created unconditionally - see [Core vs. optional features](#core-vs-optional-features) for why.
+3. **Shows a checkbox list asking which optional features you want** (Subscriptions, Refunds - see the screenshot below). Select any number with the space bar, then press Enter. Nothing you don't select gets a table - PayZephyr doesn't create database structure your app doesn't use. Already-installed features arrive pre-checked; unchecking one does **not** remove it (see [Adding a feature later](#adding-a-feature-later)).
+4. **Shows a short summary of what's about to happen**, then asks if you want to run the migrations now. Say yes unless you have a reason to run them separately later (for example, if your deployment pipeline runs migrations as its own step).
 
-> **Tip:** Pass `--force` to overwrite an already-published `config/payments.php`, useful if you're upgrading PayZephyr and want the latest default config structure to diff against your customized one.
+```
+PayZephyr Installation
 
-If you'd rather run each piece yourself instead of using the install command, here's the manual equivalent:
+Let's get your payment infrastructure ready.
+
+┌ Select the optional features you want to install ──┐
+│ ◻ Subscriptions - Recurring billing (create/cancel/ │
+│   renew) on Paystack, Stripe, PayPal, Flutterwave,  │
+│   Square, and Mollie                                │
+│ ◻ Refunds - Full and partial refunds across every   │
+│   providers                                         │
+└──────────────────────────────────────────────────────┘
+```
+
+This is what a real interactive terminal (Linux/macOS, or WSL on Windows) shows. On native Windows or in a non-interactive environment (CI, scripted deploys), PayZephyr automatically falls back to a plain numbered-choice prompt - this is Laravel's own behavior (`Illuminate\Console\Concerns\ConfiguresPrompts`), not something PayZephyr has to detect or configure itself, and it doesn't change anything about what `--no-interaction`, `--features=`, or `--all` do.
+
+> **Tip:** Pass `--force` to overwrite already-published files, useful if you're upgrading PayZephyr and want the latest default config structure to diff against your customized one.
+
+If you'd rather run each piece yourself instead of using the install command, here's the manual equivalent for core-only:
 
 ```bash
 php artisan vendor:publish --tag=payments-config
-php artisan vendor:publish --tag=payments-migrations
+php artisan vendor:publish --tag=payzephyr-migrations-core
 php artisan migrate
 ```
+
+## Core vs. optional features
+
+PayZephyr's install command distinguishes between what your app needs no matter what, and what it only needs if you're actually using that capability:
+
+| | Tables | Why |
+|---|---|---|
+| **Core** (always installed) | `payment_transactions`, `webhook_events` | `Payment::charge()`/`verify()` log to `payment_transactions` by default (`payments.logging.enabled`), and every webhook from every provider - regardless of which PayZephyr feature triggered it - is deduplicated through `webhook_events`. Both are load-bearing for the package's basic charge/verify/webhook flow, not specific to any optional feature. |
+| **Subscriptions** (optional) | `subscription_transactions` | Only needed if you call `Payment::subscription()`. |
+| **Refunds** (optional) | `refund_transactions` | Only needed if you call `Payment::refund()`. |
+
+Subscriptions and Refunds don't depend on each other or on anything beyond core - selecting one never pulls in the other.
+
+## Selecting features non-interactively
+
+For CI/CD or scripted deployments, skip the prompts entirely:
+
+```bash
+# Install every optional feature
+php artisan payzephyr:install --no-interaction --all
+
+# Install specific features (comma-separated, case-insensitive)
+php artisan payzephyr:install --no-interaction --features=subscriptions,refunds
+
+# Core only - the default when neither flag is given non-interactively
+php artisan payzephyr:install --no-interaction
+```
+
+An unknown feature name in `--features=` fails the command with a clear error naming exactly which value it didn't recognize, rather than silently ignoring it or installing everything.
+
+**`--no-interaction` alone, with neither `--all` nor `--features=`, installs core only.** This is deliberate: a non-interactive run has no way to ask you what you want, so it never guesses "everything" on your behalf.
+
+## Adding a feature later
+
+You don't need to reinstall the package to turn on a feature you skipped the first time:
+
+```bash
+php artisan payzephyr:install --features=refunds
+```
+
+Re-running the installer is always safe: it detects what's already installed (by checking which migration files already exist) and only publishes what's genuinely new. Already-installed features are left completely alone - PayZephyr never re-copies, modifies, or removes an existing feature's migration or data just because you ran the installer again, and deselecting a feature you'd previously enabled (in the checkbox prompt, or by omitting it from `--features=`) does not uninstall it. To actually remove a feature's table and data, see [Uninstalling PayZephyr](#uninstalling-payzephyr) below.
+
+Each newly enabled feature is also recorded in `.env` (`PAYZEPHYR_FEATURE_SUBSCRIPTIONS=true` / `PAYZEPHYR_FEATURE_REFUNDS=true`), surfaced back through `config('payments.features')`. This is informational bookkeeping for your own code to check if you want to - it does **not** gate `Payment::subscription()`/`Payment::refund()` at runtime; those work based on which driver the provider you called `->with()` actually supports, independent of what the installer has run.
 
 ## Step 3: Configure a provider
 
@@ -82,7 +142,7 @@ You should get back JSON listing each enabled provider and whether PayZephyr can
 
 ## What just happened, structurally
 
-After installation, your app has:
+After a core-only installation, your app has:
 
 ```
 your-app/
@@ -91,12 +151,75 @@ your-app/
 ├── database/
 │   └── migrations/
 │       ├── ..._create_payment_transactions_table.php
-│       ├── ..._create_subscription_transactions_table.php
 │       └── ..._create_webhook_events_table.php
 └── .env                       ← your provider credentials
 ```
 
+If you also selected Subscriptions and/or Refunds, their migration files (`..._create_subscription_transactions_table.php`, `..._create_refund_transactions_table.php`) appear alongside the core ones - nothing else changes.
+
 PayZephyr itself lives in `vendor/kendenigerian/payzephyr` and you never edit it directly; everything you need to customize is either in `config/payments.php` or your `.env` file.
+
+## Uninstalling PayZephyr
+
+```bash
+php artisan payzephyr:uninstall
+```
+
+This is a **destructive** operation and PayZephyr treats it that way deliberately. It:
+
+- **Drops the database table(s)** for whatever it's about to remove, and everything in them.
+- **Deletes the published migration file(s)** from `database/migrations/`.
+- **Removes the corresponding row from Laravel's own migration-tracking table**, so if you republish and re-migrate the same feature later, `migrate` recreates the table instead of silently thinking it already ran.
+- **Resets any `.env` `PAYZEPHYR_FEATURE_*` flag** it wrote back to `false` for whatever it removed.
+
+It does **not** touch `config/payments.php` - that file may hold your own customization, and there's no general "unpublish" concept to safely reverse it, so removing it is left to you if you want it gone. It also never touches any table or migration it didn't itself detect as installed, or anything outside PayZephyr's own tables.
+
+### What gets removed
+
+With no flags, everything PayZephyr owns is removed - core (`payment_transactions`, `webhook_events`) and every optional feature currently installed:
+
+```bash
+php artisan payzephyr:uninstall
+```
+
+To remove only a specific optional feature and leave everything else alone:
+
+```bash
+php artisan payzephyr:uninstall --features=refunds
+```
+
+`--features=` only accepts optional feature names (the same ones `--features=` on the installer accepts) - core can't be selectively removed this way, since leaving optional feature tables behind with no core tables isn't a state PayZephyr is designed to put your app in. Uninstall is also feature-aware: it never attempts to touch a table that was never installed in the first place, so running `--features=refunds` when Refunds was never enabled just reports there's nothing to do.
+
+### Confirmation
+
+Interactively, you're asked twice - once as a yes/no confirmation, and again by typing `UNINSTALL` (in capitals) verbatim - after being shown exactly which tables are about to be dropped:
+
+```
+WARNING This will permanently drop the following PayZephyr table(s) and all data in them:
+  - Payments (payment_transactions)
+  - Webhooks (webhook_events)
+  - Refunds (refund_transactions)
+
+This cannot be undone. config/payments.php and any other application data are not affected.
+```
+
+Answering "no" to the first prompt, or typing anything other than `UNINSTALL` at the second, cancels the whole operation - nothing is removed.
+
+For CI/CD or scripted environments, pass `--force` to skip both prompts:
+
+```bash
+php artisan payzephyr:uninstall --force
+```
+
+Running `payzephyr:uninstall` non-interactively **without** `--force` fails immediately with a clear error and removes nothing - `--force` is never assumed, the same way `--all` is never the silent default for the installer.
+
+### Running it more than once
+
+Safe. If PayZephyr (or the specific feature named in `--features=`) is already uninstalled, the command reports there's nothing to do and exits successfully rather than erroring.
+
+## Existing installations upgrading to feature-selective install
+
+If you installed PayZephyr before this command distinguished core from optional features, your app already has all four tables from a single prior `vendor:publish --tag=payments-migrations` run - and that's fine, nothing here retroactively changes your existing database. `config('payments.features')` will read as `false` for both Subscriptions and Refunds until you either set `PAYZEPHYR_FEATURE_SUBSCRIPTIONS`/`PAYZEPHYR_FEATURE_REFUNDS` in `.env` yourself (since the installer only writes them when it's the one publishing a feature for the first time) or run `php artisan payzephyr:install --features=subscriptions,refunds` once, which will detect the migration files already exist and simply record the flags without touching your schema. The old `payments-migrations` tag (publishing all four tables at once) still works exactly as before, unchanged, for any script or documentation that references it directly.
 
 ## Next steps
 

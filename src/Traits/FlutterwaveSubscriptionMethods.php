@@ -17,11 +17,10 @@ use Throwable;
 /**
  * Trait providing Flutterwave subscription functionality.
  *
- * See ADR-0010 for the API-mapping decisions. Note: the single-subscription
- * fetch/update endpoints and the tokenized-charge subscribe flow were
- * pattern-matched from Flutterwave's independently-confirmed
- * create-plan/cancel/activate/list endpoints, not independently verified via
- * live docs - flagged here and in the ADR for sandbox verification before
+ * The single-subscription fetch/update endpoints and the tokenized-charge
+ * subscribe flow were pattern-matched from Flutterwave's
+ * independently-confirmed create-plan/cancel/activate/list endpoints, not
+ * independently verified via live docs - verify against a sandbox before
  * production use.
  */
 trait FlutterwaveSubscriptionMethods
@@ -150,7 +149,7 @@ trait FlutterwaveSubscriptionMethods
      * prior charge) is required, matching the pattern already used for
      * Paystack/Stripe/Square. The subscription itself is a side effect of
      * that charge, not returned directly in its response, so this looks it
-     * up by customer email immediately afterward. See ADR-0010.
+     * up by customer email immediately afterward.
      *
      * @throws SubscriptionException
      */
@@ -166,8 +165,6 @@ trait FlutterwaveSubscriptionMethods
 
             $reference = $this->generateReference('FLW_SUB');
 
-            // No 'amount' field: the plan dictates the charge amount for a
-            // subscription tokenized-charge, unlike a one-off token charge.
             $chargeResponse = $this->makeRequest('POST', "tokenized-charges/$request->authorization", [
                 'json' => array_filter([
                     'currency' => $request->metadata['currency'] ?? null,
@@ -279,7 +276,7 @@ trait FlutterwaveSubscriptionMethods
     public function listSubscriptions(?int $perPage = 50, ?int $page = 1, ?string $customer = null): array
     {
         try {
-            $query = array_filter(['page' => $page ?? 1], fn ($value) => $value !== null);
+            $query = ['page' => $page ?? 1];
 
             $response = $this->makeRequest('GET', 'subscriptions', ['query' => $query]);
             $data = $this->parseResponse($response);

@@ -36,7 +36,7 @@ If the first provider's request fails (a network error, the provider's API retur
 
 **One thing this doesn't protect against:** if the customer already completed payment on provider A's checkout page and something fails on *your side* afterward, falling back to provider B doesn't "undo" or "retry" that payment; fallback only applies to the *initial charge request*, before the customer has been sent anywhere.
 
-## The eight providers
+## The bundled providers
 
 Every provider needs `enabled` set to `true` in `.env` before PayZephyr will route traffic to it; see [Configuration](configuration.md#provider-credentials) for the required keys per provider. What's below is what's genuinely different about each one.
 
@@ -51,6 +51,7 @@ PAYSTACK_ENABLED=true
 - **Currencies:** NGN, GHS, ZAR, USD
 - **Channels:** card, bank transfer, USSD, mobile money, QR
 - **Subscriptions:** ✅ full support: see [Subscriptions](subscriptions.md); this is the one provider whose cancel/enable operations need an extra `emailToken`
+- **Refunds:** ✅ full support, processed asynchronously (initial response is `pending`; final status arrives via the `refund.processed`/`refund.failed` webhook)
 - The default provider out of the box, and generally the easiest to get a test payment working with quickly if you're starting from zero
 
 ### Stripe
@@ -64,6 +65,7 @@ STRIPE_ENABLED=true
 
 - **Currencies:** USD, EUR, GBP, CAD, AUD
 - **Subscriptions:** ✅ full support; subscribing a customer requires a saved payment method (`->authorization(...)`); see [Subscriptions](subscriptions.md#the-building-blocks)
+- **Refunds:** ✅ full support via Stripe's native refunds resource; card refunds are usually immediate, some payment methods confirm via webhook
 - `STRIPE_WEBHOOK_SECRET` isn't optional in practice: Stripe's webhook signature verification needs it to function at all
 
 ### PayPal
@@ -78,6 +80,7 @@ PAYPAL_ENABLED=true
 
 - **Currencies:** USD, EUR, GBP, CAD, AUD
 - **Subscriptions:** ✅ full support, via PayPal's own subscription-approval checkout flow (the customer approves the subscription on PayPal's page, similar to how a one-time charge works); needs `->callbackUrl(...)` set, see [Subscriptions](subscriptions.md)
+- **Refunds:** ✅ full support, issued against the capture id (not the order id) - usually immediate
 - `PAYPAL_MODE` controls sandbox vs. live: switch this alongside your credentials when going to production, not just the keys themselves
 - PayPal webhook verification calls back to PayPal's own verification API rather than checking a local signature, which is why it's one of the providers whose webhook processing specifically depends on [queues](queues.md#what-gets-queued-and-why) working correctly
 
@@ -93,6 +96,7 @@ FLUTTERWAVE_ENABLED=true
 - **Currencies:** NGN, USD, EUR, GBP, KES, UGX, TZS
 - **Channels:** card, bank transfer, USSD, mobile money
 - **Subscriptions:** ✅ supported: subscribing a customer is a side effect of a tokenized charge (`->authorization(...)` required), not a standalone API call; see [Subscriptions](subscriptions.md)
+- **Refunds:** ✅ full support, usually immediate
 - Flutterwave's webhook signature check uses `FLUTTERWAVE_ENCRYPTION_KEY` (mapped internally to the webhook secret), not a separate dedicated webhook-secret field
 
 ### Square
@@ -106,6 +110,7 @@ SQUARE_ENABLED=true
 
 - **Currencies:** USD, CAD, GBP, AUD
 - **Subscriptions:** ✅ supported; requires a Square card-on-file ID via `->authorization(...)`; cancelling pauses rather than permanently ending the subscription (see [Subscriptions](subscriptions.md#cancelling-and-re-enabling))
+- **Refunds:** ✅ full support, starts `PENDING` and confirms via webhook
 - Needs a `location_id` in addition to the usual access token: Square's API is organized around physical/logical business locations, and every charge and subscription needs to know which one it belongs to
 
 ### Monnify
@@ -119,6 +124,7 @@ MONNIFY_ENABLED=true
 
 - **Currencies:** NGN only
 - **Subscriptions:** ❌ not supported: Monnify's recurring-payment tools are merchant-triggered repeat charges, not a provider-managed subscription entity PayZephyr can wrap. See [Subscriptions](subscriptions.md#which-providers-support-this).
+- **Refunds:** ✅ full support; the caller-generated refund reference and status webhook follow the same shape as the charge/verify flow
 - Needs a `contract_code` in addition to API credentials, specific to how Monnify structures merchant accounts
 
 ### OPay
@@ -132,6 +138,7 @@ OPAY_ENABLED=true
 
 - **Currencies:** NGN only
 - **Subscriptions:** ❌ not supported: no subscription API exists in OPay's own documentation
+- **Refunds:** ✅ full support; authenticated the same HMAC-SHA512-signed way as the status API
 - `OPAY_SECRET_KEY` is specifically required for webhook signature validation, separate from the public key used for charges
 
 ### Mollie
@@ -144,23 +151,25 @@ MOLLIE_ENABLED=true
 
 - **Currencies:** EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF (the widest currency list of any supported provider)
 - **Subscriptions:** ✅ supported, with two structural quirks worth reading about before you use them: composite subscription codes, and no server-side plan storage; both covered in [Subscriptions](subscriptions.md#mollies-subscription-codes-look-different-heres-why)
+- **Refunds:** ✅ full support; refund references are also composite (`"{paymentId}:{refundId}"`), the same reasoning as Mollie's subscription codes
 - If `MOLLIE_WEBHOOK_SECRET` isn't set, PayZephyr falls back to verifying webhooks by calling Mollie's API directly instead of checking a local signature; functionally fine, but slower per webhook, and specifically why Mollie is one of the providers whose webhook handling depends on a correctly running [queue worker](queues.md)
 
-## Subscription support at a glance
+## Subscription and refund support at a glance
 
-| Provider | Subscriptions |
-|---|---|
-| Paystack | ✅ |
-| Stripe | ✅ |
-| PayPal | ✅ |
-| Flutterwave | ✅ |
-| Square | ✅ |
-| Mollie | ✅ |
-| Monnify | ❌ |
-| OPay | ❌ |
+| Provider | Subscriptions | Refunds |
+|---|---|---|
+| Paystack | ✅ | ✅ |
+| Stripe | ✅ | ✅ |
+| PayPal | ✅ | ✅ |
+| Flutterwave | ✅ | ✅ |
+| Square | ✅ | ✅ |
+| Mollie | ✅ | ✅ |
+| Monnify | ❌ | ✅ |
+| OPay | ❌ | ✅ |
 
 ## Next steps
 
 - [Configuration](configuration.md#provider-credentials): the exact required keys per provider, in table form
 - [Subscriptions](subscriptions.md): provider-specific subscription quirks, in depth
+- [Refunds](refunds.md): provider-specific refund quirks, in depth
 - [Custom Drivers](custom-drivers.md): adding a ninth provider yourself

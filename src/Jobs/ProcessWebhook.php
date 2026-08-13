@@ -9,12 +9,17 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
+use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Events\RefundCompleted;
+use KenDeNigerian\PayZephyr\Events\RefundCreated;
+use KenDeNigerian\PayZephyr\Events\RefundFailed;
 use KenDeNigerian\PayZephyr\Events\SubscriptionCancelled;
 use KenDeNigerian\PayZephyr\Events\SubscriptionCreated;
 use KenDeNigerian\PayZephyr\Events\SubscriptionPaymentFailed;
@@ -37,8 +42,8 @@ final class ProcessWebhook implements ShouldQueue
     /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, array<int, string>>  $headers  Only used by
-     *                                                      drivers implementing RequiresAsyncWebhookVerification (see
-     *                                                      ADR-0007); harmless to omit for every other provider.
+     *                                                      drivers implementing RequiresAsyncWebhookVerification;
+     *                                                      harmless to omit for every other provider.
      */
     public function __construct(
         public readonly string $provider,
@@ -56,8 +61,11 @@ final class ProcessWebhook implements ShouldQueue
         PaymentManager $manager,
         StatusNormalizerInterface $statusNormalizer,
         TransactionRepositoryInterface $transactionRepository,
-        WebhookEventRepositoryInterface $webhookEventRepository
+        WebhookEventRepositoryInterface $webhookEventRepository,
+        RefundRepositoryInterface $refundRepository
     ): void {
+        $eventKey = null;
+
         try {
             if (! $this->verifyDeferredSignature($manager)) {
                 $this->log('warning', 'Deferred webhook signature verification failed - discarding', [
@@ -89,6 +97,10 @@ final class ProcessWebhook implements ShouldQueue
                 $this->processSubscriptionWebhook($this->payload, $this->provider, $manager);
             }
 
+            if ($this->isRefundWebhook($this->payload)) {
+                $this->processRefundWebhook($this->payload, $this->provider, $refundRepository);
+            }
+
             WebhookReceived::dispatch($this->provider, $this->payload, $reference);
 
             $this->log('info', "Webhook processed for $this->provider", [
@@ -102,13 +114,25 @@ final class ProcessWebhook implements ShouldQueue
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            if ($eventKey !== null) {
+                try {
+                    $webhookEventRepository->forget($this->provider, $eventKey);
+                } catch (Throwable $forgetError) {
+                    $this->log('error', 'Failed to clear the webhook idempotency marker after a failed delivery', [
+                        'provider' => $this->provider,
+                        'event_key' => $eventKey,
+                        'error' => $forgetError->getMessage(),
+                    ]);
+                }
+            }
+
             throw $e;
         }
     }
 
     /**
      * Verify the webhook signature for drivers that defer verification to
-     * this job instead of WebhookRequest::authorize() - see ADR-0007.
+     * this job instead of WebhookRequest::authorize().
      *
      * A no-op (returns true) for every other driver, since those were
      * already verified synchronously before this job was ever queued.
@@ -136,7 +160,7 @@ final class ProcessWebhook implements ShouldQueue
     /**
      * Resolve an idempotency key for this delivery: a provider-native event
      * id where the driver supplies one, otherwise a content hash of the
-     * payload. See ADR-0005.
+     * payload.
      */
     protected function resolveEventKey(PaymentManager $manager): string
     {
@@ -338,5 +362,137 @@ final class ProcessWebhook implements ShouldQueue
             'event' => $eventType,
             'subscription_code' => $subscriptionCode,
         ]);
+    }
+
+    /**
+     * Check if the webhook payload is refund-related.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function isRefundWebhook(array $payload): bool
+    {
+        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+
+        return str_contains($eventType, 'refund') || str_contains($eventType, 'charge.refunded');
+    }
+
+    /**
+     * Process refund-related webhook events.
+     *
+     * Several providers (Paystack, PayPal, Square) confirm refunds
+     * asynchronously - the initial refund() response is only "pending", and
+     * this is where the terminal RefundCompleted/RefundFailed event actually
+     * fires. Reference field names vary widely across providers' refund
+     * webhook shapes, so this resolves the refund/transaction reference from
+     * every known field rather than a single fixed path.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    protected function processRefundWebhook(array $payload, string $provider, RefundRepositoryInterface $refundRepository): void
+    {
+        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+        $data = $payload['data'] ?? $payload['resource'] ?? $payload;
+        $object = $data['object'] ?? $data;
+
+        $refundReference = $object['id']
+            ?? $object['refund_reference']
+            ?? $data['refundReference']
+            ?? null;
+
+        $transactionReference = $object['transaction_reference']
+            ?? $object['payment_intent']
+            ?? $data['transactionReference']
+            ?? (is_array($object['transaction'] ?? null) ? ($object['transaction']['reference'] ?? null) : null)
+            ?? null;
+
+        if (! $refundReference) {
+            $this->log('warning', 'Refund webhook missing refund reference', [
+                'provider' => $provider,
+                'event' => $eventType,
+            ]);
+
+            return;
+        }
+
+        $status = strtolower((string) ($object['status'] ?? $data['status'] ?? ''));
+
+        if (
+            str_contains($eventType, 'failed') ||
+            in_array($status, ['failed', 'declined', 'error'], true)
+        ) {
+            $reason = $object['reason'] ?? $object['message'] ?? $data['reason'] ?? 'Refund failed';
+
+            $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::FAILED);
+
+            RefundFailed::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                (string) $reason,
+                $data
+            );
+        } elseif (
+            str_contains($eventType, 'processed') ||
+            str_contains($eventType, 'refunded') ||
+            str_contains($eventType, 'completed') ||
+            in_array($status, ['completed', 'succeeded', 'success', 'processed', 'refunded'], true)
+        ) {
+            $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::COMPLETED);
+
+            RefundCompleted::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                $data
+            );
+        } else {
+            RefundCreated::dispatch(
+                (string) $refundReference,
+                (string) ($transactionReference ?? ''),
+                $provider,
+                $data
+            );
+        }
+
+        $this->log('info', 'Refund webhook event processed', [
+            'provider' => $provider,
+            'event' => $eventType,
+            'refund_reference' => $refundReference,
+        ]);
+    }
+
+    /**
+     * Persist a webhook-confirmed terminal refund status to
+     * refund_transactions, so the local row - and the duplicate/over-refund
+     * guards in RefundValidator that depend on it - actually reflects
+     * reality for providers that confirm refunds asynchronously (Paystack,
+     * Stripe, Square, ...). Without this, RefundCompleted/RefundFailed only
+     * ever fired as an in-memory event and the local row stayed "pending"
+     * forever unless the application separately called Refund::fetch().
+     *
+     * Best-effort and additive only: skips silently (via
+     * updateStatusIfExists()) when the row doesn't exist locally, when
+     * refund logging is disabled, or when the repository call itself
+     * fails - a webhook must never fail webhook processing over a
+     * bookkeeping write.
+     */
+    protected function persistRefundStatus(RefundRepositoryInterface $refundRepository, string $refundReference, RefundStatus $status): void
+    {
+        $config = app('payments.config') ?? config('payments', []);
+        $loggingEnabled = $config['refunds']['logging']['enabled'] ?? ($config['logging']['enabled'] ?? true);
+
+        if (! $loggingEnabled) {
+            return;
+        }
+
+        try {
+            $refundRepository->updateStatusIfExists($refundReference, $status->value);
+        } catch (Throwable $e) {
+            $this->log('error', 'Failed to update refund status from webhook', [
+                'error' => $e->getMessage(),
+                'refund_reference' => $refundReference,
+                'status' => $status->value,
+            ]);
+        }
     }
 }

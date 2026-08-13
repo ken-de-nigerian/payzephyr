@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr\Contracts;
 use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 
 /**
- * Persistence boundary for SubscriptionTransaction. See ADR-0004: this exists
- * specifically to give the subscription write path the same concurrency-safe
- * pattern TransactionRepositoryInterface already gives PaymentTransaction.
+ * Persistence boundary for SubscriptionTransaction, giving the subscription
+ * write path the same concurrency-safe pattern TransactionRepositoryInterface
+ * already gives PaymentTransaction.
  */
 interface SubscriptionRepositoryInterface
 {

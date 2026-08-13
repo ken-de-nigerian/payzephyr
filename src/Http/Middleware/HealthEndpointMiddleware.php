@@ -30,10 +30,6 @@ final class HealthEndpointMiddleware
         $allowedIps = $healthConfig['allowed_ips'] ?? [];
         $allowedTokens = $healthConfig['allowed_tokens'] ?? [];
 
-        // require_auth defaults to false for backward compatibility (see
-        // ADR-0002 - flipping it silently 401-locks every existing consumer,
-        // since allowed_tokens also defaults empty). Surface the exposure
-        // instead of silently accepting it, without spamming the log per hit.
         if (! $requiresAuth && empty($allowedIps) && empty($allowedTokens) && ! app()->environment(['local', 'testing'])) {
             $this->warnOnceIfUnauthenticated();
         }
@@ -96,8 +92,6 @@ final class HealthEndpointMiddleware
     {
         $cacheKey = 'payzephyr:health_check:unauthenticated_warning';
 
-        // Cache::add() is atomic - concurrent requests only ever log once
-        // per interval, regardless of traffic volume.
         if (Cache::add($cacheKey, true, self::UNAUTHENTICATED_WARNING_INTERVAL_SECONDS)) {
             $this->log('warning', 'The /payments/health endpoint is exposed without authentication', [
                 'hint' => 'Set PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true and PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS (or ALLOWED_IPS) in production. See docs/SECURITY.md#3-health-endpoint-security.',

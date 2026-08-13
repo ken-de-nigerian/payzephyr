@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -14,6 +15,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Traits\SquareRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\SquareSubscriptionMethods;
 use Random\RandomException;
 use Throwable;
@@ -21,8 +23,9 @@ use Throwable;
 /**
  * Driver implementation for the Square payment gateway.
  */
-final class SquareDriver extends AbstractDriver implements SupportsSubscriptionsInterface
+final class SquareDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    use SquareRefundMethods;
     use SquareSubscriptionMethods;
 
     protected string $name = 'square';
@@ -539,14 +542,22 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
             $response = $this->makeRequest('GET', '/v2/locations');
 
             return $response->getStatusCode() === HttpStatusCodes::OK;
-        } catch (ChargeException $e) {
+        } catch (Throwable $e) {
             $previous = $e->getPrevious();
             if ($previous instanceof ClientException) {
+                $this->log('info', 'Health check successful (expected client-error response)', [
+                    'error' => $e->getMessage(),
+                ]);
+
                 return true;
             }
             if ($previous instanceof ConnectException) {
+                $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
+
                 return false;
             }
+
+            $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
 
             return true;
         }
@@ -579,7 +590,13 @@ final class SquareDriver extends AbstractDriver implements SupportsSubscriptions
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['object']['payment']['source_type'] ?? 'card';
+        // Null rather than defaulting to 'card' when Square omits
+        // source_type: defaulting recorded a card payment for instruments
+        // that were never cards (wallet, bank transfer, gift card), which is
+        // invented data rather than a missing value.
+        $sourceType = $payload['data']['object']['payment']['source_type'] ?? null;
+
+        return is_string($sourceType) && $sourceType !== '' ? $sourceType : null;
     }
 
     /**

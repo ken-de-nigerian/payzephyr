@@ -14,13 +14,13 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 
 /**
  * @method static Builder<RefundTransaction> where(string $column, mixed $operator = null, mixed $value = null)
- * @method static RefundTransaction create(array $attributes = [])
- * @method static RefundTransaction|null first(array|string $columns = ['*'])
- * @method static RefundTransaction firstOrFail(array|string $columns = ['*'])
+ * @method static RefundTransaction create(array<string, mixed> $attributes = [])
+ * @method static RefundTransaction|null first(array<int, string>|string $columns = ['*'])
+ * @method static RefundTransaction firstOrFail(array<int, string>|string $columns = ['*'])
  * @method static Builder<RefundTransaction> lockForUpdate()
- * @method static Builder<RefundTransaction> update(array $attributes = [])
+ * @method static Builder<RefundTransaction> update(array<string, mixed> $attributes = [])
  * @method static Builder<RefundTransaction> delete()
- * @method static RefundTransaction updateOrCreate(array $attributes, array $values = [])
+ * @method static RefundTransaction updateOrCreate(array<string, mixed> $attributes, array<string, mixed> $values = [])
  *
  * @property int $id
  * @property string $refund_reference
@@ -30,7 +30,7 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
  * @property float $amount
  * @property string $currency
  * @property string|null $reason
- * @property array|ArrayObject|null $metadata
+ * @property array<string, mixed>|ArrayObject<string, mixed>|null $metadata
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */

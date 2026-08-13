@@ -17,19 +17,21 @@ final class PlanResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        /** @var PlanResponseDTO $this */
+        /** @var PlanResponseDTO $resource */
+        $resource = $this->resource;
+
         return [
-            'plan_code' => $this->planCode,
-            'name' => $this->name,
+            'plan_code' => $resource->planCode,
+            'name' => $resource->name,
             'amount' => [
-                'value' => $this->amount,
-                'currency' => $this->currency,
+                'value' => $resource->amount,
+                'currency' => $resource->currency,
             ],
-            'interval' => $this->interval,
-            'description' => $this->description,
-            'invoice_limit' => $this->invoiceLimit,
-            'metadata' => $this->metadata,
-            'provider' => $this->provider ?? null,
+            'interval' => $resource->interval,
+            'description' => $resource->description,
+            'invoice_limit' => $resource->invoiceLimit,
+            'metadata' => $resource->metadata,
+            'provider' => $resource->provider ?? null,
             'created_at' => now()->toIso8601String(),
         ];
     }

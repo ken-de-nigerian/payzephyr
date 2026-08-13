@@ -64,7 +64,7 @@ enum RefundStatus: string
             in_array($normalized, ['pending', 'requested', 'created'], true) => self::PENDING,
             in_array($normalized, ['processing', 'in_progress', 'submitted'], true) => self::PROCESSING,
             in_array($normalized, ['completed', 'succeeded', 'success', 'processed', 'refunded'], true) => self::COMPLETED,
-            in_array($normalized, ['failed', 'declined', 'error'], true) => self::FAILED,
+            in_array($normalized, ['failed', 'declined', 'error', 'rejected'], true) => self::FAILED,
             in_array($normalized, ['cancelled', 'canceled', 'reversed', 'voided'], true) => self::CANCELLED,
             default => throw new InvalidArgumentException("Unknown refund status: $status"),
         };

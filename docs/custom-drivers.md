@@ -1,6 +1,6 @@
 # Custom Drivers
 
-PayZephyr supports eight providers out of the box, but you're not limited to them. Every provider PayZephyr ships with is built the same way you'd build your own: a "driver" class that translates PayZephyr's unified API into that specific provider's HTTP API. This chapter walks through building one.
+PayZephyr supports several payment providers out of the box, but you're not limited to them. Every provider PayZephyr ships with is built the same way you'd build your own: a "driver" class that translates PayZephyr's unified API into that specific provider's HTTP API. This chapter walks through building one.
 
 ## When you'd actually need this
 

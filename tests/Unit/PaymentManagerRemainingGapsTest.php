@@ -42,8 +42,12 @@ test('chargeWithFallback skips a provider that fails its health check', function
     app()->forgetInstance('payments.config');
     config(['payments.health_check.enabled' => true]);
 
+    // A plain DriverInterface mock has no getCachedHealthCheck() - that method
+    // lives on AbstractDriver, not the interface - so the health check resolves
+    // through the interface's own healthCheck(). See
+    // PaymentManager::driverIsHealthy() and CustomDriverCompatibilityTest.
     $driver = Mockery::mock(DriverInterface::class);
-    $driver->shouldReceive('getCachedHealthCheck')->once()->andReturn(false);
+    $driver->shouldReceive('healthCheck')->once()->andReturn(false);
     $driver->shouldNotReceive('charge');
 
     $manager = new PaymentManager;
@@ -137,8 +141,7 @@ test('logTransaction returns early without persisting when logging is disabled',
 });
 
 test('getCacheContext memoizes the resolved context and does not re-resolve on second call', function () {
-    Auth::shouldReceive('check')->once()->andReturn(true);
-    Auth::shouldReceive('id')->once()->andReturn(42);
+    mockAuthGuard(check: true, id: 42);
 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
@@ -153,7 +156,7 @@ test('getCacheContext memoizes the resolved context and does not re-resolve on s
 });
 
 test('getCacheContext resolves context from an authenticated request user', function () {
-    Auth::shouldReceive('check')->andReturn(false);
+    mockAuthGuard(check: false);
 
     $fakeUser = new class
     {
@@ -176,7 +179,7 @@ test('getCacheContext resolves context from an authenticated request user', func
 });
 
 test('getCacheContext resolves context from a session user_id when no auth user is present', function () {
-    Auth::shouldReceive('check')->andReturn(false);
+    mockAuthGuard(check: false);
 
     $request = new Request;
     app()->instance('request', $request);

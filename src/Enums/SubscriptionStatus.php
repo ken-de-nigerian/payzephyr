@@ -37,7 +37,7 @@ enum SubscriptionStatus: string
     }
 
     /**
-     * Check if subscription can be cancelled from this status.
+     * Check if subscription can be canceled from this status.
      */
     public function canBeCancelled(): bool
     {

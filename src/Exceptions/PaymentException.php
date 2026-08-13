@@ -9,6 +9,13 @@ use Throwable;
 
 /**
  * Base payment exception.
+ *
+ * withContext() uses new static() so subclasses return their own type. Every
+ * subclass therefore has to keep the inherited constructor signature - this
+ * annotation makes PHPStan enforce that rather than the codebase relying on
+ * it by convention.
+ *
+ * @phpstan-consistent-constructor
  */
 class PaymentException extends Exception
 {

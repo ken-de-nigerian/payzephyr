@@ -73,10 +73,9 @@ class SubscriptionValidator
     /**
      * Validate subscription cancellation.
      *
-     * Only the provider-agnostic terminal-state check lives here. Provider-
-     * specific requirements (e.g. Paystack's email token format) are the
-     * driver's responsibility - see ADR-0006 on why that validation moved
-     * out of this generic validator.
+     * Only the provider-agnostic terminal-state check lives here.
+     * Provider-specific requirements (e.g. Paystack's email token format)
+     * are the driver's responsibility.
      */
     public function validateCancellation(
         string $subscriptionCode,

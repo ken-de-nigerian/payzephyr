@@ -172,8 +172,13 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
                 ],
                 provider: $this->getName(),
             );
+        } catch (InvalidConfigurationException $e) {
+            throw $e;
         } catch (ApiErrorException $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
+            throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
+        } catch (Throwable $e) {
+            $this->log('error', 'Charge failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
         } finally {
             $this->clearCurrentRequest();
@@ -237,7 +242,15 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             }
 
             throw new VerificationException("Payment not found for reference [$reference]");
+        } catch (VerificationException $e) {
+            throw $e;
         } catch (ApiErrorException $e) {
+            throw new VerificationException(
+                'Stripe verification failed: '.$e->getMessage(),
+                0,
+                $e
+            );
+        } catch (Throwable $e) {
             throw new VerificationException(
                 'Stripe verification failed: '.$e->getMessage(),
                 0,
@@ -341,7 +354,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     private function mapFromCheckoutSession(object $session): VerificationResponseDTO
     {
         $pi = $session->payment_intent ?? null;
-        $piAmount = isset($pi->amount) && is_object($pi) ? $pi->amount : null;
+        $piAmount = $pi?->amount;
 
         $status = match ($session->payment_status) {
             'paid' => 'success',

@@ -11,7 +11,7 @@ use Throwable;
 
 /**
  * Persists refund transactions to the database. Shared by every
- * refund-capable driver, mirroring LogsSubscriptionTransactions (ADR-0009).
+ * refund-capable driver, mirroring LogsSubscriptionTransactions.
  *
  * Requires the consuming class to also use LogsToPaymentChannel (for log())
  * and to expose getRefundRepository() (AbstractDriver already does).
@@ -52,27 +52,17 @@ trait LogsRefundTransactions
 
         try {
             $reason = $reason ?? $response->reason;
-
-            // Both metadata and reason can carry values a merchant
-            // integration passed straight from customer input (e.g.
-            // Refund::reason()) and reason is also frequently echoed back
-            // verbatim by the provider (Paystack customer_note, PayPal
-            // note_to_payer) - sanitize both the same way
-            // LogsSubscriptionTransactions sanitizes metadata before
-            // persisting, so refund_transactions doesn't become an
-            // unsanitized stored-XSS vector.
             $sanitizer = app(MetadataSanitizer::class);
             $sanitizedMetadata = $sanitizer->sanitize($response->metadata);
             $sanitizedReason = $reason !== null ? $sanitizer->sanitize($reason) : null;
 
-            // Concurrency-safe create-or-update (lock + create-race retry) -
-            // see ADR-0004.
+            // Concurrency-safe create-or-update (lock + create-race retry).
             $this->getRefundRepository()->updateOrCreateAtomic(
                 $response->refundReference,
                 [
                     'transaction_reference' => $response->transactionReference,
                     'provider' => $this->getName(),
-                    'status' => $response->status,
+                    'status' => $response->getStatus()->value,
                     'amount' => $response->amount,
                     'currency' => $response->currency,
                     'reason' => $sanitizedReason,

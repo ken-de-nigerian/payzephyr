@@ -542,14 +542,22 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $response = $this->makeRequest('GET', '/v2/locations');
 
             return $response->getStatusCode() === HttpStatusCodes::OK;
-        } catch (ChargeException $e) {
+        } catch (Throwable $e) {
             $previous = $e->getPrevious();
             if ($previous instanceof ClientException) {
+                $this->log('info', 'Health check successful (expected client-error response)', [
+                    'error' => $e->getMessage(),
+                ]);
+
                 return true;
             }
             if ($previous instanceof ConnectException) {
+                $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
+
                 return false;
             }
+
+            $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
 
             return true;
         }
@@ -582,7 +590,13 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['object']['payment']['source_type'] ?? 'card';
+        // Null rather than defaulting to 'card' when Square omits
+        // source_type: defaulting recorded a card payment for instruments
+        // that were never cards (wallet, bank transfer, gift card), which is
+        // invented data rather than a missing value.
+        $sourceType = $payload['data']['object']['payment']['source_type'] ?? null;
+
+        return is_string($sourceType) && $sourceType !== '' ? $sourceType : null;
     }
 
     /**

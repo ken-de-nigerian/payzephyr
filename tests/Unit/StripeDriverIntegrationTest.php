@@ -211,3 +211,92 @@ test('stripe verify handles not found', function () {
 
     $driver->verify('stripe_nonexistent');
 })->throws(VerificationException::class);
+
+test('stripe charge wraps a non-SDK exception in a ChargeException', function () {
+    // Stripe's charge() previously caught only ApiErrorException, so anything
+    // else - an unexpectedly-shaped SDK object, a TypeError - propagated raw
+    // instead of as the ChargeException callers classify on.
+    $sessionsService = new class
+    {
+        public function create()
+        {
+            throw new RuntimeException('unexpected SDK shape');
+        }
+    };
+
+    $checkoutService = new class($sessionsService)
+    {
+        public function __construct(public object $sessions) {}
+    };
+
+    $stripeMock = new class($checkoutService)
+    {
+        public function __construct(public object $checkout) {}
+    };
+
+    $driver = createMockStripeDriver($stripeMock);
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'ref_x', 'https://example.com/callback');
+
+    expect(fn () => $driver->charge($request))->toThrow(ChargeException::class);
+});
+
+test('stripe charge still surfaces a missing callback URL as a configuration error', function () {
+    // InvalidConfigurationException is a sibling of ChargeException, not a
+    // subclass - the broad Throwable catch must not swallow it into a generic
+    // charge failure.
+    $stripeMock = new class
+    {
+        public object $checkout;
+
+        public function __construct()
+        {
+            $this->checkout = new class
+            {
+                public object $sessions;
+
+                public function __construct()
+                {
+                    $this->sessions = new class
+                    {
+                        public function create()
+                        {
+                            return (object) ['id' => 'cs_1', 'url' => 'https://x.test'];
+                        }
+                    };
+                }
+            };
+        }
+    };
+
+    $driver = new StripeDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['USD']]);
+    $driver->setStripeClient($stripeMock);
+
+    $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'ref_no_cb');
+
+    expect(fn () => $driver->charge($request))
+        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class);
+});
+
+test('stripe verify wraps a non-SDK exception in a VerificationException', function () {
+    $sessionsService = new class
+    {
+        public function retrieve()
+        {
+            throw new RuntimeException('unexpected SDK shape');
+        }
+    };
+
+    $checkoutService = new class($sessionsService)
+    {
+        public function __construct(public object $sessions) {}
+    };
+
+    $stripeMock = new class($checkoutService)
+    {
+        public function __construct(public object $checkout) {}
+    };
+
+    $driver = createMockStripeDriver($stripeMock);
+
+    expect(fn () => $driver->verify('cs_test_123'))->toThrow(VerificationException::class);
+});

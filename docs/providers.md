@@ -36,7 +36,7 @@ If the first provider's request fails (a network error, the provider's API retur
 
 **One thing this doesn't protect against:** if the customer already completed payment on provider A's checkout page and something fails on *your side* afterward, falling back to provider B doesn't "undo" or "retry" that payment; fallback only applies to the *initial charge request*, before the customer has been sent anywhere.
 
-## The eight providers
+## The bundled providers
 
 Every provider needs `enabled` set to `true` in `.env` before PayZephyr will route traffic to it; see [Configuration](configuration.md#provider-credentials) for the required keys per provider. What's below is what's genuinely different about each one.
 

@@ -25,7 +25,7 @@ use InvalidArgumentException;
 final class Features
 {
     /**
-     * @return array<string, array{label: string, description: string, migrationTag: string, envVar: string, dependencies: array<int, string>}>
+     * @return array<string, array{label: string, description: string, migrationTag: string, envVar: string, dependencies: array<int, string>, migrationPattern: string, tableConfigKey: string, defaultTable: string}>
      */
     public static function optional(): array
     {
@@ -36,13 +36,47 @@ final class Features
                 'migrationTag' => 'payzephyr-migrations-subscriptions',
                 'envVar' => 'PAYZEPHYR_FEATURE_SUBSCRIPTIONS',
                 'dependencies' => [],
+                'migrationPattern' => '*_create_subscription_transactions_table.php',
+                'tableConfigKey' => 'subscriptions.logging.table',
+                'defaultTable' => 'subscription_transactions',
             ],
             'refunds' => [
                 'label' => 'Refunds',
-                'description' => 'Full and partial refunds across all 8 providers',
+                'description' => 'Full and partial refunds across every bundled provider',
                 'migrationTag' => 'payzephyr-migrations-refunds',
                 'envVar' => 'PAYZEPHYR_FEATURE_REFUNDS',
                 'dependencies' => [],
+                'migrationPattern' => '*_create_refund_transactions_table.php',
+                'tableConfigKey' => 'refunds.logging.table',
+                'defaultTable' => 'refund_transactions',
+            ],
+        ];
+    }
+
+    /**
+     * Core, always-installed resources - payment logging and webhook
+     * idempotency, neither of which is optional (see Features class
+     * docblock). Described here, alongside the optional features, so
+     * UninstallCommand has one place to learn every PayZephyr-owned
+     * migration/table rather than re-deriving the list PaymentServiceProvider
+     * already hardcodes for vendor:publish.
+     *
+     * @return array<string, array{label: string, migrationPattern: string, tableConfigKey: string, defaultTable: string}>
+     */
+    public static function core(): array
+    {
+        return [
+            'payments' => [
+                'label' => 'Payments',
+                'migrationPattern' => '*_create_payment_transactions_table.php',
+                'tableConfigKey' => 'logging.table',
+                'defaultTable' => 'payment_transactions',
+            ],
+            'webhooks' => [
+                'label' => 'Webhooks',
+                'migrationPattern' => '*_create_webhook_events_table.php',
+                'tableConfigKey' => 'webhook.events.table',
+                'defaultTable' => 'webhook_events',
             ],
         ];
     }
@@ -61,7 +95,7 @@ final class Features
     }
 
     /**
-     * @return array{label: string, description: string, migrationTag: string, envVar: string, dependencies: array<int, string>}
+     * @return array{label: string, description: string, migrationTag: string, envVar: string, dependencies: array<int, string>, migrationPattern: string, tableConfigKey: string, defaultTable: string}
      */
     public static function get(string $key): array
     {

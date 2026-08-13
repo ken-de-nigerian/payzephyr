@@ -12,8 +12,7 @@ use Throwable;
 
 /**
  * Persists subscription transactions to the database. Shared by every
- * subscription-capable driver (Paystack, Stripe, PayPal) rather than
- * duplicated per driver - see ADR-0009.
+ * subscription-capable driver rather than duplicated per driver.
  *
  * Requires the consuming class to also use LogsToPaymentChannel (for log())
  * and to expose getSubscriptionRepository() (AbstractDriver already does).
@@ -55,21 +54,8 @@ trait LogsSubscriptionTransactions
         try {
             $planCode = $planCode ?? $response->metadata['plan_code'] ?? $response->plan;
             $customerEmail = $customerEmail ?? $response->customer;
-
-            // Metadata here can carry values a merchant integration passed
-            // straight from customer input (e.g. Subscription::metadata())
-            // and is echoed back verbatim by every provider - sanitize it
-            // the same way PaymentManager::charge() already sanitizes
-            // PaymentTransaction::$metadata before persisting, so
-            // subscription_transactions doesn't become an unsanitized
-            // stored-XSS vector that payment_transactions already guards
-            // against.
             $sanitizedMetadata = app(MetadataSanitizer::class)->sanitize($response->metadata);
 
-            // Concurrency-safe create-or-update (lock + create-race retry) -
-            // see ADR-0004. Replaces a bare updateOrCreate() that could
-            // silently drop this event's data under concurrent webhook
-            // delivery for the same subscription_code.
             $this->getSubscriptionRepository()->updateOrCreateAtomic(
                 $response->subscriptionCode,
                 [

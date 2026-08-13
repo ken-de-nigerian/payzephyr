@@ -57,13 +57,26 @@ final readonly class RefundResponseDTO
     }
 
     /**
-     * Get refund status as enum. Falls back to FAILED for an unrecognized
-     * provider status string, since an unrecognized status is not safe to
-     * treat as a successful refund.
+     * Get refund status as enum.
+     *
+     * An unrecognized provider status falls back to PENDING, not FAILED.
+     * "Unrecognized" means the outcome is unknown, and the two questions that
+     * fallback answers pull in opposite directions:
+     *
+     *  - Did the refund succeed? Unknown must not count as yes.
+     *  - Did money leave the account? Unknown must be assumed yes, because
+     *    RefundStatus::countsTowardRefundedAmount() drives the over-refund
+     *    guard - and FAILED is excluded from it. Treating an unknown status as
+     *    FAILED therefore silently freed up the whole refundable balance
+     *    again, allowing a second refund to over-spend the captured amount.
+     *
+     * PENDING answers both correctly: it is not success, it counts toward the
+     * refunded total, and it is non-terminal, so a later webhook can still
+     * resolve it to the real outcome (see RefundStatus::isTerminal()).
      */
     public function getStatus(): RefundStatus
     {
-        return RefundStatus::tryFromString($this->status) ?? RefundStatus::FAILED;
+        return RefundStatus::tryFromString($this->status) ?? RefundStatus::PENDING;
     }
 
     public function isCompleted(): bool

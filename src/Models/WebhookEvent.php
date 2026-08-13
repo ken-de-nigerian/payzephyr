@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use KenDeNigerian\PayZephyr\Traits\HasConfigurableTableName;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 
 /**
  * A record that a given (provider, event_key) webhook delivery has already
- * been processed. See ADR-0005 - this is what makes duplicate deliveries
- * (which gateways send routinely as part of their retry/at-least-once
- * semantics) a safe no-op for side effects beyond transaction status, such
- * as the subscription lifecycle events ProcessWebhook dispatches.
+ * been processed - this is what makes duplicate deliveries (which gateways
+ * send routinely as part of their retry/at-least-once semantics) a safe
+ * no-op for side effects beyond transaction status, such as the
+ * subscription lifecycle events ProcessWebhook dispatches.
  *
- * @method static WebhookEvent create(array $attributes = [])
+ * @method static Builder<WebhookEvent> where(string $column, mixed $operator = null, mixed $value = null)
+ * @method static WebhookEvent create(array<string, mixed> $attributes = [])
+ * @method static Builder<WebhookEvent> delete()
  *
  * @property int $id
  * @property string $provider

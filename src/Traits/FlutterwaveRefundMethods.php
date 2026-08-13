@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for FlutterwaveDriver. See ADR-0011.
+ * Refund support for FlutterwaveDriver.
  *
  * $transactionReference is Flutterwave's numeric transaction id (the same
  * id FlutterwaveDriver::verify() resolves internally) - not the merchant
@@ -33,7 +33,7 @@ trait FlutterwaveRefundMethods
                 $requestOptions['headers'] = ['Idempotency-Key' => $request->idempotencyKey];
             }
 
-            $response = $this->makeRequest('POST', "transactions/{$request->transactionReference}/refund", $requestOptions);
+            $response = $this->makeRequest('POST', "transactions/$request->transactionReference/refund", $requestOptions);
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {
@@ -77,7 +77,7 @@ trait FlutterwaveRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "transactions/{$refundReference}/refunds");
+            $response = $this->makeRequest('GET', "refunds/$refundReference");
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {

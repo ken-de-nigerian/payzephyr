@@ -399,3 +399,37 @@ test('paypal driver handles empty verification status', function () {
 
     expect($result)->toBeFalse();
 });
+
+test('paypal extractWebhookChannel reports the instrument the payer actually used', function () {
+    // Regression: this returned a hardcoded 'paypal' without reading the
+    // payload, so a card-funded and a Venmo-funded payment were recorded
+    // identically - and redundantly with provider='paypal'.
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    $payload = ['resource' => ['payment_source' => ['card' => ['brand' => 'VISA']]]];
+
+    expect($driver->extractWebhookChannel($payload))->toBe('card');
+});
+
+test('paypal extractWebhookChannel distinguishes a paypal-balance payment from a card one', function () {
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    expect($driver->extractWebhookChannel(['resource' => ['payment_source' => ['paypal' => []]]]))->toBe('paypal')
+        ->and($driver->extractWebhookChannel(['resource' => ['payment_source' => ['venmo' => []]]]))->toBe('venmo');
+});
+
+test('paypal extractWebhookChannel returns null when the payload reports no payment source', function () {
+    // Null, not an invented 'paypal': the funding instrument is genuinely
+    // unknown when PayPal omits the field.
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    expect($driver->extractWebhookChannel([]))->toBeNull()
+        ->and($driver->extractWebhookChannel(['resource' => []]))->toBeNull()
+        ->and($driver->extractWebhookChannel(['resource' => ['payment_source' => []]]))->toBeNull();
+});
+
+test('paypal extractWebhookChannel ignores a non-array payment_source', function () {
+    $driver = new PayPalDriver(config('payments.providers.paypal'));
+
+    expect($driver->extractWebhookChannel(['resource' => ['payment_source' => 'card']]))->toBeNull();
+});

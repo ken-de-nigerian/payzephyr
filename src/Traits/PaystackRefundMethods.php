@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for PaystackDriver. See ADR-0011.
+ * Refund support for PaystackDriver.
  *
  * Paystack's refund endpoint (POST /refund) queues the refund for
  * asynchronous processing - the initial response status is typically

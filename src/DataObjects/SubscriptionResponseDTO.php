@@ -88,7 +88,7 @@ final readonly class SubscriptionResponseDTO
     }
 
     /**
-     * Check if subscription can be cancelled.
+     * Check if subscription can be canceled.
      */
     public function canBeCancelled(): bool
     {

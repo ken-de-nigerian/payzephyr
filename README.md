@@ -58,7 +58,7 @@ composer require kendenigerian/payzephyr
 php artisan payzephyr:install
 ```
 
-`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the core database migrations it always needs (for transaction logging), asks whether you also want Subscriptions and/or Refunds, and offers to run the migrations for you. See [Installation](docs/installation.md#core-vs-optional-features) for exactly which tables are core vs. optional, and how to select features non-interactively with `--all`/`--features=`.
+`payzephyr:install` copies PayZephyr's configuration file into your app (so you can edit it), copies the core database migrations it always needs (for transaction logging), asks whether you also want Subscriptions and/or Refunds, and offers to run the migrations for you. See [Installation](docs/installation.md#core-vs-optional-features) for exactly which tables are core vs. optional, and how to select features non-interactively with `--all`/`--features=`. A matching `php artisan payzephyr:uninstall` removes what PayZephyr installed - see [Uninstalling PayZephyr](docs/installation.md#uninstalling-payzephyr).
 
 **2. Add your provider's credentials to `.env`.** Paystack is enabled by default. Grab your test keys from your Paystack dashboard:
 
@@ -113,8 +113,8 @@ The chapters below are written to be read roughly in order if you're new to PayZ
 
 **Core features**
 
-6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on 6 of the 8 providers
-7. [Refunds](docs/refunds.md): full and partial refunds, supported on all 8 providers
+6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on most bundled providers
+7. [Refunds](docs/refunds.md): full and partial refunds, supported on every bundled provider
 8. [Webhooks](docs/webhooks.md): why they exist and how to handle them
 9. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
 10. [Testing](docs/testing.md): testing code that charges money, without charging money

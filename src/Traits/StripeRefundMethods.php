@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Stripe\Exception\ApiErrorException;
 
 /**
- * Refund support for StripeDriver. See ADR-0011.
+ * Refund support for StripeDriver.
  *
  * Stripe's refunds resource is first-class (unlike subscriptions, which had
  * to be modeled on top of Prices/Products). $transactionReference is treated
@@ -68,7 +68,7 @@ trait StripeRefundMethods
     }
 
     /**
-     * @param  object{id: string, payment_intent?: string|null, status: string, amount: int, currency: string, metadata?: array<string, mixed>|object}  $refund
+     * @param  object{id: string, payment_intent?: string|null, status: string, amount?: int|null, currency: string, metadata?: array<string, mixed>|object}  $refund
      */
     private function mapStripeRefundToResponse(object $refund, ?string $reason = null): RefundResponseDTO
     {
@@ -76,7 +76,7 @@ trait StripeRefundMethods
             refundReference: $refund->id,
             transactionReference: (string) ($refund->payment_intent ?? ''),
             status: $refund->status,
-            amount: $refund->amount / 100,
+            amount: ($refund->amount ?? 0) / 100,
             currency: strtoupper($refund->currency),
             reason: $reason,
             metadata: (array) ($refund->metadata ?? []),

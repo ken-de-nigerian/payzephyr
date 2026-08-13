@@ -4,15 +4,26 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
+use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Services\RefundValidator;
+use Throwable;
 
 final class Refund
 {
+    /**
+     * How long the in-flight refund lock (see refund()) is held before it
+     * expires on its own - a safety net so a crashed/killed process that
+     * never reaches the finally block doesn't block that transaction's
+     * refunds forever. Comfortably above any realistic provider API call.
+     */
+    private const LOCK_TTL_SECONDS = 60;
+
     protected PaymentManager $manager;
 
     /** @var array<string, mixed> */
@@ -117,7 +128,47 @@ final class Refund
             app(RefundValidator::class)->validateRefund($request);
         }
 
-        return $driver->refund($request);
+        $preventDuplicates = $config['refunds']['prevent_duplicates'] ?? true;
+        $lockKey = $this->inFlightLockKey($request->transactionReference);
+
+        if ($preventDuplicates && ! Cache::add($lockKey, true, self::LOCK_TTL_SECONDS)) {
+            throw new RefundException(
+                "A refund is already in progress for transaction $request->transactionReference. ".
+                'Wait for it to resolve before submitting another.'
+            );
+        }
+
+        try {
+            $response = $driver->refund($request);
+        } catch (Throwable $e) {
+            if ($preventDuplicates && $e instanceof RefundException && $e->isAmbiguousProviderOutcome()) {
+                throw new RefundException(
+                    "The refund for transaction $request->transactionReference timed out or lost its response before ".
+                    'its outcome could be confirmed. PayZephyr has not retried it, since the provider may already have '.
+                    'processed it - doing so could refund the customer twice. Reconcile with the provider (or '.
+                    'Refund::fetch()) before attempting another refund.',
+                    0,
+                    $e
+                );
+            }
+
+            if ($preventDuplicates) {
+                Cache::forget($lockKey);
+            }
+
+            throw $e;
+        }
+
+        if ($preventDuplicates) {
+            Cache::forget($lockKey);
+        }
+
+        return $response;
+    }
+
+    private function inFlightLockKey(string $transactionReference): string
+    {
+        return 'payzephyr:refund:inflight:'.$transactionReference;
     }
 
     /** Fetch details of a previously issued refund. */

@@ -12,7 +12,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for OPayDriver. See ADR-0011.
+ * Refund support for OPayDriver.
  *
  * $transactionReference is OPay's merchant transaction reference (the same
  * reference OPayDriver::verify() queries by). Like the status endpoint,

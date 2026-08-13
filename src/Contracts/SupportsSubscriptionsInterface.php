@@ -57,7 +57,7 @@ interface SupportsSubscriptionsInterface
      *
      * Provider-specific requirements (e.g. Paystack's email confirmation
      * token) are read from $action->option() by the implementing driver, not
-     * fixed in this signature - see ADR-0006.
+     * fixed in this signature.
      */
     public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO;
 

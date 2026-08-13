@@ -11,11 +11,11 @@ use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
-class RefundValidator
+final readonly class RefundValidator
 {
     public function __construct(
-        private readonly RefundRepositoryInterface $refundRepository,
-        private readonly TransactionRepositoryInterface $transactionRepository,
+        private RefundRepositoryInterface $refundRepository,
+        private TransactionRepositoryInterface $transactionRepository,
     ) {}
 
     /**
@@ -28,7 +28,7 @@ class RefundValidator
      *    accidental double-submission (e.g. a double-clicked "refund"
      *    button) before the first attempt's outcome is known. This does
      *    NOT block a *new* refund once an earlier one has reached a
-     *    terminal state (completed/failed/cancelled) - sequential partial
+     *    terminal state (completed/failed/canceled) - sequential partial
      *    refunds remain fully supported.
      * 2. Over-refund guard: best-effort, since the original
      *    PaymentTransaction row may not exist (a different process/DB
@@ -44,7 +44,7 @@ class RefundValidator
 
         if ($preventDuplicates && $this->refundRepository->hasInFlightRefund($request->transactionReference)) {
             throw new RefundException(
-                "A refund is already in progress for transaction {$request->transactionReference}. ".
+                "A refund is already in progress for transaction $request->transactionReference. ".
                 'Wait for it to resolve before submitting another.'
             );
         }
@@ -70,7 +70,7 @@ class RefundValidator
 
         if ($remaining <= 0) {
             throw new RefundException(
-                "Transaction {$request->transactionReference} has already been fully refunded."
+                "Transaction $request->transactionReference has already been fully refunded."
             );
         }
 
@@ -78,7 +78,7 @@ class RefundValidator
 
         if ($requestedAmount > $remaining + 0.01) {
             throw new RefundException(
-                "Refund amount ($requestedAmount) exceeds the remaining refundable balance ($remaining) for transaction {$request->transactionReference}."
+                "Refund amount ($requestedAmount) exceeds the remaining refundable balance ($remaining) for transaction $request->transactionReference."
             );
         }
     }

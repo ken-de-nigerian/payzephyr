@@ -2,7 +2,7 @@
 
 **Does PayZephyr support refunds?**
 
-Yes, across all eight providers: `Payment::refund($transactionReference)->with('stripe')->refund()`, full or partial, with automatic tracking to a `refund_transactions` table and events for async confirmation. See [Refunds](refunds.md).
+Yes, across every bundled provider: `Payment::refund($transactionReference)->with('stripe')->refund()`, full or partial, with automatic tracking to a `refund_transactions` table and events for async confirmation. See [Refunds](refunds.md).
 
 **Can I use more than one provider at the same time?**
 

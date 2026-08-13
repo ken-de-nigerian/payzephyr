@@ -37,9 +37,6 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
                     throw $e;
                 }
 
-                // Lost the create race to a concurrent request: the row now
-                // exists. Lock and update it rather than dropping this
-                // event's data - see ADR-0004.
                 /** @var SubscriptionTransaction $existing */
                 $existing = SubscriptionTransaction::where('subscription_code', $subscriptionCode)
                     ->lockForUpdate()

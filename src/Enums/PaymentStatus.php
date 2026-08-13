@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Enums;
 
-use ValueError;
-
 enum PaymentStatus: string
 {
     case SUCCESS = 'success';
@@ -41,9 +39,6 @@ enum PaymentStatus: string
         return self::tryFrom(strtolower(trim($value)));
     }
 
-    /**
-     * @throws ValueError
-     */
     public static function fromString(string $value): self
     {
         return self::from(strtolower(trim($value)));
@@ -56,22 +51,16 @@ enum PaymentStatus: string
 
     public static function isSuccessfulString(string $status): bool
     {
-        $enum = self::tryFromString($status);
-
-        return $enum?->isSuccessful() ?? false;
+        return self::tryFromString($status)?->isSuccessful() ?? false;
     }
 
     public static function isFailedString(string $status): bool
     {
-        $enum = self::tryFromString($status);
-
-        return $enum?->isFailed() ?? false;
+        return self::tryFromString($status)?->isFailed() ?? false;
     }
 
     public static function isPendingString(string $status): bool
     {
-        $enum = self::tryFromString($status);
-
-        return $enum?->isPending() ?? false;
+        return self::tryFromString($status)?->isPending() ?? false;
     }
 }

@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for PayPalDriver. See ADR-0011.
+ * Refund support for PayPalDriver.
  *
  * $transactionReference is the PayPal capture id (the same id
  * PayPalDriver::verify()/captureOrder() resolve internally, exposed as
@@ -24,10 +24,12 @@ trait PayPalRefundMethods
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
+            $refundCurrency = $request->currency ?? $this->config['currencies'][0] ?? 'USD';
+
             $payload = array_filter([
                 'amount' => $request->amount !== null ? [
-                    'value' => number_format($request->amount, 2, '.', ''),
-                    'currency_code' => $request->currency ?? $this->config['currencies'][0] ?? 'USD',
+                    'value' => number_format($request->amount, $this->getCurrencyDecimals($refundCurrency), '.', ''),
+                    'currency_code' => $refundCurrency,
                 ] : null,
                 'note_to_payer' => $request->reason,
             ], fn ($value) => $value !== null);
@@ -40,7 +42,7 @@ trait PayPalRefundMethods
                 $requestOptions['headers']['PayPal-Request-Id'] = $request->idempotencyKey;
             }
 
-            $response = $this->makeRequest('POST', "/v2/payments/captures/{$request->transactionReference}/refund", $requestOptions);
+            $response = $this->makeRequest('POST', "/v2/payments/captures/$request->transactionReference/refund", $requestOptions);
             $data = $this->parseResponse($response);
 
             if (! isset($data['id'])) {

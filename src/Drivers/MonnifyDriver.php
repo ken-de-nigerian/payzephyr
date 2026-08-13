@@ -243,7 +243,6 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
     /**
      * Monnify nests event data (including `paidOn` / `completedOn`) under
      * `eventData`, not at the top level of the webhook body.
-     *  See ADR-0001.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -254,7 +253,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
     /**
      * Monnify nests the transaction/disbursement reference (used for
-     * event-level idempotency) under `eventData`. See ADR-0005.
+     * event-level idempotency) under `eventData`.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -277,10 +276,6 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             return true;
 
         } catch (ChargeException $e) {
-            // getAccessToken() wraps makeRequest()'s own ChargeException in a
-            // second ChargeException, so a ClientException (API reachable,
-            // credentials rejected) sits two levels down getPrevious(), not
-            // one - walk the full chain rather than checking a single level.
             $previous = $e;
             while ($previous = $previous->getPrevious()) {
                 if ($previous instanceof ClientException) {
@@ -288,9 +283,13 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 }
             }
 
+            $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
+
             return false;
 
-        } catch (Throwable) {
+        } catch (Throwable $e) {
+            $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
+
             return false;
         }
     }

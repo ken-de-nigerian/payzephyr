@@ -8,7 +8,7 @@ use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 
 /**
  * Persistence boundary for RefundTransaction. Mirrors
- * SubscriptionRepositoryInterface's concurrency-safe upsert pattern (ADR-0004).
+ * SubscriptionRepositoryInterface's concurrency-safe upsert pattern.
  */
 interface RefundRepositoryInterface
 {
@@ -27,7 +27,7 @@ interface RefundRepositoryInterface
     /**
      * Sum the amount of all refunds for a transaction whose status still
      * counts toward the refunded total (pending, processing, or completed -
-     * failed/cancelled refunds don't reduce the refundable balance).
+     * failed/canceled refunds don't reduce the refundable balance).
      */
     public function sumRefundedAmount(string $transactionReference): float;
 
@@ -38,4 +38,17 @@ interface RefundRepositoryInterface
      * outcome is known - see refunds.prevent_duplicates.
      */
     public function hasInFlightRefund(string $transactionReference): bool;
+
+    /**
+     * Atomically apply $status to the refund matching $refundReference,
+     * unless it does not exist locally or has already reached a terminal
+     * state (completed/failed/canceled). Used by asynchronous webhook
+     * confirmation: the local row may not exist (refund initiated outside
+     * PayZephyr, or logging was disabled when refund() ran), and an
+     * out-of-order or replayed webhook delivery must never regress an
+     * already-resolved refund back to a non-terminal status.
+     *
+     * @return bool True if the update was applied, false if skipped.
+     */
+    public function updateStatusIfExists(string $refundReference, string $status): bool;
 }

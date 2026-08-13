@@ -12,14 +12,16 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Stripe\Exception\ApiErrorException;
+use Stripe\Product;
+use Stripe\StripeObject;
 
 /**
  * Trait providing Stripe subscription functionality.
  *
- * See ADR-0009 for the API-mapping decisions this trait makes (Prices as
- * plans, immutable-price updates creating a new Price, cancel_at_period_end
- * vs. immediate cancellation, and why a fully-cancelled Stripe subscription
- * cannot be re-enabled).
+ * Plans map to Prices. Immutable-price updates (amount/currency/interval)
+ * create a new Price rather than mutating the existing one.
+ * cancel_at_period_end distinguishes scheduled from immediate cancellation,
+ * and a fully-canceled Stripe subscription cannot be re-enabled.
  */
 trait StripeSubscriptionMethods
 {
@@ -41,7 +43,7 @@ trait StripeSubscriptionMethods
                 'currency' => strtolower($plan->currency),
                 'recurring' => ['interval' => $this->mapIntervalToStripe($plan->interval)],
                 'product' => $product->id,
-                'metadata' => $plan->metadata,
+                'metadata' => $this->toStripeMetadata($plan->metadata),
             ]);
 
             $this->log('info', 'Subscription plan created', [
@@ -64,8 +66,7 @@ trait StripeSubscriptionMethods
      * mutating this one (Stripe's own recommended pattern; existing
      * subscriptions keep billing at their original price). Metadata,
      * nickname, and active-state changes update the existing Price in
-     * place. Name/description changes update the underlying Product. See
-     * ADR-0009.
+     * place. Name/description changes update the underlying Product.
      *
      * @param  array<string, mixed>  $updates
      *
@@ -75,26 +76,29 @@ trait StripeSubscriptionMethods
     {
         try {
             $existingPrice = $this->stripe->prices->retrieve($planCode, ['expand' => ['product']]);
-            $productId = is_object($existingPrice->product) ? $existingPrice->product->id : $existingPrice->product;
+            $existingProduct = $existingPrice->product;
+            $productId = $existingProduct instanceof Product ? $existingProduct->id : $existingProduct;
 
             if (isset($updates['name']) || isset($updates['description'])) {
                 $this->stripe->products->update($productId, array_filter([
-                    'name' => $updates['name'] ?? null,
-                    'description' => $updates['description'] ?? null,
+                    'name' => isset($updates['name']) ? (string) $updates['name'] : null,
+                    'description' => isset($updates['description']) ? (string) $updates['description'] : null,
                 ], fn ($value) => $value !== null));
             }
 
             if (isset($updates['amount']) || isset($updates['interval'])) {
                 $price = $this->stripe->prices->create([
-                    'unit_amount' => isset($updates['amount']) ? (int) round($updates['amount'] * 100) : $existingPrice->unit_amount,
+                    'unit_amount' => isset($updates['amount']) ? (int) round($updates['amount'] * 100) : (int) $existingPrice->unit_amount,
                     'currency' => $existingPrice->currency,
                     'recurring' => [
                         'interval' => isset($updates['interval'])
-                            ? $this->mapIntervalToStripe($updates['interval'])
+                            ? $this->mapIntervalToStripe((string) $updates['interval'])
                             : $existingPrice->recurring->interval,
                     ],
                     'product' => $productId,
-                    'metadata' => $updates['metadata'] ?? (array) $existingPrice->metadata,
+                    'metadata' => isset($updates['metadata'])
+                        ? $this->toStripeMetadata($updates['metadata'])
+                        : $this->toStripeMetadata($existingPrice->metadata),
                 ]);
 
                 $this->log('info', 'Subscription plan updated with a new price (amount/interval changed)', [
@@ -103,9 +107,9 @@ trait StripeSubscriptionMethods
                 ]);
             } else {
                 $mutable = array_filter([
-                    'metadata' => $updates['metadata'] ?? null,
+                    'metadata' => isset($updates['metadata']) ? $this->toStripeMetadata($updates['metadata']) : null,
                     'active' => $updates['active'] ?? null,
-                    'nickname' => $updates['nickname'] ?? null,
+                    'nickname' => isset($updates['nickname']) ? (string) $updates['nickname'] : null,
                 ], fn ($value) => $value !== null);
 
                 $price = $mutable !== [] ? $this->stripe->prices->update($planCode, $mutable) : $existingPrice;
@@ -143,7 +147,7 @@ trait StripeSubscriptionMethods
      * Stripe's list API is cursor-based, not page-numbered - $perPage is
      * honored, but only page 1 can be served faithfully. A $page > 1
      * request logs a warning and still returns page 1 rather than silently
-     * returning wrong data. See ADR-0009.
+     * returning wrong data.
      *
      * @return array<string, mixed>
      *
@@ -182,8 +186,7 @@ trait StripeSubscriptionMethods
      *
      * Requires $request->authorization (a Stripe PaymentMethod ID already
      * usable for the customer) - the same precondition Paystack's driver
-     * already has (a prior authorization_code from a completed charge). See
-     * ADR-0009.
+     * already has (a prior authorization_code from a completed charge).
      *
      * @throws SubscriptionException
      */
@@ -222,8 +225,6 @@ trait StripeSubscriptionMethods
             $this->logSubscription($request, $response);
 
             return $response;
-        } catch (SubscriptionException $e) {
-            throw $e;
         } catch (ApiErrorException $e) {
             $this->log('error', 'Failed to create subscription', ['error' => $e->getMessage()]);
             throw new SubscriptionException('Failed to create subscription: '.$e->getMessage(), 0, $e);
@@ -296,7 +297,7 @@ trait StripeSubscriptionMethods
      * Stripe cannot reactivate a subscription already in its terminal
      * `canceled` status - only Paystack's model allows that. Throws a clear
      * exception rather than silently no-op'ing or approximating incorrect
-     * behavior. See ADR-0009.
+     * behavior.
      *
      * @throws SubscriptionException
      */
@@ -307,7 +308,7 @@ trait StripeSubscriptionMethods
 
             if ($current->status === 'canceled') {
                 throw new SubscriptionException(
-                    "Subscription {$action->subscriptionCode} is fully cancelled and cannot be reactivated on ".
+                    "Subscription $action->subscriptionCode is fully cancelled and cannot be reactivated on ".
                     'Stripe - create a new subscription instead. Only a subscription still pending '.
                     'cancel_at_period_end can be resumed.'
                 );
@@ -323,8 +324,6 @@ trait StripeSubscriptionMethods
             $this->logSubscriptionFromResponse($response);
 
             return $response;
-        } catch (SubscriptionException $e) {
-            throw $e;
         } catch (ApiErrorException $e) {
             $this->log('error', 'Failed to enable subscription', [
                 'subscription_code' => $action->subscriptionCode,
@@ -337,7 +336,7 @@ trait StripeSubscriptionMethods
     /**
      * List customer subscriptions.
      *
-     * Same cursor-pagination caveat as listPlans() - see ADR-0009.
+     * Same cursor-pagination caveat as listPlans().
      *
      * @return array<string, mixed>
      *
@@ -392,6 +391,25 @@ trait StripeSubscriptionMethods
         return $this->findStripeCustomerByEmail($email) ?? $this->stripe->customers->create(['email' => $email]);
     }
 
+    /**
+     * Stripe's `metadata` request parameter is always array<string, string>.
+     * Neither of this method's callers can prove that statically: a
+     * StripeObject (Price::$metadata coming back from the API) stores its
+     * values dynamically/untyped, and this package's own DTOs declare
+     * metadata as array<string, mixed> since they're a general-purpose bag.
+     * Stripe's metadata values are always strings in practice (that's the
+     * API's own contract), so casting is safe rather than lossy.
+     *
+     * @param  array<string, mixed>|StripeObject  $metadata
+     * @return array<string, string>
+     */
+    private function toStripeMetadata(array|StripeObject $metadata): array
+    {
+        $array = $metadata instanceof StripeObject ? $metadata->toArray() : $metadata;
+
+        return array_map(strval(...), $array);
+    }
+
     private function mapIntervalToStripe(string $interval): string
     {
         return match ($interval) {
@@ -437,7 +455,7 @@ trait StripeSubscriptionMethods
             customer: $customer->email
                 ?? (is_object($subscription->customer ?? null) ? $subscription->customer->email : '')
                 ?? '',
-            plan: is_object($price) ? $price->id : (string) ($item->price ?? ''),
+            plan: is_object($price) ? $price->id : $item->price ?? '',
             amount: is_object($price) ? ($price->unit_amount ?? 0) / 100 : 0,
             currency: is_object($price) ? strtoupper($price->currency) : 'USD',
             nextPaymentDate: isset($subscription->current_period_end)

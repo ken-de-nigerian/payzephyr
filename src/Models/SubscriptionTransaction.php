@@ -14,13 +14,13 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 
 /**
  * @method static Builder<SubscriptionTransaction> where(string $column, mixed $operator = null, mixed $value = null)
- * @method static SubscriptionTransaction create(array $attributes = [])
- * @method static SubscriptionTransaction|null first(array|string $columns = ['*'])
- * @method static SubscriptionTransaction firstOrFail(array|string $columns = ['*'])
+ * @method static SubscriptionTransaction create(array<string, mixed> $attributes = [])
+ * @method static SubscriptionTransaction|null first(array<int, string>|string $columns = ['*'])
+ * @method static SubscriptionTransaction firstOrFail(array<int, string>|string $columns = ['*'])
  * @method static Builder<SubscriptionTransaction> lockForUpdate()
- * @method static Builder<SubscriptionTransaction> update(array $attributes = [])
+ * @method static Builder<SubscriptionTransaction> update(array<string, mixed> $attributes = [])
  * @method static Builder<SubscriptionTransaction> delete()
- * @method static SubscriptionTransaction updateOrCreate(array $attributes, array $values = [])
+ * @method static SubscriptionTransaction updateOrCreate(array<string, mixed> $attributes, array<string, mixed> $values = [])
  *
  * @property int $id
  * @property string $subscription_code
@@ -31,7 +31,7 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
  * @property float $amount
  * @property string $currency
  * @property Carbon|null $next_payment_date
- * @property array|ArrayObject|null $metadata
+ * @property array<string, mixed>|ArrayObject<string, mixed>|null $metadata
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */

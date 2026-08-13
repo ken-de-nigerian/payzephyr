@@ -10,14 +10,14 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for MollieDriver. See ADR-0011.
+ * Refund support for MollieDriver.
  *
  * $transactionReference is Mollie's payment id (the same id
  * MollieDriver::verify() uses). Mollie refunds are nested resources under
  * the payment, so both refund() and fetchRefund() need the payment id -
  * fetchRefund() therefore expects "{paymentId}:{refundId}" (mirroring the
  * composite-code approach MollieSubscriptionMethods already uses for
- * subscription codes, per ADR-0010).
+ * subscription codes).
  */
 trait MollieRefundMethods
 {

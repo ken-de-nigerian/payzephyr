@@ -11,7 +11,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
 /**
- * Refund support for MonnifyDriver. See ADR-0011.
+ * Refund support for MonnifyDriver.
  *
  * $transactionReference is Monnify's transactionReference (the same
  * reference MonnifyDriver::verify() queries by). Monnify requires the
@@ -28,10 +28,12 @@ trait MonnifyRefundMethods
         $refundReference = $request->idempotencyKey ?? Str::uuid()->toString();
 
         try {
+            $refundAmount = $request->amount ?? $this->fetchOriginalTransactionAmount($request->transactionReference);
+
             $payload = array_filter([
                 'transactionReference' => $request->transactionReference,
                 'refundReference' => $refundReference,
-                'refundAmount' => $request->amount,
+                'refundAmount' => $refundAmount,
                 'refundReason' => $request->reason ?? 'Refund requested',
             ], fn ($value) => $value !== null);
 
@@ -71,6 +73,28 @@ trait MonnifyRefundMethods
         } catch (Throwable $e) {
             $this->log('error', 'Failed to create refund', ['error' => $e->getMessage()]);
             throw new RefundException('Failed to create refund: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Fetch the original transaction's amount for a full (no explicit
+     * amount) Monnify refund - see the comment in refund() above. Reuses
+     * verify() rather than a bespoke lookup, since $transactionReference is
+     * documented (see the trait docblock) as the same reference verify()
+     * already queries by.
+     *
+     * @throws RefundException
+     */
+    private function fetchOriginalTransactionAmount(string $transactionReference): float
+    {
+        try {
+            return $this->verify($transactionReference)->amount;
+        } catch (Throwable $e) {
+            throw new RefundException(
+                "Cannot issue a full refund for Monnify transaction [$transactionReference]: failed to look up the original transaction's amount. Pass an explicit amount() instead. (".$e->getMessage().')',
+                0,
+                $e
+            );
         }
     }
 

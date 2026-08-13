@@ -37,7 +37,7 @@ interface SubscriptionLifecycleHooks
     public function afterSubscriptionCreate(SubscriptionResponseDTO $response): void;
 
     /**
-     * Called before a subscription is cancelled.
+     * Called before a subscription is canceled.
      *
      * This hook allows you to perform any pre-cancellation logic, such as
      * checking if cancellation is allowed, sending warnings, or logging.
@@ -45,9 +45,9 @@ interface SubscriptionLifecycleHooks
     public function beforeSubscriptionCancel(string $subscriptionCode): void;
 
     /**
-     * Called after a subscription is successfully cancelled.
+     * Called after a subscription is successfully canceled.
      *
-     * This hook is called immediately after the subscription is cancelled.
+     * This hook is called immediately after the subscription is canceled.
      * You can use this to trigger notifications, update local records,
      * or perform cleanup tasks.
      */

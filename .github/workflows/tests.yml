@@ -6,7 +6,34 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    name: Static Analysis & Formatting
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, soap, gd, exif, iconv
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Run PHPStan
+        run: composer analyse
+
+      - name: Check code style
+        run: vendor/bin/pint --test
+
   test:
     runs-on: ubuntu-latest
 
@@ -42,17 +69,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: ${{ matrix.php }}
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, soap, gd, exif, iconv
           coverage: none  # Disable Xdebug for regular tests (faster)
 
       - name: Cache Composer
-        uses: actions/cache@v3
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
         with:
           path: vendor
           key: composer-${{ matrix.php }}-${{ matrix.laravel }}-${{ hashFiles('**/composer.lock') }}
@@ -85,17 +112,17 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: 8.4
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, soap, gd, exif, iconv
           coverage: xdebug
 
       - name: Cache Composer
-        uses: actions/cache@v3
+        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3
         with:
           path: vendor
           key: composer-8.4-12-${{ hashFiles('**/composer.lock') }}
@@ -113,6 +140,9 @@ jobs:
       - name: Install dependencies
         run: composer update --prefer-dist --no-interaction --no-progress
 
+      - name: Audit dependencies for known vulnerabilities
+        run: composer audit
+
       - name: Prepare test environment
         run: |
           mkdir -p .phpunit.cache
@@ -120,10 +150,10 @@ jobs:
           mkdir -p build/logs
 
       - name: Execute tests with coverage
-        run: vendor/bin/pest --coverage --min=80 --coverage-clover=build/logs/clover.xml --coverage-html=build/coverage --coverage-text=build/coverage.txt
+        run: vendor/bin/pest --coverage --min=99 --coverage-clover=build/logs/clover.xml --coverage-html=build/coverage --coverage-text=build/coverage.txt
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3
         with:
           files: ./build/logs/clover.xml
           fail_ci_if_error: false

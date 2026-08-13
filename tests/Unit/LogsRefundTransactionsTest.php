@@ -7,6 +7,7 @@ use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
+use KenDeNigerian\PayZephyr\Repositories\EloquentRefundRepository;
 use Tests\Helpers\RefundTestHelper;
 
 /**
@@ -120,6 +121,66 @@ test('refund metadata is sanitized before being persisted to refund_transactions
 
     expect($metadata['xss'] ?? '')->not->toContain('<script>')
         ->and($metadata['html'] ?? '')->not->toContain('onerror=');
+});
+
+test('logRefundFromResponse normalizes a raw uppercase provider status before persisting', function () {
+    // Regression: Square/PayPal/Monnify return raw statuses like "PENDING"/
+    // "COMPLETED" (uppercase), but RefundRepository::hasInFlightRefund() and
+    // sumRefundedAmount() match against the fixed lowercase set
+    // ['pending','processing','completed']. Persisting the raw string
+    // verbatim silently disabled the duplicate-refund and over-refund
+    // guards for those providers - this asserts the persisted row uses the
+    // normalized RefundStatus value, not the raw provider casing.
+    $driver = makeRefundLoggingDriver();
+    $driver->setRefundRepository(new EloquentRefundRepository);
+
+    $response = new RefundResponseDTO(
+        refundReference: 'REF_CASE_TEST',
+        transactionReference: 'TXN_CASE_TEST',
+        status: 'PENDING',
+        amount: 5000.0,
+        currency: 'NGN',
+    );
+
+    $reflection = new ReflectionClass($driver);
+    $method = $reflection->getMethod('logRefundFromResponse');
+    $method->invoke($driver, $response);
+
+    $logged = RefundTransaction::where('refund_reference', 'REF_CASE_TEST')->first();
+
+    expect($logged->status)->toBe('pending');
+
+    $repository = new EloquentRefundRepository;
+    expect($repository->hasInFlightRefund('TXN_CASE_TEST'))->toBeTrue()
+        ->and($repository->sumRefundedAmount('TXN_CASE_TEST'))->toBe(5000.0);
+});
+
+test('logRefundFromResponse normalizes a differently-worded completed status before persisting', function () {
+    // Paystack's create-refund response can report "processed" rather than
+    // "completed" - RefundStatus::fromString() maps it to COMPLETED, and
+    // that canonical value (not the raw word "processed") must be what's
+    // persisted for sumRefundedAmount()'s literal string match to count it.
+    $driver = makeRefundLoggingDriver();
+    $driver->setRefundRepository(new EloquentRefundRepository);
+
+    $response = new RefundResponseDTO(
+        refundReference: 'REF_WORD_TEST',
+        transactionReference: 'TXN_WORD_TEST',
+        status: 'processed',
+        amount: 2500.0,
+        currency: 'NGN',
+    );
+
+    $reflection = new ReflectionClass($driver);
+    $method = $reflection->getMethod('logRefundFromResponse');
+    $method->invoke($driver, $response);
+
+    $logged = RefundTransaction::where('refund_reference', 'REF_WORD_TEST')->first();
+
+    expect($logged->status)->toBe('completed');
+
+    $repository = new EloquentRefundRepository;
+    expect($repository->sumRefundedAmount('TXN_WORD_TEST'))->toBe(2500.0);
 });
 
 test('refund reason is sanitized before being persisted to refund_transactions', function () {

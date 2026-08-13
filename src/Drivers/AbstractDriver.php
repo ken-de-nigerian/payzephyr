@@ -497,7 +497,7 @@ abstract class AbstractDriver implements DriverInterface
 
     /**
      * Extract a provider-native event identifier from a raw webhook payload,
-     * for event-level idempotency (see ADR-0005).
+     * for event-level idempotency.
      *
      * Deliberately not part of DriverInterface - a driver implementing that
      * interface directly (rather than extending this class) isn't required
@@ -505,10 +505,9 @@ abstract class AbstractDriver implements DriverInterface
      * content-hash key when absent, so this stays fully backward compatible.
      *
      * Checks common top-level field names (works as-is for Stripe, PayPal,
-     * Square, Mollie). Providers that nest their event data
-     * under a sub-object (Paystack, Flutterwave, Monnify, OPay) override this
-     * - see ADR-0001's identical nested-field precedent for
-     * extractWebhookTimestamp().
+     * Square, Mollie). Providers that nest their event data under a
+     * sub-object (Paystack, Flutterwave, Monnify, OPay) override this, the
+     * same way they override extractWebhookTimestamp().
      *
      * @param  array<string, mixed>  $payload
      */

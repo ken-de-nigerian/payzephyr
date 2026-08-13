@@ -5,9 +5,3 @@ parameters:
     excludePaths:
         - tests
     treatPhpDocTypesAsCertain: false
-    ignoreErrors:
-        - '#Unsafe usage of new static\(\)#'
-        - '#Call to an undefined method.*Illuminate\\Contracts\\Auth\\Factory::.*#'
-        - '#Call to an undefined method.*Illuminate\\Contracts\\Foundation\\Application::.*#'
-        - '#Call to an undefined method.*DriverInterface::(getCachedHealthCheck|isCurrencySupported)\(\)#'
-

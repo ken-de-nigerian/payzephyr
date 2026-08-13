@@ -6,6 +6,185 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [3.0.0] - 2026-08-13
+
+Second and final pass of the production-readiness audit, closing the caller double-submission
+gap the first pass identified but deliberately deferred. Entries below are additional to the
+first pass's, recorded further down under the same version (nothing from the first pass has
+been released yet).
+
+### Added
+
+- **`docs/idempotency.md`** - precise documentation of what PayZephyr does and does not
+  guarantee about duplicate submissions, retries, and exactly-once semantics. It states
+  plainly that exactly-once payment processing is *not* guaranteed and explains the three
+  layers that do exist. Worth reading before relying on any of them.
+- **[ADR-0013](architecture/adr/0013-charge-idempotency-identity.md)** - the logical payment
+  identity decision and the options rejected along the way.
+
+### Fixed
+
+- **A retry of the same logical payment reached providers under a different idempotency key.**
+  `ChargeRequestDTO::fromArray()` minted a fresh random UUID on every call, even when the
+  caller supplied the same `reference` both times - so a retry after a lost or ambiguous
+  response looked like a brand new request to every provider, defeating provider-side
+  idempotency in exactly the case it exists to protect. The idempotency key is now derived
+  from the caller's `reference` when no explicit key is given. An explicit
+  `->idempotency($key)` still always wins.
+- **Concurrent submissions of the same payment could both reach a provider.** Nothing
+  serialised two in-flight charges for the same reference. `chargeWithFallback()` now
+  atomically claims the reference before contacting any provider, and rejects a second
+  submission with a `ProviderException` rather than charging again. The claim is held on
+  success and on an ambiguous outcome, and released only on a definitive failure so
+  legitimate retries still work. Requires a shared atomic cache store (database/redis/
+  memcached) to protect across processes - documented in `docs/idempotency.md`.
+- **An unrecognised refund status silently released the entire refundable balance.**
+  `RefundResponseDTO::getStatus()` fell back to `FAILED` for a provider status string it did
+  not recognise, and `FAILED` is excluded from `sumRefundedAmount()` - so an unknown status
+  made a payment look fully refundable again and a second refund could over-spend the
+  captured amount. It now falls back to `PENDING`: still never treated as success, but
+  counted toward the refunded total and non-terminal so a later webhook can resolve it.
+- **An ambiguous refund outcome released the in-flight lock**, letting an immediate retry
+  issue a second real refund when the provider may already have processed the first.
+  `Refund::refund()` now holds the lock and raises a reconcile-don't-retry error instead.
+  Ambiguity detection is now shared between `ChargeException` and `RefundException` via
+  `DetectsAmbiguousProviderOutcome`, which walks the full exception chain - refunds wrap the
+  underlying network exception one level deeper than charges do, so the previous
+  single-level check would not have detected it.
+
+- **A driver implementing only `DriverInterface` broke every charge, and the failure was
+  silently misreported.** `chargeWithFallback()` called `isCurrencySupported()` and
+  `getCachedHealthCheck()`, neither of which is declared on `DriverInterface` - they exist
+  only on `AbstractDriver`. Since `DriverFactory::create()` and `PaymentManager::driver()`
+  are both typed to the interface, and `docs/custom-drivers.md` documents the interface as
+  the contract, a pure-interface driver is legitimate - and hit
+  `Error: Call to undefined method` mid-charge. Worse, the fallback loop's
+  `catch (Throwable)` swallowed that into a generic "All payment providers failed", so in a
+  multi-provider setup the custom driver was silently skipped and payments quietly routed to
+  a different provider. The same call also made `/payments/health` report a perfectly healthy
+  custom driver as unhealthy.
+
+  Both call sites now resolve through `PaymentManager::driverIsHealthy()` and
+  `driverSupportsCurrency()`, which prefer the driver's own implementation when present and
+  otherwise derive the identical answer from `healthCheck()` / `getSupportedCurrencies()` -
+  both of which *are* on the interface. No interface change was needed, so third-party
+  drivers keep working unchanged.
+
+  This had been actively hidden: `phpstan.neon` carried an
+  `ignoreErrors` entry silencing exactly this diagnostic, with no justifying comment (every
+  other suppression in that file has one). The suppression has been removed rather than
+  updated - and removing it immediately surfaced the second occurrence in
+  `PaymentServiceProvider`, which the silencer had also been covering.
+
+- **All five `phpstan.neon` `ignoreErrors` suppressions removed; the `ignoreErrors` block no
+  longer exists.** Two were already dead (`environment()` and `bound()` *are* on the
+  Application/Container contracts). The other three were hiding real issues:
+  - `auth()->check()` / `auth()->id()` — the Auth *Factory* contract exposes only `guard()`
+    and `shouldUse()`; `check()`/`id()` live on the Guard it resolves. Now calls
+    `auth()->guard()->check()`. Same guard at runtime, but type-safe.
+  - `new static()` in `PaymentException::withContext()` — replaced with a
+    `@phpstan-consistent-constructor` annotation, which PHPStan *enforces*: adding a subclass
+    with a different constructor signature is now an error rather than a silent hazard.
+  - `PaymentServiceProvider::registerRoutes()` called `routesAreCached()`, which exists only
+    on the concrete `Foundation\Application`, not the contract `ServiceProvider::$app` is
+    typed to. Now narrowed with an `instanceof` check that falls through to registering
+    routes on a non-standard container — routes present when they could have been cached is
+    harmless; routes missing is not.
+
+### Changed
+
+- **Webhook channel extraction now reports the real payment instrument** (behavior change).
+  `PayPalDriver::extractWebhookChannel()` returned a hardcoded `'paypal'` without reading the
+  payload at all, so a card-funded, Venmo-funded, and balance-funded payment were all recorded
+  identically — and redundantly with `provider = 'paypal'`. It now reads
+  `resource.payment_source` and returns the instrument key (`card`, `paypal`, `venmo`, …), or
+  `null` when PayPal reports none. `SquareDriver::extractWebhookChannel()` similarly defaulted
+  a missing `source_type` to `'card'`, recording card payments for instruments that were never
+  cards; it now returns `null` when the field is absent or empty.
+
+  Both previously satisfied their `?string` signature only because a PHPStan suppression hid
+  that they could never actually return `null`. Applications reading `channel` off PayPal or
+  Square transactions will now see accurate instrument values (or `null`) instead of a
+  constant — more useful, but different from before, hence noted as a behavior change.
+
+- `ChannelMapper::mapToPayPal()` removed; the `paypal` match arm returns `null` directly.
+  PayPal's Orders v2 API has no funding-source restriction parameter, so the method could only
+  ever return `null` — the indirection just obscured that.
+
+- **The post-success invariant is now enforced structurally rather than by convention.**
+  Every post-charge side effect moved into `PaymentManager::completeSuccessfulCharge()`,
+  which cannot throw. Previously each risky call was individually wrapped, so a future edit
+  adding an unwrapped line between the provider call and the return would silently
+  reintroduce the double-charge bug.
+- `EloquentRefundRepository`'s refunded-total query now derives its status list from
+  `RefundStatus::countsTowardRefundedAmount()` instead of hardcoding the strings, so a new
+  status cannot silently escape the over-refund guard.
+- Documentation no longer hardcodes the bundled provider count ("all 8 providers" ->
+  "every bundled provider"), which was guaranteed to go stale.
+
+---
+---
+
+*Remainder of 3.0.0, from the first audit pass (2026-08-12).*
+
+Production-readiness audit following 2.1.0's refund/feature-selective-install work. Every item below
+was found and fixed with a test-first regression test in the same audit pass - see the audit's Payment
+Safety Matrix for how each was verified.
+
+### Breaking
+
+- **`WebhookEventRepositoryInterface` gained a new required method, `forget(string $provider, string $eventKey): void`.**
+  Any application binding a custom implementation of this interface (via `$this->app->bind(WebhookEventRepositoryInterface::class, ...)`)
+  must add this method before upgrading. See "Fixed" below for why it exists. The bundled
+  `EloquentWebhookEventRepository` already implements it - no action needed if you use the default binding.
+
+### Fixed
+
+- **Duplicate-charge risk in `PaymentManager::chargeWithFallback()`**: post-charge bookkeeping (session
+  cache write, `PaymentInitiated` event dispatch) ran *inside* the same try block as the provider call, so a
+  failure in bookkeeping *after* a successful charge was caught by the fallback loop's own error handling and
+  retried against the next configured provider - charging the customer twice. Bookkeeping now runs in its own
+  isolated try/catch that can never trigger a fallback retry.
+- **Ambiguous network-timeout charges no longer fall back to a second provider.** A charge request that times
+  out or loses its response before confirming success is not distinguishable from one the provider actually
+  processed - retrying it against a different provider risked a double charge. `ChargeException::isAmbiguousProviderOutcome()`
+  now detects this case (no HTTP response was ever received, or the Stripe SDK reports a connection-level
+  failure) and `chargeWithFallback()` stops immediately with a clear `ProviderException` instead of trying
+  another provider.
+- **A webhook delivery that fails mid-processing can now actually be retried.** `ProcessWebhook` records a
+  delivery as "seen" before processing it (so a genuinely concurrent duplicate is rejected immediately), but a
+  failure afterward (a `WebhookReceived` listener throwing, a transient DB error) left that marker in place
+  forever - so the job's own configured retries (`$tries`/`$backoff`) would see the delivery as "already
+  processed" and silently skip every retry. The catch block now clears the marker on failure via the new
+  `forget()` method (see Breaking, above) so a genuine retry reprocesses the delivery.
+- **Concurrent refund requests for the same transaction could both reach the provider.** The existing
+  duplicate-refund guard (`RefundValidator::hasInFlightRefund()`) only sees a `pending` `refund_transactions`
+  row once a *previous* refund's provider call has already returned - so two refund requests submitted close
+  enough together (a double-clicked "refund" button, two app processes handling a retried request) could both
+  pass that check before either had written anything, and both proceed to call the provider. `Refund::refund()`
+  now also claims an atomic, short-lived cache lock (`Cache::add()`) before calling the provider, closing that
+  window. Requires a cache store that's actually shared and atomic across processes (database/redis/memcached)
+  to protect multi-process deployments - the `array` driver is process-local and provides no cross-process
+  protection.
+- **`StripeDriver::charge()`/`verify()` only caught `Stripe\Exception\ApiErrorException`**, unlike every other
+  driver's charge/verify methods, which also catch a generic `Throwable` as a safety net. A non-SDK exception
+  (e.g. accessing an unexpectedly-shaped SDK response object) would previously propagate raw instead of as a
+  clean `ChargeException`/`VerificationException`. Now consistent with the other seven drivers.
+- **`FlutterwaveDriver::charge()` silently sent `redirect_url: null` to Flutterwave when no callback URL was
+  configured**, instead of failing fast the way Stripe and PayPal already do for the same situation. Now
+  throws `InvalidConfigurationException` with the same guidance those two drivers give.
+- **`SquareDriver::healthCheck()` and `MonnifyDriver::healthCheck()` logged nothing on failure**, unlike the
+  other six drivers' health checks. Both now log on every branch, and Square's now catches `Throwable` instead
+  of only `ChargeException`, matching the rest.
+
+### Also fixed (non-behavioral)
+
+- PHPStan: `WebhookEvent` model was missing `@method` annotations for `where()`/`delete()`, used by the new
+  `forget()` method above.
+- PHPStan: dead `$envVar = null` assignment in `UninstallCommand::describeResource()` that made its own `??`
+  fallback unreachable.
+
+---
 ## [2.1.0] - 2026-08-12
 
 ### Added
@@ -53,8 +232,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New single source of truth: `Console\Features` registry (also resolves feature dependencies, though none
     exist between Subscriptions and Refunds today).
   - See [Installation: core vs. optional features](installation.md#core-vs-optional-features).
+- **`php artisan payzephyr:uninstall`.** Feature-aware, explicitly destructive counterpart to the installer:
+  drops the tables PayZephyr owns, removes the migration files it published, and clears the `.env` feature
+  flags it wrote - nothing else. `config/payments.php` is never touched (it may contain your own
+  customization, and there's no general "unpublish" concept to safely reverse).
+  - Refuses to run in a non-interactive environment without `--force`. Interactively, requires confirming
+    twice: a yes/no prompt, then typing `UNINSTALL` verbatim.
+  - `--features=refunds` removes only the named optional feature, leaving core and every other feature
+    untouched; omit it to remove everything, including core. Only accepts optional feature names (the same
+    registry `--features=` on the installer validates against) - core can't be selectively uninstalled while
+    leaving optional feature tables behind.
+  - Feature-aware: never attempts to touch a table/migration that was never installed in the first place.
+  - Also removes the corresponding row from Laravel's own migration-tracking table, so a feature removed this
+    way and reinstalled later gets its table recreated by `migrate` instead of being silently skipped as
+    "already run."
+  - Safe to run repeatedly: a second run against an already-uninstalled feature reports there's nothing to do
+    rather than erroring.
+  - See [Installation: uninstalling PayZephyr](installation.md#uninstalling-payzephyr).
+- **Polished installer UI using Laravel Prompts.** `payzephyr:install`'s feature selection is now a single
+  `multiselect` prompt (checkboxes, already-installed features pre-checked) instead of one yes/no confirmation
+  per feature, plus an intro/outro and a pre-migration summary of what's about to run. Laravel Prompts is a
+  hard dependency of `laravel/framework` itself, so no new package dependency was added; it automatically
+  falls back to standard Artisan-style prompts on Windows and in non-interactive/test environments (Laravel's
+  own `ConfiguresPrompts` handles this transparently), so nothing about `--no-interaction`, `--features=`, or
+  `--all` behavior changed.
 
 ### Fixed
+
+- **Refund status was persisted to `refund_transactions` as the provider's raw, un-normalized string instead
+  of the canonical `RefundStatus` value** (e.g. Square/PayPal/Monnify's `"PENDING"`/`"COMPLETED"`, Paystack's
+  `"processed"`, Stripe's `"succeeded"`, Mollie's `"refunded"`). `EloquentRefundRepository::hasInFlightRefund()`
+  and `sumRefundedAmount()` match against the fixed lowercase set `['pending','processing','completed']`, so
+  for most providers this **silently disabled the duplicate-refund and over-refund guards** documented in
+  [Refunds: preventing over-refunds and duplicates](refunds.md#preventing-over-refunds-and-duplicates) - the
+  checks always saw an empty/zero refund history for that transaction regardless of what had actually been
+  refunded. Fixed by normalizing via `RefundResponseDTO::getStatus()->value` before persisting.
+- **A refund confirmed by webhook never updated the locally-persisted `refund_transactions` row.**
+  `ProcessWebhook::processRefundWebhook()` dispatched `RefundCompleted`/`RefundFailed` but never wrote the
+  resolved status back to the database, so for any provider confirming asynchronously - exactly the case
+  [Refunds](refunds.md#listening-for-refund-events) recommends listening for these events over polling
+  `fetch()` - the local row stayed `pending` forever, permanently tripping the in-flight duplicate guard for
+  that transaction. Fixed with a new `RefundRepositoryInterface::updateStatusIfExists()` (mirrors
+  `TransactionRepositoryInterface::updateIfNotSuccessful()`'s concurrency-safe, no-op-if-missing pattern, and
+  never regresses an already-terminal status from a replayed/out-of-order webhook).
+- **`FlutterwaveDriver::fetchRefund()` queried the wrong endpoint.** It called
+  `GET /v3/transactions/{id}/refunds` - a *transaction*-id-keyed endpoint that lists every refund against a
+  transaction - using the *refund's own* reference as the transaction id. Since refund IDs and transaction IDs
+  are different Flutterwave ID sequences, this could return refund data for an unrelated transaction that
+  happened to share that numeric ID. Fixed to call `GET /v3/refunds/{id}` (verified against Flutterwave's API
+  documentation), which fetches a single refund by its own ID directly.
+- **A full (no explicit amount) Square refund omitted the required `amount_money` field.** Unlike the other
+  seven providers, Square's `CreateRefund` API has no "omit amount for a full refund" semantics -
+  `amount_money` is required unconditionally (verified against Square's API documentation). `SquareDriver`'s
+  full-refund path now looks up the original payment first to determine the amount to refund, and fails with
+  a clear `RefundException` if that lookup fails rather than sending an incomplete request.
+- **PayPal refunds always formatted the amount with 2 decimal places**, even for zero-decimal currencies
+  (JPY, KRW, ...), where PayPal's API expects e.g. `"5000"` rather than `"5000.00"`. `PayPalDriver::charge()`
+  already computed per-currency decimals via `getCurrencyDecimals()`; the refund path now uses the same logic.
+- Minor: `StripeRefundMethods` accessed `$refund->amount` without a null-coalesce, unlike every other driver's
+  defensive `?? 0` pattern around provider response fields.
+- `guzzlehttp/guzzle`/`guzzlehttp/psr7` and `league/commonmark` dev lockfile entries refreshed to their latest
+  CVE-fixed versions (flagged as M-1 in the pre-2.0.0 audit for guzzle; commonmark surfaced separately during
+  this pass). Both are dev-only in this package's dependency tree and don't propagate to a consuming app's
+  install, but the lockfile hygiene is worth keeping current.
+- `stripe/stripe-php` bumped from `^13.0` (8 majors, ~2 years behind) to `^21.0` - flagged as a suggestion
+  (S-1) in the pre-2.0.0 audit. Verified against the package's actual Stripe SDK usage (`StripeClient`,
+  `Webhook`, the SDK's exception hierarchy): full test suite and static analysis pass unchanged against v21.2.0.
+- **A full (no explicit amount) Monnify refund omitted the required `refundAmount` field**, the same class of
+  bug as the Square one above. Monnify's own API documentation is explicit: `refundAmount` is required, and
+  "for a full refund, set this to the full transaction amount" rather than allowing it to be left out.
+  `MonnifyDriver`'s full-refund path now looks up the original transaction via `verify()` first (the trait's
+  own docblock already documents `$transactionReference` as the same reference `verify()` queries by).
+- `RefundStatus::fromString()` now recognizes Square's `"REJECTED"` refund status (verified against Square's
+  Refunds API docs) as `FAILED`. It previously fell through to `FAILED` only via the DTO's unrecognized-status
+  fallback, not through explicit recognition.
+- `Stripe\Price::$unit_amount` and stripe-php v21's other stricter API-parameter type stubs surfaced a couple
+  of `null`-vs-`int` mismatches in `StripeSubscriptionMethods::updatePlan()`'s new-Price-on-amount-change path,
+  a direct consequence of the SDK bump above - fixed with an explicit cast (behaviorally identical for the
+  `per_unit` prices this package ever creates; only tiered-billing prices, which this package doesn't support,
+  would ever have a genuinely null `unit_amount`).
+- New opt-in `php artisan payzephyr:refunds:normalize-status` (`--dry-run` supported) - a one-time backfill for
+  `refund_transactions` rows written *before* the status-normalization fix above, whose `status` column may
+  still hold a raw, un-normalized provider string. Not run automatically: whether to rewrite existing
+  production data is the application owner's call. Idempotent; reports (without guessing at) any row whose
+  status can't be mapped to a known `RefundStatus`.
+- `phpstan/phpstan` bumped from `1.12.34` (65 releases behind) to `^2.2`. Surfaced 37 previously-invisible
+  findings at the project's existing level-6 configuration - almost all incomplete generic-array type
+  annotations on `@method`/`@property` docblocks (Models, the `Payment` facade), plus a handful of genuinely
+  dead code (redundant `!==` comparisons, an always-true `is_object()` check, two `Http\Resources` classes
+  using an inline `@var $this` trick PHPStan 2.x now correctly rejects). All fixed; the remaining 3 findings
+  (two drivers' `extractWebhookChannel()`, `ChannelMapper::mapToPayPal()`) are deliberate false positives -
+  narrowing just those implementations' return types would break the uniform interface contract shared across
+  all drivers/mappers - and are now explicit, commented `ignoreErrors` entries rather than silent noise.
 
 - **Webhook signature verification narrowed its `catch` to `Exception` instead of `Throwable` in four sites**
   (`StripeDriver::validateWebhook()`, two in `PayPalDriver`, `MonnifyDriver::healthCheck()`) - a latent gap

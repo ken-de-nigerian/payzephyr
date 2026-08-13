@@ -81,10 +81,7 @@ test('payment manager cacheKey includes context when available', function () {
     $getCacheContextMethod = $reflection->getMethod('getCacheContext');
     $getCacheContextMethod->setAccessible(true);
 
-    \Illuminate\Support\Facades\Auth::shouldReceive('check')
-        ->andReturn(true);
-    \Illuminate\Support\Facades\Auth::shouldReceive('id')
-        ->andReturn(123);
+    mockAuthGuard(check: true, id: 123);
 
     $key = $cacheKeyMethod->invoke($manager, 'session', 'REF_123');
 

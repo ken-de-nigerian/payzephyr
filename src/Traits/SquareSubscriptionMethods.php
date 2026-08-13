@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Throwable;
@@ -16,10 +17,10 @@ use Throwable;
 /**
  * Trait providing Square subscription functionality.
  *
- * See ADR-0010 for the API-mapping decisions this trait makes (Catalog
- * SUBSCRIPTION_PLAN + SUBSCRIPTION_PLAN_VARIATION pair, /pause and /resume
- * for cancel/enable, and the price_override_money simplification noted on
- * mapSquareSubscriptionToResponse()).
+ * Plans map to a Catalog SUBSCRIPTION_PLAN + SUBSCRIPTION_PLAN_VARIATION
+ * pair. Cancel/enable map to /pause and /resume. See the
+ * price_override_money simplification noted on
+ * mapSquareSubscriptionToResponse().
  */
 trait SquareSubscriptionMethods
 {
@@ -90,7 +91,7 @@ trait SquareSubscriptionMethods
      * Square catalog objects carry a version number for optimistic
      * concurrency - the existing plan/variation objects are fetched first
      * and re-upserted individually (rather than via batch-upsert, since
-     * there are no new objects being created here). See ADR-0010.
+     * there are no new objects being created here).
      *
      * @param  array<string, mixed>  $updates
      *
@@ -161,7 +162,7 @@ trait SquareSubscriptionMethods
      * List subscription plans.
      *
      * Square's catalog list API is cursor-based, not page-numbered - same
-     * caveat as Stripe's listPlans(). See ADR-0010.
+     * caveat as Stripe's listPlans().
      *
      * @return array<string, mixed>
      *
@@ -213,7 +214,6 @@ trait SquareSubscriptionMethods
      *
      * Requires $request->authorization as an existing Square card-on-file ID
      * for the customer - the same precondition Stripe's driver already has.
-     * See ADR-0010.
      *
      * @throws SubscriptionException
      */
@@ -292,7 +292,7 @@ trait SquareSubscriptionMethods
      * Cancel (pause) a subscription.
      *
      * Maps to Square's /pause endpoint rather than /cancel - reversible,
-     * matching Paystack's disable/enable semantics. See ADR-0010.
+     * matching Paystack's disable/enable semantics.
      *
      * @throws SubscriptionException
      */
@@ -304,7 +304,7 @@ trait SquareSubscriptionMethods
                 'pause_cycle_duration' => $action->option('pause_cycle_duration'),
             ], fn ($value) => $value !== null);
 
-            $response = $this->makeRequest('POST', "/v2/subscriptions/{$action->subscriptionCode}/pause", [
+            $response = $this->makeRequest('POST', "/v2/subscriptions/$action->subscriptionCode/pause", [
                 'json' => $payload,
             ]);
             $data = $this->parseResponse($response);
@@ -340,7 +340,7 @@ trait SquareSubscriptionMethods
                 'resume_change_timing' => $action->option('resume_change_timing'),
             ], fn ($value) => $value !== null);
 
-            $response = $this->makeRequest('POST', "/v2/subscriptions/{$action->subscriptionCode}/resume", [
+            $response = $this->makeRequest('POST', "/v2/subscriptions/$action->subscriptionCode/resume", [
                 'json' => $payload,
             ]);
             $data = $this->parseResponse($response);
@@ -366,7 +366,7 @@ trait SquareSubscriptionMethods
     /**
      * List customer subscriptions.
      *
-     * Same cursor-pagination caveat as listPlans(). See ADR-0010.
+     * Same cursor-pagination caveat as listPlans().
      *
      * @return array<string, mixed>
      *
@@ -415,7 +415,7 @@ trait SquareSubscriptionMethods
     /**
      * @return array{0: ?array<string, mixed>, 1: array<string, mixed>}
      *
-     * @throws PlanException
+     * @throws PlanException|ChargeException
      */
     private function fetchSquareCatalogObjects(string $variationId): array
     {
@@ -464,6 +464,8 @@ trait SquareSubscriptionMethods
 
     /**
      * @return array<string, mixed>|null
+     *
+     * @throws ChargeException
      */
     private function findSquareCustomerByEmail(string $email): ?array
     {
@@ -480,6 +482,8 @@ trait SquareSubscriptionMethods
 
     /**
      * @return array<string, mixed>
+     *
+     * @throws ChargeException
      */
     private function findOrCreateSquareCustomer(string $email): array
     {
@@ -488,6 +492,8 @@ trait SquareSubscriptionMethods
 
     /**
      * @return array<string, mixed>
+     *
+     * @throws ChargeException
      */
     private function createSquareCustomer(string $email): array
     {
@@ -545,8 +551,8 @@ trait SquareSubscriptionMethods
      * SubscriptionResponseDTO::status feeds Enums\SubscriptionStatus - see
      * the identical note in StripeSubscriptionMethods. Square's own
      * PAUSED status maps to 'non-renewing' (not a direct synonym, but the
-     * closest match: reversible via enableSubscription(), same as our
-     * pause/resume mapping decision in ADR-0010).
+     * closest match: reversible via enableSubscription(), same as
+     * cancelSubscription()'s pause/resume mapping).
      */
     private function mapSquareSubscriptionStatus(string $status): string
     {

@@ -174,9 +174,6 @@ return [
         'max_retries' => env('PAYMENTS_WEBHOOK_MAX_RETRIES', 3),
         'retry_backoff' => env('PAYMENTS_WEBHOOK_RETRY_BACKOFF', 60), // seconds
         'events' => [
-            // Event-level idempotency (ADR-0005): dedupes duplicate webhook
-            // deliveries before any side effect (transaction update, event
-            // dispatch) runs, not just at the transaction-status level.
             'table' => env('PAYMENTS_WEBHOOK_EVENTS_TABLE', 'webhook_events'),
         ],
     ],

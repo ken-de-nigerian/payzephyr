@@ -34,6 +34,20 @@ function cleanPublishedInstallerState(): void
     }
 }
 
+/**
+ * The exact option labels InstallCommand's multiselect() feature prompt
+ * shows - must match Features::optional()'s label/description strings.
+ *
+ * @return array<string, string>
+ */
+function featureMultiselectOptions(): array
+{
+    return [
+        'subscriptions' => 'Subscriptions - Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie',
+        'refunds' => 'Refunds - Full and partial refunds across every bundled provider',
+    ];
+}
+
 function installedMigrationFiles(): array
 {
     return [
@@ -100,27 +114,24 @@ test('--no-interaction with no explicit feature flags installs core only, with n
 });
 
 test('install command runs migrations when the user confirms every prompt', function () {
-    // Covers the interactive elseif ($this->confirm(...)) branch. Feature
-    // prompts come before the "run migrations now" prompt, in registry order.
+    // Covers the interactive branch: the multiselect feature prompt comes
+    // before the "run migrations now" confirmation.
     $this->artisan('payzephyr:install')
-        ->expectsConfirmation('Install Subscriptions? (Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie)', 'no')
-        ->expectsConfirmation('Install Refunds? (Full and partial refunds across all 8 providers)', 'no')
+        ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'yes')
         ->assertExitCode(0);
 });
 
 test('install command skips migrations when the user declines the final prompt', function () {
     $this->artisan('payzephyr:install')
-        ->expectsConfirmation('Install Subscriptions? (Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie)', 'no')
-        ->expectsConfirmation('Install Refunds? (Full and partial refunds across all 8 providers)', 'no')
+        ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
         ->assertExitCode(0);
 });
 
 test('interactively selecting one optional feature installs only that feature', function () {
     $this->artisan('payzephyr:install')
-        ->expectsConfirmation('Install Subscriptions? (Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie)', 'yes')
-        ->expectsConfirmation('Install Refunds? (Full and partial refunds across all 8 providers)', 'no')
+        ->expectsChoice('Select the optional features you want to install', ['subscriptions'], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
         ->assertExitCode(0);
 
@@ -220,11 +231,11 @@ test('declining an already-installed feature interactively does not remove it', 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
     expect(installedMigrationFiles()['subscriptions'])->not->toBeEmpty();
 
-    // Second, interactive run: say "no" to Subscriptions even though it's
-    // already installed - PayZephyr must never delete on a "no" answer.
+    // Second, interactive run: deselect Subscriptions in the multiselect
+    // even though it's already installed - PayZephyr must never delete on
+    // a deselect.
     $this->artisan('payzephyr:install')
-        ->expectsConfirmation('Install Subscriptions? (Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie)', 'no')
-        ->expectsConfirmation('Install Refunds? (Full and partial refunds across all 8 providers)', 'no')
+        ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
         ->assertExitCode(0);
 
@@ -234,14 +245,13 @@ test('declining an already-installed feature interactively does not remove it', 
 test('interactive prompts pre-select features that are already installed', function () {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
-    // expectsConfirmation()'s second argument is the *answer given*, not the
-    // default - this only proves the prompt appears and accepting it again
-    // doesn't error or duplicate anything; the default-preselection itself
-    // is exercised by the "does not remove" test above via its 'no' answer
+    // expectsChoice()'s $answer is the answer given, not the default - this
+    // only proves the prompt appears and keeping Refunds selected doesn't
+    // error or duplicate anything; the default-preselection itself is
+    // exercised by the "does not remove" test above via its [] answer
     // leaving the feature intact.
     $this->artisan('payzephyr:install')
-        ->expectsConfirmation('Install Subscriptions? (Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie)', 'no')
-        ->expectsConfirmation('Install Refunds? (Full and partial refunds across all 8 providers)', 'yes')
+        ->expectsChoice('Select the optional features you want to install', ['refunds'], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
         ->assertExitCode(0);
 
@@ -288,6 +298,24 @@ test('install command gracefully handles a missing .env file instead of erroring
             File::delete($envPath);
         }
     }
+});
+
+test('interactive installation shows an intro and outro', function () {
+    $this->artisan('payzephyr:install')
+        ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
+        ->expectsConfirmation('Run migrations now?', 'no')
+        ->expectsOutputToContain('PayZephyr Installation')
+        ->expectsOutputToContain('PayZephyr is ready.')
+        ->assertExitCode(0);
+});
+
+test('non-interactive installation does not print the interactive intro/outro framing', function () {
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
+
+    $output = Artisan::output();
+
+    expect($output)->not->toContain('PayZephyr Installation')
+        ->and($output)->toContain('Installing PayZephyr...');
 });
 
 test('selecting both optional features installs both and neither is skipped', function () {

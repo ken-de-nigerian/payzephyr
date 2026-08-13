@@ -30,7 +30,8 @@ function makeSquareRefundDriver(array $responses, ?array &$history = null): Squa
     return $driver;
 }
 
-test('square refund succeeds with valid response', function () {
+test('square refund succeeds with an explicit amount, without looking up the original payment', function () {
+    $history = [];
     $driver = makeSquareRefundDriver([
         new Response(200, [], json_encode([
             'refund' => [
@@ -41,16 +42,63 @@ test('square refund succeeds with valid response', function () {
                 'reason' => 'requested by customer',
             ],
         ])),
-    ]);
+    ], $history);
 
-    $result = $driver->refund(new RefundRequestDTO(transactionReference: 'payment_abc', reason: 'requested by customer'));
+    $result = $driver->refund(new RefundRequestDTO(transactionReference: 'payment_abc', amount: 50.00, reason: 'requested by customer'));
 
     expect($result->refundReference)->toBe('refund_123')
         ->and($result->transactionReference)->toBe('payment_abc')
         ->and($result->status)->toBe('PENDING')
         ->and($result->amount)->toBe(50.0)
-        ->and($result->provider)->toBe('square');
+        ->and($result->provider)->toBe('square')
+        ->and($history)->toHaveCount(1);
 });
+
+test('a full square refund (no explicit amount) fetches the original payment to determine amount_money', function () {
+    // Regression: Square's CreateRefund API requires amount_money
+    // unconditionally - there is no "omit amount for a full refund"
+    // semantics the way Stripe/Paystack/PayPal/Mollie/Flutterwave work.
+    // Omitting it used to send a payload Square would reject outright.
+    $history = [];
+    $driver = makeSquareRefundDriver([
+        new Response(200, [], json_encode([
+            'payment' => [
+                'id' => 'payment_full',
+                'amount_money' => ['amount' => 12345, 'currency' => 'USD'],
+            ],
+        ])),
+        new Response(200, [], json_encode([
+            'refund' => [
+                'id' => 'refund_full',
+                'payment_id' => 'payment_full',
+                'status' => 'PENDING',
+                'amount_money' => ['amount' => 12345, 'currency' => 'USD'],
+            ],
+        ])),
+    ], $history);
+
+    $result = $driver->refund(new RefundRequestDTO(transactionReference: 'payment_full'));
+
+    expect($history)->toHaveCount(2);
+
+    $lookupRequest = $history[0]['request'];
+    expect($lookupRequest->getMethod())->toBe('GET')
+        ->and((string) $lookupRequest->getUri())->toContain('/v2/payments/payment_full');
+
+    $refundRequest = $history[1]['request'];
+    $sentBody = json_decode((string) $refundRequest->getBody(), true);
+    expect($sentBody['amount_money'])->toBe(['amount' => 12345, 'currency' => 'USD']);
+
+    expect($result->amount)->toBe(123.45);
+});
+
+test('a full square refund fails clearly when the original payment cannot be looked up', function () {
+    $driver = makeSquareRefundDriver([
+        new Response(200, [], json_encode(['errors' => [['detail' => 'Payment not found', 'code' => 'NOT_FOUND']]])),
+    ]);
+
+    $driver->refund(new RefundRequestDTO(transactionReference: 'payment_missing'));
+})->throws(RefundException::class, "Cannot issue a full refund for Square payment [payment_missing]: the original payment's amount could not be determined");
 
 test('square refund sends the explicit request currency, not just the first configured currency', function () {
     // The merchant is configured for USD *and* CAD (multi-currency), and
@@ -83,7 +131,10 @@ test('square refund throws exception on api error', function () {
         new Response(200, [], json_encode(['errors' => [['detail' => 'Payment not found', 'code' => 'NOT_FOUND']]])),
     ]);
 
-    $driver->refund(new RefundRequestDTO(transactionReference: 'invalid'));
+    // An explicit amount is passed so this exercises the POST /v2/refunds
+    // error path directly, without first going through the full-refund
+    // original-payment lookup (covered separately above).
+    $driver->refund(new RefundRequestDTO(transactionReference: 'invalid', amount: 10.0));
 })->throws(RefundException::class, 'Payment not found');
 
 test('square fetchRefund succeeds with valid response', function () {

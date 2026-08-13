@@ -10,6 +10,46 @@ beforeEach(function () {
     $this->repository = new EloquentRefundRepository;
 });
 
+test('updateStatusIfExists updates the status of an existing pending refund', function () {
+    $this->repository->updateOrCreateAtomic('REF_UPD_1', [
+        'transaction_reference' => 'TXN_UPD_1',
+        'provider' => 'paystack',
+        'status' => 'pending',
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    $applied = $this->repository->updateStatusIfExists('REF_UPD_1', 'completed');
+
+    expect($applied)->toBeTrue()
+        ->and(RefundTransaction::where('refund_reference', 'REF_UPD_1')->first()->status)->toBe('completed');
+});
+
+test('updateStatusIfExists is a safe no-op when the refund does not exist locally', function () {
+    $applied = $this->repository->updateStatusIfExists('REF_DOES_NOT_EXIST', 'completed');
+
+    expect($applied)->toBeFalse()
+        ->and(RefundTransaction::where('refund_reference', 'REF_DOES_NOT_EXIST')->exists())->toBeFalse();
+});
+
+test('updateStatusIfExists never regresses a refund that already reached a terminal state', function () {
+    // Guards against an out-of-order or replayed webhook delivery (e.g. a
+    // stale "processing" event arriving after "completed" already landed)
+    // flipping a resolved refund's status backward.
+    $this->repository->updateOrCreateAtomic('REF_TERMINAL', [
+        'transaction_reference' => 'TXN_TERMINAL',
+        'provider' => 'paystack',
+        'status' => 'completed',
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    $applied = $this->repository->updateStatusIfExists('REF_TERMINAL', 'failed');
+
+    expect($applied)->toBeFalse()
+        ->and(RefundTransaction::where('refund_reference', 'REF_TERMINAL')->first()->status)->toBe('completed');
+});
+
 test('updateOrCreateAtomic creates a new refund transaction', function () {
     $result = $this->repository->updateOrCreateAtomic('REF_1', [
         'transaction_reference' => 'TXN_1',

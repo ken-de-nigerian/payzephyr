@@ -13,7 +13,7 @@ Most values in the config file are read from environment variables via `env(...)
 ],
 ```
 
-Set by `php artisan payzephyr:install` the first time it publishes that feature's migration - see [Installation: core vs. optional features](installation.md#core-vs-optional-features) for what's core (always available, not listed here) versus optional. This is purely informational bookkeeping for your own code (`config('payments.features.refunds')`); it does not gate `Payment::subscription()`/`Payment::refund()` at runtime, which work based on whatever the provider driver you called `->with()` actually supports.
+Set by `php artisan payzephyr:install` the first time it publishes that feature's migration, and reset back to `false` by `php artisan payzephyr:uninstall` if that feature is later removed - see [Installation: core vs. optional features](installation.md#core-vs-optional-features) and [Uninstalling PayZephyr](installation.md#uninstalling-payzephyr) for what's core (always available, not listed here) versus optional. This is purely informational bookkeeping for your own code (`config('payments.features.refunds')`); it does not gate `Payment::subscription()`/`Payment::refund()` at runtime, which work based on whatever the provider driver you called `->with()` actually supports.
 
 ## Default and fallback providers
 

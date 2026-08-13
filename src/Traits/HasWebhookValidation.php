@@ -125,15 +125,6 @@ trait HasWebhookValidation
                     $candidate = (int) $value;
                 }
 
-                // A matched field name is necessary but not sufficient -
-                // "time" in particular is generic enough that an unrelated
-                // numeric field (a duration, a counter) could match it. Only
-                // accept a candidate that falls within a plausible calendar
-                // range for a real Unix timestamp; otherwise keep checking
-                // the remaining field names instead of either misreporting a
-                // bogus timestamp or falsely rejecting a legitimate webhook
-                // whose actual timestamp field appears later in the list.
-                // See RELEASE_AUDIT_2026-07-31.md M-4.
                 if ($candidate !== null && $this->isPlausibleUnixTimestamp($candidate)) {
                     return $candidate;
                 }

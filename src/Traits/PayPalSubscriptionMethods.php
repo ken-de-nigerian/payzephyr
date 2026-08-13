@@ -16,12 +16,11 @@ use Throwable;
 /**
  * Trait providing PayPal subscription functionality.
  *
- * See ADR-0009 for the API-mapping decisions this trait makes: plans as
- * Catalog Product + Billing Plan pairs, cancel/enable mapped to PayPal's
- * reversible suspend/activate pair (not the permanent /cancel endpoint,
- * reachable via $action->option('permanent', true) instead), the required
- * callbackUrl for the approval redirect, and why listSubscriptions() throws
- * (PayPal's REST API has no such endpoint).
+ * Plans map to Catalog Product + Billing Plan pairs. Cancel/enable map to
+ * PayPal's reversible suspend/activate pair (not the permanent /cancel
+ * endpoint, reachable via $action->option('permanent', true) instead).
+ * Subscriptions require a callbackUrl for the approval redirect.
+ * listSubscriptions() throws, since PayPal's REST API has no such endpoint.
  */
 trait PayPalSubscriptionMethods
 {
@@ -186,7 +185,7 @@ trait PayPalSubscriptionMethods
      * approval redirect (return_url/cancel_url). The created subscription
      * starts in APPROVAL_PENDING, not active - the approval link is
      * returned in $response->metadata['approval_url']; the customer must
-     * complete it before billing starts. See ADR-0009.
+     * complete it before billing starts.
      *
      * @throws SubscriptionException
      */
@@ -278,7 +277,7 @@ trait PayPalSubscriptionMethods
      * Paystack's disable/enable semantics. Pass
      * $action->option('permanent', true) to instead call PayPal's
      * irreversible /cancel endpoint. $action->option('reason', ...)
-     * overrides the default reason text sent to PayPal. See ADR-0009.
+     * overrides the default reason text sent to PayPal.
      *
      * @throws SubscriptionException
      */
@@ -289,7 +288,7 @@ trait PayPalSubscriptionMethods
             $reason = (string) $action->option('reason', 'Cancelled by merchant');
             $endpoint = $permanent ? 'cancel' : 'suspend';
 
-            $this->makeRequest('POST', "/v1/billing/subscriptions/{$action->subscriptionCode}/$endpoint", [
+            $this->makeRequest('POST', "/v1/billing/subscriptions/$action->subscriptionCode/$endpoint", [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => ['reason' => $reason],
             ]);
@@ -318,25 +317,25 @@ trait PayPalSubscriptionMethods
      * PayPal's /activate endpoint only works on a SUSPENDED subscription -
      * a permanently CANCELLED one (see cancelSubscription()'s 'permanent'
      * option) cannot be reactivated. Throws a clear exception rather than
-     * silently failing or approximating incorrect behavior. See ADR-0009.
+     * silently failing or approximating incorrect behavior.
      *
      * @throws SubscriptionException
      */
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $current = $this->parseResponse($this->makeRequest('GET', "/v1/billing/subscriptions/{$action->subscriptionCode}", [
+            $current = $this->parseResponse($this->makeRequest('GET', "/v1/billing/subscriptions/$action->subscriptionCode", [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]));
 
             if (($current['status'] ?? null) === 'CANCELLED') {
                 throw new SubscriptionException(
-                    "Subscription {$action->subscriptionCode} is permanently cancelled on PayPal and cannot be ".
+                    "Subscription $action->subscriptionCode is permanently cancelled on PayPal and cannot be ".
                     'reactivated - create a new subscription instead. Only a suspended subscription can be activated.'
                 );
             }
 
-            $this->makeRequest('POST', "/v1/billing/subscriptions/{$action->subscriptionCode}/activate", [
+            $this->makeRequest('POST', "/v1/billing/subscriptions/$action->subscriptionCode/activate", [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => ['reason' => (string) $action->option('reason', 'Reactivated by merchant')],
             ]);
@@ -362,7 +361,7 @@ trait PayPalSubscriptionMethods
      * PayPal's REST API has no endpoint to list subscriptions (only create,
      * fetch-by-id, and the state-transition endpoints exist) - throws
      * rather than returning an empty result that could be mistaken for "no
-     * subscriptions exist". See ADR-0009.
+     * subscriptions exist".
      *
      * @return array<string, mixed>
      *

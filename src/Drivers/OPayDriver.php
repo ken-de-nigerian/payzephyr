@@ -282,7 +282,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
     /**
      * OPay nests transaction data (including `timestamp`) under `payload`,
-     * not at the top level of the webhook body. See ADR-0001.
+     * not at the top level of the webhook body.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -293,7 +293,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
     /**
      * OPay nests the transaction id (used for event-level idempotency) under
-     * `payload`. See ADR-0005.
+     * `payload`.
      *
      * @param  array<string, mixed>  $payload
      */

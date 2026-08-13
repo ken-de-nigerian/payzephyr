@@ -340,7 +340,7 @@ trait PaystackSubscriptionMethods
 
     /**
      * Cancel a subscription. Requires $action->option('token') - Paystack's
-     * email confirmation token; see ADR-0006.
+     * email confirmation token.
      *
      * @throws SubscriptionException If subscription cancellation fails, or
      *                               the required token is missing/invalid
@@ -392,7 +392,7 @@ trait PaystackSubscriptionMethods
 
     /**
      * Enable a disabled subscription. Requires $action->option('token') -
-     * Paystack's email confirmation token; see ADR-0006.
+     * Paystack's email confirmation token.
      *
      * @throws SubscriptionException If subscription enabling fails, or the
      *                               required token is missing/invalid

@@ -7,6 +7,7 @@ use KenDeNigerian\PayZephyr\Events\RefundCompleted;
 use KenDeNigerian\PayZephyr\Events\RefundCreated;
 use KenDeNigerian\PayZephyr\Events\RefundFailed;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
+use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 
 beforeEach(function () {
     app()->forgetInstance('payments.config');
@@ -97,6 +98,82 @@ test('a stripe refund.created webhook dispatches RefundCreated using the payment
             && $event->transactionReference === 'pi_123'
             && $event->provider === 'stripe';
     });
+});
+
+test('a completed refund webhook updates the locally-persisted refund_transactions row to completed', function () {
+    // Regression: processRefundWebhook() used to only dispatch an in-memory
+    // event. The local row (created "pending" when refund() first ran)
+    // never transitioned to a terminal state, so RefundValidator's
+    // in-flight duplicate guard stayed permanently tripped for any
+    // provider - like Paystack - that confirms refunds asynchronously,
+    // exactly the flow docs/refunds.md recommends ("listen for the
+    // webhook-driven events").
+    RefundTransaction::create([
+        'refund_reference' => '55555',
+        'transaction_reference' => 'txn_ref_persist',
+        'provider' => 'paystack',
+        'status' => 'pending',
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    $payload = [
+        'event' => 'refund.processed',
+        'data' => [
+            'id' => 55555,
+            'status' => 'processed',
+            'transaction' => ['reference' => 'txn_ref_persist'],
+        ],
+    ];
+
+    $job = new ProcessWebhook('paystack', $payload);
+    app()->call([$job, 'handle']);
+
+    expect(RefundTransaction::where('refund_reference', '55555')->first()->status)->toBe('completed');
+});
+
+test('a failed refund webhook updates the locally-persisted refund_transactions row to failed', function () {
+    RefundTransaction::create([
+        'refund_reference' => '66666',
+        'transaction_reference' => 'txn_ref_fail_persist',
+        'provider' => 'paystack',
+        'status' => 'pending',
+        'amount' => 5000,
+        'currency' => 'NGN',
+    ]);
+
+    $payload = [
+        'event' => 'refund.failed',
+        'data' => [
+            'id' => 66666,
+            'status' => 'failed',
+            'reason' => 'insufficient balance',
+            'transaction' => ['reference' => 'txn_ref_fail_persist'],
+        ],
+    ];
+
+    $job = new ProcessWebhook('paystack', $payload);
+    app()->call([$job, 'handle']);
+
+    expect(RefundTransaction::where('refund_reference', '66666')->first()->status)->toBe('failed');
+});
+
+test('a refund webhook for a refund with no locally-persisted row does not throw', function () {
+    // Best-effort: the refund may have been initiated outside PayZephyr, or
+    // refund logging may have been disabled when it ran.
+    $payload = [
+        'event' => 'refund.processed',
+        'data' => [
+            'id' => 77777,
+            'status' => 'processed',
+            'transaction' => ['reference' => 'txn_ref_no_local_row'],
+        ],
+    ];
+
+    $job = new ProcessWebhook('paystack', $payload);
+    app()->call([$job, 'handle']);
+
+    expect(RefundTransaction::where('refund_reference', '77777')->exists())->toBeFalse();
 });
 
 test('a refund webhook missing a refund reference is skipped without dispatching an event', function () {

@@ -240,9 +240,9 @@ final class Subscription
 
     /**
      * Set a provider-specific option for cancel/enable operations (see
-     * DataObjects\SubscriptionActionDTO / ADR-0006). Use this for anything a
-     * given provider needs beyond the subscription code - e.g. a future
-     * PayPal driver's cancellation reason.
+     * DataObjects\SubscriptionActionDTO). Use this for anything a given
+     * provider needs beyond the subscription code - e.g. Paystack's email
+     * confirmation token.
      */
     public function option(string $key, mixed $value): self
     {
@@ -292,7 +292,7 @@ final class Subscription
     }
 
     /**
-     * Enable a cancelled subscription. See cancel() - same $token shorthand.
+     * Enable a canceled subscription. See cancel() - same $token shorthand.
      */
     public function enable(?string $token = null): SubscriptionResponseDTO
     {

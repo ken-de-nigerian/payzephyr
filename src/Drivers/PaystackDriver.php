@@ -227,7 +227,6 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
     /**
      * Paystack nests event data (including `paid_at` / `created_at`) under
      * `data`, not at the top level of the webhook body.
-     *  See ADR-0001.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -238,7 +237,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
     /**
      * Paystack nests the transaction id (used for event-level idempotency)
-     * under `data`, not at the top level. See ADR-0005.
+     * under `data`, not at the top level.
      *
      * @param  array<string, mixed>  $payload
      */

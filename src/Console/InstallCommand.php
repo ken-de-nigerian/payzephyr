@@ -5,8 +5,15 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Facades\File;
 use InvalidArgumentException;
+
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\intro;
+use function Laravel\Prompts\multiselect;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\outro;
 
 final class InstallCommand extends Command
 {
@@ -22,7 +29,12 @@ final class InstallCommand extends Command
      */
     public function handle(): int
     {
-        $this->info('Installing PayZephyr...');
+        if (! $this->option('no-interaction')) {
+            intro('PayZephyr Installation');
+            note("Let's get your payment infrastructure ready.");
+        } else {
+            $this->info('Installing PayZephyr...');
+        }
 
         $this->call('vendor:publish', [
             '--tag' => 'payments-config',
@@ -61,9 +73,11 @@ final class InstallCommand extends Command
             $this->comment(Features::get($key)['label'].' is already installed - skipping (PayZephyr never re-publishes or removes an installed feature automatically).');
         }
 
-        $shouldMigrate = $this->option('no-interaction')
-            ? false
-            : $this->confirm('Run migrations now?', true);
+        if (! $this->option('no-interaction')) {
+            note($this->buildPreMigrateSummary($alreadyInstalled, $newlySelected));
+        }
+
+        $shouldMigrate = ! $this->option('no-interaction') && confirm('Run migrations now?');
 
         if ($shouldMigrate) {
             $this->call('migrate');
@@ -76,7 +90,31 @@ final class InstallCommand extends Command
 
         $this->printSummary($alreadyInstalled, $newlySelected);
 
+        if (! $this->option('no-interaction')) {
+            outro('PayZephyr is ready. Configure your providers in .env to get started.');
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * A concise "what's about to happen" summary shown before the
+     * DB-mutating migrate step - see Phase 12.28 in the installer spec:
+     * the developer should know exactly what's about to run before it does.
+     *
+     * @param  array<int, string>  $alreadyInstalled
+     * @param  array<int, string>  $newlySelected
+     */
+    private function buildPreMigrateSummary(array $alreadyInstalled, array $newlySelected): string
+    {
+        $lines = ['Features to install:', '  - Payments (core)', '  - Webhooks (core)'];
+
+        foreach (Features::optional() as $key => $feature) {
+            $mark = in_array($key, $newlySelected, true) || in_array($key, $alreadyInstalled, true) ? '✓' : '○';
+            $lines[] = "  $mark {$feature['label']}";
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
@@ -107,16 +145,17 @@ final class InstallCommand extends Command
         }
 
         $alreadyInstalled = $this->installedFeatures();
-        $selected = [];
 
-        foreach (Features::optional() as $key => $feature) {
-            $default = in_array($key, $alreadyInstalled, true);
-            $wantsIt = $this->confirm("Install {$feature['label']}? ({$feature['description']})", $default);
+        $options = array_map(function ($feature) {
+            return "{$feature['label']} - {$feature['description']}";
+        }, Features::optional());
 
-            if ($wantsIt) {
-                $selected[] = $key;
-            }
-        }
+        $selected = multiselect(
+            label: 'Select the optional features you want to install',
+            options: $options,
+            default: $alreadyInstalled,
+            hint: 'Space to select, Enter to continue. Deselecting an already-installed feature does not remove it.',
+        );
 
         return Features::resolveDependencies($selected);
     }
@@ -135,13 +174,7 @@ final class InstallCommand extends Command
         $installed = [];
 
         foreach (Features::optional() as $key => $feature) {
-            $pattern = match ($key) {
-                'subscriptions' => '*_create_subscription_transactions_table.php',
-                'refunds' => '*_create_refund_transactions_table.php',
-                default => null,
-            };
-
-            if ($pattern !== null && glob(database_path('migrations/'.$pattern)) !== []) {
+            if (glob(database_path('migrations/'.$feature['migrationPattern'])) !== []) {
                 $installed[] = $key;
             }
         }
@@ -157,6 +190,8 @@ final class InstallCommand extends Command
      * environment variables instead.
      *
      * @param  array<int, string>  $newlySelected
+     *
+     * @throws FileNotFoundException
      */
     private function updateEnvironmentFlags(array $newlySelected): void
     {

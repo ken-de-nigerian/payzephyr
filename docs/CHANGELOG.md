@@ -187,6 +187,15 @@ Safety Matrix for how each was verified.
 ---
 ## [2.1.0] - 2026-08-12
 
+> **Never tagged, and intentionally not installable.** Everything below shipped as part of
+> `3.0.0`. It is recorded under its own heading because the work is a distinct, self-contained
+> feature set, not because a `v2.1.0` release exists - the tag history goes `v2.0.2` -> `v3.0.0`.
+>
+> The tag was withheld deliberately. This commit predates the payment-safety fixes in `3.0.0`,
+> so publishing it would have made a version with known duplicate-charge and double-refund
+> defects resolvable for anyone on a `^2.0` constraint - and a *newer* one than `v2.0.2`, so
+> Composer would have upgraded them into it.
+
 ### Added
 
 - **Refund support across all 8 providers** (Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify,

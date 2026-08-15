@@ -3,12 +3,13 @@
 # Exclude from export (composer package)
 /.github export-ignore
 /.vscode export-ignore
+/.idea export-ignore
 /tests export-ignore
 /examples export-ignore
 /.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
-/phpunit.xml.dist export-ignore
+/phpunit.xml export-ignore
 /phpstan.neon export-ignore
 /pint.json export-ignore
 /DEPLOYMENT_CHECKLIST.md export-ignore

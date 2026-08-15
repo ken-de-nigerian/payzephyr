@@ -200,11 +200,18 @@ Payment::amount(50.00)->email('customer@example.com')->with('acmepay')->redirect
 
 Exactly the same technique as testing anything else built on PayZephyr; see [Testing](testing.md#the-actual-mechanism-inject-a-mock-guzzle-client). Inject a mocked Guzzle client via `setClient()` and assert your driver builds the right request and correctly interprets the provider's response shape.
 
-## Adding subscription support (optional)
+## Adding refunds and subscriptions
 
-If Acmepay has its own subscription/recurring-billing API, you can additionally implement `SupportsSubscriptionsInterface`. This is meaningfully more work than charge/verify; read [Subscriptions](subscriptions.md) first to understand the shape PayZephyr expects (plans, subscription lifecycle, the provider-specific quirks other drivers deal with), then look at one of the existing subscription-capable drivers in PayZephyr's source (Stripe's is a reasonably clean reference) as a template.
+Your driver can charge and verify. Adding refunds or subscriptions is the next step, and each is
+opt-in: you add an interface, and PayZephyr starts routing that feature to your driver. Skip
+either one and PayZephyr tells your users clearly that this provider does not support it,
+instead of failing in a confusing way.
+
+[Extending a Driver](extending-drivers.md) covers both in full: every method you must write,
+every field of every DTO, complete worked examples, the error-handling rules, and what to test.
 
 ## Next steps
 
+- [Extending a Driver](extending-drivers.md): add refunds and subscriptions to the driver you just built
 - [Advanced Usage](advanced-usage.md): direct driver access, useful while debugging a custom driver
 - [Architecture](architecture.md): how drivers fit into PayZephyr's layers overall

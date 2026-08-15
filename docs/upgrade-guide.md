@@ -2,6 +2,82 @@
 
 This chapter walks through what changes when you move between PayZephyr's major versions. For the complete, exhaustive list of every change (not just breaking ones), see [CHANGELOG.md](CHANGELOG.md): this chapter is the narrative, tutorial version of the same information, focused on *what you need to actually do*.
 
+## Upgrading to v3.0.0
+
+Most applications upgrade to v3.0.0 with **no code changes at all**. There is one breaking
+change, and it only affects you if you have replaced one of PayZephyr's internal pieces with
+your own.
+
+### Do you need to do anything? Start here
+
+```mermaid
+flowchart TD
+    A["Do you bind your own<br/>WebhookEventRepositoryInterface?"] -->|"No (most apps)"| B["Nothing to do.<br/>composer update and you're done."]
+    A -->|Yes| C["Add a forget() method<br/>to your implementation"]
+    C --> D["composer update"]
+```
+
+If you have never heard of `WebhookEventRepositoryInterface`, the answer is no. You are in the
+first branch, and you can skip the rest of this section.
+
+### The breaking change: `WebhookEventRepositoryInterface::forget()`
+
+This interface is how PayZephyr remembers which webhooks it has already handled, so a provider
+sending the same webhook twice does not cause you to ship an order twice. It now requires one
+extra method:
+
+```php
+public function forget(string $provider, string $eventKey): void;
+```
+
+**Why it was added.** PayZephyr marks a webhook as "seen" *before* it processes it, so that two
+copies arriving at the same moment cannot both get through. The problem: if processing then
+failed halfway, the mark stayed. Every retry looked at the mark, decided "already handled", and
+skipped. The webhook could never succeed, and the queue's own retry setting silently did
+nothing. `forget()` clears the mark when processing fails, so a retry gets a real second chance.
+
+**If you use the built-in repository (the default), you do not need to do anything.** The
+bundled `EloquentWebhookEventRepository` already has this method.
+
+**If you wrote your own**, add it. Deleting the row for that provider and event key is all it
+needs to do:
+
+```php
+public function forget(string $provider, string $eventKey): void
+{
+    WebhookEvent::where('provider', $provider)
+        ->where('event_key', $eventKey)
+        ->delete();
+}
+```
+
+### One behaviour change worth knowing about
+
+This is not breaking, but the data your app sees will change.
+
+For **PayPal** and **Square**, the `channel` field on a transaction now reports the payment
+method the customer actually used. Before, PayPal always recorded the literal text `paypal`,
+and Square recorded `card` whenever it was unsure.
+
+| Provider | Before | Now |
+| --- | --- | --- |
+| PayPal | always `paypal` | `card`, `paypal`, `venmo`, and so on, or `null` if PayPal did not say |
+| Square | `card` when unknown | the real source type, or `null` if Square did not say |
+
+The old values were guesses. The new ones are what the provider reported, and `null` honestly
+means "not stated" instead of inventing an answer.
+
+**What to check:** if any of your code reads `channel` and assumes it is never empty, it now
+needs to handle `null`. If you only display the value, nothing breaks.
+
+### Everything else in v3.0.0 is a fix
+
+v3.0.0 is mainly a payment-safety release. Several situations that could charge or refund a
+customer twice were found and fixed. Those fixes need nothing from you: upgrade and you have
+them. The [changelog](CHANGELOG.md) lists each one.
+
+---
+
 ## Upgrading to v2.0.0
 
 v2.0.0 contains real breaking changes. Read this whole section before running `composer update` on a production app.
@@ -18,7 +94,7 @@ If you were using the `nowpayments` provider, it's gone, not deprecated, not sof
 
 **What breaks:** `PAYMENTS_DEFAULT_PROVIDER=nowpayments` or `PAYMENTS_FALLBACK_PROVIDER=nowpayments` in your `.env`, or any code calling `Payment::with('nowpayments')`.
 
-**What to do:** remove NOWPayments from your `.env` and switch to one of the [eight remaining supported providers](providers.md). There's no automatic migration path: if you need crypto payments, PayZephyr v2.0.0 isn't the right tool for that anymore.
+**What to do:** remove NOWPayments from your `.env` and switch to one of the [other supported providers](providers.md). There's no automatic migration path: if you need crypto payments, PayZephyr v2.0.0 isn't the right tool for that anymore.
 
 ### Subscription cancel/enable now take a DTO instead of raw parameters
 

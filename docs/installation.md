@@ -42,8 +42,8 @@ Let's get your payment infrastructure ready.
 │ ◻ Subscriptions - Recurring billing (create/cancel/ │
 │   renew) on Paystack, Stripe, PayPal, Flutterwave,  │
 │   Square, and Mollie                                │
-│ ◻ Refunds - Full and partial refunds across every   │
-│   providers                                         │
+│ ◻ Refunds - Full and partial refunds on every        │
+│   supported provider                                 │
 └──────────────────────────────────────────────────────┘
 ```
 

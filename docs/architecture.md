@@ -73,7 +73,31 @@ Covered in depth in [Queues](queues.md): the short version is that some provider
 
 ## Why things are built this way
 
-Significant architectural decisions in PayZephyr are recorded as Architecture Decision Records (ADRs) in `docs/architecture/adr/`: each one documents a specific problem, the options considered, and why a particular approach was chosen, at the time it was chosen. If you're curious about the reasoning behind something specific (why webhook event deduplication works the way it does, why PayPal's webhook verification is asynchronous, why Mollie's subscription codes are composite strings), the ADRs are the primary source, more detailed than what fits in a user-facing chapter. They're written to stay accurate as historical record even after the code around them evolves, so treat them as "why this decision was made then," not necessarily "the current state of everything": for current behavior, trust the numbered chapters in this documentation set.
+A few design choices look odd until you know what they are protecting against. Here are the ones people ask about most.
+
+### Why a webhook is marked "seen" before it is processed, not after
+
+If PayZephyr waited until processing finished, two copies of the same webhook arriving at the same instant would both start work before either had finished, and both would run your listener. Marking first makes the second copy stop immediately.
+
+The cost of marking first is that a failure halfway through leaves a mark behind for something that never actually completed. PayZephyr handles that by clearing the mark when processing fails, so a retry gets a genuine second attempt. See [Webhooks](webhooks.md) for the full lifecycle.
+
+### Why a lost connection and a lost response are treated differently
+
+They sound similar, but only one of them is dangerous.
+
+If the connection was never established, nothing reached the provider, so nothing could have happened. That is safe to retry.
+
+If the request went out and the reply never came back, the provider may have charged the customer. PayZephyr cannot tell from the outside. Retrying that against another provider is how a customer gets charged twice, so PayZephyr refuses to and asks you to reconcile instead. [Idempotency](idempotency.md) covers this in detail.
+
+### Why some providers verify webhooks in a queued job
+
+Verifying a PayPal webhook signature requires calling PayPal back, twice. Doing that inside the web request would make your webhook endpoint slow, and providers expect a fast reply. So for those providers the request is accepted quickly and verified inside the queued job instead, where an invalid one is discarded. See [Queues](queues.md).
+
+### Why bookkeeping runs separately from the payment call
+
+Once a provider says "charged", that is final. Anything PayZephyr does afterwards, writing a database row, dispatching an event, updating a cache, is bookkeeping. If bookkeeping fails, the money still moved.
+
+So bookkeeping runs inside its own error handling. It can fail, and it will be logged, but it can never make PayZephyr think the payment failed and try a second provider.
 
 ## Next steps
 

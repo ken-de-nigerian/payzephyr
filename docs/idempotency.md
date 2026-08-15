@@ -24,12 +24,16 @@ will only ever have one provider transaction ID if the deduplication worked.
 
 ## The problem
 
-```
-Request A  ->  provider charges the customer  ->  response is lost in transit
-                                                          |
-Your app sees a timeout. Did it work? It cannot tell.      |
-                                                          v
-Request B  ->  ??? 
+```mermaid
+sequenceDiagram
+    participant App as Your app
+    participant P as Provider
+    App->>P: Request A: charge the customer
+    P->>P: Customer is charged
+    P--xApp: Response is lost in transit
+    Note over App: Your app sees a timeout.<br/>Did it work? It cannot tell.
+    App->>P: Request B: retry
+    Note over P: Is this a new payment,<br/>or the same one again?
 ```
 
 If request B reaches the provider as a brand new request, the customer pays twice. The only
@@ -39,7 +43,7 @@ this one".
 ## What you should do
 
 **Supply a stable `reference` for every charge**, derived from something in your own domain
-that doesn't change between retries — an order ID, a checkout session ID, an invoice number:
+that doesn't change between retries: an order ID, a checkout session ID, an invoice number:
 
 ```php
 Payment::amount(50000)
@@ -54,7 +58,7 @@ Do **not** use something that changes per request (a random UUID generated in th
 a timestamp, a session token that rotates). If the reference changes on retry, no layer of
 protection below can help you.
 
-If you need the reference and the idempotency key to differ, set the key explicitly — it
+If you need the reference and the idempotency key to differ, set the key explicitly. It
 always wins over the derived one:
 
 ```php
@@ -74,7 +78,7 @@ This is the layer that protects the lost-response case, because it works even af
 process has died and restarted.
 
 Whether a given provider actually honours the key is that provider's behaviour, not
-PayZephyr's — see [Per-provider support](#per-provider-support).
+PayZephyr's. See [Per-provider support](#per-provider-support).
 
 ### 2. In-flight claim (concurrent / rapid double submission)
 
@@ -92,7 +96,7 @@ It expires on its own after a few minutes, so a crashed process cannot leave a p
 permanently unchargeable. That expiry is also why layer 1 matters: after the claim expires,
 the idempotency key is what still protects you.
 
-> **This layer requires a shared, atomic cache store** — `database`, `redis`, or `memcached`.
+> **This layer requires a shared, atomic cache store**: `database`, `redis`, or `memcached`.
 > The `array` and `file` drivers give no protection across processes, so a multi-server or
 > multi-worker deployment on those drivers effectively has only layer 1.
 
@@ -110,8 +114,8 @@ An ambiguous outcome throws immediately rather than trying the next provider, be
 first provider may already have charged the customer. Reconcile with
 `Payment::verify($reference)` before doing anything else.
 
-A connection that was never established is a *definitive* failure, not an ambiguous one —
-nothing was transmitted, so nothing could have been processed.
+A connection that was never established is a *definitive* failure, not an ambiguous one.
+Nothing was transmitted, so nothing could have been processed.
 
 ## What PayZephyr guarantees
 
@@ -160,7 +164,7 @@ Payment::refund($transactionReference)
     ->refund();
 ```
 
-A refund status PayZephyr does not recognise is treated as *pending*, not failed — an unknown
+A refund status PayZephyr does not recognise is treated as *pending*, not failed. An unknown
 outcome counts toward the refunded total so it cannot free up refundable balance that may
 already have been spent.
 
@@ -169,14 +173,13 @@ already have been spent.
 Whether a provider honours an idempotency key on charge creation is that provider's
 documented behaviour. PayZephyr sends the key using each provider's own mechanism (an HTTP
 header for most, a request-body field for Square, the SDK's option for Stripe), but
-**PayZephyr cannot verify the provider's side of that contract** — consult your provider's
+**PayZephyr cannot verify the provider's side of that contract**. Consult your provider's
 API documentation, and test against their sandbox, before relying on it for a specific
 provider.
 
 ## See also
 
-- [ADR-0012](architecture/adr/0012-post-success-failure-isolation.md) - why post-success
-  bookkeeping is isolated from the operation it follows
-- [ADR-0013](architecture/adr/0013-charge-idempotency-identity.md) - how the logical payment
-  identity was chosen
+- [Architecture](architecture.md#why-things-are-built-this-way) - why bookkeeping is kept
+  separate from the payment call, and why a lost connection and a lost response are treated
+  differently
 - [Refunds](refunds.md)

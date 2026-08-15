@@ -2,7 +2,7 @@
 
 ## What makes a refund different from a charge or a verify
 
-A charge moves money toward you; a refund moves some or all of it back. That sounds like a small difference, but it changes what your code needs to guard against: a refund always targets a *specific, already-completed* charge, it can be partial (issuing several refunds against the same charge until the original amount is exhausted), and several providers don't confirm it immediately — the API call only tells you the refund was *accepted*, and a webhook tells you whether it actually *completed*. Design your refund flow assuming the initial response might say "pending", not "done".
+A charge moves money toward you; a refund moves some or all of it back. That sounds like a small difference, but it changes what your code needs to guard against: a refund always targets a *specific, already-completed* charge, it can be partial (issuing several refunds against the same charge until the original amount is exhausted), and several providers don't confirm it immediately. The API call only tells you the refund was *accepted*, and a webhook tells you whether it actually *completed*. Design your refund flow assuming the initial response might say "pending", not "done".
 
 ## Which providers support this
 
@@ -16,7 +16,7 @@ $refund = Payment::refund('txn_ref_123')
     ->refund();
 ```
 
-If you write a custom driver (see [Custom Drivers](custom-drivers.md)) that doesn't implement `SupportsRefundsInterface`, calling `->refund()` against it throws a `PaymentException` telling you so — the same graceful-failure pattern subscriptions uses for Monnify/OPay.
+If you write a custom driver (see [Custom Drivers](custom-drivers.md)) that doesn't implement `SupportsRefundsInterface`, calling `->refund()` against it throws a `PaymentException` telling you so, the same graceful-failure pattern subscriptions uses for Monnify/OPay.
 
 ## Issuing a refund
 
@@ -36,9 +36,9 @@ $refund = Payment::refund('txn_ref_123')
     ->refund();
 ```
 
-`transaction()` (or the shorthand first argument to `Payment::refund()`) takes the **original charge's reference** — the same value `Payment::verify($reference)` uses, not a refund-specific ID. `amount()` is optional: omit it for a full refund, or pass a smaller amount for a partial one. You can call `refund()` more than once against the same transaction reference, as long as the total across all refunds doesn't exceed the original charge — PayZephyr validates this for you (see [Preventing over-refunds and duplicates](#preventing-over-refunds-and-duplicates) below) whenever the original charge was logged locally.
+`transaction()` (or the shorthand first argument to `Payment::refund()`) takes the **original charge's reference**, the same value `Payment::verify($reference)` uses, not a refund-specific ID. `amount()` is optional: omit it for a full refund, or pass a smaller amount for a partial one. You can call `refund()` more than once against the same transaction reference, as long as the total across all refunds doesn't exceed the original charge. PayZephyr validates this for you (see [Preventing over-refunds and duplicates](#preventing-over-refunds-and-duplicates) below) whenever the original charge was logged locally.
 
-For multi-currency merchants, pass `->currency('CAD')` explicitly when it differs from your default. Square, PayPal, Mollie, and OPay all require an explicit currency in the refund request itself (they can't infer it from the original charge the way Paystack, Flutterwave, Monnify, and Stripe do) — if you omit it, PayZephyr falls back to your provider config's first configured currency, which is only correct for single-currency merchants:
+For multi-currency merchants, pass `->currency('CAD')` explicitly when it differs from your default. Square, PayPal, Mollie, and OPay all require an explicit currency in the refund request itself (they can't infer it from the original charge the way Paystack, Flutterwave, Monnify, and Stripe do). If you omit it, PayZephyr falls back to your provider config's first configured currency, which is only correct for single-currency merchants:
 
 ```php
 $refund = Payment::refund('txn_ref_123')
@@ -80,7 +80,7 @@ This is the most important thing to understand before you build a refund flow: n
 | Monnify | `PENDING` | Refund status webhook |
 | OPay | `PENDING` | Refund status webhook |
 
-If `$refund->isPending()` after calling `refund()`, don't treat the refund as done yet — either poll with `fetch()` or (better) listen for the webhook-driven events below.
+If `$refund->isPending()` after calling `refund()`, don't treat the refund as done yet. Either poll with `fetch()` or (better) listen for the webhook-driven events below.
 
 ## Fetching a refund
 
@@ -96,10 +96,10 @@ Because several providers confirm refunds asynchronously, webhooks matter here t
 
 By default (`payments.refunds.validation.enabled`, on by default) PayZephyr runs two checks before it ever calls the provider:
 
-1. **In-flight duplicate guard** (`payments.refunds.prevent_duplicates`, on by default): rejects a second refund attempt on a transaction that already has a `pending`/`processing` refund against it. This is aimed at the accidental-double-submission case — a double-clicked "refund" button, a retried request — not at blocking legitimate follow-up refunds; once an earlier refund reaches a terminal state (`completed`, `failed`, or `cancelled`), a new sequential partial refund is allowed again.
+1. **In-flight duplicate guard** (`payments.refunds.prevent_duplicates`, on by default): rejects a second refund attempt on a transaction that already has a `pending`/`processing` refund against it. This is aimed at the accidental-double-submission case, a double-clicked "refund" button or a retried request, not at blocking legitimate follow-up refunds; once an earlier refund reaches a terminal state (`completed`, `failed`, or `cancelled`), a new sequential partial refund is allowed again.
 2. **Over-refund guard**: checks that a refund's amount doesn't exceed the original transaction's amount minus whatever has already been refunded against it.
 
-Both checks are **best-effort**: the over-refund check only runs when the original charge was logged locally (`payments.logging.enabled`, on by default) and can be found by its reference. If it can't be found — a different process logged it, or logging is disabled — that check is skipped rather than blocking the refund; providers enforce their own over-refund limits server-side regardless. The duplicate guard has no such dependency, since it only needs PayZephyr's own `refund_transactions` log.
+Both checks are **best-effort**: the over-refund check only runs when the original charge was logged locally (`payments.logging.enabled`, on by default) and can be found by its reference. If it can't be found, because a different process logged it or logging is disabled, that check is skipped rather than blocking the refund; providers enforce their own over-refund limits server-side regardless. The duplicate guard has no such dependency, since it only needs PayZephyr's own `refund_transactions` log.
 
 ## Next steps
 

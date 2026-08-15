@@ -19,8 +19,6 @@ been released yet).
   guarantee about duplicate submissions, retries, and exactly-once semantics. It states
   plainly that exactly-once payment processing is *not* guaranteed and explains the three
   layers that do exist. Worth reading before relying on any of them.
-- **[ADR-0013](architecture/adr/0013-charge-idempotency-identity.md)** - the logical payment
-  identity decision and the options rejected along the way.
 
 ### Fixed
 
@@ -79,16 +77,16 @@ been released yet).
 - **All five `phpstan.neon` `ignoreErrors` suppressions removed; the `ignoreErrors` block no
   longer exists.** Two were already dead (`environment()` and `bound()` *are* on the
   Application/Container contracts). The other three were hiding real issues:
-  - `auth()->check()` / `auth()->id()` — the Auth *Factory* contract exposes only `guard()`
+  - `auth()->check()` / `auth()->id()`: the Auth *Factory* contract exposes only `guard()`
     and `shouldUse()`; `check()`/`id()` live on the Guard it resolves. Now calls
     `auth()->guard()->check()`. Same guard at runtime, but type-safe.
-  - `new static()` in `PaymentException::withContext()` — replaced with a
+  - `new static()` in `PaymentException::withContext()`, replaced with a
     `@phpstan-consistent-constructor` annotation, which PHPStan *enforces*: adding a subclass
     with a different constructor signature is now an error rather than a silent hazard.
   - `PaymentServiceProvider::registerRoutes()` called `routesAreCached()`, which exists only
     on the concrete `Foundation\Application`, not the contract `ServiceProvider::$app` is
     typed to. Now narrowed with an `instanceof` check that falls through to registering
-    routes on a non-standard container — routes present when they could have been cached is
+    routes on a non-standard container. Routes present when they could have been cached is
     harmless; routes missing is not.
 
 ### Changed
@@ -96,7 +94,7 @@ been released yet).
 - **Webhook channel extraction now reports the real payment instrument** (behavior change).
   `PayPalDriver::extractWebhookChannel()` returned a hardcoded `'paypal'` without reading the
   payload at all, so a card-funded, Venmo-funded, and balance-funded payment were all recorded
-  identically — and redundantly with `provider = 'paypal'`. It now reads
+  identically, and redundantly with `provider = 'paypal'`. It now reads
   `resource.payment_source` and returns the instrument key (`card`, `paypal`, `venmo`, …), or
   `null` when PayPal reports none. `SquareDriver::extractWebhookChannel()` similarly defaulted
   a missing `source_type` to `'card'`, recording card payments for instruments that were never
@@ -105,11 +103,11 @@ been released yet).
   Both previously satisfied their `?string` signature only because a PHPStan suppression hid
   that they could never actually return `null`. Applications reading `channel` off PayPal or
   Square transactions will now see accurate instrument values (or `null`) instead of a
-  constant — more useful, but different from before, hence noted as a behavior change.
+  constant. More useful, but different from before, hence noted as a behavior change.
 
 - `ChannelMapper::mapToPayPal()` removed; the `paypal` match arm returns `null` directly.
   PayPal's Orders v2 API has no funding-source restriction parameter, so the method could only
-  ever return `null` — the indirection just obscured that.
+  ever return `null`. The indirection just obscured that.
 
 - **The post-success invariant is now enforced structurally rather than by convention.**
   Every post-charge side effect moved into `PaymentManager::completeSuccessfulCharge()`,
@@ -200,9 +198,7 @@ Safety Matrix for how each was verified.
 
 - **Refund support across all 8 providers** (Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify,
   OPay). Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so this shipped
-  in one release rather than rolling out incrementally - see [ADR-0011](architecture/adr/0011-refund-driver-mapping.md)
-  for the per-provider mapping decisions (sync vs. async confirmation, endpoint/event names, reference
-  formats).
+  in one release rather than rolling out incrementally. Per-provider mapping decisions are covered in the refunds chapter.
   - New fluent API: `Payment::refund($transactionReference)->amount(...)->currency(...)->reason(...)->with($provider)->refund()`,
     plus `->fetch($refundReference)`. Supports full and partial refunds. `->currency()` is required for
     multi-currency merchants on Square, PayPal, Mollie, and OPay, whose refund APIs need it specified
@@ -441,7 +437,6 @@ Safety Matrix for how each was verified.
   automated verification - only local `composer analyse` runs against a Laravel-13-only
   install.
 
-Architecture decisions behind every entry below are recorded in `docs/architecture/adr/`.
 
 ### BREAKING
 
@@ -449,7 +444,7 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
   `enableSubscription()`** now take a single `DataObjects\SubscriptionActionDTO $action`
   instead of `(string $subscriptionCode, string $token)`. `$token` was Paystack-specific
   and forced every other provider's driver to accept a parameter it couldn't use. Read
-  provider-specific parameters via `$action->option('token')`. See ADR-0006.
+  provider-specific parameters via `$action->option('token')`.
   - **Not affected**: the public fluent API (`Subscription::cancel(?string $token =
     null)`, `->enable()`, `->token()`) keeps its exact existing signature - only direct
     callers of the driver interface, or custom driver implementations, need to update.
@@ -461,7 +456,7 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
   rejection status - verification happens inside the `ProcessWebhook` job and invalid
   deliveries are silently discarded there. This removes two outbound HTTP calls
   (OAuth token fetch + PayPal's verify-webhook-signature API) from the request/response
-  cycle. See ADR-0007.
+  cycle.
 - **NOWPayments support removed entirely** - not deprecated, not soft-disabled.
   `NowPaymentsDriver`, the `payments.providers.nowpayments` config block, and all
   provider-mapping registrations are gone. Any application with
@@ -469,12 +464,12 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
   or code calling `Payment::with('nowpayments')`, breaks on upgrade. This is an
   intentional product decision to drop crypto payment support, not a technical
   deprecation with a replacement - remove NOWPayments usage before upgrading. See
-  ADR-0010.
+
 
 ### Added
 
 - **Stripe and PayPal subscription support** (`SupportsSubscriptionsInterface` was
-  previously only implemented by `PaystackDriver`). See ADR-0009 for the full set of
+  previously only implemented by `PaystackDriver`). Full set of
   API-mapping decisions - Stripe Prices as plans (immutable amount/interval, so
   `updatePlan()` creates a new Price when either changes), Stripe's terminal `canceled`
   status being unrecoverable (`enableSubscription()` throws rather than approximating),
@@ -487,7 +482,7 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
     fluently. Additive, defaults to `null` - no existing call site changes.
 - **Flutterwave, Square, and Mollie subscription support**, bringing subscription
   support to every driver whose provider actually offers a recurring-billing API. See
-  ADR-0010 for full API-mapping decisions and disclosed limitations:
+  Full API-mapping decisions and disclosed limitations:
   - **Flutterwave**: plans via `payment-plans`; subscribing is a side effect of a
     tokenized charge carrying `payment_plan` (requires `->authorization()` with a saved
     card token); cancel/enable map to confirmed `/cancel` and `/activate` endpoints.
@@ -506,24 +501,23 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
     codes are encoded as `"{customerId}:{subscriptionId}"` since Mollie requires both
     IDs for every operation.
   - `MonnifyDriver` and `OPayDriver` remain unimplemented - neither provider exposes a
-    provider-managed subscription API today (ADR-0010 documents the research behind
+    provider-managed subscription API today (research behind
     this).
 - **Event-level webhook idempotency** (`webhook_events` table): duplicate webhook
   deliveries - which gateways send routinely as part of retry/at-least-once semantics -
   are now deduped before any side effect runs, including subscription lifecycle event
   dispatch (`SubscriptionCreated`, `SubscriptionRenewed`, etc.), not just the
-  transaction-status update. See ADR-0005. New migration:
+  transaction-status update. New migration:
   `2024_01_01_000002_create_webhook_events_table.php`.
 - **Repository layer** (`TransactionRepositoryInterface`, `SubscriptionRepositoryInterface`,
   `WebhookEventRepositoryInterface`): `PaymentManager` and `ProcessWebhook` no longer call
-  Eloquent statics directly, closing the DIP gap that made them hard to unit test. See
-  ADR-0004.
+  Eloquent statics directly, closing the DIP gap that made them hard to unit test.
 - **`DataObjects\SubscriptionActionDTO`**: generic carrier for subscription action
   parameters (see BREAKING above).
 - **`Contracts\RequiresAsyncWebhookVerification`**: interface for drivers whose webhook
   verification requires an outbound API call. `PayPalDriver` always defers;
   `MollieDriver` defers only when no `webhook_secret` is configured (its API-fallback
-  path) - see ADR-0007/ADR-0008.
+  path)
 
 ### Fixed
 
@@ -531,17 +525,17 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
   treated as valid ("missing = trust it"). It's now rejected. This required fixing
   timestamp *extraction* itself first - the previous implementation never actually found
   a timestamp for 5 of 9 providers, because it only checked the wrong (flat, top-level)
-  location in the payload. See ADR-0001.
+  location in the payload.
 - **`SubscriptionTransaction` race condition**: concurrent webhook deliveries for a
   brand-new `subscription_code` could silently drop one delivery's data (unique
   constraint violation swallowed by a broad catch block). Now uses the same lock +
-  create-race retry pattern already proven correct for `PaymentTransaction`. See ADR-0004.
+  create-race retry pattern already proven correct for `PaymentTransaction`.
 - **TLS verification could be disabled via config** (`testing_mode`). Removed entirely -
   outbound requests to payment providers always verify certificates. Tests use
-  `AbstractDriver::setClient()` to inject a mock HTTP client instead. See ADR-0002.
+  `AbstractDriver::setClient()` to inject a mock HTTP client instead.
 - **Unbounded recursion in log sanitization** could exhaust memory on deeply nested,
   attacker-influenced log context. Depth-capped, matching the limit already applied to
-  persisted transaction metadata. See ADR-0002.
+  persisted transaction metadata.
 - **`TypeError` on logging a plain array**: `HasLogSanitization` called a
   string-typed method with a numeric array key under `declare(strict_types=1)`,
   crashing the log call itself for any context containing a plain list.
@@ -571,15 +565,14 @@ Architecture decisions behind every entry below are recorded in `docs/architectu
    + $driver->cancelSubscription(new SubscriptionActionDTO($code, ['token' => $token]));
    ```
 2. If you have a custom driver implementing `SupportsSubscriptionsInterface`: update
-   `cancelSubscription()`/`enableSubscription()` to the new signature (see ADR-0006 for a
-   worked example).
+   `cancelSubscription()`/`enableSubscription()` to the new signature (the upgrade guide has a worked example).
 3. If you call `SubscriptionValidator::validateCancellation()` directly: drop the
    `$token` argument.
 4. Run the new migration: `php artisan migrate` (adds `webhook_events`).
 5. Remove any `PAYMENTS_TESTING_MODE` / `testing_mode` config entry - it's inert and will
    be silently ignored either way.
 6. If you monitor PayPal webhook response codes for signature-rejection: that signal has
-   moved to the `payments` log channel (see ADR-0007) - the HTTP response is now always
+   moved to the `payments` log channel - the HTTP response is now always
    `202` regardless of signature validity.
 
 Everything else in this release is additive or internal and requires no changes.

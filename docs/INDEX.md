@@ -25,27 +25,28 @@ New here? Start with the [README](../README.md), then work through the chapters 
 
 14. [Multiple Providers](providers.md)
 15. [Custom Drivers](custom-drivers.md)
-16. [Advanced Usage](advanced-usage.md)
+16. [Extending a Driver](extending-drivers.md): add refunds and subscriptions to a custom driver
+17. [Advanced Usage](advanced-usage.md)
 
 ## Shipping it
 
-17. [Production Checklist](production-checklist.md)
-18. [Deployment](deployment.md)
-19. [Upgrade Guide](upgrade-guide.md)
+18. [Production Checklist](production-checklist.md)
+19. [Deployment](deployment.md)
+20. [Upgrade Guide](upgrade-guide.md)
 
 ## When things go wrong
 
-20. [Troubleshooting](troubleshooting.md)
-21. [FAQ](faq.md)
+21. [Troubleshooting](troubleshooting.md)
+22. [FAQ](faq.md)
 
 ## Reference
 
-22. [API Reference](api-reference.md)
-23. [Architecture](architecture.md)
-24. [Contributing](contributing.md)
-25. [Changelog](CHANGELOG.md)
+23. [API Reference](api-reference.md)
+24. [Architecture](architecture.md)
+25. [Contributing](contributing.md)
+26. [Changelog](CHANGELOG.md)
 
 ## Other
 
 - [Logging](logging.md): more detail on the transaction-logging tables, if [Configuration](configuration.md#transaction-logging) and [Advanced Usage](advanced-usage.md#reading-transaction-history-directly) left you wanting more
-- [Architecture Decision Records](architecture/adr/): the historical record of *why* specific internal design decisions were made
+- [Idempotency](idempotency.md): what PayZephyr guarantees about duplicate submissions and retries, and what it cannot

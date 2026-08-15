@@ -191,13 +191,13 @@ to guard against exactly this asserted nothing.
 other providers will be added in future releases": false as of this release.
 Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie all implement
 `SupportsSubscriptionsInterface`. Only Monnify and OPay genuinely lack support (neither
-provider has a subscription API to wrap; see ADR-0010).
+provider has a subscription API to wrap; see ).
 
 **Root cause:** Documentation not updated as subscription support was added
 incrementally across several drivers in this release cycle.
 
 **Proposed fix / what was done:** Updated the README to list all six supporting
-providers and link to `docs/providers.md` / ADR-0010 for the Monnify/OPay rationale.
+providers and link to `docs/providers.md` /  for the Monnify/OPay rationale.
 
 **Files affected:** `README.md`
 
@@ -225,7 +225,7 @@ Cashier" (the brief's own bar) implies refund support, and every one of the 8 dr
 APIs PayZephyr already talks to (Paystack, Stripe, PayPal, Flutterwave, Square, OPay,
 Mollie, Monnify) has a real refund endpoint that could be wrapped following the exact
 same driver-trait pattern already established for subscriptions in this release
-(ADR-0009/ADR-0010).
+(/).
 
 **Files affected:** None yet: this is a gap, not a fix.
 

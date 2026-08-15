@@ -37,15 +37,46 @@ flowchart LR
     B --> C{Which provider?}
     C -->|paystack| D[Paystack API]
     C -->|stripe| E[Stripe API]
-    C -->|"...or any of the 8"| F[...]
-    D & E & F --> G[Customer pays on\nthe provider's page]
-    G --> H[Provider redirects back\nto your callback URL]
+    C -->|"...or any other provider"| F[...]
+    D & E & F --> G["Customer pays on<br/>the provider's page"]
+    G --> H["Provider redirects back<br/>to your callback URL"]
     G -.->|webhook, in parallel| I[Your queue worker]
     H --> J[Payment::verify]
     I --> K[WebhookReceived event]
 ```
 
 Two things happen when a customer pays: they get redirected back to your app (so you can show a "thank you" page), *and* the provider sends your app a webhook in the background (so your database stays correct even if the customer closes their browser before the redirect completes). PayZephyr handles both paths: the [Understanding Payment Flow](docs/payment-flow.md) chapter walks through exactly what happens at each step.
+
+## Pick a provider, get everything
+
+The point of PayZephyr is that choosing a provider is the *only* decision you make. Everything
+else is already built.
+
+Switch from Paystack to Stripe and you change one line in `.env`. Your checkout code does not
+change. Neither does your webhook handling, your retry safety, or your database schema.
+
+The same is true for a provider PayZephyr does not ship with. Write a driver, and it inherits
+all of this without you implementing any of it:
+
+| You get, automatically | Meaning |
+| --- | --- |
+| Automatic fallback | Provider down? The next one takes over. |
+| Double-charge protection | The safety rules that stop a customer paying twice apply to your driver too. |
+| Retry safety | A request that timed out is never quietly retried somewhere else. |
+| Webhook verification | Signature checking and replay protection. |
+| Transaction logging | Every payment recorded, in the same tables. |
+| Events | The same events fire, so your listeners keep working. |
+| Health checks | Cached, so a slow provider does not slow every charge. |
+| Secret-safe logging | Keys and tokens stripped before anything is written. |
+
+You write what is genuinely specific to your provider: how to build its request, and how to read
+its response. That is the part nobody else can write for you.
+
+Adding refunds or subscriptions later is opt-in, one interface at a time. A provider that cannot
+do refunds is not a broken driver, and PayZephyr says so clearly rather than failing strangely.
+
+See [Custom Drivers](docs/custom-drivers.md) to build one, then
+[Extending a Driver](docs/extending-drivers.md) to add refunds and subscriptions.
 
 ## Quick Start
 
@@ -126,30 +157,36 @@ The chapters below are written to be read roughly in order if you're new to PayZ
 
 14. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
 15. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
-16. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
+16. [Extending a Driver](docs/extending-drivers.md): add refunds and subscriptions to a custom driver
+17. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
 
 **Shipping it**
 
-17. [Production Checklist](docs/production-checklist.md): what to double-check before going live
-18. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
-19. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
+18. [Production Checklist](docs/production-checklist.md): what to double-check before going live
+19. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
+20. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
 
 **When things go wrong**
 
-20. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
-21. [FAQ](docs/faq.md)
+21. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
+22. [FAQ](docs/faq.md)
 
 **Reference**
 
-22. [API Reference](docs/api-reference.md): every public method, documented
-23. [Architecture](docs/architecture.md): how the package is put together internally
-24. [Contributing](docs/contributing.md)
+23. [API Reference](docs/api-reference.md): every public method, documented
+24. [Architecture](docs/architecture.md): how the package is put together internally
+25. [Contributing](docs/contributing.md)
 
 The full table of contents, if you'd rather browse than read linearly, is in [docs/INDEX.md](docs/INDEX.md).
 
 ## Changelog
 
-See [CHANGELOG.md](docs/CHANGELOG.md) for version history. **v2.0.0 contains breaking changes**: read the upgrade notes before updating a production app.
+The current release is **v3.0.0**. See [CHANGELOG.md](docs/CHANGELOG.md) for the full version history.
+
+**v3.0.0 contains one breaking change.** If you bind your own implementation of
+`WebhookEventRepositoryInterface`, it now needs a `forget()` method. If you don't (and most
+apps don't), upgrading needs no code changes from you. The [Upgrade Guide](docs/upgrade-guide.md)
+walks through it.
 
 ## License
 

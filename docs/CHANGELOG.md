@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [3.0.1] - 2026-08-14
+
+Documentation and packaging only. No code, behaviour, or API changes.
+
+### Fixed
+
+- **The README shipped inside the package pointed at the wrong version.** It said
+  "v2.0.0 contains breaking changes: read the upgrade notes", which is what someone who had
+  just installed v3.0.0 would read in `vendor/kendenigerian/payzephyr`. It now names the
+  current release and its one breaking change.
+- **The upgrade guide had no v3.0.0 section**, despite v3.0.0 being the release with the
+  breaking change. Added, leading with a decision flowchart, since most applications need to
+  do nothing.
+- **Two working files were shipping to consumers.** `payzephyr-audit-final-report.md` and
+  `PR_BODY.md` were committed by mistake and are not `export-ignore`d, so both landed in every
+  consumer's vendor directory. Both removed. Their content remains in git history.
+- Fixed "refunds across every providers" in the installer example in the installation guide.
+- Fixed the architecture diagram in the README: it used `\n`, which Mermaid does not render as
+  a line break, and hardcoded a provider count that goes stale each time one is added.
+
+### Added
+
+- **[Extending a Driver](extending-drivers.md)**: how to add refunds and subscriptions to a
+  custom driver. Every method both interfaces require, every field of every DTO, worked
+  examples, error-handling rules, webhook wiring for renewals, and what to test. This was
+  previously a single paragraph telling readers to go and read the source.
+- A section in the README setting out what a driver inherits automatically (fallback,
+  double-charge protection, retry safety, webhook verification, logging, events, health
+  checks) versus the part the author actually writes.
+
+### Changed
+
+- Documentation now reads consistently throughout: em dashes removed, internal architecture
+  decision records no longer referenced from user-facing chapters (the reasoning is written
+  inline instead, so each chapter stands on its own), and the remaining ASCII flow diagram
+  converted to Mermaid.
+
+---
+
 ## [3.0.0] - 2026-08-13
 
 Second and final pass of the production-readiness audit, closing the caller double-submission

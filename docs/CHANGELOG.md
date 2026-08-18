@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [3.0.2] - 2026-08-15
+
+### Fixed
+
+- **`verify()` crashed whenever a provider returned metadata as an empty string.**
+  Reported from production against a live Paystack sandbox: a charge created *with* metadata
+  verified fine, while the identical charge created *without* metadata failed every time.
+
+  Metadata was read with a plain null-coalesce, which only catches `null` and missing keys.
+  Paystack returns an empty string when a transaction has no metadata, and that string passed
+  straight into `VerificationResponseDTO`'s typed `array` parameter, fataling with a
+  `TypeError` before the constructor body ran. Because the drivers wrap `Throwable`, it
+  surfaced as a `VerificationException`, so every verify of a metadata-less charge failed.
+
+  Affected `verify()` on Paystack, Flutterwave, Mollie, Monnify, and OPay. Stripe was already
+  safe because it casts with `(array)`.
+
+- **The same crash was in all nine `fromArray()` DTO factories.** Those are public API, so
+  anyone rebuilding a DTO from a provider payload or from stored JSON hit it too.
+
+- **A JSON-string metadata value is now decoded instead of discarded.** Some providers encode
+  metadata as a JSON string rather than an object. Treating every non-array as empty would
+  have stopped the crash while silently losing the caller's own data, which is a quieter bug
+  than the original.
+
+- **`PaymentManager` carried two near-copies of this normalisation, and they had drifted.**
+  One decoded JSON strings, the other did not. The second is the path that reads
+  `_provider_id` to route verification, so with string-encoded metadata it silently lost the
+  provider id and fell back to the raw reference. Both now share one implementation.
+
+### Added
+
+- `Traits\NormalizesMetadata`, one shared helper used by every driver and DTO instead of
+  fourteen separate inline guards. Drivers extending `AbstractDriver` inherit it
+  automatically, so a new driver gets the correct behaviour without repeating it.
+
+### Upgrading
+
+Nothing to do. No API, signature, or configuration changes. Charges and verifies that already
+worked behave identically; ones that crashed now succeed.
+
+---
+
 ## [3.0.1] - 2026-08-14
 
 Documentation and packaging only. No code, behaviour, or API changes.

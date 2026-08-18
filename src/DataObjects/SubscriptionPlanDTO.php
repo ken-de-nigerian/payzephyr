@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionPlanDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -62,7 +65,7 @@ final readonly class SubscriptionPlanDTO
             invoiceLimit: $data['invoice_limit'] ?? null,
             sendInvoices: $data['send_invoices'] ?? true,
             sendSms: $data['send_sms'] ?? true,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
         );
     }
 

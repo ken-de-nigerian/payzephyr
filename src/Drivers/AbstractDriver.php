@@ -21,6 +21,7 @@ use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 use KenDeNigerian\PayZephyr\Traits\HasLogSanitization;
 use KenDeNigerian\PayZephyr\Traits\HasNetworkErrorHandling;
 use KenDeNigerian\PayZephyr\Traits\HasWebhookValidation;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use Psr\Http\Message\ResponseInterface;
 use Random\RandomException;
 
@@ -36,6 +37,7 @@ abstract class AbstractDriver implements DriverInterface
     use HasLogSanitization;
     use HasNetworkErrorHandling;
     use HasWebhookValidation;
+    use NormalizesMetadata;
 
     protected Client $client;
 

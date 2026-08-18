@@ -191,7 +191,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 amount: (float) $data['amount']['value'],
                 currency: $data['amount']['currency'],
                 paidAt: $data['paidAt'] ?? null,
-                metadata: $data['metadata'] ?? [],
+                metadata: self::normalizeMetadata($data['metadata'] ?? null),
                 provider: $this->getName(),
                 channel: $data['method'] ?? null,
                 cardType: $data['details']['cardLabel'] ?? null,

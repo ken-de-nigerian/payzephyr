@@ -6,9 +6,12 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionRequestDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -56,7 +59,7 @@ final readonly class SubscriptionRequestDTO
             quantity: $data['quantity'] ?? 1,
             startDate: $data['start_date'] ?? null,
             trialDays: $data['trial_days'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             authorization: $data['authorization'] ?? null,
             idempotencyKey: $data['idempotency_key'] ?? self::generateIdempotencyKey(),
             callbackUrl: $data['callback_url'] ?? null,

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use JsonSerializable;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class PlanResponseDTO implements JsonSerializable
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -36,7 +39,7 @@ final readonly class PlanResponseDTO implements JsonSerializable
             currency: $data['currency'] ?? 'NGN',
             description: $data['description'] ?? null,
             invoiceLimit: $data['invoice_limit'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $data['provider'] ?? null,
         );
     }

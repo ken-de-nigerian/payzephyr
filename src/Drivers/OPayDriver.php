@@ -208,7 +208,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 amount: ($result['amount']['total'] ?? 0) / 100,
                 currency: $result['amount']['currency'] ?? 'NGN',
                 paidAt: isset($result['createTime']) ? date('Y-m-d H:i:s', $result['createTime']) : null,
-                metadata: $result['metadata'] ?? [],
+                metadata: self::normalizeMetadata($result['metadata'] ?? null),
                 provider: $this->getName(),
                 channel: $result['instrumentType'] ?? null,
                 cardType: $result['opayCardToken'] ?? null,

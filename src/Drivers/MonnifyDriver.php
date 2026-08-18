@@ -191,7 +191,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 amount: (float) $result['amountPaid'],
                 currency: $result['currency'] ?? $result['currencyCode'] ?? 'NGN',
                 paidAt: $result['paidOn'] ?? null,
-                metadata: $result['metaData'] ?? [],
+                metadata: self::normalizeMetadata($result['metaData'] ?? null),
                 provider: $this->getName(),
                 channel: $result['paymentMethod'] ?? null,
                 customer: [

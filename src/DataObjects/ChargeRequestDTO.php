@@ -7,9 +7,12 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class ChargeRequestDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>|null  $customer
@@ -155,7 +158,7 @@ final readonly class ChargeRequestDTO
             email: $data['email'] ?? '',
             reference: $data['reference'] ?? null,
             callbackUrl: $data['callback_url'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             description: $data['description'] ?? null,
             customer: $data['customer'] ?? null,
             customFields: $data['custom_fields'] ?? null,

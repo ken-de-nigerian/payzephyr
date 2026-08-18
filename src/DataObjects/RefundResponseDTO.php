@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class RefundResponseDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -34,7 +37,7 @@ final readonly class RefundResponseDTO
             amount: (float) ($data['amount'] ?? 0),
             currency: $data['currency'] ?? 'NGN',
             reason: $data['reason'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $data['provider'] ?? null,
         );
     }

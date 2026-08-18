@@ -6,10 +6,13 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use Throwable;
 
 final readonly class VerificationResponseDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      * @param  array<string, mixed>|null  $customer
@@ -54,7 +57,7 @@ final readonly class VerificationResponseDTO
             amount: (float) ($data['amount'] ?? 0),
             currency: strtoupper($data['currency'] ?? ''),
             paidAt: $data['paid_at'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $data['provider'] ?? null,
             channel: $data['channel'] ?? null,
             cardType: $data['card_type'] ?? null,

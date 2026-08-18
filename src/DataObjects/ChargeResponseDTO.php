@@ -6,10 +6,13 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use Throwable;
 
 final readonly class ChargeResponseDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -46,7 +49,7 @@ final readonly class ChargeResponseDTO
             authorizationUrl: $data['authorization_url'] ?? '',
             accessCode: $data['access_code'] ?? '',
             status: $data['status'] ?? 'pending',
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $data['provider'] ?? null,
         );
     }

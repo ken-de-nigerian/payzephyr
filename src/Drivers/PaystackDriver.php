@@ -158,7 +158,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 amount: ($result['amount'] ?? 0) / 100,
                 currency: $result['currency'],
                 paidAt: $result['paid_at'] ?? null,
-                metadata: $result['metadata'] ?? [],
+                metadata: self::normalizeMetadata($result['metadata'] ?? null),
                 provider: $this->getName(),
                 channel: $result['channel'] ?? null,
                 cardType: $result['authorization']['card_type'] ?? null,

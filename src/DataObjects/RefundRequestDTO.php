@@ -7,9 +7,12 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class RefundRequestDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -66,7 +69,7 @@ final readonly class RefundRequestDTO
             amount: isset($data['amount']) ? round((float) $data['amount'], 2) : null,
             currency: isset($data['currency']) ? strtoupper($data['currency']) : null,
             reason: $data['reason'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             idempotencyKey: $idempotencyKey,
         );
     }

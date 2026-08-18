@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\SubscriptionStatus;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionResponseDTO
 {
+    use NormalizesMetadata;
+
     /**
      * @param  array<string, mixed>  $metadata
      */
@@ -38,7 +41,7 @@ final readonly class SubscriptionResponseDTO
             currency: $data['currency'] ?? 'NGN',
             nextPaymentDate: $data['next_payment_date'] ?? null,
             emailToken: $data['email_token'] ?? null,
-            metadata: $data['metadata'] ?? [],
+            metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $data['provider'] ?? null,
         );
     }

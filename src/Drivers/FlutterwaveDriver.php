@@ -182,7 +182,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
                 amount: (float) $result['amount'],
                 currency: $result['currency'],
                 paidAt: $result['created_at'] ?? null,
-                metadata: $result['meta'] ?? [],
+                metadata: self::normalizeMetadata($result['meta'] ?? null),
                 provider: $this->getName(),
                 channel: $result['payment_type'] ?? null,
                 cardType: $result['card']['type'] ?? null,

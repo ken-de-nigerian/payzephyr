@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
-use ArrayObject;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
@@ -24,11 +23,13 @@ use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
+use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use Throwable;
 
 final class PaymentManager
 {
     use LogsToPaymentChannel;
+    use NormalizesMetadata;
 
     /** @var array<string, DriverInterface> */
     protected array $drivers = [];
@@ -557,12 +558,7 @@ final class PaymentManager
                     $provider = $transaction->getAttribute('provider');
                     $driver = $this->driver($provider);
 
-                    $metadata = $transaction->getAttribute('metadata');
-                    if ($metadata instanceof ArrayObject) {
-                        $metadata = $metadata->getArrayCopy();
-                    } elseif (! is_array($metadata)) {
-                        $metadata = [];
-                    }
+                    $metadata = self::normalizeMetadata($transaction->getAttribute('metadata'));
 
                     $providerId = $metadata['_provider_id']
                         ?? $metadata['session_id']
@@ -576,15 +572,7 @@ final class PaymentManager
                         'id' => $verificationId,
                     ];
                 } catch (DriverNotFoundException) {
-                    $metadata = $transaction->getAttribute('metadata');
-                    if ($metadata instanceof ArrayObject) {
-                        $metadata = $metadata->getArrayCopy();
-                    } elseif (is_string($metadata)) {
-                        $decoded = json_decode($metadata, true);
-                        $metadata = is_array($decoded) ? $decoded : [];
-                    } elseif (! is_array($metadata)) {
-                        $metadata = [];
-                    }
+                    $metadata = self::normalizeMetadata($transaction->getAttribute('metadata'));
 
                     $providerId = $metadata['_provider_id']
                         ?? $metadata['session_id']

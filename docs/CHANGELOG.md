@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [Unreleased]
+
+### Changed
+
+- Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square
+  drivers. Comment-only: no logic changed, and the behaviour is exactly as before. PayPal
+  still reports the real funding instrument, and Square still returns `null` instead of
+  inventing `card` when the provider does not say. The reasoning behind that behaviour is
+  recorded in the `3.0.0` entry below and in the [Upgrade Guide](upgrade-guide.md).
+
+  **No user-facing impact.** Listed here for completeness rather than because it changes
+  anything you can observe.
+
+---
+
 ## [3.0.3] - 2026-08-18
 
 ### Fixed

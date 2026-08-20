@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Traits;
 
 use ArrayObject;
+use JsonSerializable;
 
 /**
  * Turns whatever a provider sent as "metadata" into a real array.
@@ -38,9 +39,20 @@ trait NormalizesMetadata
             return $copy;
         }
 
-        // A JSON string is decoded rather than discarded: providers that
-        // encode metadata as a string still carry real data, and throwing it
-        // away would silently lose the caller's own values.
+        if (is_object($value) && method_exists($value, 'toArray')) {
+            $converted = $value->toArray();
+
+            /** @var array<string, mixed> $converted */
+            return is_array($converted) ? $converted : [];
+        }
+
+        if ($value instanceof JsonSerializable) {
+            $serialized = $value->jsonSerialize();
+
+            /** @var array<string, mixed> $serialized */
+            return is_array($serialized) ? $serialized : [];
+        }
+
         if (is_string($value)) {
             $decoded = json_decode($value, true);
 

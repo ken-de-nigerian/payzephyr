@@ -181,3 +181,26 @@ test('DTO factories decode a JSON-string metadata value', function () {
     expect(VerificationResponseDTO::fromArray(['metadata' => '{"a":1}'])->metadata)->toBe(['a' => 1])
         ->and(ChargeResponseDTO::fromArray(['metadata' => '{"a":1}'])->metadata)->toBe(['a' => 1]);
 });
+
+test('a DTO factory reads a StripeObject via toArray, not a broken array cast', function () {
+    // Regression: StripeObject keeps its values in protected internals, so
+    // (array) returned mangled property names like "\0*\0_values" instead of
+    // the customer's metadata. It never crashed, it just silently returned the
+    // wrong thing, which is why it went unnoticed for so long.
+    $stripeMetadata = Stripe\Util\Util::convertToStripeObject(
+        ['reference' => 'ref_stripe_1', 'order_id' => 991],
+        []
+    );
+
+    $dto = VerificationResponseDTO::fromArray(['metadata' => $stripeMetadata]);
+
+    expect($dto->metadata)->toBe(['reference' => 'ref_stripe_1', 'order_id' => 991]);
+});
+
+test('a plain array cast on a StripeObject really does produce mangled keys', function () {
+    // Pins the reason the fix exists, so nobody "simplifies" it back.
+    $stripeMetadata = Stripe\Util\Util::convertToStripeObject(['order_id' => 991], []);
+
+    expect(array_keys((array) $stripeMetadata))->toContain("\0*\0_values")
+        ->and((array) $stripeMetadata)->not->toHaveKey('order_id');
+});

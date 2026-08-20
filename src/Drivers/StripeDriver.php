@@ -370,7 +370,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             paidAt: $session->payment_status === 'paid'
                 ? date('Y-m-d H:i:s', $session->created)
                 : null,
-            metadata: (array) ($session->metadata ?? []),
+            metadata: self::normalizeMetadata($session->metadata ?? null),
             provider: $this->getName(),
             channel: implode(',', $session->payment_method_types ?? []),
             customer: [
@@ -392,7 +392,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             paidAt: $intent->status === 'succeeded'
                 ? date('Y-m-d H:i:s', $intent->created)
                 : null,
-            metadata: (array) $intent->metadata,
+            metadata: self::normalizeMetadata($intent->metadata ?? null),
             provider: $this->getName(),
             channel: $intent->payment_method_types[0] ?? null,
             customer: [

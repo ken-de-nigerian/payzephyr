@@ -6,6 +6,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [3.0.3] - 2026-08-18
+
+### Fixed
+
+- **Stripe verify returned internal SDK state instead of your metadata.** The v3.0.2 work
+  left Stripe out of the shared metadata helper because it cast with `(array)` rather than a
+  bare null-coalesce, so it could not crash. It could still be wrong, and it was.
+
+  `StripeObject` keeps its values in protected internals, so `(array)` does not return the
+  metadata. It returns the object's own property table with null-byte-mangled keys
+  (`"\0*\0_values"`, `"\0*\0_lastResponse"`, and so on). Every Stripe verify has been handing
+  that back as the caller's metadata.
+
+  This never threw, which is why it went unnoticed while the Paystack empty-string crash was
+  obvious. A loud bug gets reported; a quiet one just produces wrong data.
+
+  Both Stripe paths, checkout sessions and payment intents, now go through the shared helper.
+
+  **What to check:** if you read `metadata` off a Stripe verification and found it empty or
+  full of odd keys, it will now contain what you actually set. Anything reading it defensively
+  keeps working.
+
+### Changed
+
+- The metadata helper now understands objects that expose `toArray()`, with a
+  `JsonSerializable` fallback. It matches on capability rather than class name, so it handles
+  Stripe's objects without the shared trait depending on the Stripe SDK, and any other SDK
+  value object gets the same treatment automatically.
+
+### Upgrading
+
+Nothing to do. No API, signature, or configuration changes.
+
+---
+
 ## [3.0.2] - 2026-08-15
 
 ### Fixed

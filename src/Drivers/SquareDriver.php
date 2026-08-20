@@ -590,10 +590,6 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        // Null rather than defaulting to 'card' when Square omits
-        // source_type: defaulting recorded a card payment for instruments
-        // that were never cards (wallet, bank transfer, gift card), which is
-        // invented data rather than a missing value.
         $sourceType = $payload['data']['object']['payment']['source_type'] ?? null;
 
         return is_string($sourceType) && $sourceType !== '' ? $sourceType : null;

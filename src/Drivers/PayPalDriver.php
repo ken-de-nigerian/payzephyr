@@ -504,15 +504,6 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        // PayPal reports the instrument the payer actually used under
-        // resource.payment_source, keyed by type ({"card": {...}},
-        // {"paypal": {...}}, {"venmo": {...}}, ...). This previously returned
-        // a hardcoded 'paypal' without reading the payload at all, which both
-        // duplicated the provider name and erased which instrument was used.
-        //
-        // Null when the field is absent: the channel is genuinely unknown
-        // then, and inventing one would record a funding source PayPal never
-        // reported.
         $paymentSource = $payload['resource']['payment_source'] ?? null;
 
         if (! is_array($paymentSource) || $paymentSource === []) {

@@ -7,11 +7,16 @@ namespace KenDeNigerian\PayZephyr\Exceptions;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 
 /**
- * Thrown when a trace event carries data that cannot be stored as-is.
+ * Thrown when a trace event carries a reference that cannot key a timeline.
  *
- * Every one of these is a programming error on the recording side, not a
- * payment failure. Nothing on the payment path is allowed to surface one -
- * TraceRecorder catches them, reports them, and drops the event.
+ * The only thing TraceEventDTO refuses outright. Everything else it is handed
+ * gets normalized, because a trace event describes something that already
+ * happened and is worth keeping even with a field trimmed. A bad reference is
+ * different in kind: it would file this payment's history under some other
+ * payment, which is worse than having no history at all.
+ *
+ * Nothing on the payment path is allowed to surface one. TraceRecorder catches
+ * it, reports it to the payment log channel, and drops the event.
  */
 final class InvalidTraceDataException extends PaymentException
 {
@@ -21,25 +26,5 @@ final class InvalidTraceDataException extends PaymentException
             "Invalid trace reference [$reference]. A reference must be 1-".PaymentConstants::MAX_REFERENCE_LENGTH.
             ' characters of letters, digits, hyphens and underscores.'
         );
-    }
-
-    public static function payloadTooLarge(int $size, int $maxSize): self
-    {
-        return new self("Trace payload size ($size bytes) exceeds the maximum of $maxSize bytes");
-    }
-
-    public static function providerNameTooLong(string $provider, int $maxLength): self
-    {
-        return new self("Provider name [$provider] exceeds the maximum length of $maxLength characters");
-    }
-
-    public static function invalidHttpMethod(string $method): self
-    {
-        return new self("Invalid HTTP method [$method]. Must be one of: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS");
-    }
-
-    public static function invalidHttpStatusCode(int $statusCode): self
-    {
-        return new self("Invalid HTTP status code [$statusCode]. Must be between 100 and 599");
     }
 }

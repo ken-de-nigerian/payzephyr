@@ -31,6 +31,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   other tables. Several steps of one payment routinely land inside the same second, and the gap
   between them is the thing a timeline is read for.
 
+- **`PAYZEPHYR_FEATURE_TRACE` is a real kill switch.** Tracing is the only PayZephyr feature
+  that writes on the hot path of every charge, verification and webhook, so switching it off
+  has to mean *nothing runs* - not "a disabled check runs first". With the flag off the
+  container hands out `Services\NullTraceRecorder`, which touches no database, no queue, no
+  config and no container. It takes effect on the next request: no deploy, and no migration to
+  roll back.
+
+  This makes `trace` the first `PAYZEPHYR_FEATURE_*` flag that is read at runtime rather than
+  only by the installer. `subscriptions` and `refunds` remain installer bookkeeping.
+
+- **Recording a trace event can never fail a payment.** A trace event describes something that
+  has already happened; if storing that description fails, the payment is still exactly as true
+  as it was, and the caller must hear about the payment rather than about PayZephyr's
+  bookkeeping. `TraceRecorder::record()` is now guaranteed not to throw - a missing table, an
+  unreachable database, a dead queue backend and a broken log channel all end in a log line and
+  a `null` return. It takes the same position, for the same reason, as
+  `PaymentManager::completeSuccessfulCharge()`.
+
+  The most likely version of this in practice is the flag being switched on before
+  `payzephyr:install --features=trace` has been run, so the table does not exist yet. That
+  degrades to "no timeline", not "no payments".
+
+- **`TraceEventDTO` now normalizes what it is given instead of refusing it.** Several of its
+  fields arrive from outside PayZephyr's control: the webhook route is `POST /{provider}` with
+  no constraint on the segment, and payloads are provider response bodies that are not
+  guaranteed to be valid UTF-8. An over-long provider slug is trimmed to the column width, an
+  unrecognised HTTP method or an out-of-range status code is dropped, and a payload or metadata
+  array that is too large or not encodable is replaced by a `_payzephyr_dropped` marker
+  explaining why. In every case the event survives with its timestamp, event type and timing
+  intact, which is most of what a timeline is for.
+
+  The single exception is the reference. It is the key the whole timeline hangs off, and a
+  coerced one would file this payment's history under a different payment, so that still
+  throws - and `TraceRecorder` catches it. The payload ceiling matches
+  `payments.webhook.max_payload_size` rather than being a number of its own.
+
 ### Fixed
 
 - **A payment that failed over to another provider had no single reference.** Every driver

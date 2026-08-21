@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Foundation\Application as FoundationApplication;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
@@ -28,6 +29,7 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Services\NullTraceRecorder;
 use KenDeNigerian\PayZephyr\Services\PayloadRedactor;
 use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
@@ -55,8 +57,13 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(DriverFactory::class);
 
         $this->app->singleton(PayloadRedactor::class);
-        $this->app->singleton(TraceRecorderInterface::class, TraceRecorder::class);
         $this->app->singleton(TraceTimelineBuilder::class);
+
+        $this->app->singleton(TraceRecorderInterface::class, function ($app) {
+            return data_get($app->make('payments.config'), 'trace.enabled') ?? false
+                ? $app->make(TraceRecorder::class)
+                : $app->make(NullTraceRecorder::class);
+        });
 
         $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
         $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);

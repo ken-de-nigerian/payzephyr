@@ -92,11 +92,15 @@ test('withPayload swaps the payload and leaves everything else alone', function 
         ->and($swapped->responseTimeMs)->toBe($original->responseTimeMs);
 });
 
+
 // ---------------------------------------------------------------------------
-// Validation
+// The reference is the one thing that must be right
 // ---------------------------------------------------------------------------
 
 test('the reference must be a reference PayZephyr would have issued', function (string $reference) {
+    // The only refusal in the DTO. A coerced reference would file this
+    // payment's history under a different payment, which is worse than
+    // having no history at all.
     expect(fn () => traceEvent(reference: $reference))
         ->toThrow(InvalidTraceDataException::class, 'Invalid trace reference');
 })->with([
@@ -113,51 +117,95 @@ test('a reference at the maximum permitted length is accepted', function () {
     expect(traceEvent(reference: $reference)->reference)->toBe($reference);
 });
 
-test('a provider name longer than the column is rejected', function () {
-    expect(fn () => traceEvent(provider: str_repeat('p', 51)))
-        ->toThrow(InvalidTraceDataException::class, 'exceeds the maximum length of 50');
+test('a bad reference is catchable as a PaymentException like everything else in the package', function () {
+    expect(fn () => traceEvent(reference: 'no good'))->toThrow(PaymentException::class);
 });
 
-test('a provider name at the column limit is accepted', function () {
+test('the exception names the offending reference', function () {
+    expect(InvalidTraceDataException::invalidReference('bad ref')->getMessage())->toContain('bad ref');
+});
+
+// ---------------------------------------------------------------------------
+// Everything else is normalized rather than refused
+// ---------------------------------------------------------------------------
+
+test('a provider name longer than the column is trimmed to fit', function () {
+    // POST /payments/webhook/{provider} has no constraint on the segment, so
+    // this value is attacker-controlled. Refusing here would let a long URL
+    // take down webhook handling through the tracing code.
+    expect(traceEvent(provider: str_repeat('p', 200))->provider)->toBe(str_repeat('p', 50));
+});
+
+test('a provider name at the column limit is kept whole', function () {
     expect(traceEvent(provider: str_repeat('p', 50))->provider)->toBe(str_repeat('p', 50));
 });
 
-test('a payload larger than the webhook ceiling is rejected', function () {
-    expect(fn () => traceEvent(payload: ['blob' => str_repeat('x', 1048577)]))
-        ->toThrow(InvalidTraceDataException::class, 'exceeds the maximum of 1048576 bytes');
+test('an empty provider is stored as no provider at all', function () {
+    expect(traceEvent(provider: '')->provider)->toBeNull();
 });
 
-test('an unrecognised HTTP method is rejected', function () {
-    expect(fn () => traceEvent(httpMethod: 'TRACE'))
-        ->toThrow(InvalidTraceDataException::class, 'Invalid HTTP method [TRACE]');
+test('a payload past the ceiling is dropped, and the event survives', function () {
+    $dto = traceEvent(payload: ['blob' => str_repeat('x', TraceEventDTO::MAX_PAYLOAD_SIZE + 1)]);
+
+    expect($dto->payload)->toHaveKey(TraceEventDTO::DROPPED_KEY)
+        ->and($dto->payload[TraceEventDTO::DROPPED_KEY])->toContain('exceeded the 1048576 byte ceiling')
+        ->and($dto->reference)->toBe('PZ_1755000000_abcdef01')
+        ->and($dto->event)->toBe(TraceEvent::PAYMENT_INITIATED);
 });
 
-test('HTTP methods are accepted regardless of case', function () {
-    expect(traceEvent(httpMethod: 'post')->httpMethod)->toBe('post');
+test('metadata past the ceiling is dropped the same way', function () {
+    $dto = traceEvent(metadata: ['headers' => str_repeat('x', TraceEventDTO::MAX_PAYLOAD_SIZE + 1)]);
+
+    expect($dto->metadata)->toHaveKey(TraceEventDTO::DROPPED_KEY)
+        ->and($dto->payload)->toBe([]);
 });
 
-test('an HTTP status code outside the real range is rejected', function (int $status) {
-    expect(fn () => traceEvent(httpStatusCode: $status))
-        ->toThrow(InvalidTraceDataException::class, 'Invalid HTTP status code');
+test('a payload that is not encodable as JSON is dropped rather than thrown', function () {
+    // Provider bodies are not guaranteed to be valid UTF-8, and json_encode
+    // throwing here would surface as a failed payment.
+    $dto = traceEvent(payload: ['body' => "\xB1\x31"]);
+
+    expect($dto->payload)->toHaveKey(TraceEventDTO::DROPPED_KEY)
+        ->and($dto->payload[TraceEventDTO::DROPPED_KEY])->toContain('not encodable as JSON');
+});
+
+test('a payload at exactly the ceiling is kept', function () {
+    $filler = str_repeat('x', TraceEventDTO::MAX_PAYLOAD_SIZE - strlen('{"blob":""}'));
+
+    expect(traceEvent(payload: ['blob' => $filler])->payload)->toBe(['blob' => $filler]);
+});
+
+test('an unrecognised HTTP method is dropped', function () {
+    expect(traceEvent(httpMethod: 'TRACE')->httpMethod)->toBeNull();
+});
+
+test('HTTP methods are upper-cased so a timeline shows one spelling', function () {
+    expect(traceEvent(httpMethod: 'post')->httpMethod)->toBe('POST');
+});
+
+test('an HTTP status code outside the real range is dropped', function (int $status) {
+    expect(traceEvent(httpStatusCode: $status)->httpStatusCode)->toBeNull();
 })->with([
     'below range' => [99],
     'above range' => [600],
     'zero' => [0],
 ]);
 
-test('HTTP status codes at the edges of the real range are accepted', function () {
+test('HTTP status codes at the edges of the real range are kept', function () {
     expect(traceEvent(httpStatusCode: 100)->httpStatusCode)->toBe(100)
         ->and(traceEvent(httpStatusCode: 599)->httpStatusCode)->toBe(599);
 });
 
-test('invalid trace data is catchable as a PaymentException like everything else in the package', function () {
-    expect(fn () => traceEvent(reference: 'no good'))->toThrow(PaymentException::class);
+test('an empty correlation id is stored as no correlation', function () {
+    // NullTraceRecorder::startCorrelation() returns an empty string, and a
+    // call site that passes it straight through must not write one.
+    expect(traceEvent(correlationId: '')->correlationId)->toBeNull();
 });
 
-test('every validation failure names the offending value', function () {
-    expect(InvalidTraceDataException::invalidReference('bad ref')->getMessage())->toContain('bad ref')
-        ->and(InvalidTraceDataException::payloadTooLarge(20, 10)->getMessage())->toContain('20')
-        ->and(InvalidTraceDataException::providerNameTooLong('wide', 3)->getMessage())->toContain('wide')
-        ->and(InvalidTraceDataException::invalidHttpMethod('NOPE')->getMessage())->toContain('NOPE')
-        ->and(InvalidTraceDataException::invalidHttpStatusCode(999)->getMessage())->toContain('999');
+test('normalization survives withPayload', function () {
+    $dto = traceEvent(provider: str_repeat('p', 200), httpMethod: 'get')->withPayload(['a' => 1]);
+
+    expect($dto->provider)->toBe(str_repeat('p', 50))
+        ->and($dto->httpMethod)->toBe('GET')
+        ->and($dto->payload)->toBe(['a' => 1]);
 });

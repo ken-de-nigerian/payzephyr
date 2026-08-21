@@ -8,6 +8,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+
+- **Payment tracing has moved into PayZephyr**, folded in from the separate `payzephyr-trace`
+  package, which is being retired. Where `logging` keeps a payment's current state, tracing
+  keeps the sequence that produced it: one append-only row per step, so a payment's whole
+  lifecycle can be replayed afterwards.
+
+  This release lands the machinery only. Nothing on the payment path records anything yet, and
+  the feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`. Instrumentation, the installer
+  entry, and the `payzephyr:trace` command follow in later releases - there is nothing to turn
+  on yet, and turning it on does nothing.
+
+  New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
+  `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
+  `Enums\TraceDirection`, `Services\TraceRecorder`, `Services\PayloadRedactor`,
+  `Services\Timeline`, `Services\TraceTimelineBuilder`, `Jobs\RecordTraceEvent`, and a
+  `Facades\Trace` for recording your own steps. `TraceRecorderInterface` is bound in the
+  container, so a custom recorder can be swapped in.
+
+  The trace table's timestamps are millisecond-precision (`timestamps(3)`), unlike PayZephyr's
+  other tables. Several steps of one payment routinely land inside the same second, and the gap
+  between them is the thing a timeline is read for.
+
 ### Fixed
 
 - **A payment that failed over to another provider had no single reference.** Every driver

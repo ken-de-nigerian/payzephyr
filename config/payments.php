@@ -210,6 +210,63 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Payment Tracing
+    |--------------------------------------------------------------------------
+    |
+    | Records every step of a payment - provider requests and responses,
+    | fallback decisions, webhooks, retries - as its own row, so the whole
+    | lifecycle can be replayed afterwards. Where 'logging' above keeps a
+    | payment's current state, this keeps the sequence that produced it.
+    |
+    | Off by default, and gated at runtime rather than only at install time:
+    | this is the one PayZephyr table that grows per step rather than per
+    | payment, so turning it off has to take effect without a deploy.
+    |
+    */
+    'trace' => [
+        'enabled' => env('PAYZEPHYR_FEATURE_TRACE', false),
+
+        'table' => env('PAYZEPHYR_TRACE_TABLE', 'payment_trace_events'),
+
+        // Null uses the default connection. Trace is the highest-volume table
+        // PayZephyr writes, so pointing it elsewhere is a reasonable thing to
+        // want under load.
+        'connection' => env('PAYZEPHYR_TRACE_CONNECTION'),
+
+        // Recommended in production: keeps the write off the request path.
+        'async' => env('PAYZEPHYR_TRACE_ASYNC', false),
+
+        'queue' => [
+            'connection' => env('PAYZEPHYR_TRACE_QUEUE_CONNECTION'),
+            'name' => env('PAYZEPHYR_TRACE_QUEUE_NAME', 'default'),
+        ],
+
+        // Any payload key *containing* one of these, case-insensitively, is
+        // stored as [REDACTED]. Substring matching is deliberate - providers
+        // name the same secret a dozen ways - but it means a benign key like
+        // 'tokenization_enabled' is redacted too.
+        'redact_fields' => [
+            'card_number',
+            'cvv',
+            'cvc',
+            'card_cvv',
+            'card_cvc',
+            'secret',
+            'password',
+            'api_key',
+            'secret_key',
+            'private_key',
+            'authorization',
+            'token',
+            'access_token',
+            'refresh_token',
+        ],
+
+        'redaction_max_depth' => env('PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH', 10),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Subscription Configuration
     |--------------------------------------------------------------------------
     |

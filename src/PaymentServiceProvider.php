@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
 use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
+use KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
@@ -27,8 +28,11 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Services\PayloadRedactor;
 use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Services\TraceRecorder;
+use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
 use Throwable;
 
 final class PaymentServiceProvider extends ServiceProvider
@@ -49,6 +53,10 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(MetadataSanitizer::class);
 
         $this->app->singleton(DriverFactory::class);
+
+        $this->app->singleton(PayloadRedactor::class);
+        $this->app->singleton(TraceRecorderInterface::class, TraceRecorder::class);
+        $this->app->singleton(TraceTimelineBuilder::class);
 
         $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
         $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);
@@ -109,11 +117,6 @@ final class PaymentServiceProvider extends ServiceProvider
 
     protected function registerRoutes(): void
     {
-        // routesAreCached() is only on the concrete Foundation Application,
-        // not the contract ServiceProvider::$app is typed to - so narrow
-        // before calling it. If the container is something else (Lumen, a
-        // custom kernel), fall through and register: routes present when they
-        // could have been cached is harmless, routes missing is not.
         if ($this->app instanceof FoundationApplication && $this->app->routesAreCached()) {
             return;
         }

@@ -8,7 +8,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Fixed
+
+- **A payment that failed over to another provider had no single reference.** Every driver
+  resolved its own reference inside `charge()`, as
+  `$request->reference ?? $this->generateReference(...)`. That is fine for one provider and
+  wrong for a chain: when the caller supplied no reference, each fallback attempt invented its
+  own. A payment that failed on Paystack and succeeded on Stripe left two attempts with nothing
+  in common, and the failed attempt's reference - never stored, never returned - could not be
+  recovered at all. Anything trying to reconstruct what happened to that payment had two
+  unrelated halves and no way to know they belonged together.
+
+  `chargeWithFallback()` now resolves the reference once, before the fallback loop and before
+  the in-flight claim. Every provider in the chain is handed the same reference, and it is the
+  reference you get back.
+
+  A knock-on effect: `claimChargeInFlight()` returns early when the request carries no
+  reference, so charges without a caller-supplied one previously took no double-submission
+  claim at all and released none. They do now. This does **not** make two independent
+  auto-referenced submissions deduplicable - each still mints its own reference, and nothing
+  ties them together - but re-submitting the reference PayZephyr just handed back is now
+  rejected instead of charging the customer a second time.
+
 ### Changed
+
+- **Auto-generated references now carry a provider-neutral `PZ_` prefix** rather than the
+  fulfilling provider's name (`PAYSTACK_`, `STRIPE_`, and so on). A reference minted before the
+  chain runs cannot know which provider will settle it, and naming the wrong one is worse than
+  naming none: `ProviderDetector` resolves prefixes confidently, so a `PAYSTACK_` reference
+  ultimately settled by Stripe would send a later `verify()` to the wrong provider. The shape is
+  otherwise unchanged - `PREFIX_TIMESTAMP_RANDOMHEX`.
+
+  **The trade this accepts:** `ProviderDetector::detectFromReference()` cannot resolve a
+  provider from a `PZ_` reference, by design. That matters only on the last-resort branch of
+  `verify()` - no cached session, no `payment_transactions` row, and no provider passed
+  explicitly - where `verify()` now tries each enabled provider in turn rather than going
+  straight to one. Slower in that narrow case, and still correct. Transaction logging is on by
+  default and its table is part of the core install, so most applications never reach it.
+
+  References you supply yourself are untouched, and so are references already stored.
+
+- `ChargeRequestDTO::withReference()` is new. It returns a copy of the request carrying the
+  given reference, preserving every other field including the idempotency key - the key
+  identifies the logical submission, and stamping a reference onto a request must not change
+  which submissions a provider treats as duplicates of each other.
 
 - Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square
   drivers. Comment-only: no logic changed, and the behaviour is exactly as before. PayPal
@@ -18,6 +61,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **No user-facing impact.** Listed here for completeness rather than because it changes
   anything you can observe.
+
+### Upgrading
+
+No API, signature, or configuration changes. Three things worth a look before you deploy:
+
+1. **If you let PayZephyr generate references**, new ones look like `PZ_1755000000_a1b2c3d4`
+   instead of `STRIPE_1755000000_a1b2c3d4`. Anything that parses a provider out of a reference
+   you did not supply - dashboards, reconciliation scripts, support tooling - needs updating to
+   read the `provider` column on `payment_transactions` instead. Existing references are
+   unchanged.
+
+2. **If you charge without a reference and re-submit the returned one**, that second submission
+   is now rejected with a `ProviderException` while the first is still in flight, where it
+   previously reached a provider. That is the fix working, but it is a new exception on a path
+   that used to succeed.
+
+3. **If you supply your own references**, nothing changes.
 
 ---
 

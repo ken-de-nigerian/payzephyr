@@ -133,6 +133,34 @@ final readonly class ChargeRequestDTO
     }
 
     /**
+     * Return a copy of this request carrying the given reference.
+     *
+     * The idempotency key is carried over untouched: it identifies the logical
+     * submission, and stamping a reference onto a request that reached
+     * PayZephyr without one must not change which submissions a provider
+     * considers duplicates of each other.
+     *
+     * @throws InvalidArgumentException If the reference is not a valid reference.
+     */
+    public function withReference(string $reference): self
+    {
+        return new self(
+            amount: $this->amount,
+            currency: $this->currency,
+            email: $this->email,
+            reference: $reference,
+            callbackUrl: $this->callbackUrl,
+            metadata: $this->metadata,
+            description: $this->description,
+            customer: $this->customer,
+            customFields: $this->customFields,
+            split: $this->split,
+            channels: $this->channels,
+            idempotencyKey: $this->idempotencyKey,
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public static function fromArray(array $data): ChargeRequestDTO

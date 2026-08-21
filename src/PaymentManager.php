@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
@@ -24,6 +25,7 @@ use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
+use Random\RandomException;
 use Throwable;
 
 final class PaymentManager
@@ -90,6 +92,7 @@ final class PaymentManager
      */
     public function chargeWithFallback(ChargeRequestDTO $request, ?array $providers = null): ChargeResponseDTO
     {
+        $request = $this->resolveChargeReference($request);
         $providers = $providers ?? $this->getFallbackChain();
         $exceptions = [];
 
@@ -104,6 +107,51 @@ final class PaymentManager
 
             throw $e;
         }
+    }
+
+    /**
+     * Guarantee the request carries a reference before anything else sees it.
+     *
+     * Every driver resolves its own reference inside charge(), as
+     * `$request->reference ?? $this->generateReference(...)`. That is fine for
+     * a single provider and wrong for a chain: with no caller-supplied
+     * reference, each fallback attempt invented its own, so a payment that
+     * failed on Paystack and succeeded on Stripe left two attempts with no
+     * shared identifier - and the failed attempt's reference, never stored or
+     * returned, was unrecoverable.
+     *
+     * Resolving here, before claimChargeInFlight() and before the loop, gives
+     * the whole chain one identity, and makes the in-flight claim reachable at
+     * all for these requests - claimChargeInFlight() returns early on a null
+     * reference, so an auto-referenced charge previously took no claim and
+     * released none.
+     *
+     * That does not make two independent auto-referenced submissions
+     * deduplicable: each still mints its own reference, and nothing ties them
+     * together. It makes the charge claimable *once it has a reference*, so a
+     * caller who re-submits the reference PayZephyr handed back is now
+     * rejected rather than charged twice.
+     *
+     * @throws RandomException If the platform cannot produce secure randomness.
+     */
+    private function resolveChargeReference(ChargeRequestDTO $request): ChargeRequestDTO
+    {
+        if ($request->reference !== null && $request->reference !== '') {
+            return $request;
+        }
+
+        return $request->withReference($this->generateReference());
+    }
+
+    /**
+     * Mint a chain-wide reference, in the same shape drivers produce
+     * (PREFIX_TIMESTAMP_RANDOMHEX) but under a provider-neutral prefix.
+     *
+     * @throws RandomException If the platform cannot produce secure randomness.
+     */
+    private function generateReference(): string
+    {
+        return PaymentConstants::REFERENCE_PREFIX.'_'.time().'_'.bin2hex(random_bytes(8));
     }
 
     /**
@@ -248,8 +296,15 @@ final class PaymentManager
      * Atomically claim a logical payment before any provider is contacted.
      *
      * Returns the claim key on success, or null when the request carries no
-     * stable identity to claim (no caller-supplied reference) - in which case
-     * no protection is possible and the charge proceeds unguarded.
+     * stable identity to claim.
+     *
+     * chargeWithFallback() now runs resolveChargeReference() first, so that
+     * null branch is unreachable from the charge path. It stays because PHP
+     * cannot express "a ChargeRequestDTO whose reference is set" in the
+     * signature: without it, a future second call site handing over an
+     * unresolved request would build a claim key from an empty identifier and
+     * silently collide with every other such request. Failing to claim is the
+     * safe outcome; claiming the wrong thing is not.
      *
      * @throws ProviderException when the same logical payment is already in flight.
      */

@@ -18,9 +18,18 @@ use InvalidArgumentException;
  * tables (payment_transactions, webhook_events) are core installation,
  * not optional features - see docs/installation.md#core-vs-optional.
  *
- * Neither optional feature currently depends on the other, or on anything
- * beyond core - $dependencies exists so a future feature can declare one
- * without changing the registry's shape, not because one exists today.
+ * No optional feature currently depends on another, or on anything beyond
+ * core - $dependencies exists so a future feature can declare one without
+ * changing the registry's shape, not because one exists today.
+ *
+ * One asymmetry worth knowing about: the env vars for 'subscriptions' and
+ * 'refunds' are installer bookkeeping that nothing reads at runtime, while
+ * PAYZEPHYR_FEATURE_TRACE is consulted on every request - with it off, the
+ * container resolves a do-nothing recorder. UninstallCommand::removeResource()
+ * drops the table before it clears the flag, so a live app briefly sees
+ * tracing switched on with no table behind it. That is survivable rather
+ * than lucky: TraceRecorder::record() is guaranteed not to throw, and this
+ * is one of the cases it exists for.
  */
 final class Features
 {
@@ -49,6 +58,16 @@ final class Features
                 'migrationPattern' => '*_create_refund_transactions_table.php',
                 'tableConfigKey' => 'refunds.logging.table',
                 'defaultTable' => 'refund_transactions',
+            ],
+            'trace' => [
+                'label' => 'Trace',
+                'description' => 'Step-by-step forensic timeline of every payment - what happened, in order, and why',
+                'migrationTag' => 'payzephyr-migrations-trace',
+                'envVar' => 'PAYZEPHYR_FEATURE_TRACE',
+                'dependencies' => [],
+                'migrationPattern' => '*_create_payment_trace_events_table.php',
+                'tableConfigKey' => 'trace.table',
+                'defaultTable' => 'payment_trace_events',
             ],
         ];
     }

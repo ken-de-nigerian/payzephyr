@@ -49,7 +49,19 @@ final class UninstallCommand extends Command
             return self::FAILURE;
         }
 
-        $installed = array_filter($resources, fn (array $resource) => $this->isInstalled($resource));
+        // Naming features explicitly is an instruction, not a question. The
+        // isInstalled() filter exists so a bare `payzephyr:uninstall` can say
+        // "nothing to do" instead of listing tables that were never created -
+        // but it reads only the published migration file, which is a poor
+        // proxy for what an app actually has. A migration deleted by hand
+        // leaves the table standing, and PAYZEPHYR_FEATURE_TRACE=true leaves
+        // the app writing traces, in both cases with nothing on disk to show
+        // for it. Those partial states are exactly when uninstall is most
+        // needed, and removeResource() is idempotent, so acting on a resource
+        // that turns out to be absent costs nothing.
+        $installed = $this->option('features') !== null
+            ? $resources
+            : array_filter($resources, fn (array $resource) => $this->isInstalled($resource));
 
         if ($installed === []) {
             $this->info('PayZephyr does not appear to be installed (no matching migrations were found) - nothing to do.');

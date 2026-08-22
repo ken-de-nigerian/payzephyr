@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle can be replayed afterwards.
 
   This release lands the machinery only. Nothing on the payment path records anything yet, and
-  the feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`. Instrumentation, the installer
-  entry, and the `payzephyr:trace` command follow in later releases - there is nothing to turn
-  on yet, and turning it on does nothing.
+  the feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`. Instrumentation and the
+  `payzephyr:trace` command follow in later releases - there is nothing to turn on yet, and
+  turning it on does nothing.
 
   New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
   `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
@@ -30,6 +30,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The trace table's timestamps are millisecond-precision (`timestamps(3)`), unlike PayZephyr's
   other tables. Several steps of one payment routinely land inside the same second, and the gap
   between them is the thing a timeline is read for.
+
+- **`payzephyr:install --features=trace`** installs it, and `payzephyr:uninstall --features=trace`
+  removes it, alongside `subscriptions` and `refunds`. Interactive installs list it as a third
+  checkbox, and `--all` includes it. Nothing in `InstallCommand` or `UninstallCommand` needed
+  changing: both iterate the `Features` registry, so trace is one entry rather than a special
+  case.
+
+  The switch lives at `payments.features.trace` - one key, one meaning. An earlier draft of
+  this release had a second `payments.trace.enabled`, which would have let a published config
+  file disagree with itself about whether tracing was on.
 
 - **`PAYZEPHYR_FEATURE_TRACE` is a real kill switch.** Tracing is the only PayZephyr feature
   that writes on the hot path of every charge, verification and webhook, so switching it off
@@ -68,6 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `payments.webhook.max_payload_size` rather than being a number of its own.
 
 ### Fixed
+
+- **`payzephyr:uninstall --features=…` refused to remove anything whose migration file was
+  gone.** It decided what to act on by globbing `database/migrations`, which is a poor proxy
+  for what an app actually has: deleting a migration file by hand does not drop the table it
+  created, and the table would then survive every subsequent uninstall. Naming features
+  explicitly is now treated as an instruction rather than a question, and the command acts on
+  exactly what you asked for. `removeResource()` was already idempotent, so a resource that
+  turns out to be absent costs nothing.
+
+  A bare `payzephyr:uninstall` still reports "nothing to do" when there is genuinely nothing
+  installed - that check is what the glob was for.
+
+  This matters more for trace than for the other two features, because
+  `PAYZEPHYR_FEATURE_TRACE` is read at runtime: an app left with the flag on and no table
+  would keep attempting a trace write on every payment. It degrades to a log line rather than
+  a failed payment, but "uninstall" should mean it stops.
 
 - **A payment that failed over to another provider had no single reference.** Every driver
   resolved its own reference inside `charge()`, as

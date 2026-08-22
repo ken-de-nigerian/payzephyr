@@ -11,7 +11,7 @@ use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
 
 beforeEach(function () {
     app()->forgetInstance('payments.config');
-    config(['payments.trace.enabled' => true]);
+    config(['payments.features.trace' => true]);
 });
 
 function traceRow(

@@ -106,7 +106,7 @@ final readonly class TraceRecorder implements TraceRecorderInterface
 
     private function isEnabled(): bool
     {
-        return (bool) (data_get($this->config(), 'trace.enabled') ?? false);
+        return (bool) (data_get($this->config(), 'features.trace') ?? false);
     }
 
     private function shouldRecordAsync(): bool

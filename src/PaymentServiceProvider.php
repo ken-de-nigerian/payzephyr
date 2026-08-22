@@ -60,7 +60,7 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(TraceTimelineBuilder::class);
 
         $this->app->singleton(TraceRecorderInterface::class, function ($app) {
-            return data_get($app->make('payments.config'), 'trace.enabled') ?? false
+            return data_get($app->make('payments.config'), 'features.trace') ?? false
                 ? $app->make(TraceRecorder::class)
                 : $app->make(NullTraceRecorder::class);
         });
@@ -107,6 +107,10 @@ final class PaymentServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../database/migrations/2024_01_02_000000_create_refund_transactions_table.php' => database_path('migrations/2024_01_02_000000_create_refund_transactions_table.php'),
             ], 'payzephyr-migrations-refunds');
+
+            $this->publishes([
+                __DIR__.'/../database/migrations/2024_01_03_000000_create_payment_trace_events_table.php' => database_path('migrations/2024_01_03_000000_create_payment_trace_events_table.php'),
+            ], 'payzephyr-migrations-trace');
 
             $this->commands([
                 InstallCommand::class,

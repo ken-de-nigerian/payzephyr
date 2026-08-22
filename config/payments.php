@@ -11,15 +11,25 @@ return [
     |
     | Tracks which optional PayZephyr features `php artisan payzephyr:install`
     | has enabled for this app (payment logging and webhook processing are
-    | core and always available, not listed here). This is informational -
-    | set by the installer, readable by your own code - and does not gate
-    | Payment::subscription()/Payment::refund() at runtime; see
+    | core and always available, not listed here). See
     | docs/installation.md#core-vs-optional-features.
+    |
+    | 'subscriptions' and 'refunds' are informational - set by the installer,
+    | readable by your own code - and do not gate Payment::subscription() or
+    | Payment::refund() at runtime.
+    |
+    | 'trace' is different, and is the one flag here that is read on every
+    | request: with it off, PayZephyr resolves a do-nothing recorder that
+    | touches no database at all. Tracing is the only feature that writes on
+    | the hot path of every charge, verification and webhook, and the only one
+    | whose table grows per step rather than per payment, so switching it off
+    | has to take effect immediately - no deploy, and no migration to roll back.
     |
     */
     'features' => [
         'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
         'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+        'trace' => env('PAYZEPHYR_FEATURE_TRACE', false),
     ],
 
     /*
@@ -218,14 +228,12 @@ return [
     | lifecycle can be replayed afterwards. Where 'logging' above keeps a
     | payment's current state, this keeps the sequence that produced it.
     |
-    | Off by default, and gated at runtime rather than only at install time:
-    | this is the one PayZephyr table that grows per step rather than per
-    | payment, so turning it off has to take effect without a deploy.
+    | Switched on and off by 'features.trace' above, not by a key of its own -
+    | one flag, one meaning. Everything here describes how tracing behaves
+    | once it is on.
     |
     */
     'trace' => [
-        'enabled' => env('PAYZEPHYR_FEATURE_TRACE', false),
-
         'table' => env('PAYZEPHYR_TRACE_TABLE', 'payment_trace_events'),
 
         // Null uses the default connection. Trace is the highest-volume table
@@ -241,10 +249,6 @@ return [
             'name' => env('PAYZEPHYR_TRACE_QUEUE_NAME', 'default'),
         ],
 
-        // Any payload key *containing* one of these, case-insensitively, is
-        // stored as [REDACTED]. Substring matching is deliberate - providers
-        // name the same secret a dozen ways - but it means a benign key like
-        // 'tokenization_enabled' is redacted too.
         'redact_fields' => [
             'card_number',
             'cvv',

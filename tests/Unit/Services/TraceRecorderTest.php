@@ -19,7 +19,7 @@ beforeEach(function () {
     app()->forgetInstance('payments.config');
 
     config([
-        'payments.trace.enabled' => true,
+        'payments.features.trace' => true,
         'payments.trace.async' => false,
     ]);
 });
@@ -100,7 +100,7 @@ test('trace rows are append-only, so recording twice keeps both steps', function
 // ---------------------------------------------------------------------------
 
 test('nothing is written while tracing is disabled', function () {
-    config(['payments.trace.enabled' => false]);
+    config(['payments.features.trace' => false]);
 
     $result = recorder()->record(recordableEvent());
 
@@ -109,7 +109,7 @@ test('nothing is written while tracing is disabled', function () {
 });
 
 test('tracing is off unless it has been switched on', function () {
-    config(['payments.trace' => []]);
+    config(['payments.features' => []]);
 
     expect(recorder()->record(recordableEvent()))->toBeNull();
 });

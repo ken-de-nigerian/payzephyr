@@ -13,7 +13,9 @@ use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Events\PaymentInitiated;
 use KenDeNigerian\PayZephyr\Events\PaymentVerificationFailed;
 use KenDeNigerian\PayZephyr\Events\PaymentVerificationSuccess;
@@ -25,6 +27,7 @@ use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Random\RandomException;
 use Throwable;
 
@@ -32,6 +35,7 @@ final class PaymentManager
 {
     use LogsToPaymentChannel;
     use NormalizesMetadata;
+    use RecordsTraceEvents;
 
     /** @var array<string, DriverInterface> */
     protected array $drivers = [];
@@ -95,6 +99,12 @@ final class PaymentManager
         $request = $this->resolveChargeReference($request);
         $providers = $providers ?? $this->getFallbackChain();
         $exceptions = [];
+
+        $this->trace($request->reference, TraceEvent::PAYMENT_INITIATED, payload: [
+            'amount' => $request->amount,
+            'currency' => $request->currency,
+            'provider_chain' => array_values($providers),
+        ]);
 
         $claimed = $this->claimChargeInFlight($request);
 
@@ -173,6 +183,10 @@ final class PaymentManager
                 if ($this->config['health_check']['enabled'] ?? true) {
                     if (! $this->driverIsHealthy($driver)) {
                         $this->log('warning', "Provider [$providerName] failed health check, skipping");
+                        $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                            payload: ['reason' => 'failed_health_check'],
+                            provider: $providerName,
+                        );
 
                         continue;
                     }
@@ -180,11 +194,15 @@ final class PaymentManager
 
                 if (! $this->driverSupportsCurrency($driver, $request->currency)) {
                     $this->log('info', "Provider [$providerName] does not support currency $request->currency");
+                    $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                        payload: ['reason' => 'unsupported_currency', 'currency' => $request->currency],
+                        provider: $providerName,
+                    );
 
                     continue;
                 }
 
-                $response = $driver->charge($request);
+                $response = $this->chargeWithTraceContext($driver, $request);
                 $this->completeSuccessfulCharge($request, $response, $providerName);
 
                 return $response;
@@ -195,6 +213,10 @@ final class PaymentManager
                         'provider' => $providerName,
                         'reference' => $request->reference,
                     ]);
+                    $this->trace($request->reference, TraceEvent::CHARGE_AMBIGUOUS,
+                        payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
+                        provider: $providerName,
+                    );
 
                     throw ProviderException::withContext(
                         "Charge via [$providerName] timed out or lost its response before payment status could be confirmed. ".
@@ -221,13 +243,61 @@ final class PaymentManager
                         'enabled' => ($this->config['providers'][$providerName]['enabled'] ?? true),
                     ],
                 ]);
+
+                $this->trace($request->reference, TraceEvent::PROVIDER_ERROR,
+                    payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
+                    provider: $providerName,
+                );
             }
         }
+
+        $this->trace($request->reference, TraceEvent::PAYMENT_FAILED, payload: [
+            'providers_tried' => array_keys($exceptions),
+            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+        ]);
 
         throw ProviderException::withContext(
             'All payment providers failed',
             ['exceptions' => array_map(fn ($e) => $e->getMessage(), $exceptions)]
         );
+    }
+
+    /**
+     * Call the driver with a fresh correlation group around it.
+     *
+     * One reference spans the whole payment; one correlation id spans a single
+     * provider attempt within it. That is what makes a fallback chain readable
+     * rather than a flat pile of events: three attempts against three
+     * providers produce three correlation groups under one reference.
+     *
+     * Cleared in a finally, always. DriverFactory hands back a new instance
+     * per create() today, but PaymentManager caches drivers by name in
+     * $this->drivers, so a second charge in the same process reuses the same
+     * object. A leaked correlation id would file one customer's provider
+     * round-trip under another customer's attempt - the only way this feature
+     * could leak data between payments, and the reason this is not simply set
+     * inside the drivers.
+     *
+     * Guarded by instanceof for the same reason driverIsHealthy() is: a driver
+     * implementing only DriverInterface is legitimate and documented, and must
+     * not blow up on a method the contract never promised. Such a driver
+     * simply records no HTTP-level steps.
+     *
+     * @throws Throwable Whatever the driver's charge() throws, untouched.
+     */
+    private function chargeWithTraceContext(DriverInterface $driver, ChargeRequestDTO $request): ChargeResponseDTO
+    {
+        if (! $driver instanceof AbstractDriver) {
+            return $driver->charge($request);
+        }
+
+        $driver->setTraceCorrelationId($this->startTraceCorrelation());
+
+        try {
+            return $driver->charge($request);
+        } finally {
+            $driver->setTraceCorrelationId(null);
+        }
     }
 
     /**
@@ -333,6 +403,7 @@ final class PaymentManager
             $this->log('warning', 'Rejected a duplicate in-flight charge submission', [
                 'reference' => $reference,
             ]);
+            $this->trace($reference, TraceEvent::CHARGE_DUPLICATE_REJECTED);
 
             throw ProviderException::withContext(
                 "A charge for reference [$reference] is already in progress or was recently submitted. ".
@@ -389,6 +460,11 @@ final class PaymentManager
         ChargeResponseDTO $response,
         string $providerName
     ): void {
+        $this->trace($response->reference, TraceEvent::PAYMENT_COMPLETED,
+            payload: ['status' => $response->status],
+            provider: $providerName,
+        );
+
         try {
             $this->cacheSessionData($response->reference, $providerName, $response->accessCode);
         } catch (Throwable $e) {
@@ -434,11 +510,6 @@ final class PaymentManager
             return;
         }
 
-        // Deliberately unguarded: the single caller already runs this inside
-        // the post-success try/catch that absorbs and logs any failure here.
-        // A second catch would just duplicate that, and made the caller's
-        // guard unreachable - which meant the guard protecting the package's
-        // central invariant could never actually be exercised by a test.
         $rawMetadata = array_merge($request->metadata, $response->metadata, [
             '_provider_id' => $response->accessCode,
         ]);
@@ -553,8 +624,6 @@ final class PaymentManager
         }
 
         try {
-            // auth() returns the Auth Factory, which only exposes guard()/
-            // shouldUse() - check()/id() live on the Guard it resolves.
             if (function_exists('auth') && auth()->guard()->check()) {
                 $this->cachedContext = 'user_'.auth()->guard()->id();
 

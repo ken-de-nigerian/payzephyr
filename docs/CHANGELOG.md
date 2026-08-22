@@ -15,10 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the sequence that produced it: one append-only row per step, so a payment's whole
   lifecycle can be replayed afterwards.
 
-  This release lands the machinery only. Nothing on the payment path records anything yet, and
-  the feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`. Instrumentation and the
-  `payzephyr:trace` command follow in later releases - there is nothing to turn on yet, and
-  turning it on does nothing.
+  The charge path is instrumented as of this release; verification, webhooks and the
+  `payzephyr:trace` command follow. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
 
   New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
   `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
@@ -30,6 +28,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The trace table's timestamps are millisecond-precision (`timestamps(3)`), unlike PayZephyr's
   other tables. Several steps of one payment routinely land inside the same second, and the gap
   between them is the thing a timeline is read for.
+
+- **The charge path now records what it did and why.** This is the part that earns the feature.
+  PayZephyr can silently route a payment to a provider the caller never chose, and until now the
+  only durable record of that was a single `payment_transactions` row saying which provider
+  eventually won. A failed first attempt left nothing behind at all.
+
+  A charge now records: `payment.initiated` with the provider chain it intends to try;
+  `provider.skipped` with a reason whenever a provider is passed over without being contacted
+  (failed health check, or unsupported currency); `provider.request.sent` and
+  `provider.response.received` for each HTTP round trip, with method, URL, status code and
+  elapsed milliseconds; `provider.error` when a provider fails and the chain moves on;
+  `charge.ambiguous` when the outcome is genuinely unknown; `charge.duplicate_rejected` when the
+  in-flight claim turns a resubmission away; and `payment.completed` or `payment.failed` at the
+  end.
+
+  Every one of those is keyed by the single reference the chain shares, so a payment that failed
+  on one provider and succeeded on another reads as one timeline rather than two unrelated
+  halves.
+
+  Two classification decisions worth knowing about, because getting them wrong would make
+  timelines lie:
+
+  - A single provider failing inside a fallback chain is `provider.error`, **not**
+    `payment.failed`. `Timeline::terminal()` returns the *first* terminal event, so marking an
+    individual provider's failure terminal would report a payment that was successfully
+    recovered by the next provider as having failed. `payment.failed` is reserved for the chain
+    giving up.
+  - `charge.ambiguous` is terminal and counts as an error, but makes neither
+    `Timeline::succeeded()` nor `Timeline::failed()` true. Nobody knows yet whether the customer
+    was charged, and a timeline that guessed would be worse than one that says so.
+
+- **HTTP tracing is instrumented once, in `AbstractDriver::makeRequest()`**, which is the single
+  chokepoint every one of the eight bundled drivers already routes through. A driver that
+  implements `DriverInterface` directly rather than extending `AbstractDriver` remains entirely
+  valid and simply records no HTTP-level steps.
+
+  Reading a response body for the timeline never costs the charge: the stream is rewound
+  afterwards, a non-seekable body is left untouched rather than drained, and a body that cannot
+  be read at all costs the timeline its payload and nothing else.
+
+  Guzzle reports connection refused, DNS failure and connect timeouts all as the same
+  `ConnectException`, so PayZephyr records `provider.timeout` only when the underlying error
+  actually says it timed out. Everything else is `provider.exception` - otherwise whoever reads
+  the timeline goes hunting for a slow provider when the real answer is a bad host.
+
+  `payments.trace.record_http_bodies` (default `true`) turns body capture off on its own,
+  keeping the timing, status codes and event sequence. Worth turning off if provider bodies in
+  your integration carry more customer data than you want at rest.
+
+- **`Traits\RecordsTraceEvents`** is how every call site records. `TraceRecorder::record()`
+  already promised not to throw, but that promise started too late: building a `TraceEventDTO`
+  happens at the call site, and the DTO refuses a reference that cannot key a timeline. On the
+  webhook path that reference comes out of a provider payload, so the wrapper closes the gap
+  where a malformed body could otherwise have taken down payment handling through the tracing
+  code.
 
 - **`payzephyr:install --features=trace`** installs it, and `payzephyr:uninstall --features=trace`
   removes it, alongside `subscriptions` and `refunds`. Interactive installs list it as a third

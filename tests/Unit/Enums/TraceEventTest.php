@@ -6,8 +6,11 @@ use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 
 test('the trace event taxonomy covers every recorded stage of a payment', function () {
-    expect(TraceEvent::cases())->toHaveCount(24)
+    expect(TraceEvent::cases())->toHaveCount(27)
         ->and(TraceEvent::PAYMENT_INITIATED->value)->toBe('payment.initiated')
+        ->and(TraceEvent::PROVIDER_SKIPPED->value)->toBe('provider.skipped')
+        ->and(TraceEvent::CHARGE_DUPLICATE_REJECTED->value)->toBe('charge.duplicate_rejected')
+        ->and(TraceEvent::CHARGE_AMBIGUOUS->value)->toBe('charge.ambiguous')
         ->and(TraceEvent::PROVIDER_REQUEST_SENT->value)->toBe('provider.request.sent')
         ->and(TraceEvent::WEBHOOK_DUPLICATE->value)->toBe('webhook.duplicate')
         ->and(TraceEvent::RETRY_ABANDONED->value)->toBe('retry.abandoned')
@@ -27,10 +30,16 @@ test('terminal events are exactly the ones that end a payment flow', function ()
         fn (TraceEvent $case): bool => $case->isTerminal()
     ));
 
+    // Narrow on purpose. Timeline::terminal() takes the *first* terminal
+    // event, so anything listed here that can still be followed by a real
+    // outcome would misreport the payment - which is why a single provider
+    // failing inside a fallback chain is PROVIDER_ERROR, and why a rejected
+    // duplicate submission is not terminal at all.
     expect($terminal)->toBe([
         TraceEvent::PAYMENT_COMPLETED,
         TraceEvent::PAYMENT_FAILED,
         TraceEvent::PAYMENT_CANCELLED,
+        TraceEvent::CHARGE_AMBIGUOUS,
         TraceEvent::RETRY_ABANDONED,
     ]);
 });
@@ -43,6 +52,7 @@ test('error events are exactly the ones worth surfacing as a problem', function 
 
     expect($errors)->toBe([
         TraceEvent::PAYMENT_FAILED,
+        TraceEvent::CHARGE_AMBIGUOUS,
         TraceEvent::PROVIDER_TIMEOUT,
         TraceEvent::PROVIDER_ERROR,
         TraceEvent::PROVIDER_EXCEPTION,

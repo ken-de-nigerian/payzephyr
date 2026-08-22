@@ -267,6 +267,7 @@ return [
         ],
 
         'redaction_max_depth' => env('PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH', 10),
+        'record_http_bodies' => env('PAYZEPHYR_TRACE_RECORD_HTTP_BODIES', true),
     ],
 
     /*

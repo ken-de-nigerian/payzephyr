@@ -13,6 +13,11 @@ enum TraceEvent: string
     case PAYMENT_CANCELLED = 'payment.cancelled';
     case PAYMENT_REFUNDED = 'payment.refunded';
 
+    // Fallback-chain decisions
+    case PROVIDER_SKIPPED = 'provider.skipped';
+    case CHARGE_DUPLICATE_REJECTED = 'charge.duplicate_rejected';
+    case CHARGE_AMBIGUOUS = 'charge.ambiguous';
+
     // Provider communication
     case PROVIDER_REQUEST_SENT = 'provider.request.sent';
     case PROVIDER_RESPONSE_RECEIVED = 'provider.response.received';
@@ -52,6 +57,10 @@ enum TraceEvent: string
             self::PAYMENT_CANCELLED => 'Payment cancelled by user or system',
             self::PAYMENT_REFUNDED => 'Payment refunded',
 
+            self::PROVIDER_SKIPPED => 'Provider skipped without being contacted',
+            self::CHARGE_DUPLICATE_REJECTED => 'Duplicate submission rejected while the first was still in flight',
+            self::CHARGE_AMBIGUOUS => 'Charge outcome unknown - the provider may or may not have taken the money',
+
             self::PROVIDER_REQUEST_SENT => 'Request sent to payment provider',
             self::PROVIDER_RESPONSE_RECEIVED => 'Response received from payment provider',
             self::PROVIDER_TIMEOUT => 'Provider request timed out',
@@ -81,6 +90,17 @@ enum TraceEvent: string
 
     /**
      * Whether this event ends the payment flow.
+     *
+     * Timeline::terminal() returns the *first* terminal event, so this list
+     * has to stay narrow: anything marked terminal that can be followed by a
+     * different real outcome would misreport the payment. A single provider
+     * failing inside a fallback chain is PROVIDER_ERROR rather than
+     * PAYMENT_FAILED for exactly that reason - the next provider may still
+     * succeed, and PAYMENT_FAILED is reserved for the chain giving up.
+     *
+     * CHARGE_DUPLICATE_REJECTED is deliberately absent too. Both submissions
+     * share a reference and therefore share a timeline, and the rejected one
+     * is not the outcome - the surviving one is.
      */
     public function isTerminal(): bool
     {
@@ -88,14 +108,22 @@ enum TraceEvent: string
             self::PAYMENT_COMPLETED,
             self::PAYMENT_FAILED,
             self::PAYMENT_CANCELLED,
+            self::CHARGE_AMBIGUOUS,
             self::RETRY_ABANDONED,
         ], true);
     }
 
+    /**
+     * CHARGE_AMBIGUOUS counts as an error, but note that it makes neither
+     * Timeline::succeeded() nor Timeline::failed() true. That is the honest
+     * answer: nobody knows yet whether the customer was charged, and a
+     * timeline that guessed would be worse than one that says so.
+     */
     public function isError(): bool
     {
         return in_array($this, [
             self::PAYMENT_FAILED,
+            self::CHARGE_AMBIGUOUS,
             self::PROVIDER_TIMEOUT,
             self::PROVIDER_ERROR,
             self::PROVIDER_EXCEPTION,

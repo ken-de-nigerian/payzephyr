@@ -26,7 +26,9 @@ use function Laravel\Prompts\warning;
  *   customization, and Laravel has no "unpublish" concept for vendor:publish
  *   output, so removing it automatically is a judgment call this command
  *   does not make on the developer's behalf.
- * - Never removes a feature that was never installed (see isInstalled()).
+ * - With no --features=, never reports or removes a feature that was never
+ *   installed (see isInstalled()). With --features=, acts on exactly what
+ *   was named, since a missing migration file does not mean a missing table.
  * - Never runs without either an explicit interactive confirmation
  *   (including typing "UNINSTALL") or --force in a non-interactive
  *   environment - see confirmDestruction().
@@ -49,16 +51,6 @@ final class UninstallCommand extends Command
             return self::FAILURE;
         }
 
-        // Naming features explicitly is an instruction, not a question. The
-        // isInstalled() filter exists so a bare `payzephyr:uninstall` can say
-        // "nothing to do" instead of listing tables that were never created -
-        // but it reads only the published migration file, which is a poor
-        // proxy for what an app actually has. A migration deleted by hand
-        // leaves the table standing, and PAYZEPHYR_FEATURE_TRACE=true leaves
-        // the app writing traces, in both cases with nothing on disk to show
-        // for it. Those partial states are exactly when uninstall is most
-        // needed, and removeResource() is idempotent, so acting on a resource
-        // that turns out to be absent costs nothing.
         $installed = $this->option('features') !== null
             ? $resources
             : array_filter($resources, fn (array $resource) => $this->isInstalled($resource));

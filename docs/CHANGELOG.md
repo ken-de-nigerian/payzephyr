@@ -8,6 +8,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+
+- **Paddle Billing support** as a ninth provider: `PaddleDriver` with charge, verify, webhook
+  signature validation, health check, and refunds. Enable it with `PADDLE_ENABLED=true` plus
+  `PADDLE_API_KEY` and `PADDLE_WEBHOOK_SECRET`; see
+  [Providers](providers.md#paddle) for the full list of what's different about it.
+
+  This is **Paddle Billing**, not Paddle Classic. The two are separate products with
+  incompatible APIs, and Classic credentials will not work here.
+
+  Four things about Paddle genuinely do not fit the shape of the other eight drivers, and
+  they are worth knowing before you enable it rather than discovering them in production:
+
+  - **A charge is a transaction, and the checkout URL is not guaranteed.** PayZephyr creates a
+    transaction with a single non-catalog item priced at the requested amount and returns
+    Paddle's `checkout.url`. Paddle only populates that URL once you have set, and had
+    approved, a default payment link under **Paddle > Checkout > Checkout settings**. Without
+    it the charge raises `ChargeException` naming that setting, rather than returning a
+    response with an empty redirect.
+
+  - **Refunds are adjustments, and "pending" is the normal outcome.** Paddle has no refunds
+    resource; a refund is an adjustment with `action: refund`. On live accounts most start as
+    `pending_approval` until Paddle reviews them, so a successful `Refund::create()` normally
+    reports `pending` with nothing wrong. The terminal status arrives on the
+    `adjustment.updated` webhook, the same asynchronous pattern Paystack, Square, and PayPal
+    refunds already use. Paddle's `pending_approval`/`approved`/`rejected`/`reversed`
+    vocabulary is mapped explicitly; without that mapping `approved` would have fallen through
+    to `RefundStatus::PENDING` and reported an approved refund as still in flight.
+
+  - **Partial refunds need a single-item transaction.** Paddle requires a partial adjustment to
+    name the transaction item it applies to. Charges PayZephyr creates always have exactly one
+    item, so this is invisible in the normal flow — but a partial refund against a transaction
+    created elsewhere (a subscription renewal, a multi-item checkout) is rejected with an
+    explanatory `RefundException` instead of PayZephyr picking an item for you.
+
+  - **Subscriptions are deliberately not supported.** Paddle subscriptions cannot be created
+    through the API at all: Paddle creates them when a recurring-price checkout completes, and
+    only then can they be updated. That is not the same operation as
+    `Payment::subscription()->create()`, so `PaddleDriver` does not implement
+    `SupportsSubscriptionsInterface` rather than shipping a `create()` that always throws.
+
+  Webhook signatures are the `Paddle-Signature` header (`ts=<unix>;h1=<hmac>`), verified as
+  HMAC-SHA256 over `"<ts>:<raw body>"` with the notification destination's endpoint secret
+  key. The signed timestamp is checked against `PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE`, so a
+  validly-signed event cannot be replayed later — and because the timestamp is inside the
+  signed payload, swapping it for a fresh one invalidates the signature too. Unlike Mollie,
+  there is no API-fallback verification path: with no `PADDLE_WEBHOOK_SECRET` configured,
+  webhooks are rejected rather than accepted unverified. Event idempotency uses Paddle's own
+  `event_id`.
+
+  `PADDLE_BASE_URL` defaults to the **sandbox** (`https://sandbox-api.paddle.com`), not live,
+  so an install that is enabled before it is fully configured cannot charge real cards.
+
 ### Changed
 
 - Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square

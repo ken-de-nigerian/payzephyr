@@ -6,7 +6,7 @@ A charge moves money toward you; a refund moves some or all of it back. That sou
 
 ## Which providers support this
 
-All eight supported providers: **Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify, and OPay.** Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally.
+All nine supported providers: **Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify, OPay, and Paddle.** Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally — Paddle being the one that calls it something else (an *adjustment*, see [Providers](providers.md#paddle)).
 
 ```php
 use KenDeNigerian\PayZephyr\Facades\Payment;
@@ -38,7 +38,7 @@ $refund = Payment::refund('txn_ref_123')
 
 `transaction()` (or the shorthand first argument to `Payment::refund()`) takes the **original charge's reference**, the same value `Payment::verify($reference)` uses, not a refund-specific ID. `amount()` is optional: omit it for a full refund, or pass a smaller amount for a partial one. You can call `refund()` more than once against the same transaction reference, as long as the total across all refunds doesn't exceed the original charge. PayZephyr validates this for you (see [Preventing over-refunds and duplicates](#preventing-over-refunds-and-duplicates) below) whenever the original charge was logged locally.
 
-For multi-currency merchants, pass `->currency('CAD')` explicitly when it differs from your default. Square, PayPal, Mollie, and OPay all require an explicit currency in the refund request itself (they can't infer it from the original charge the way Paystack, Flutterwave, Monnify, and Stripe do). If you omit it, PayZephyr falls back to your provider config's first configured currency, which is only correct for single-currency merchants:
+For multi-currency merchants, pass `->currency('CAD')` explicitly when it differs from your default. Square, PayPal, Mollie, OPay, and Paddle (for partial refunds) all require an explicit currency in the refund request itself (they can't infer it from the original charge the way Paystack, Flutterwave, Monnify, and Stripe do). If you omit it, PayZephyr falls back to your provider config's first configured currency, which is only correct for single-currency merchants:
 
 ```php
 $refund = Payment::refund('txn_ref_123')
@@ -77,6 +77,7 @@ This is the most important thing to understand before you build a refund flow: n
 | Square | `PENDING` initially | `refund.updated` webhook |
 | Flutterwave | Immediate in most cases | - |
 | Mollie | `pending`/`processing` | Payment/refund status change, checked via `fetchRefund()` or webhook |
+| Paddle | `pending` (Paddle reviews most live refunds before approving them) | `adjustment.updated` webhook |
 | Monnify | `PENDING` | Refund status webhook |
 | OPay | `PENDING` | Refund status webhook |
 

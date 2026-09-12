@@ -28,6 +28,12 @@ final class ChannelMapper implements ChannelMapperInterface
             // parameter on order creation - the payer picks their instrument
             // on PayPal's own hosted checkout - so there is nothing to map.
             'paypal' => null,
+            // Paddle's transaction API has no payment-method restriction
+            // parameter either - which methods appear is a Paddle Checkout
+            // setting, not a per-transaction field - so there is nothing to
+            // map on the way out. Incoming method types are still mapped back
+            // to unified channels by mapFromPaddle().
+            'paddle' => null,
             'square' => $this->mapToSquare($channels),
             'opay' => $this->mapToOpay($channels),
             'mollie' => $this->mapToMollie($channels),
@@ -248,7 +254,7 @@ final class ChannelMapper implements ChannelMapperInterface
 
     public function supportsChannels(string $provider): bool
     {
-        if (strtolower($provider) === 'paypal') {
+        if (in_array(strtolower($provider), ['paypal', 'paddle'], true)) {
             return false;
         }
 
@@ -269,6 +275,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'stripe' => $this->mapFromStripe($providerMethod),
             'monnify' => $this->mapFromMonnify($providerMethod),
             'mollie' => $this->mapFromMollie($providerMethod),
+            'paddle' => $this->mapFromPaddle($providerMethod),
             'flutterwave' => $this->mapFromFlutterwave($providerMethod),
             'square' => $this->mapFromSquare($providerMethod),
             'opay' => $this->mapFromOpay($providerMethod),
@@ -338,6 +345,37 @@ final class ChannelMapper implements ChannelMapperInterface
             'paypal' => PaymentChannel::PAYPAL->value,
             'ideal' => PaymentChannel::QR_CODE->value,
             'applepay' => PaymentChannel::DIGITAL_WALLET->value,
+        ];
+
+        return $mapping[strtolower($providerMethod)] ?? null;
+    }
+
+    /**
+     * Paddle Billing payment method types (transaction
+     * `payments[].method_details.type`).
+     */
+    protected function mapFromPaddle(string $providerMethod): ?string
+    {
+        $mapping = [
+            'card' => PaymentChannel::CARD->value,
+            'south_korea_local_card' => PaymentChannel::CARD->value,
+            'wire_transfer' => PaymentChannel::BANK_TRANSFER->value,
+            'offline' => PaymentChannel::BANK_TRANSFER->value,
+            'paypal' => PaymentChannel::PAYPAL->value,
+            'apple_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'google_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'alipay' => PaymentChannel::DIGITAL_WALLET->value,
+            'wechat_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'kakao_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'naver_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'samsung_pay' => PaymentChannel::DIGITAL_WALLET->value,
+            'payco' => PaymentChannel::DIGITAL_WALLET->value,
+            'mb_way' => PaymentChannel::MOBILE_MONEY->value,
+            'upi' => PaymentChannel::MOBILE_MONEY->value,
+            'blik' => PaymentChannel::BANK_ACCOUNT->value,
+            'bancontact' => PaymentChannel::BANK_ACCOUNT->value,
+            'ideal' => PaymentChannel::QR_CODE->value,
+            'pix' => PaymentChannel::QR_CODE->value,
         ];
 
         return $mapping[strtolower($providerMethod)] ?? null;

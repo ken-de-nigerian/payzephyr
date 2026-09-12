@@ -105,7 +105,7 @@ class UnifiedPaymentAbstractionTest extends TestCase
     protected function getTestCurrency(string $provider): string
     {
         return match ($provider) {
-            'stripe', 'paypal', 'square' => 'USD',
+            'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
             default => 'NGN',
         };

@@ -49,6 +49,7 @@ Here's exactly what each provider requires: these are the keys PayZephyr's own v
 | Monnify | `MONNIFY_` | `API_KEY`, `SECRET_KEY`, `CONTRACT_CODE` | `MONNIFY_ENABLED` |
 | OPay | `OPAY_` | `MERCHANT_ID`, `PUBLIC_KEY` | `OPAY_ENABLED` |
 | Mollie | `MOLLIE_` | `API_KEY` | `MOLLIE_ENABLED` |
+| Paddle | `PADDLE_` | `API_KEY` | `PADDLE_ENABLED` |
 
 A couple of things worth calling out that aren't obvious from the table:
 

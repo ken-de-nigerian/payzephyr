@@ -189,6 +189,11 @@ final class PaymentServiceProvider extends ServiceProvider
             'success' => ['SUCCEEDED', 'PAID', 'COMPLETE'],
             'failed' => ['PAYMENT_FAILED', 'CANCELED', 'REQUIRES_ACTION'],
         ]);
+        $normalizer->registerProviderMappings('paddle', [
+            'success' => ['COMPLETED', 'PAID'],
+            'failed' => ['CANCELED', 'CANCELLED'],
+            'pending' => ['DRAFT', 'READY', 'BILLED', 'PAST_DUE'],
+        ]);
         $normalizer->registerProviderMappings('mollie', [
             'success' => ['PAID', 'AUTHORIZED', 'PAIDOUT'],
             'failed' => ['FAILED', 'CANCELED', 'EXPIRED'],

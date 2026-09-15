@@ -33,6 +33,7 @@ class StatusNormalizationConsistencyTest extends TestCase
             ['paypal', ['COMPLETED']],
             ['square', ['COMPLETED', 'APPROVED']],
             ['mollie', ['paid', 'paidout']],
+            ['razorpay', ['paid', 'captured']],
         ];
     }
 
@@ -50,6 +51,7 @@ class StatusNormalizationConsistencyTest extends TestCase
             ['paypal', ['PENDING', 'CREATED', 'APPROVED']],
             ['square', ['PENDING']],
             ['mollie', ['open', 'pending']],
+            ['razorpay', ['created', 'partially_paid', 'authorized']],
         ];
     }
 
@@ -67,6 +69,7 @@ class StatusNormalizationConsistencyTest extends TestCase
             ['paypal', ['FAILED', 'DENIED']],
             ['square', ['FAILED', 'CANCELED']],
             ['mollie', ['failed', 'expired', 'canceled']],
+            ['razorpay', ['failed', 'expired', 'cancelled']],
         ];
     }
 

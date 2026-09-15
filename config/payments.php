@@ -144,6 +144,19 @@ return [
             'currencies' => ['EUR', 'USD', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'],
             'enabled' => env('MOLLIE_ENABLED', false),
         ],
+
+        'razorpay' => [
+            'driver' => 'razorpay',
+            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\RazorpayDriver::class,
+            'reference_prefix' => 'RAZORPAY',
+            'key_id' => env('RAZORPAY_KEY_ID'),
+            'key_secret' => env('RAZORPAY_KEY_SECRET'),
+            'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'), // Required for webhook validation: the secret set on the webhook in the Dashboard, not the key secret
+            'base_url' => env('RAZORPAY_BASE_URL', 'https://api.razorpay.com'), // One host for both modes: rzp_test_ or rzp_live_ keys decide which
+            'refund_speed' => env('RAZORPAY_REFUND_SPEED', 'normal'), // normal | optimum
+            'currencies' => ['INR'],
+            'enabled' => env('RAZORPAY_ENABLED', false),
+        ],
     ],
 
     /*

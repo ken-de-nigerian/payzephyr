@@ -177,6 +177,15 @@ header for most, a request-body field for Square, the SDK's option for Stripe), 
 API documentation, and test against their sandbox, before relying on it for a specific
 provider.
 
+**Razorpay is the exception on charges.** Its Payment Links API accepts no idempotency key, so
+PayZephyr sends none. What stands in for it is that Razorpay requires a link's `reference_id` to
+be unique, and PayZephyr sends your reference as that `reference_id`, so supplying a stable
+reference matters even more here. The in-flight claim and ambiguous-outcome detection above
+still apply. Razorpay refunds do accept a key: PayZephyr sends it as the `X-Refund-Idempotency`
+header when it is at least 10 characters of letters, digits, `-`, or `_`, and omits it otherwise.
+Razorpay binds the key to the request: reusing it for a different refund request is rejected,
+not treated as a retry.
+
 ## See also
 
 - [Architecture](architecture.md#why-things-are-built-this-way) - why bookkeeping is kept

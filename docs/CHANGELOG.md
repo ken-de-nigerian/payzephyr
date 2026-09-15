@@ -8,7 +8,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+
+- **Razorpay support** as a ninth provider: `RazorpayDriver` with charge, verify, webhook
+  signature validation, health check, and refunds. Enable it with `RAZORPAY_ENABLED=true` plus
+  `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`; see
+  [Providers](providers.md#razorpay) for what is different about it, and
+  [ADR-0014](architecture/adr/0014-razorpay-driver.md) for why.
+
+  - **A charge is a Payment Link.** PayZephyr redirects to the link's `short_url` and sends
+    your reference as its `reference_id`, which Razorpay limits to 40 characters. A longer
+    reference fails with `ChargeException` before any request is sent, so fallback to another
+    provider still applies.
+  - **Amounts use each currency's exponent.** Zero-decimal (JPY, KRW, ...) and three-decimal
+    (KWD, BHD, OMR, ...) currencies are converted correctly rather than multiplied by 100.
+  - **Refunds find the payment behind your reference**, take the currency from Razorpay
+    rather than from config, always send an explicit amount (the unrefunded remainder for a
+    full refund), and settle through the `refund.processed` / `refund.failed` webhooks.
+  - **Subscriptions are not wrapped yet.** Razorpay has a subscriptions API; it is left for a
+    follow-up.
+
+  Webhooks are verified as HMAC-SHA256 of the raw body (`X-Razorpay-Signature`) with the
+  webhook secret. No timestamp window is applied: Razorpay's `created_at` is when the link or
+  refund was created, not when the event happened, so replays are stopped by the existing
+  duplicate-delivery deduplication instead. With no `RAZORPAY_WEBHOOK_SECRET`, webhooks are
+  rejected. Only `payment_link.*` events update `payment_transactions`.
+
+  Checked against a Razorpay test account as well as mocked HTTP; ADR-0014 lists what was
+  and was not verified.
+
 ### Changed
+
+- `ProcessWebhook` now also finds a refund nested under `payload.refund.entity`, and reads its
+  transaction reference from `notes.payzephyr_reference` or `payment_id`, which is how Razorpay
+  shapes refund webhooks. These are checked after every existing field, so other providers'
+  refund webhooks resolve exactly as before.
 
 - Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square
   drivers. Comment-only: no logic changed, and the behaviour is exactly as before. PayPal

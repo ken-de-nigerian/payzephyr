@@ -31,6 +31,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'square' => $this->mapToSquare($channels),
             'opay' => $this->mapToOpay($channels),
             'mollie' => $this->mapToMollie($channels),
+            'razorpay' => $this->mapToRazorpay($channels),
             default => $channels,
         };
     }
@@ -227,6 +228,34 @@ final class ChannelMapper implements ChannelMapperInterface
     }
 
     /**
+     * Razorpay Payment Links can only show or hide these four method groups
+     * (`options.checkout.method`); USSD and PayPal have no equivalent.
+     *
+     * @param  array<int, string>  $channels
+     * @return array<int, string>
+     */
+    protected function mapToRazorpay(array $channels): array
+    {
+        $mapping = [
+            PaymentChannel::CARD->value => 'card',
+            PaymentChannel::BANK_TRANSFER->value => 'netbanking',
+            PaymentChannel::BANK_ACCOUNT->value => 'netbanking',
+            PaymentChannel::MOBILE_MONEY->value => 'upi',
+            PaymentChannel::QR_CODE->value => 'upi',
+            PaymentChannel::DIGITAL_WALLET->value => 'wallet',
+        ];
+
+        $mapped = array_map(
+            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            $channels
+        );
+
+        $validMethods = ['card', 'netbanking', 'upi', 'wallet'];
+
+        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+    }
+
+    /**
      * @param  array<int, string>|null  $channels
      */
     public function shouldIncludeChannels(string $provider, ?array $channels): bool
@@ -253,7 +282,7 @@ final class ChannelMapper implements ChannelMapperInterface
         }
 
         return match (strtolower($provider)) {
-            'paystack', 'monnify', 'flutterwave', 'stripe', 'square', 'opay', 'mollie' => true,
+            'paystack', 'monnify', 'flutterwave', 'stripe', 'square', 'opay', 'mollie', 'razorpay' => true,
             default => false,
         };
     }
@@ -272,6 +301,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'flutterwave' => $this->mapFromFlutterwave($providerMethod),
             'square' => $this->mapFromSquare($providerMethod),
             'opay' => $this->mapFromOpay($providerMethod),
+            'razorpay' => $this->mapFromRazorpay($providerMethod),
             default => null,
         };
 
@@ -385,5 +415,24 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         return $mapping[strtoupper($providerMethod)] ?? null;
+    }
+
+    /**
+     * Razorpay payment `method` values.
+     */
+    protected function mapFromRazorpay(string $providerMethod): ?string
+    {
+        $mapping = [
+            'card' => PaymentChannel::CARD->value,
+            'emi' => PaymentChannel::CARD->value,
+            'netbanking' => PaymentChannel::BANK_TRANSFER->value,
+            'bank_transfer' => PaymentChannel::BANK_TRANSFER->value,
+            'upi' => PaymentChannel::MOBILE_MONEY->value,
+            'wallet' => PaymentChannel::DIGITAL_WALLET->value,
+            'cardless_emi' => PaymentChannel::DIGITAL_WALLET->value,
+            'paylater' => PaymentChannel::DIGITAL_WALLET->value,
+        ];
+
+        return $mapping[strtolower($providerMethod)] ?? null;
     }
 }

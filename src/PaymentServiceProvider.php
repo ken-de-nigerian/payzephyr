@@ -194,5 +194,10 @@ final class PaymentServiceProvider extends ServiceProvider
             'failed' => ['FAILED', 'CANCELED', 'EXPIRED'],
             'pending' => ['OPEN', 'PENDING'],
         ]);
+        $normalizer->registerProviderMappings('razorpay', [
+            'success' => ['PAID', 'CAPTURED'],
+            'failed' => ['EXPIRED', 'CANCELLED', 'FAILED'],
+            'pending' => ['CREATED', 'PARTIALLY_PAID', 'AUTHORIZED'],
+        ]);
     }
 }

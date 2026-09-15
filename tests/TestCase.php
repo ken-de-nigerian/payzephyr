@@ -99,6 +99,16 @@ abstract class TestCase extends Orchestra
             'currencies' => ['EUR', 'USD'],
         ]);
 
+        $app['config']->set('payments.providers.razorpay', [
+            'driver' => 'razorpay',
+            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\RazorpayDriver::class,
+            'key_id' => 'rzp_test_xxx',
+            'key_secret' => 'test_key_secret',
+            'webhook_secret' => 'test_webhook_secret',
+            'enabled' => true,
+            'currencies' => ['INR'],
+        ]);
+
         // Keep validation enabled for comprehensive testing
         // Tests should provide proper mocks for plan validation
 
@@ -106,12 +116,13 @@ abstract class TestCase extends Orchestra
         $app['config']->set('payments.health_check.enabled', false);
 
         // Ensure all providers have proper currency support configured
-        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie'] as $provider) {
+        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie', 'razorpay'] as $provider) {
             $providerConfig = $app['config']->get("payments.providers.{$provider}", []);
             if (empty($providerConfig['currencies'])) {
                 $app['config']->set("payments.providers.{$provider}.currencies", match ($provider) {
                     'stripe', 'paypal', 'square' => ['USD', 'EUR'],
                     'mollie' => ['EUR', 'USD'],
+                    'razorpay' => ['INR'],
                     default => ['NGN', 'USD'],
                 });
             }
@@ -141,6 +152,7 @@ abstract class TestCase extends Orchestra
         $currency = match ($provider) {
             'stripe', 'paypal', 'square' => 'USD',
             'mollie' => 'EUR',
+            'razorpay' => 'INR',
             default => 'NGN',
         };
 
@@ -187,6 +199,7 @@ abstract class TestCase extends Orchestra
         $currency = match ($provider) {
             'stripe', 'paypal', 'square' => 'USD',
             'mollie' => 'EUR',
+            'razorpay' => 'INR',
             default => 'NGN',
         };
         if (empty($freshConfig['providers'][$provider]['currencies']) || ! in_array($currency, $freshConfig['providers'][$provider]['currencies'] ?? [])) {
@@ -532,6 +545,7 @@ abstract class TestCase extends Orchestra
         $currency = match ($provider) {
             'stripe', 'paypal', 'square' => 'USD',
             'mollie' => 'EUR',
+            'razorpay' => 'INR',
             default => 'NGN',
         };
         if (empty($currentConfig['providers'][$provider]['currencies']) || ! in_array($currency, $currentConfig['providers'][$provider]['currencies'] ?? [])) {

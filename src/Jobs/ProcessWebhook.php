@@ -392,7 +392,8 @@ final class ProcessWebhook implements ShouldQueue
     {
         $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
         $data = $payload['data'] ?? $payload['resource'] ?? $payload;
-        $object = $data['object'] ?? $data;
+        // Razorpay nests the refund one level deeper, under payload.refund.entity.
+        $object = $data['object'] ?? $payload['payload']['refund']['entity'] ?? $data;
 
         $refundReference = $object['id']
             ?? $object['refund_reference']
@@ -403,6 +404,8 @@ final class ProcessWebhook implements ShouldQueue
             ?? $object['payment_intent']
             ?? $data['transactionReference']
             ?? (is_array($object['transaction'] ?? null) ? ($object['transaction']['reference'] ?? null) : null)
+            ?? $object['notes']['payzephyr_reference']
+            ?? $object['payment_id']
             ?? null;
 
         if (! $refundReference) {

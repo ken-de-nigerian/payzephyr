@@ -36,6 +36,8 @@ PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE=300
 
 This is separate from (and in addition to) the [duplicate-delivery deduplication](webhooks.md#duplicate-deliveries) covered in the Webhooks chapter. That mechanism stops the *same* webhook a provider sends twice from being processed twice (normal provider behavior); this one stops an *old* webhook from being resent by someone else and treated as new.
 
+**Razorpay is the exception.** Its webhook `created_at` is when the Payment Link or refund was created, not when the event happened, so a link paid ten minutes after it was created would fail the window. Razorpay webhooks are therefore checked by signature only, and a replayed one is stopped by duplicate-delivery deduplication: a replay is byte-identical to the original, so it is recognised and skipped. See [ADR-0014](architecture/adr/0014-razorpay-driver.md).
+
 ## Metadata sanitization
 
 Anything you pass into `->metadata([...])` on a charge, subscription, or refund gets stored in PayZephyr's own `payment_transactions`/`subscription_transactions`/`refund_transactions` tables, and depending on your app, some of that metadata might ultimately come from something a customer typed (a note field, for instance). Before it's persisted, PayZephyr strips HTML tags, `javascript:`/`data:text/html:` URIs, and inline event handlers (`onerror=`, and similar) out of string values, and caps how deep nested arrays and how long individual strings can be. Refunds get the same treatment on their `->reason(...)` value too - free text is exactly the kind of field a customer-facing "why are you refunding this" form would feed straight into, and several providers echo a reason-like field back in their own response, so it gets sanitized before storage the same way metadata does.

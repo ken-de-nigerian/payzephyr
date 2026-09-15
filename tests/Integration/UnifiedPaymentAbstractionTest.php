@@ -49,6 +49,7 @@ class UnifiedPaymentAbstractionTest extends TestCase
             ['square'],
             ['opay'],
             ['mollie'],
+            ['razorpay'],
         ];
     }
 
@@ -58,7 +59,7 @@ class UnifiedPaymentAbstractionTest extends TestCase
     public function test_switching_providers_requires_only_config_change(): void
     {
         // Same code, different providers via config
-        $providers = ['paystack', 'stripe'];
+        $providers = ['paystack', 'stripe', 'razorpay'];
 
         foreach ($providers as $provider) {
             // Ensure provider is enabled
@@ -107,6 +108,7 @@ class UnifiedPaymentAbstractionTest extends TestCase
         return match ($provider) {
             'stripe', 'paypal', 'square' => 'USD',
             'mollie' => 'EUR',
+            'razorpay' => 'INR',
             default => 'NGN',
         };
     }
@@ -163,6 +165,11 @@ class UnifiedPaymentAbstractionTest extends TestCase
                 '_links' => [
                     'checkout' => ['href' => $authUrl],
                 ],
+            ])),
+            'razorpay' => new Response(200, [], json_encode([
+                'id' => 'plink_test123',
+                'status' => 'created',
+                'short_url' => $authUrl,
             ])),
             'paypal' => new Response(201, [], json_encode([
                 'id' => 'ORDER_ID_123',
@@ -265,6 +272,13 @@ class UnifiedPaymentAbstractionTest extends TestCase
                     'status' => 'COMPLETED',
                     'amount_money' => ['amount' => 10000, 'currency' => 'USD'],
                 ],
+            ])),
+            'razorpay' => new Response(200, [], json_encode([
+                'id' => 'plink_test123',
+                'reference_id' => $reference,
+                'status' => 'paid',
+                'amount' => 10000,
+                'currency' => 'INR',
             ])),
             'mollie' => new Response(200, [], json_encode([
                 'id' => $reference,

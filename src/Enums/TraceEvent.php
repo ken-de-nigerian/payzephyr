@@ -29,6 +29,7 @@ enum TraceEvent: string
     case WEBHOOK_RECEIVED = 'webhook.received';
     case WEBHOOK_DUPLICATE = 'webhook.duplicate';
     case WEBHOOK_VALIDATION_FAILED = 'webhook.validation_failed';
+    case WEBHOOK_QUEUE_FAILED = 'webhook.queue_failed';
     case WEBHOOK_PROCESSING_FAILED = 'webhook.processing_failed';
 
     // Retries
@@ -70,6 +71,7 @@ enum TraceEvent: string
             self::WEBHOOK_RECEIVED => 'Webhook received from provider',
             self::WEBHOOK_DUPLICATE => 'Duplicate webhook detected',
             self::WEBHOOK_VALIDATION_FAILED => 'Webhook signature validation failed',
+            self::WEBHOOK_QUEUE_FAILED => 'Webhook accepted but never queued, so it will never be retried',
             self::WEBHOOK_PROCESSING_FAILED => 'Webhook processing failed',
 
             self::RETRY_SCHEDULED => 'Retry scheduled',
@@ -128,6 +130,7 @@ enum TraceEvent: string
             self::PROVIDER_ERROR,
             self::PROVIDER_EXCEPTION,
             self::WEBHOOK_VALIDATION_FAILED,
+            self::WEBHOOK_QUEUE_FAILED,
             self::WEBHOOK_PROCESSING_FAILED,
             self::AUTH_FAILED,
             self::VERIFICATION_FAILED,

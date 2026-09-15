@@ -17,6 +17,8 @@ use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Enums\TraceDirection;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Events\RefundCompleted;
 use KenDeNigerian\PayZephyr\Events\RefundCreated;
 use KenDeNigerian\PayZephyr\Events\RefundFailed;
@@ -28,12 +30,14 @@ use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
 
 final class ProcessWebhook implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
     use LogsToPaymentChannel;
+    use RecordsTraceEvents;
 
     public int $tries;
 
@@ -65,12 +69,29 @@ final class ProcessWebhook implements ShouldQueue
         RefundRepositoryInterface $refundRepository
     ): void {
         $eventKey = null;
+        $reference = null;
 
         try {
+            // Resolved first so that every outcome below can be keyed to the
+            // payment it concerns. A discarded or duplicated webhook that
+            // cannot be attributed to a reference is exactly the one nobody
+            // can act on afterwards.
+            //
+            // Inside the try, not before it: extractReference() only absorbs
+            // DriverNotFoundException, and driver() can still raise a
+            // configuration error that belongs in the handler below with
+            // everything else - logged, idempotency marker released, rethrown
+            // so the delivery is retried.
+            $reference = $this->extractReference($manager);
+
             if (! $this->verifyDeferredSignature($manager)) {
                 $this->log('warning', 'Deferred webhook signature verification failed - discarding', [
                     'provider' => $this->provider,
                 ]);
+                $this->trace($reference, TraceEvent::WEBHOOK_VALIDATION_FAILED, TraceDirection::INBOUND,
+                    payload: $this->tracePayload(),
+                    provider: $this->provider,
+                );
 
                 return;
             }
@@ -82,11 +103,23 @@ final class ProcessWebhook implements ShouldQueue
                     'provider' => $this->provider,
                     'event_key' => $eventKey,
                 ]);
+                // webhook_events stores only the key, so without this the
+                // duplicate is known to have happened but its contents are
+                // gone. This is the record of what the second delivery said.
+                $this->trace($reference, TraceEvent::WEBHOOK_DUPLICATE, TraceDirection::INBOUND,
+                    payload: $this->tracePayload(),
+                    provider: $this->provider,
+                    metadata: ['event_key' => $eventKey],
+                );
 
                 return;
             }
 
-            $reference = $this->extractReference($manager);
+            $this->trace($reference, TraceEvent::WEBHOOK_RECEIVED, TraceDirection::INBOUND,
+                payload: $this->tracePayload(),
+                provider: $this->provider,
+                metadata: ['event_key' => $eventKey],
+            );
 
             $config = app('payments.config') ?? config('payments', []);
             if ($reference && ($config['logging']['enabled'] ?? true)) {
@@ -113,6 +146,26 @@ final class ProcessWebhook implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
+            $this->trace($reference, TraceEvent::WEBHOOK_PROCESSING_FAILED, TraceDirection::INBOUND,
+                payload: [
+                    'error' => $e->getMessage(),
+                    'error_class' => $e::class,
+                    'attempt' => $this->attempts(),
+                    'max_attempts' => $this->tries,
+                ],
+                provider: $this->provider,
+            );
+
+            // Only claimed when this is really running on a queue and another
+            // attempt is genuinely coming. attempts() reports 0 off a queue,
+            // which would otherwise promise a retry that never happens.
+            if ($this->job !== null && $this->attempts() < $this->tries) {
+                $this->trace($reference, TraceEvent::RETRY_SCHEDULED,
+                    payload: ['in_seconds' => $this->backoff, 'attempt' => $this->attempts() + 1],
+                    provider: $this->provider,
+                );
+            }
 
             if ($eventKey !== null) {
                 try {
@@ -184,6 +237,52 @@ final class ProcessWebhook implements ShouldQueue
         } catch (DriverNotFoundException) {
             return null;
         }
+    }
+
+    /**
+     * The webhook body, if trace is configured to keep provider bodies.
+     *
+     * webhook_events stores only a dedup key, so this is the only place the
+     * contents of a delivery survive. Gated by the same switch that governs
+     * provider request and response bodies, since it is the same category of
+     * data and the same reason to be able to turn it off.
+     *
+     * @return array<string, mixed>
+     */
+    private function tracePayload(): array
+    {
+        return $this->traceRecordsHttpBodies() ? $this->payload : [];
+    }
+
+    /**
+     * Record that PayZephyr has stopped retrying this delivery.
+     *
+     * Laravel calls this once the final attempt has failed, which is the only
+     * point at which "abandoned" is true rather than guessed. The catch block
+     * in handle() cannot know it is the last attempt, so it records the
+     * failure and, separately, a retry only when one is really coming.
+     */
+    public function failed(Throwable $exception): void
+    {
+        $reference = null;
+
+        try {
+            $reference = $this->extractReference(app(PaymentManager::class));
+        } catch (Throwable) {
+            // Without a reference there is nothing to hang the event off, and
+            // a job that has already failed is not worth a second exception.
+        }
+
+        // Internal, like RETRY_SCHEDULED: the delivery was inbound, but
+        // giving up on it is PayZephyr's own decision, not the provider's.
+        $this->trace($reference, TraceEvent::RETRY_ABANDONED,
+            payload: [
+                'error' => $exception->getMessage(),
+                'error_class' => $exception::class,
+                'attempts' => $this->tries,
+            ],
+            provider: $this->provider,
+        );
     }
 
     protected function updateTransactionFromWebhook(

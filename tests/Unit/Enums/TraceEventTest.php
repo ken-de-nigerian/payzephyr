@@ -6,13 +6,14 @@ use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 
 test('the trace event taxonomy covers every recorded stage of a payment', function () {
-    expect(TraceEvent::cases())->toHaveCount(27)
+    expect(TraceEvent::cases())->toHaveCount(28)
         ->and(TraceEvent::PAYMENT_INITIATED->value)->toBe('payment.initiated')
         ->and(TraceEvent::PROVIDER_SKIPPED->value)->toBe('provider.skipped')
         ->and(TraceEvent::CHARGE_DUPLICATE_REJECTED->value)->toBe('charge.duplicate_rejected')
         ->and(TraceEvent::CHARGE_AMBIGUOUS->value)->toBe('charge.ambiguous')
         ->and(TraceEvent::PROVIDER_REQUEST_SENT->value)->toBe('provider.request.sent')
         ->and(TraceEvent::WEBHOOK_DUPLICATE->value)->toBe('webhook.duplicate')
+        ->and(TraceEvent::WEBHOOK_QUEUE_FAILED->value)->toBe('webhook.queue_failed')
         ->and(TraceEvent::RETRY_ABANDONED->value)->toBe('retry.abandoned')
         ->and(TraceEvent::VERIFICATION_FAILED->value)->toBe('verification.failed')
         ->and(TraceEvent::CUSTOM->value)->toBe('custom');
@@ -57,6 +58,7 @@ test('error events are exactly the ones worth surfacing as a problem', function 
         TraceEvent::PROVIDER_ERROR,
         TraceEvent::PROVIDER_EXCEPTION,
         TraceEvent::WEBHOOK_VALIDATION_FAILED,
+        TraceEvent::WEBHOOK_QUEUE_FAILED,
         TraceEvent::WEBHOOK_PROCESSING_FAILED,
         TraceEvent::AUTH_FAILED,
         TraceEvent::VERIFICATION_FAILED,

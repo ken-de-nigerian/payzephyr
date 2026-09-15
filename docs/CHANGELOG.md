@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the sequence that produced it: one append-only row per step, so a payment's whole
   lifecycle can be replayed afterwards.
 
-  The charge path is instrumented as of this release; verification, webhooks and the
+  The charge and webhook paths are instrumented as of this release; verification and the
   `payzephyr:trace` command follow. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
 
   New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
@@ -77,12 +77,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeping the timing, status codes and event sequence. Worth turning off if provider bodies in
   your integration carry more customer data than you want at rest.
 
+- **The webhook path now records what arrived, what was thrown away, and what was retried.**
+  This closes the two gaps that were invisible in the database. `webhook_events` stores a
+  provider and a dedup key and nothing else, so you could tell that a duplicate delivery had
+  arrived but never what it said - not even whether it agreed with the first one. And
+  `ProcessWebhook` has always been configured with `tries` and `backoff`, so a failing delivery
+  was retried up to three times with nothing durable to show for the attempts.
+
+  A delivery now records `webhook.received` with the body and the dedup key;
+  `webhook.duplicate` with the *second* delivery's body alongside it; `webhook.validation_failed`
+  when a deferred signature check rejects it; `webhook.processing_failed` with the attempt
+  number and the ceiling; `retry.scheduled` when another attempt is genuinely coming; and
+  `retry.abandoned` once PayZephyr gives up. All keyed by the same reference the charge used, so
+  the redirect and the webhook land on one timeline instead of two.
+
+  `retry.scheduled` is only claimed when the job is really running on a queue and an attempt
+  remains. `attempts()` reports `0` off a queue, so an unguarded check would promise a retry
+  that never comes. `retry.abandoned` is recorded from Laravel's `failed()` hook, which is the
+  only point at which "abandoned" is a fact rather than a guess.
+
+  Webhook bodies are governed by the same `payments.trace.record_http_bodies` switch as provider
+  request and response bodies, since it is the same category of data and the same reason to want
+  it off.
+
+- **`webhook.queue_failed`** is new, and is the one webhook failure the job can never record for
+  itself: the delivery was accepted, queueing it failed, and so no job will ever run and no
+  retry will ever happen. `WebhookController` stays ignorant of the payload on the happy path -
+  `ProcessWebhook` extracts the reference once, where it is needed - and only resolves a driver
+  from inside the catch block, when something has already gone wrong.
+
+  **Two limits worth knowing.** `webhook.validation_failed` only fires for drivers that defer
+  verification (Mollie and PayPal). Every other driver's signature is checked in
+  `WebhookRequest::authorize()`, which returns a `403` before the controller or the job runs, so
+  those rejections leave no trace row at all.
+
+  And because the reference is now read before the signature is verified, a
+  `webhook.validation_failed` row is keyed by a reference taken from an **unverified** payload.
+  That is deliberate - a signature failure you cannot attribute to a payment is the one you
+  cannot act on - but it does mean an unauthenticated caller can cause rows to be written
+  against a reference they name. It is bounded by the webhook route's rate limit, the payload
+  size cap, and retention pruning. Turn tracing off, or lower
+  `payments.webhook.rate_limit`, if that trade is not one you want.
+
 - **`Traits\RecordsTraceEvents`** is how every call site records. `TraceRecorder::record()`
   already promised not to throw, but that promise started too late: building a `TraceEventDTO`
   happens at the call site, and the DTO refuses a reference that cannot key a timeline. On the
   webhook path that reference comes out of a provider payload, so the wrapper closes the gap
   where a malformed body could otherwise have taken down payment handling through the tracing
   code.
+
+- **The webhook path now records what arrived, including what a duplicate said.** `webhook_events`
+  stores a provider and a dedup key and nothing else, so until now you could tell that a duplicate
+  delivery had happened but had no way to see whether it agreed with the first one. That content
+  is kept now, under the same reference the charge used, so the redirect and the webhook land on
+  one timeline instead of two.
+
+  A delivery records `webhook.received` once it passes deduplication, `webhook.duplicate` when it
+  does not, `webhook.validation_failed` when a deferred signature check rejects it,
+  `webhook.processing_failed` with the attempt number when the job throws, `retry.scheduled` when
+  another attempt is genuinely coming, and `retry.abandoned` once PayZephyr gives up. Bodies are
+  governed by the same `payments.trace.record_http_bodies` switch as provider request and response
+  bodies, since it is the same category of data.
+
+  `retry.abandoned` is recorded from the job's `failed()` hook rather than inferred in the catch
+  block, because that is the only point at which "abandoned" is a fact rather than a guess.
+  `retry.scheduled` is claimed only when the job is really running on a queue - `attempts()`
+  reports `0` off one, which would otherwise promise a retry that never arrives.
+
+- **A webhook that is accepted but never queued is recorded as `webhook.queue_failed`.** It is the
+  one failure the job cannot report on its own, because the job never runs - and unlike a
+  processing failure, no retry is coming. The controller stays ignorant of the payload on the
+  happy path and only resolves the reference inside its catch block, so this costs nothing until
+  something has already gone wrong.
+
+  **Two limits worth knowing.** `webhook.validation_failed` only fires for drivers that defer
+  verification (Mollie and PayPal). Every other driver's signature is checked in
+  `WebhookRequest::authorize()`, which returns `403` before the controller or the job runs, so
+  those rejections leave no trace row at all.
+
+  And because the reference is now read before the deferred signature check - it has to be, or a
+  rejected delivery could not be attributed to anything - a `webhook.validation_failed` row is
+  keyed by a reference taken from an **unverified** payload. Someone sending forged webhooks could
+  therefore write rows into a timeline they do not own. It is bounded by the route's rate limit,
+  the payload size cap and trace retention, and the forensic value is real, but it is an
+  unauthenticated write path and you should decide whether you want it.
 
 - **`payzephyr:install --features=trace`** installs it, and `payzephyr:uninstall --features=trace`
   removes it, alongside `subscriptions` and `refunds`. Interactive installs list it as a third

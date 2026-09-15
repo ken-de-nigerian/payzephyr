@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Foundation\Application as FoundationApplication;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;

@@ -6,7 +6,7 @@ use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 
 test('the trace event taxonomy covers every recorded stage of a payment', function () {
-    expect(TraceEvent::cases())->toHaveCount(28)
+    expect(TraceEvent::cases())->toHaveCount(29)
         ->and(TraceEvent::PAYMENT_INITIATED->value)->toBe('payment.initiated')
         ->and(TraceEvent::PROVIDER_SKIPPED->value)->toBe('provider.skipped')
         ->and(TraceEvent::CHARGE_DUPLICATE_REJECTED->value)->toBe('charge.duplicate_rejected')
@@ -62,6 +62,7 @@ test('error events are exactly the ones worth surfacing as a problem', function 
         TraceEvent::WEBHOOK_PROCESSING_FAILED,
         TraceEvent::AUTH_FAILED,
         TraceEvent::VERIFICATION_FAILED,
+        TraceEvent::VERIFICATION_NOT_PERSISTED,
     ]);
 });
 

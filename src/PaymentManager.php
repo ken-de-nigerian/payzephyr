@@ -263,7 +263,48 @@ final class PaymentManager
     }
 
     /**
-     * Call the driver with a fresh correlation group around it.
+     * Call the driver's charge() inside a fresh trace context.
+     *
+     * The reference is passed explicitly rather than left to $currentRequest
+     * so that both operations go through the same door; see withTraceContext()
+     * for why the manager owns this boundary at all.
+     *
+     * @throws Throwable Whatever the driver's charge() throws, untouched.
+     */
+    private function chargeWithTraceContext(DriverInterface $driver, ChargeRequestDTO $request): ChargeResponseDTO
+    {
+        return $this->withTraceContext(
+            $driver,
+            (string) $request->reference,
+            fn (): ChargeResponseDTO => $driver->charge($request)
+        );
+    }
+
+    /**
+     * The verification counterpart of chargeWithTraceContext().
+     *
+     * A verification carries no ChargeRequestDTO, so AbstractDriver cannot
+     * recover the reference from $currentRequest the way it does during a
+     * charge. Supplying it here is what puts the provider round-trip of a
+     * verify - its URL, status code and latency - onto the same timeline as
+     * the charge that created the payment.
+     *
+     * @throws Throwable Whatever the driver's verify() throws, untouched.
+     */
+    private function verifyWithTraceContext(
+        DriverInterface $driver,
+        string $reference,
+        string $verificationId
+    ): VerificationResponseDTO {
+        return $this->withTraceContext(
+            $driver,
+            $reference,
+            fn (): VerificationResponseDTO => $driver->verify($verificationId)
+        );
+    }
+
+    /**
+     * Run one provider attempt with a fresh correlation group around it.
      *
      * One reference spans the whole payment; one correlation id spans a single
      * provider attempt within it. That is what makes a fallback chain readable
@@ -272,8 +313,8 @@ final class PaymentManager
      *
      * Cleared in a finally, always. DriverFactory hands back a new instance
      * per create() today, but PaymentManager caches drivers by name in
-     * $this->drivers, so a second charge in the same process reuses the same
-     * object. A leaked correlation id would file one customer's provider
+     * $this->drivers, so a second operation in the same process reuses the
+     * same object. Leaked context would file one customer's provider
      * round-trip under another customer's attempt - the only way this feature
      * could leak data between payments, and the reason this is not simply set
      * inside the drivers.
@@ -283,20 +324,25 @@ final class PaymentManager
      * not blow up on a method the contract never promised. Such a driver
      * simply records no HTTP-level steps.
      *
-     * @throws Throwable Whatever the driver's charge() throws, untouched.
+     * @template TResult
+     *
+     * @param  callable(): TResult  $operation
+     * @return TResult
+     *
+     * @throws Throwable Whatever $operation throws, untouched.
      */
-    private function chargeWithTraceContext(DriverInterface $driver, ChargeRequestDTO $request): ChargeResponseDTO
+    private function withTraceContext(DriverInterface $driver, string $reference, callable $operation): mixed
     {
         if (! $driver instanceof AbstractDriver) {
-            return $driver->charge($request);
+            return $operation();
         }
 
-        $driver->setTraceCorrelationId($this->startTraceCorrelation());
+        $driver->setTraceContext($reference, $this->startTraceCorrelation());
 
         try {
-            return $driver->charge($request);
+            return $operation();
         } finally {
-            $driver->setTraceCorrelationId(null);
+            $driver->setTraceContext();
         }
     }
 
@@ -542,11 +588,28 @@ final class PaymentManager
 
         $exceptions = [];
 
+        // Recorded after resolution so the timeline shows which providers were
+        // actually going to be asked. With no cached session, no transaction
+        // row and no explicit provider, that is every enabled provider in turn
+        // - which is worth seeing, because it is slow and it means PayZephyr
+        // had nothing to go on.
+        $this->trace($reference, TraceEvent::VERIFICATION_STARTED, payload: [
+            'providers_to_try' => $providers,
+            'provider_was_explicit' => $provider !== null,
+        ]);
+
         foreach ($providers as $providerName) {
             try {
                 $driver = $this->driver($providerName);
-                $response = $driver->verify($verificationId);
+                $response = $this->verifyWithTraceContext($driver, $reference, $verificationId);
                 $this->updateTransactionFromVerification($reference, $response);
+
+                // "Completed" means PayZephyr got a definitive answer, not that
+                // the payment succeeded - the status says which.
+                $this->trace($reference, TraceEvent::VERIFICATION_COMPLETED,
+                    payload: ['status' => $response->status, 'channel' => $response->channel],
+                    provider: $providerName,
+                );
 
                 try {
                     if ($response->isSuccessful()) {
@@ -581,8 +644,22 @@ final class PaymentManager
                     'provider' => $providerName,
                     'trace' => $e->getTraceAsString(),
                 ]);
+
+                // PROVIDER_ERROR per provider, VERIFICATION_FAILED once at the
+                // end - the same split the charge chain uses, so that one
+                // provider being unable to answer is not mistaken for the
+                // verification itself having failed.
+                $this->trace($reference, TraceEvent::PROVIDER_ERROR,
+                    payload: ['error' => $e->getMessage(), 'error_class' => $e::class, 'during' => 'verification'],
+                    provider: $providerName,
+                );
             }
         }
+
+        $this->trace($reference, TraceEvent::VERIFICATION_FAILED, payload: [
+            'providers_tried' => array_keys($exceptions),
+            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+        ]);
 
         throw ProviderException::withContext(
             "Unable to verify payment reference: $reference",
@@ -745,6 +822,16 @@ final class PaymentManager
             $this->log('error', 'Failed to update transaction from verification', [
                 'error' => $e->getMessage(),
                 'reference' => $reference,
+            ]);
+
+            // The quiet one. The provider has answered and the caller is about
+            // to be told the payment succeeded, while payment_transactions
+            // still says otherwise - a divergence that surfaces later as a
+            // reconciliation problem with nothing to explain it.
+            $this->trace($reference, TraceEvent::VERIFICATION_NOT_PERSISTED, payload: [
+                'error' => $e->getMessage(),
+                'error_class' => $e::class,
+                'provider_status' => $response->status,
             ]);
         }
     }

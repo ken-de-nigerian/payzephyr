@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the sequence that produced it: one append-only row per step, so a payment's whole
   lifecycle can be replayed afterwards.
 
-  The charge and webhook paths are instrumented as of this release; verification and the
-  `payzephyr:trace` command follow. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
+  The charge, webhook and verification paths are all instrumented as of this release; the
+  `payzephyr:trace` command follows. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
 
   New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
   `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
@@ -77,47 +77,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeping the timing, status codes and event sequence. Worth turning off if provider bodies in
   your integration carry more customer data than you want at rest.
 
-- **The webhook path now records what arrived, what was thrown away, and what was retried.**
-  This closes the two gaps that were invisible in the database. `webhook_events` stores a
-  provider and a dedup key and nothing else, so you could tell that a duplicate delivery had
-  arrived but never what it said - not even whether it agreed with the first one. And
-  `ProcessWebhook` has always been configured with `tries` and `backoff`, so a failing delivery
-  was retried up to three times with nothing durable to show for the attempts.
+- **The verification path is recorded too, which is what finally answers the redirect-versus-webhook
+  question.** A verification records `verification.started` with the providers it is about to ask,
+  then `verification.completed` with the status the provider gave, or `verification.failed` once
+  nobody could answer. Individual providers that cannot answer are `provider.error` - the same
+  split the charge chain uses, so one provider being unreachable is never mistaken for the
+  verification itself having failed.
 
-  A delivery now records `webhook.received` with the body and the dedup key;
-  `webhook.duplicate` with the *second* delivery's body alongside it; `webhook.validation_failed`
-  when a deferred signature check rejects it; `webhook.processing_failed` with the attempt
-  number and the ceiling; `retry.scheduled` when another attempt is genuinely coming; and
-  `retry.abandoned` once PayZephyr gives up. All keyed by the same reference the charge used, so
-  the redirect and the webhook land on one timeline instead of two.
+  "Completed" means PayZephyr got a definitive answer, not that the payment succeeded. A provider
+  replying "this payment failed" is a verification that worked, and the status in the payload says
+  which.
 
-  `retry.scheduled` is only claimed when the job is really running on a queue and an attempt
-  remains. `attempts()` reports `0` off a queue, so an unguarded check would promise a retry
-  that never comes. `retry.abandoned` is recorded from Laravel's `failed()` hook, which is the
-  only point at which "abandoned" is a fact rather than a guess.
+  Because a charge and its later verification share one reference, they now share one timeline -
+  with millisecond timestamps. Which of the redirect and the webhook actually arrived first stops
+  being a guess.
 
-  Webhook bodies are governed by the same `payments.trace.record_http_bodies` switch as provider
-  request and response bodies, since it is the same category of data and the same reason to want
-  it off.
+- **`verification.not_persisted` is new, for the quietest failure in the package.** The provider
+  confirms a payment, the local `payment_transactions` update then fails, and the caller is told
+  the payment succeeded while the database still says otherwise. That divergence used to surface
+  weeks later as a reconciliation mismatch with nothing anywhere to explain it. It is an error but
+  not terminal, and it carries the status the provider actually reported.
 
-- **`webhook.queue_failed`** is new, and is the one webhook failure the job can never record for
-  itself: the delivery was accepted, queueing it failed, and so no job will ever run and no
-  retry will ever happen. `WebhookController` stays ignorant of the payload on the happy path -
-  `ProcessWebhook` extracts the reference once, where it is needed - and only resolves a driver
-  from inside the catch block, when something has already gone wrong.
-
-  **Two limits worth knowing.** `webhook.validation_failed` only fires for drivers that defer
-  verification (Mollie and PayPal). Every other driver's signature is checked in
-  `WebhookRequest::authorize()`, which returns a `403` before the controller or the job runs, so
-  those rejections leave no trace row at all.
-
-  And because the reference is now read before the signature is verified, a
-  `webhook.validation_failed` row is keyed by a reference taken from an **unverified** payload.
-  That is deliberate - a signature failure you cannot attribute to a payment is the one you
-  cannot act on - but it does mean an unauthenticated caller can cause rows to be written
-  against a reference they name. It is bounded by the webhook route's rate limit, the payload
-  size cap, and retention pruning. Turn tracing off, or lower
-  `payments.webhook.rate_limit`, if that trade is not one you want.
+- **Provider round trips made during a verification are now recorded.** A verification carries no
+  `ChargeRequestDTO`, so `AbstractDriver` could not recover the reference from `$currentRequest`
+  the way it does during a charge, and these calls went unrecorded. `setTraceCorrelationId()` has
+  been replaced by `setTraceContext(?string $reference, ?string $correlationId)`, and both the
+  charge and verification paths go through one `withTraceContext()` helper that clears it in a
+  `finally`. A driver implementing only `DriverInterface` is unaffected and simply records no
+  HTTP-level steps.
 
 - **`Traits\RecordsTraceEvents`** is how every call site records. `TraceRecorder::record()`
   already promised not to throw, but that promise started too late: building a `TraceEventDTO`

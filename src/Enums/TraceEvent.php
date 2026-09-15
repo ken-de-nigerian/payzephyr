@@ -46,6 +46,7 @@ enum TraceEvent: string
     case VERIFICATION_STARTED = 'verification.started';
     case VERIFICATION_COMPLETED = 'verification.completed';
     case VERIFICATION_FAILED = 'verification.failed';
+    case VERIFICATION_NOT_PERSISTED = 'verification.not_persisted';
 
     case CUSTOM = 'custom';
 
@@ -85,6 +86,7 @@ enum TraceEvent: string
             self::VERIFICATION_STARTED => 'Payment verification started',
             self::VERIFICATION_COMPLETED => 'Payment verification completed',
             self::VERIFICATION_FAILED => 'Payment verification failed',
+            self::VERIFICATION_NOT_PERSISTED => 'Provider confirmed the payment but the local record could not be updated',
 
             self::CUSTOM => 'Custom trace event',
         };
@@ -134,6 +136,7 @@ enum TraceEvent: string
             self::WEBHOOK_PROCESSING_FAILED,
             self::AUTH_FAILED,
             self::VERIFICATION_FAILED,
+            self::VERIFICATION_NOT_PERSISTED,
         ], true);
     }
 }

@@ -62,12 +62,22 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Groups the HTTP steps of a single provider attempt.
      *
-     * Set and cleared by PaymentManager::chargeWithTraceContext() around each
-     * charge, rather than by the drivers themselves: PaymentManager caches
-     * driver instances by name, so a value left behind here would attach one
-     * customer's provider round-trip to another customer's attempt.
+     * Set and cleared by PaymentManager around each attempt, rather than by
+     * the drivers themselves: PaymentManager caches driver instances by name,
+     * so a value left behind here would attach one customer's provider
+     * round-trip to another customer's attempt.
      */
     protected ?string $traceCorrelationId = null;
+
+    /**
+     * The payment the HTTP steps in progress belong to.
+     *
+     * Only needed where $currentRequest cannot supply it. A charge sets
+     * $currentRequest and the reference comes from there; a verification has
+     * no ChargeRequestDTO at all, so without this its provider round-trips
+     * would go unrecorded.
+     */
+    protected ?string $traceReference = null;
 
     /**
      * Status normalizer instance.
@@ -170,7 +180,7 @@ abstract class AbstractDriver implements DriverInterface
             }
         }
 
-        $reference = $this->currentRequest?->reference;
+        $reference = $this->traceReference ?? $this->currentRequest?->reference;
         $traceable = $reference !== null && $reference !== '';
         $withBodies = $traceable && $this->traceRecordsHttpBodies();
 
@@ -338,12 +348,16 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * Set (or clear, with null) the correlation group for the attempt in
-     * progress. Public because PaymentManager owns the attempt boundary; see
-     * the property docblock for why the drivers do not manage this themselves.
+     * Set (or clear, by passing nothing) the trace context for the attempt in
+     * progress.
+     *
+     * Public because PaymentManager owns the attempt boundary; see the
+     * property docblocks for why the drivers do not manage this themselves.
+     * Always cleared in a finally by whoever set it.
      */
-    public function setTraceCorrelationId(?string $correlationId): void
+    public function setTraceContext(?string $reference = null, ?string $correlationId = null): void
     {
+        $this->traceReference = $reference;
         $this->traceCorrelationId = $correlationId;
     }
 

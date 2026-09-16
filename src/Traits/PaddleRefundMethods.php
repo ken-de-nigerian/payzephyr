@@ -20,7 +20,10 @@ use Throwable;
  * refund must name the transaction item it applies to, so it reads
  * `details.line_items` back from the transaction first; PayZephyr charges
  * create single-item transactions, and a partial refund of a multi-item
- * transaction is rejected rather than guessed at.
+ * transaction is rejected rather than guessed at. That same lookup supplies the
+ * transaction's `currency_code`, which decides whether the refund amount is
+ * multiplied into minor units - a detail no other driver has to get right,
+ * and one Paddle would not complain about getting wrong.
  */
 trait PaddleRefundMethods
 {
@@ -38,11 +41,23 @@ trait PaddleRefundMethods
             if ($request->amount === null) {
                 $payload['type'] = 'full';
             } else {
+                // Paddle is the only bundled provider where the currency
+                // changes the numeric amount sent (zero-decimal currencies are
+                // not multiplied by 100), and it accepts any partial amount
+                // under the line-item total without complaint. Guessing the
+                // currency from config would therefore turn a $25.50 refund
+                // into a silent $0.25 one whenever a zero-decimal currency
+                // happens to sit first in the configured list. The
+                // transaction's own currency_code is authoritative, and
+                // resolveRefundTarget() is already fetching that transaction
+                // for the line item, so it costs no extra call.
+                [$itemId, $transactionCurrency] = $this->resolveRefundTarget($request->transactionReference);
+
                 $payload['type'] = 'partial';
                 $payload['items'] = [[
-                    'item_id' => $this->resolveSingleLineItemId($request->transactionReference),
+                    'item_id' => $itemId,
                     'type' => 'partial',
-                    'amount' => $this->toMinorUnits($request->amount, $request->currency ?? $this->config['currencies'][0] ?? 'USD'),
+                    'amount' => $this->toMinorUnits($request->amount, $transactionCurrency),
                 ]];
             }
 
@@ -99,22 +114,39 @@ trait PaddleRefundMethods
     }
 
     /**
+     * Resolve the single line item a partial refund applies to, and the
+     * transaction's own currency, from one GET of the transaction.
+     *
+     * @return array{0: string, 1: string} [item_id, currency_code]
+     *
      * @throws RefundException
      */
-    private function resolveSingleLineItemId(string $transactionId): string
+    private function resolveRefundTarget(string $transactionId): array
     {
         try {
-            $response = $this->makeRequest('GET', "/transactions/$transactionId");
-            $lineItems = $this->parseResponse($response)['data']['details']['line_items'] ?? [];
+            $response = $this->makeRequest('GET', '/transactions/'.rawurlencode($transactionId));
+            $transaction = $this->parseResponse($response)['data'] ?? [];
         } catch (Throwable $e) {
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: failed to look up its line items. (".$e->getMessage().')', 0, $e);
         }
+
+        $lineItems = $transaction['details']['line_items'] ?? [];
 
         if (count($lineItems) !== 1 || empty($lineItems[0]['id'])) {
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: expected exactly one line item, found ".count($lineItems).'. Issue a full refund instead, or create the adjustment directly through Paddle.');
         }
 
-        return (string) $lineItems[0]['id'];
+        $currency = strtoupper((string) ($transaction['currency_code'] ?? ''));
+
+        if ($currency === '') {
+            // Without the transaction's currency the minor-unit conversion is
+            // a guess, and guessing wrong under-refunds silently (see the
+            // comment in refund()). Refuse rather than send a number that may
+            // be off by a factor of 100.
+            throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: the transaction did not report a currency_code, so the refund amount cannot be converted safely.");
+        }
+
+        return [(string) $lineItems[0]['id'], $currency];
     }
 
     /**

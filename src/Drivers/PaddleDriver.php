@@ -123,18 +123,28 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
                 throw new ChargeException('No checkout URL returned by Paddle. Set an approved default payment link under Paddle > Checkout > Checkout settings.');
             }
 
+            $transactionId = $data['id'] ?? null;
+            if (! $transactionId) {
+                // The transaction id is the only thing verify() can query by,
+                // so accepting a response without one would hand back a
+                // ChargeResponseDTO whose accessCode is empty - and
+                // verify('') would then hit the transactions *list* endpoint
+                // rather than a single transaction.
+                throw new ChargeException('Paddle returned a transaction without an id; the payment cannot be verified later.');
+            }
+
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
-                'paddle_id' => $data['id'] ?? null,
+                'paddle_id' => $transactionId,
             ]);
 
             return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $checkoutUrl,
-                accessCode: (string) ($data['id'] ?? ''),
+                accessCode: (string) $transactionId,
                 status: $this->normalizeStatus((string) ($data['status'] ?? 'draft')),
                 metadata: array_merge($request->metadata, [
-                    'paddle_transaction_id' => $data['id'] ?? null,
+                    'paddle_transaction_id' => $transactionId,
                     'reference' => $reference,
                 ]),
                 provider: $this->getName(),
@@ -161,7 +171,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     public function verify(string $reference): VerificationResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/transactions/$reference");
+            $response = $this->makeRequest('GET', '/transactions/'.rawurlencode($reference));
             $data = $this->parseResponse($response)['data'] ?? [];
 
             $currency = strtoupper((string) ($data['currency_code'] ?? ''));
@@ -304,10 +314,28 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
+     * Paddle delivers transaction, subscription and adjustment events to the
+     * same endpoint, and their `status` vocabularies are unrelated: a
+     * `subscription.created` carries `active`, an `adjustment.updated` carries
+     * `approved`, neither of which means anything as a payment status.
+     *
+     * This is reachable, not theoretical: Paddle copies a transaction's
+     * `custom_data` onto the subscription it creates, and onto every
+     * transaction that subscription later creates, so a subscription event can
+     * legitimately resolve to a known reference via extractWebhookReference()
+     * and reach this method. Scoping to `transaction.*` keeps a subscription's
+     * lifecycle status from being written over a payment's.
+     *
      * @param  array<string, mixed>  $payload
      */
     public function extractWebhookStatus(array $payload): string
     {
+        $eventType = (string) ($payload['event_type'] ?? '');
+
+        if (! str_starts_with($eventType, 'transaction.')) {
+            return 'unknown';
+        }
+
         return $payload['data']['status'] ?? 'unknown';
     }
 

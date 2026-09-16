@@ -127,6 +127,16 @@ test('paddle driver fails the charge when paddle returns no checkout url', funct
     $driver->charge(new ChargeRequestDTO(amount: 10.0, currency: 'USD', email: 'test@example.com'));
 })->throws(ChargeException::class, 'No checkout URL returned by Paddle');
 
+test('paddle driver fails the charge when paddle returns no transaction id', function () {
+    $driver = paddleDriverWith($this->config, [
+        new Response(201, [], json_encode([
+            'data' => ['status' => 'ready', 'checkout' => ['url' => 'https://example.com/pay']],
+        ])),
+    ]);
+
+    $driver->charge(new ChargeRequestDTO(amount: 10.0, currency: 'USD', email: 'test@example.com'));
+})->throws(ChargeException::class, 'without an id');
+
 test('paddle driver verifies a transaction successfully', function () {
     $driver = paddleDriverWith($this->config, [
         new Response(200, [], json_encode([
@@ -247,6 +257,33 @@ test('paddle driver falls back to the transaction id when no reference was store
     expect($driver->extractWebhookReference(['data' => ['id' => 'txn_01h']]))->toBe('txn_01h');
 });
 
+test('paddle driver only reads a payment status from transaction events', function () {
+    // Paddle delivers transaction, subscription and adjustment events to the
+    // same endpoint, and Paddle copies custom_data from a transaction onto the
+    // subscription it creates - so a subscription event can resolve to a known
+    // reference and reach extractWebhookStatus(). Its `active` is a
+    // subscription lifecycle state, not a payment status, and must not be
+    // written over the transaction's.
+    $driver = new PaddleDriver($this->config);
+
+    $subscription = [
+        'event_type' => 'subscription.created',
+        'data' => ['id' => 'sub_01h', 'status' => 'active', 'custom_data' => ['reference' => 'PADDLE_999']],
+    ];
+    $adjustment = [
+        'event_type' => 'adjustment.updated',
+        'data' => ['id' => 'adj_01h', 'status' => 'approved'],
+    ];
+
+    expect($driver->extractWebhookStatus($subscription))->toBe('unknown')
+        ->and($driver->extractWebhookStatus($adjustment))->toBe('unknown')
+        ->and($driver->extractWebhookStatus(['data' => ['status' => 'completed']]))->toBe('unknown')
+        ->and($driver->extractWebhookStatus([
+            'event_type' => 'transaction.completed',
+            'data' => ['status' => 'completed'],
+        ]))->toBe('completed');
+});
+
 test('paddle driver health check succeeds against event types', function () {
     $driver = paddleDriverWith($this->config, [new Response(200, [], json_encode(['data' => []]))]);
 
@@ -306,7 +343,10 @@ test('paddle driver creates a partial refund against the resolved line item', fu
     $history = GuzzleHttp\Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
-            'data' => ['details' => ['line_items' => [['id' => 'txnitm_01hvcc94b7qgz60qmrqmbm19zw']]]],
+            'data' => [
+                'currency_code' => 'USD',
+                'details' => ['line_items' => [['id' => 'txnitm_01hvcc94b7qgz60qmrqmbm19zw']]],
+            ],
         ])),
         new Response(201, [], json_encode([
             'data' => [
@@ -340,6 +380,92 @@ test('paddle driver creates a partial refund against the resolved line item', fu
         ->and($response->status)->toBe('completed')
         ->and($response->isCompleted())->toBeTrue()
         ->and($response->amount)->toBe(25.0);
+});
+
+test('paddle driver converts a partial refund using the transaction currency, not the configured one', function () {
+    // The guard this covers: JPY has no minor unit, so if the multiplier were
+    // taken from the configured currency list (whose first entry here is JPY)
+    // a $25.50 USD refund would be sent as 25 minor units - a $0.25 refund
+    // Paddle accepts silently, because it is under the line-item total.
+    $container = [];
+    $history = GuzzleHttp\Middleware::history($container);
+    $stack = HandlerStack::create(new MockHandler([
+        new Response(200, [], json_encode([
+            'data' => [
+                'currency_code' => 'USD',
+                'details' => ['line_items' => [['id' => 'txnitm_1']]],
+            ],
+        ])),
+        new Response(201, [], json_encode([
+            'data' => ['id' => 'adj_3', 'transaction_id' => 'txn_1', 'status' => 'approved', 'currency_code' => 'USD', 'totals' => ['total' => '2550']],
+        ])),
+    ]));
+    $stack->push($history);
+
+    $driver = new PaddleDriver(array_merge($this->config, ['currencies' => ['JPY', 'USD']]));
+    $driver->setClient(new Client(['handler' => $stack]));
+
+    $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 25.50));
+
+    $body = json_decode((string) $container[1]['request']->getBody(), true);
+
+    expect($body['items'][0]['amount'])->toBe('2550');
+});
+
+test('paddle driver honours a zero-decimal transaction currency on a partial refund', function () {
+    $container = [];
+    $history = GuzzleHttp\Middleware::history($container);
+    $stack = HandlerStack::create(new MockHandler([
+        new Response(200, [], json_encode([
+            'data' => [
+                'currency_code' => 'JPY',
+                'details' => ['line_items' => [['id' => 'txnitm_1']]],
+            ],
+        ])),
+        new Response(201, [], json_encode([
+            'data' => ['id' => 'adj_4', 'transaction_id' => 'txn_1', 'status' => 'approved', 'currency_code' => 'JPY', 'totals' => ['total' => '1200']],
+        ])),
+    ]));
+    $stack->push($history);
+
+    // USD first in the configured list: the opposite error, over-refunding by
+    // 100x, if the configured currency were trusted over the transaction's.
+    $driver = new PaddleDriver(array_merge($this->config, ['currencies' => ['USD', 'JPY']]));
+    $driver->setClient(new Client(['handler' => $stack]));
+
+    $response = $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 1200.0));
+
+    $body = json_decode((string) $container[1]['request']->getBody(), true);
+
+    expect($body['items'][0]['amount'])->toBe('1200')
+        ->and($response->amount)->toBe(1200.0)
+        ->and($response->currency)->toBe('JPY');
+});
+
+test('paddle driver refuses a partial refund when the transaction reports no currency', function () {
+    $driver = paddleDriverWith($this->config, [
+        new Response(200, [], json_encode([
+            'data' => ['details' => ['line_items' => [['id' => 'txnitm_1']]]],
+        ])),
+    ]);
+
+    $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 5.0));
+})->throws(RefundException::class, 'did not report a currency_code');
+
+test('paddle driver url-encodes references interpolated into request paths', function () {
+    $container = [];
+    $history = GuzzleHttp\Middleware::history($container);
+    $stack = HandlerStack::create(new MockHandler([
+        new Response(200, [], json_encode(['data' => ['id' => 'txn_1', 'currency_code' => 'USD', 'details' => ['totals' => ['grand_total' => '100']]]])),
+    ]));
+    $stack->push($history);
+
+    $driver = new PaddleDriver($this->config);
+    $driver->setClient(new Client(['handler' => $stack]));
+
+    $driver->verify('txn_1/../../events');
+
+    expect($container[0]['request']->getUri()->getPath())->toBe('/transactions/txn_1%2F..%2F..%2Fevents');
 });
 
 test('paddle driver refuses a partial refund on a multi-item transaction', function () {

@@ -177,6 +177,21 @@ header for most, a request-body field for Square, the SDK's option for Stripe), 
 API documentation, and test against their sandbox, before relying on it for a specific
 provider.
 
+**Paddle is the exception: there is no key to send.** Paddle Billing's API has no
+client-supplied idempotency key at all, so PayZephyr sends none rather than inventing a
+header Paddle would ignore. Layer 1 therefore does not exist for Paddle, and a retry after
+a lost response can create a second transaction.
+
+Layers 2 and 3 apply to Paddle exactly as they do to every other provider: a concurrent
+resubmission of the same reference is still refused before it reaches Paddle, and an
+ambiguous outcome still throws instead of falling back or retrying. What this leaves
+uncovered is the narrow case both of those are designed around - a retry attempted *after*
+the in-flight claim has expired, when the first request may already have created a
+transaction. For Paddle specifically, reconcile with `Payment::verify($reference)` before
+re-charging rather than relying on the provider to deduplicate. Note that a Paddle
+transaction only becomes a charge when the customer completes the hosted checkout, so a
+duplicate transaction is not in itself a duplicate payment.
+
 ## See also
 
 - [Architecture](architecture.md#why-things-are-built-this-way) - why bookkeeping is kept

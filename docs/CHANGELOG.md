@@ -41,7 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     name the transaction item it applies to. Charges PayZephyr creates always have exactly one
     item, so this is invisible in the normal flow — but a partial refund against a transaction
     created elsewhere (a subscription renewal, a multi-item checkout) is rejected with an
-    explanatory `RefundException` instead of PayZephyr picking an item for you.
+    explanatory `RefundException` instead of PayZephyr picking an item for you. The same lookup
+    supplies the transaction's own `currency_code`, which is what decides whether the refund
+    amount is multiplied into minor units. Paddle is the only bundled provider where the
+    currency changes the number sent, and it accepts any partial amount under the line-item
+    total without error, so inferring the currency from configuration would silently
+    under-refund whenever a zero-decimal currency sat first in the list.
 
   - **Subscriptions are deliberately not supported.** Paddle subscriptions cannot be created
     through the API at all: Paddle creates them when a recurring-price checkout completes, and
@@ -57,6 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   there is no API-fallback verification path: with no `PADDLE_WEBHOOK_SECRET` configured,
   webhooks are rejected rather than accepted unverified. Event idempotency uses Paddle's own
   `event_id`.
+
+  Paddle delivers transaction, subscription and adjustment events to the same endpoint, and
+  copies a transaction's `custom_data` onto the subscription it creates, so a subscription
+  event can resolve to a reference PayZephyr knows. Payment status is therefore read only
+  from `transaction.*` events; anything else reports `unknown` rather than writing a
+  subscription's `active` or an adjustment's `approved` over a payment's status.
+
+  Paddle Billing has no client-supplied idempotency key, so PayZephyr sends none instead of
+  a header Paddle would ignore. The in-flight claim and ambiguous-outcome detection still
+  apply unchanged; see [Idempotency](idempotency.md#per-provider-support) for what that
+  leaves uncovered.
 
   `PADDLE_BASE_URL` defaults to the **sandbox** (`https://sandbox-api.paddle.com`), not live,
   so an install that is enabled before it is fully configured cannot charge real cards.

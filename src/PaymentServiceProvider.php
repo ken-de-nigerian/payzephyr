@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Console\NormalizeRefundStatusCommand;
+use KenDeNigerian\PayZephyr\Console\PruneTraceEventsCommand;
+use KenDeNigerian\PayZephyr\Console\TraceCommand;
 use KenDeNigerian\PayZephyr\Console\UninstallCommand;
 use KenDeNigerian\PayZephyr\Contracts\ChannelMapperInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
@@ -111,10 +113,18 @@ final class PaymentServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations/2024_01_03_000000_create_payment_trace_events_table.php' => database_path('migrations/2024_01_03_000000_create_payment_trace_events_table.php'),
             ], 'payzephyr-migrations-trace');
 
+            // Registered unconditionally, including when tracing is off. The
+            // alternative - registering only when the feature is enabled -
+            // means someone who has not switched it on yet gets "command not
+            // found", which tells them nothing. Both commands detect a missing
+            // table or a disabled feature themselves and say what to do about
+            // it, which is the message that person actually needs.
             $this->commands([
                 InstallCommand::class,
                 UninstallCommand::class,
                 NormalizeRefundStatusCommand::class,
+                TraceCommand::class,
+                PruneTraceEventsCommand::class,
             ]);
         }
 

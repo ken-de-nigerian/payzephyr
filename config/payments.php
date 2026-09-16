@@ -268,6 +268,16 @@ return [
 
         'redaction_max_depth' => env('PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH', 10),
         'record_http_bodies' => env('PAYZEPHYR_TRACE_RECORD_HTTP_BODIES', true),
+
+        // How long trace events are kept, in days. Nothing deletes anything on
+        // its own - `payzephyr:trace:prune` does, and you have to schedule it.
+        // This is the only PayZephyr table that grows per step rather than per
+        // payment, so leaving it unscheduled is how it becomes a problem.
+        'retention_days' => env('PAYZEPHYR_TRACE_RETENTION_DAYS', 90),
+
+        // A provider round trip slower than this is called out when a timeline
+        // is inspected with `payzephyr:trace --detailed`.
+        'slow_response_ms' => env('PAYZEPHYR_TRACE_SLOW_RESPONSE_MS', 5000),
     ],
 
     /*

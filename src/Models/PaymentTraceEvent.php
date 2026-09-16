@@ -20,6 +20,8 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
  * in the sequence, so nothing here is ever updated in place.
  *
  * @method static Builder<PaymentTraceEvent> timelineFor(string $reference)
+ * @method static Builder<PaymentTraceEvent> olderThan(int $days)
+ * @method static Builder<PaymentTraceEvent> whereIn(string $column, mixed $values)
  * @method static Builder<PaymentTraceEvent> where(string $column, mixed $operator = null, mixed $value = null)
  * @method static PaymentTraceEvent create(array<string, mixed> $attributes = [])
  * @method static Builder<PaymentTraceEvent> delete()
@@ -122,6 +124,22 @@ final class PaymentTraceEvent extends Model
         return $query->where('reference', $reference)
             ->oldest()
             ->orderBy('id');
+    }
+
+    /**
+     * Events older than the retention window.
+     *
+     * Deliberately keyed on created_at rather than id: the table may be
+     * sharing a connection with anything, and "old" is a question about time,
+     * not about insertion order.
+     *
+     * @param  Builder<PaymentTraceEvent>  $query
+     * @return Builder<PaymentTraceEvent>
+     */
+    public function scopeOlderThan(Builder $query, int $days): Builder
+    {
+        /** @var Builder<self> */
+        return $query->where('created_at', '<', now()->subDays($days));
     }
 
     public function isError(): bool

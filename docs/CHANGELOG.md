@@ -15,8 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps the sequence that produced it: one append-only row per step, so a payment's whole
   lifecycle can be replayed afterwards.
 
-  The charge, webhook and verification paths are all instrumented as of this release; the
-  `payzephyr:trace` command follows. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
+  The charge, webhook and verification paths are all instrumented, and `payzephyr:trace` reads a
+  timeline back. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
 
   New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
   `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
@@ -105,6 +105,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   charge and verification paths go through one `withTraceContext()` helper that clears it in a
   `finally`. A driver implementing only `DriverInterface` is unaffected and simply records no
   HTTP-level steps.
+
+- **`php artisan payzephyr:trace <reference>`** reads a timeline back, which is the point of
+  recording one. Keyed by reference - the same string `Payment::charge()` returned and
+  `Payment::verify()` takes - so there is nothing new to look up first. `--provider` narrows it to
+  one provider, `--json` gives a machine-readable version for piping elsewhere, and `--detailed`
+  adds the analysis below.
+
+  An unknown reference is not an error. A payment made before tracing was switched on has no
+  events and never will, so the command says which of those it is - including telling you that
+  tracing is off, and how to turn it on - rather than implying the payment does not exist.
+
+- **One analyser, one vocabulary.** The package this was folded in from shipped two overlapping
+  ones, `analyze()` and `detectAnomalies()`, which both reported slow responses and both reported
+  missing responses, using different thresholds and different wording for the same finding.
+  `Timeline::analyze()` is now the only one.
+
+  It reports, in severity order: an ambiguous charge outcome, a verification the provider
+  confirmed but the database did not record, provider timeouts, abandoned webhook retries,
+  webhooks that were never queued, duplicate deliveries, failed signature checks, requests that
+  were sent and never answered, and provider responses slower than
+  `payments.trace.slow_response_ms`. Repeated problems are counted rather than listed one by one,
+  and a clean timeline says so - a report that flags ordinary events teaches people to skim past
+  it.
+
+  Orphaned requests are matched within a correlation group, which is what that identifier is for:
+  one group is one provider round trip, so a group holding a request and no reply is a call that
+  went out and vanished.
+
+- **`php artisan payzephyr:trace:prune`** deletes trace events past
+  `payments.trace.retention_days` (90 by default). **Nothing prunes on its own.** This is the only
+  PayZephyr table that grows per *step* rather than per payment - six to ten rows where there used
+  to be one - so it is the one that needs scheduling:
+
+  ```php
+  Schedule::command('payzephyr:trace:prune')->daily();
+  ```
+
+  `--dry-run` reports the count and the span it would remove without touching anything, `--days`
+  overrides the window for a one-off, `--chunk` sets the batch size, and `--force` skips the
+  confirmation.
+
+  The unattended path is an explicit branch rather than a prompt falling through to its default
+  value - this command exists to run on a schedule, and "it proceeds because `confirm()` returns
+  its default when there is no TTY" is a behaviour nobody chose. Interactively it asks, and
+  defaults to no. It also refuses a window of less than a day, and rejects a non-numeric `--days`
+  instead of quietly pruning against the configured window.
+
+  Deletion selects ids and deletes by primary key, re-running the filter on each pass, rather than
+  chunking a cursor over the rows being deleted underneath it. That also keeps it portable:
+  `LIMIT` on a `DELETE` is a MySQL extension SQLite refuses unless it was compiled to allow it.
+
+- **Both commands are registered whether or not tracing is on**, and explain themselves when it
+  is not. Registering them conditionally would mean someone who has not enabled the feature gets
+  "command not found", which tells them nothing - and would have made the command's own "tracing
+  is switched off, here is how to turn it on" message unreachable. A missing table is reported
+  with the one command that fixes it, rather than as a driver-level complaint.
 
 - **`Traits\RecordsTraceEvents`** is how every call site records. `TraceRecorder::record()`
   already promised not to throw, but that promise started too late: building a `TraceEventDTO`

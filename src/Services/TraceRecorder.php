@@ -43,7 +43,10 @@ final readonly class TraceRecorder implements TraceRecorderInterface
                 return null;
             }
 
-            $redacted = $event->withPayload($this->redactor->redact($event->payload));
+            $redacted = $event->withRedacted(
+                $this->redactor->redact($event->payload),
+                $this->redactor->redact($event->metadata),
+            );
 
             if ($this->shouldRecordAsync()) {
                 $this->recordAsync($redacted);

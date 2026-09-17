@@ -167,16 +167,19 @@ final readonly class TraceEventDTO
     }
 
     /**
-     * Return a copy of this event carrying the given payload.
+     * Return a copy of this event carrying scrubbed payload and metadata.
      *
-     * Lets TraceRecorder swap in the redacted payload without the DTO giving
-     * up readonly on everything else.
+     * Lets TraceRecorder swap both in without the DTO giving up readonly on
+     * everything else. Both together rather than one at a time: they are the
+     * two free-form columns, they are redacted by the same pass, and doing
+     * them separately would build and re-validate the DTO twice.
      *
      * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $metadata
      *
      * @throws InvalidTraceDataException
      */
-    public function withPayload(array $payload): self
+    public function withRedacted(array $payload, array $metadata): self
     {
         return new self(
             reference: $this->reference,
@@ -185,7 +188,7 @@ final readonly class TraceEventDTO
             payload: $payload,
             provider: $this->provider,
             correlationId: $this->correlationId,
-            metadata: $this->metadata,
+            metadata: $metadata,
             httpMethod: $this->httpMethod,
             httpUrl: $this->httpUrl,
             httpStatusCode: $this->httpStatusCode,

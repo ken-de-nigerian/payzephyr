@@ -64,7 +64,7 @@ test('toArray maps to the column names the trace table actually uses', function 
     ]);
 });
 
-test('withPayload swaps the payload and leaves everything else alone', function () {
+test('withRedacted swaps payload and metadata, leaving everything else alone', function () {
     $original = traceEvent(
         payload: ['card_number' => '4111111111111111'],
         provider: 'stripe',
@@ -76,22 +76,25 @@ test('withPayload swaps the payload and leaves everything else alone', function 
         responseTimeMs: 90,
     );
 
-    $swapped = $original->withPayload(['card_number' => '[REDACTED]']);
+    $swapped = $original->withRedacted(
+        ['card_number' => '[REDACTED]'],
+        ['authorization' => '[REDACTED]'],
+    );
 
     expect($swapped->payload)->toBe(['card_number' => '[REDACTED]'])
+        ->and($swapped->metadata)->toBe(['authorization' => '[REDACTED]'])
         ->and($original->payload)->toBe(['card_number' => '4111111111111111'])
+        ->and($original->metadata)->toBe(['ip' => '127.0.0.1'])
         ->and($swapped->reference)->toBe($original->reference)
         ->and($swapped->event)->toBe($original->event)
         ->and($swapped->direction)->toBe($original->direction)
         ->and($swapped->provider)->toBe($original->provider)
         ->and($swapped->correlationId)->toBe($original->correlationId)
-        ->and($swapped->metadata)->toBe($original->metadata)
         ->and($swapped->httpMethod)->toBe($original->httpMethod)
         ->and($swapped->httpUrl)->toBe($original->httpUrl)
         ->and($swapped->httpStatusCode)->toBe($original->httpStatusCode)
         ->and($swapped->responseTimeMs)->toBe($original->responseTimeMs);
 });
-
 
 // ---------------------------------------------------------------------------
 // The reference is the one thing that must be right
@@ -202,8 +205,8 @@ test('an empty correlation id is stored as no correlation', function () {
     expect(traceEvent(correlationId: '')->correlationId)->toBeNull();
 });
 
-test('normalization survives withPayload', function () {
-    $dto = traceEvent(provider: str_repeat('p', 200), httpMethod: 'get')->withPayload(['a' => 1]);
+test('normalization survives withRedacted', function () {
+    $dto = traceEvent(provider: str_repeat('p', 200), httpMethod: 'get')->withRedacted(['a' => 1], []);
 
     expect($dto->provider)->toBe(str_repeat('p', 50))
         ->and($dto->httpMethod)->toBe('GET')

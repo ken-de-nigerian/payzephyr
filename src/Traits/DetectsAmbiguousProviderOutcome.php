@@ -42,23 +42,14 @@ trait DetectsAmbiguousProviderOutcome
 
         while ($current !== null) {
             if ($current instanceof ConnectException) {
-                // The connection itself was never established - nothing was
-                // ever transmitted to the provider. Checked before
-                // RequestException because ConnectException extends it.
                 return false;
             }
 
             if ($current instanceof RequestException) {
-                // A request was sent but no response was ever received (e.g. a
-                // read timeout after the connection succeeded) - the provider
-                // may have processed it regardless.
                 return $current->getResponse() === null;
             }
 
             if ($current instanceof ApiConnectionException) {
-                // Stripe's SDK does not distinguish "never connected" from
-                // "connected but no response" the way Guzzle's exception
-                // hierarchy does - treat conservatively as ambiguous.
                 return true;
             }
 

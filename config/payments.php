@@ -11,19 +11,7 @@ return [
     |
     | Tracks which optional PayZephyr features `php artisan payzephyr:install`
     | has enabled for this app (payment logging and webhook processing are
-    | core and always available, not listed here). See
-    | docs/installation.md#core-vs-optional-features.
-    |
-    | 'subscriptions' and 'refunds' are informational - set by the installer,
-    | readable by your own code - and do not gate Payment::subscription() or
-    | Payment::refund() at runtime.
-    |
-    | 'trace' is different, and is the one flag here that is read on every
-    | request: with it off, PayZephyr resolves a do-nothing recorder that
-    | touches no database at all. Tracing is the only feature that writes on
-    | the hot path of every charge, verification and webhook, and the only one
-    | whose table grows per step rather than per payment, so switching it off
-    | has to take effect immediately - no deploy, and no migration to roll back.
+    | core and always available, not listed here).
     |
     */
     'features' => [
@@ -228,17 +216,9 @@ return [
     | lifecycle can be replayed afterwards. Where 'logging' above keeps a
     | payment's current state, this keeps the sequence that produced it.
     |
-    | Switched on and off by 'features.trace' above, not by a key of its own -
-    | one flag, one meaning. Everything here describes how tracing behaves
-    | once it is on.
-    |
     */
     'trace' => [
         'table' => env('PAYZEPHYR_TRACE_TABLE', 'payment_trace_events'),
-
-        // Null uses the default connection. Trace is the highest-volume table
-        // PayZephyr writes, so pointing it elsewhere is a reasonable thing to
-        // want under load.
         'connection' => env('PAYZEPHYR_TRACE_CONNECTION'),
 
         // Recommended in production: keeps the write off the request path.
@@ -268,15 +248,7 @@ return [
 
         'redaction_max_depth' => env('PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH', 10),
         'record_http_bodies' => env('PAYZEPHYR_TRACE_RECORD_HTTP_BODIES', true),
-
-        // How long trace events are kept, in days. Nothing deletes anything on
-        // its own - `payzephyr:trace:prune` does, and you have to schedule it.
-        // This is the only PayZephyr table that grows per step rather than per
-        // payment, so leaving it unscheduled is how it becomes a problem.
         'retention_days' => env('PAYZEPHYR_TRACE_RETENTION_DAYS', 90),
-
-        // A provider round trip slower than this is called out when a timeline
-        // is inspected with `payzephyr:trace --detailed`.
         'slow_response_ms' => env('PAYZEPHYR_TRACE_SLOW_RESPONSE_MS', 5000),
     ],
 

@@ -102,7 +102,7 @@ final class TraceCommand extends Command
 
     private function renderText(Timeline $timeline): int
     {
-        $this->line("Payment timeline: {$timeline->reference}");
+        $this->line("Payment timeline: $timeline->reference");
         $this->line(str_repeat('=', 72));
         $this->newLine();
 
@@ -124,9 +124,6 @@ final class TraceCommand extends Command
     {
         $line = $event->formatForTimeline();
 
-        // Errors in red, the definitive outcome in green, everything else
-        // plain - so scanning a long timeline surfaces the interesting rows
-        // without having to read every one.
         match (true) {
             $event->isError() => $this->error("  $line"),
             $event->isTerminal() => $this->info("  $line"),
@@ -134,7 +131,7 @@ final class TraceCommand extends Command
         };
 
         if ($event->http_status_code !== null) {
-            $this->line("        HTTP {$event->http_status_code}");
+            $this->line("        HTTP $event->http_status_code");
         }
 
         if ($event->response_time_ms !== null) {

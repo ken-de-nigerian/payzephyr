@@ -24,9 +24,6 @@ final class ChannelMapper implements ChannelMapperInterface
             'monnify' => $this->mapToMonnify($channels),
             'flutterwave' => $this->mapToFlutterwave($channels),
             'stripe' => $this->mapToStripe($channels),
-            // PayPal's Orders v2 API has no funding-source restriction
-            // parameter on order creation - the payer picks their instrument
-            // on PayPal's own hosted checkout - so there is nothing to map.
             'paypal' => null,
             'square' => $this->mapToSquare($channels),
             'opay' => $this->mapToOpay($channels),

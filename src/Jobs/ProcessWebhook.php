@@ -72,16 +72,6 @@ final class ProcessWebhook implements ShouldQueue
         $reference = null;
 
         try {
-            // Resolved first so that every outcome below can be keyed to the
-            // payment it concerns. A discarded or duplicated webhook that
-            // cannot be attributed to a reference is exactly the one nobody
-            // can act on afterwards.
-            //
-            // Inside the try, not before it: extractReference() only absorbs
-            // DriverNotFoundException, and driver() can still raise a
-            // configuration error that belongs in the handler below with
-            // everything else - logged, idempotency marker released, rethrown
-            // so the delivery is retried.
             $reference = $this->extractReference($manager);
 
             if (! $this->verifyDeferredSignature($manager)) {
@@ -103,9 +93,7 @@ final class ProcessWebhook implements ShouldQueue
                     'provider' => $this->provider,
                     'event_key' => $eventKey,
                 ]);
-                // webhook_events stores only the key, so without this the
-                // duplicate is known to have happened but its contents are
-                // gone. This is the record of what the second delivery said.
+
                 $this->trace($reference, TraceEvent::WEBHOOK_DUPLICATE, TraceDirection::INBOUND,
                     payload: $this->tracePayload(),
                     provider: $this->provider,
@@ -157,9 +145,6 @@ final class ProcessWebhook implements ShouldQueue
                 provider: $this->provider,
             );
 
-            // Only claimed when this is really running on a queue and another
-            // attempt is genuinely coming. attempts() reports 0 off a queue,
-            // which would otherwise promise a retry that never happens.
             if ($this->job !== null && $this->attempts() < $this->tries) {
                 $this->trace($reference, TraceEvent::RETRY_SCHEDULED,
                     payload: ['in_seconds' => $this->backoff, 'attempt' => $this->attempts() + 1],
@@ -273,8 +258,6 @@ final class ProcessWebhook implements ShouldQueue
             // a job that has already failed is not worth a second exception.
         }
 
-        // Internal, like RETRY_SCHEDULED: the delivery was inbound, but
-        // giving up on it is PayZephyr's own decision, not the provider's.
         $this->trace($reference, TraceEvent::RETRY_ABANDONED,
             payload: [
                 'error' => $exception->getMessage(),

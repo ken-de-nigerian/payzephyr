@@ -588,11 +588,6 @@ final class PaymentManager
 
         $exceptions = [];
 
-        // Recorded after resolution so the timeline shows which providers were
-        // actually going to be asked. With no cached session, no transaction
-        // row and no explicit provider, that is every enabled provider in turn
-        // - which is worth seeing, because it is slow and it means PayZephyr
-        // had nothing to go on.
         $this->trace($reference, TraceEvent::VERIFICATION_STARTED, payload: [
             'providers_to_try' => $providers,
             'provider_was_explicit' => $provider !== null,
@@ -604,8 +599,6 @@ final class PaymentManager
                 $response = $this->verifyWithTraceContext($driver, $reference, $verificationId);
                 $this->updateTransactionFromVerification($reference, $response);
 
-                // "Completed" means PayZephyr got a definitive answer, not that
-                // the payment succeeded - the status says which.
                 $this->trace($reference, TraceEvent::VERIFICATION_COMPLETED,
                     payload: ['status' => $response->status, 'channel' => $response->channel],
                     provider: $providerName,
@@ -645,10 +638,6 @@ final class PaymentManager
                     'trace' => $e->getTraceAsString(),
                 ]);
 
-                // PROVIDER_ERROR per provider, VERIFICATION_FAILED once at the
-                // end - the same split the charge chain uses, so that one
-                // provider being unable to answer is not mistaken for the
-                // verification itself having failed.
                 $this->trace($reference, TraceEvent::PROVIDER_ERROR,
                     payload: ['error' => $e->getMessage(), 'error_class' => $e::class, 'during' => 'verification'],
                     provider: $providerName,
@@ -824,10 +813,6 @@ final class PaymentManager
                 'reference' => $reference,
             ]);
 
-            // The quiet one. The provider has answered and the caller is about
-            // to be told the payment succeeded, while payment_transactions
-            // still says otherwise - a divergence that surfaces later as a
-            // reconciliation problem with nothing to explain it.
             $this->trace($reference, TraceEvent::VERIFICATION_NOT_PERSISTED, payload: [
                 'error' => $e->getMessage(),
                 'error_class' => $e::class,

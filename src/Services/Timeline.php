@@ -99,7 +99,7 @@ final readonly class Timeline
     /**
      * What is worth someone's attention in this timeline.
      *
-     * One analyser, one threshold, one vocabulary. The package this was folded
+     * One analyzer, one threshold, one vocabulary. The package this was folded
      * in from shipped two overlapping ones - analyze() and detectAnomalies() -
      * which both reported slow responses and both reported missing responses,
      * using different thresholds and different wording for the same finding.

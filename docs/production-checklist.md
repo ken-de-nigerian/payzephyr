@@ -23,6 +23,16 @@ A concrete list to work through before you point PayZephyr at real payment provi
 
 - [ ] You're running MySQL or PostgreSQL, not SQLite, if you expect genuinely concurrent traffic. PayZephyr's concurrency-safety (preventing two simultaneous webhook deliveries from corrupting the same transaction record) relies on row-level locking, which SQLite doesn't support the same way: SQLite's own whole-database locking still prevents silent data corruption, but under real concurrent load you're more likely to see transient "database is locked" errors than a smooth queue. SQLite is fine for development and testing; for production, especially with webhook traffic, use MySQL or PostgreSQL.
 
+## Tracing
+
+Skip this section entirely if you haven't enabled [Tracing](tracing.md) - it's off by default.
+
+- [ ] **`payzephyr:trace:prune` is scheduled**, and Laravel's scheduler is actually running on the box (`php artisan schedule:list` to confirm). This is the only PayZephyr table that grows per step rather than per payment; unscheduled, it is the most likely way tracing becomes a problem for you. See [Deployment](deployment.md#scheduled-tasks).
+- [ ] `PAYZEPHYR_TRACE_RETENTION_DAYS` is a window you've actually chosen (90 by default), not one you inherited. Run `php artisan payzephyr:trace:prune --dry-run` once to see what that means in rows.
+- [ ] `PAYZEPHYR_TRACE_ASYNC=true`, so the write stays off the request path. This needs a queue worker, which you have anyway for webhooks.
+- [ ] You've decided about `PAYZEPHYR_TRACE_RECORD_HTTP_BODIES`. It defaults to `true`, which stores provider request/response and webhook bodies (redacted). That's where the forensic value is; it's also customer data at rest. See [Security](security.md#what-tracing-stores).
+- [ ] You know that `PAYZEPHYR_FEATURE_TRACE=false` takes effect on the next request, with no deploy - worth knowing *before* you need it at 3am.
+
 ## Logging
 
 - [ ] `PAYMENTS_SANITIZE_LOGS=true` (default). Confirm your own application code isn't separately logging raw request data that might contain sensitive fields PayZephyr's own sanitization doesn't reach; see [Security](security.md#log-sanitization).

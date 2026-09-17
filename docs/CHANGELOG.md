@@ -323,7 +323,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading
 
-No API, signature, or configuration changes. Three things worth a look before you deploy:
+**Nothing is required.** Tracing is off unless you install it, no existing signature changed, and
+an app that upgrades and does nothing else behaves exactly as before.
+
+Three things worth a look before you deploy:
 
 1. **If you let PayZephyr generate references**, new ones look like `PZ_1755000000_a1b2c3d4`
    instead of `STRIPE_1755000000_a1b2c3d4`. Anything that parses a provider out of a reference
@@ -337,6 +340,28 @@ No API, signature, or configuration changes. Three things worth a look before yo
    that used to succeed.
 
 3. **If you supply your own references**, nothing changes.
+
+#### If you want tracing
+
+```bash
+php artisan payzephyr:install --features=trace
+```
+
+Then schedule the prune, in the same breath - this is the only PayZephyr table that grows per
+step rather than per payment, and nothing prunes it on its own:
+
+```php
+Schedule::command('payzephyr:trace:prune')->daily();
+```
+
+`PAYZEPHYR_TRACE_ASYNC=true` is recommended in production to keep the write off the request path,
+and `php artisan payzephyr:trace <reference> --detailed` is the thing you'll actually reach for.
+Read [Tracing](tracing.md) before turning it on in production, particularly
+[what it stores](security.md#what-tracing-stores) - by default that includes provider request and
+response bodies, redacted.
+
+If it ever needs to stop, `PAYZEPHYR_FEATURE_TRACE=false` takes effect on the next request. No
+deploy, no migration rollback.
 
 ---
 

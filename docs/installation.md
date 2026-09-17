@@ -30,7 +30,7 @@ Here's exactly what this does, in order:
 
 1. **Publishes the configuration file** to `config/payments.php`. This is your copy: PayZephyr ships with sensible defaults baked into the package, but publishing the file lets you see every option and change what you need to. Nothing works without this file existing in your app; PayZephyr reads its settings from `config/payments.php`, not from inside the package itself.
 2. **Publishes the core database migrations.** `payment_transactions` (a log of every payment you initiate) and `webhook_events` (used internally to make sure a webhook delivered twice by a provider only gets processed once; more on that in [Webhooks](webhooks.md)) are created unconditionally - see [Core vs. optional features](#core-vs-optional-features) for why.
-3. **Shows a checkbox list asking which optional features you want** (Subscriptions, Refunds - see the screenshot below). Select any number with the space bar, then press Enter. Nothing you don't select gets a table - PayZephyr doesn't create database structure your app doesn't use. Already-installed features arrive pre-checked; unchecking one does **not** remove it (see [Adding a feature later](#adding-a-feature-later)).
+3. **Shows a checkbox list asking which optional features you want** (Subscriptions, Refunds, Trace - see the screenshot below). Select any number with the space bar, then press Enter. Nothing you don't select gets a table - PayZephyr doesn't create database structure your app doesn't use. Already-installed features arrive pre-checked; unchecking one does **not** remove it (see [Adding a feature later](#adding-a-feature-later)).
 4. **Shows a short summary of what's about to happen**, then asks if you want to run the migrations now. Say yes unless you have a reason to run them separately later (for example, if your deployment pipeline runs migrations as its own step).
 
 ```
@@ -68,8 +68,11 @@ PayZephyr's install command distinguishes between what your app needs no matter 
 | **Core** (always installed) | `payment_transactions`, `webhook_events` | `Payment::charge()`/`verify()` log to `payment_transactions` by default (`payments.logging.enabled`), and every webhook from every provider - regardless of which PayZephyr feature triggered it - is deduplicated through `webhook_events`. Both are load-bearing for the package's basic charge/verify/webhook flow, not specific to any optional feature. |
 | **Subscriptions** (optional) | `subscription_transactions` | Only needed if you call `Payment::subscription()`. |
 | **Refunds** (optional) | `refund_transactions` | Only needed if you call `Payment::refund()`. |
+| **Trace** (optional) | `payment_trace_events` | Only needed if you want a step-by-step record of what happened to each payment - see [Tracing](tracing.md). |
 
-Subscriptions and Refunds don't depend on each other or on anything beyond core - selecting one never pulls in the other.
+No optional feature depends on another, or on anything beyond core - selecting one never pulls in the others.
+
+Trace differs from the other two in one way worth knowing at install time. `PAYZEPHYR_FEATURE_SUBSCRIPTIONS` and `PAYZEPHYR_FEATURE_REFUNDS` are bookkeeping: the installer writes them, your own code can read them, and nothing in PayZephyr consults them at runtime. `PAYZEPHYR_FEATURE_TRACE` **is** consulted, on every request - with it off, PayZephyr resolves a do-nothing recorder that touches no database at all. It's the one feature you can switch off without a deploy, and the one that needs [a pruning schedule](tracing.md#retention-is-your-job) once it's on.
 
 ## Selecting features non-interactively
 

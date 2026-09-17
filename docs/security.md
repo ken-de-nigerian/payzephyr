@@ -52,6 +52,27 @@ PAYMENTS_SANITIZE_LOGS=true
 
 Leave it on. The only reason to disable it is deep local debugging where you specifically need to see a raw value PayZephyr would otherwise redact; never in an environment whose logs anyone else might read.
 
+## What tracing stores
+
+Only relevant if you've enabled the optional [Tracing](tracing.md) feature - it's off by default, and with it off nothing below applies.
+
+Tracing stores considerably more than the rest of PayZephyr does: by default it keeps **provider request and response bodies, and webhook bodies**, in the `payment_trace_events` table. That's where most of its value lives, and it's also the part worth a deliberate decision.
+
+Sensitive fields are redacted before anything is written, and both free-form columns - `payload` and `metadata` - go through the same pass. The field list at `payments.trace.redact_fields` covers card numbers, CVVs, tokens, API keys and authorization headers out of the box. Matching is on substrings and case-insensitive, deliberately: providers name the same secret a dozen different ways, and catching `stripe_api_key` matters more than the cost of also redacting a benign `tokenization_enabled`.
+
+If provider bodies in your integration carry more customer data than you want sitting at rest, turn body capture off and keep everything else:
+
+```env
+PAYZEPHYR_TRACE_RECORD_HTTP_BODIES=false
+```
+
+You keep every event, timestamp, status code and timing; you lose only the bodies.
+
+Two other things worth knowing:
+
+- **Redaction happens before queueing.** With `PAYZEPHYR_TRACE_ASYNC=true`, payloads are scrubbed *before* the job is dispatched, so nothing sensitive sits in your queue backend waiting to be written.
+- **A rejected webhook can still write a row.** `webhook.validation_failed` is keyed by the reference read out of an unverified payload, so an attacker who knows a reference can cause rows attributed to it. The webhook route is rate-limited and payload-capped, and the forensic value of seeing "someone is sending bad-signature webhooks for this payment" is the reason it's recorded at all - but it is an unauthenticated write path, and worth knowing about.
+
 ## Health endpoint
 
 `/payments/health` (see [Configuration](configuration.md#health-check)) is registered **without authentication by default**, which is a deliberate trade-off, not an oversight: it means the endpoint works immediately for local development and for uptime monitors that don't support custom headers, with zero setup. But an unauthenticated endpoint that reports which payment providers you have configured and whether they're currently reachable is information you probably don't want handed to anyone who requests it in production.

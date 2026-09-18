@@ -187,9 +187,17 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
             return new VerificationResponseDTO(
                 reference: $result['paymentReference'] ?? $reference,
-                status: $this->normalizeStatus($result['paymentStatus']),
-                amount: (float) $result['amountPaid'],
-                currency: $result['currency'] ?? $result['currencyCode'] ?? 'NGN',
+                status: $this->normalizeStatus($this->requireString($result, 'paymentStatus', 'verify')),
+                amount: $this->requireAmount($result, 'amountPaid', 'verify'),
+                // Monnify names this either way depending on the endpoint, so
+                // collapse the two and then insist on one of them. Defaulting
+                // to NGN would silently mis-denominate every non-Naira
+                // Monnify account.
+                currency: $this->requireString(
+                    ['currency' => $result['currency'] ?? $result['currencyCode'] ?? null],
+                    'currency',
+                    'verify',
+                ),
                 paidAt: $result['paidOn'] ?? null,
                 metadata: self::normalizeMetadata($result['metaData'] ?? null),
                 provider: $this->getName(),

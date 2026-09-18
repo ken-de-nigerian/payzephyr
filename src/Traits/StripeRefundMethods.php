@@ -76,7 +76,7 @@ trait StripeRefundMethods
             refundReference: $refund->id,
             transactionReference: (string) ($refund->payment_intent ?? ''),
             status: $refund->status,
-            amount: ($refund->amount ?? 0) / 100,
+            amount: $this->requireAmountValue($refund->amount ?? null, 'amount', 'refund') / 100,
             currency: strtoupper($refund->currency),
             reason: $reason,
             metadata: (array) ($refund->metadata ?? []),

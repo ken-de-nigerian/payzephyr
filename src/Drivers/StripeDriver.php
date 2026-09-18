@@ -365,7 +365,11 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         return new VerificationResponseDTO(
             reference: $session->client_reference_id ?? $session->id,
             status: $status,
-            amount: ($session->amount_total ?? $piAmount ?? 0) / 100,
+            // Never `?? 0`. A checkout session with no amount_total and no
+            // payment intent behind it would otherwise verify as a completed
+            // payment worth nothing, which reconciles against the provider as
+            // a missing N and against the customer as a charge they made.
+            amount: $this->requireAmountValue($session->amount_total ?? $piAmount, 'amount_total', 'verify') / 100,
             currency: strtoupper((string) $session->currency),
             paidAt: $session->payment_status === 'paid'
                 ? date('Y-m-d H:i:s', $session->created)

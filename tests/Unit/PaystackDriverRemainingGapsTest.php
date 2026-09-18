@@ -50,12 +50,12 @@ test('paystack driver charge throws when body reports status false with a 200 re
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'Duplicate transaction reference');
 
-test('paystack driver charge wraps unexpected non-charge errors in a charge exception', function () {
-    // status: true but the 'data' object is missing 'access_code'. Building
-    // the ChargeResponseDTO then passes null into its non-nullable
-    // `string $accessCode` parameter, triggering a TypeError under
-    // strict_types - a Throwable that isn't already a ChargeException, so it
-    // must be caught by the generic catch (Throwable $e) block.
+test('paystack driver names the field Paystack omitted rather than blaming PHP', function () {
+    // status: true, but the 'data' object is missing 'access_code'. This used
+    // to pass null into ChargeResponseDTO's non-nullable `string $accessCode`,
+    // raising a TypeError that the generic catch rewrapped as "Payment
+    // initialization failed: ..." - technically correct and useless to whoever
+    // has to work out which provider did what.
     $driver = paystackRemainingGapsDriver([
         new Response(200, [], json_encode([
             'status' => true,
@@ -67,7 +67,21 @@ test('paystack driver charge wraps unexpected non-charge errors in a charge exce
     ]);
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
-})->throws(ChargeException::class, 'Payment initialization failed');
+})->throws(ChargeException::class, 'omitted the required field [access_code]');
+
+test('a charge that failed on an unreadable response still warns that it may have landed', function () {
+    // The important half of that message. A malformed response says nothing
+    // about whether Paystack accepted the request - so the exception must not
+    // read as "this did not happen".
+    $driver = paystackRemainingGapsDriver([
+        new Response(200, [], json_encode([
+            'status' => true,
+            'data' => ['reference' => 'ref_no_url'],
+        ])),
+    ]);
+
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
+})->throws(ChargeException::class, 'verify before retrying');
 
 test('paystack driver verify throws when body reports status false with a 200 response', function () {
     $driver = paystackRemainingGapsDriver([

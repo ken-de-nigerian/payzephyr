@@ -114,7 +114,14 @@ test('opay verify returns pending for PENDING status', function () {
             'message' => 'Success',
             'data' => [
                 'reference' => 'OPAY_123',
-                'amount' => 20000,
+                // The nested shape OPay actually returns. This fixture used to
+                // pass `amount` as a scalar, which meant the driver reported
+                // 0.0 - and the test passed anyway, because it only asserted
+                // the status. The amount is asserted here now for that reason.
+                'amount' => [
+                    'total' => 20000,
+                    'currency' => 'NGN',
+                ],
                 'status' => 'PENDING',
             ],
         ])),
@@ -122,7 +129,9 @@ test('opay verify returns pending for PENDING status', function () {
 
     $result = $driver->verify('OPAY_123');
 
-    expect($result->status)->toBe('pending');
+    expect($result->status)->toBe('pending')
+        ->and($result->amount)->toBe(200.0)
+        ->and($result->currency)->toBe('NGN');
 });
 
 test('opay verify throws exception when code is not 00000', function () {

@@ -362,6 +362,121 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * Read a field the provider is contractually required to return.
+     *
+     * Reading these directly off the array is how PayZephyr used to do it, and
+     * it fails badly in two different ways when a provider returns a shape
+     * nobody expected. An absent key raises "Undefined array key", which the
+     * driver rewraps into a message naming PHP rather than the provider. And
+     * where the value feeds a cast - `(float) $data['amount']` - a missing key
+     * becomes `0.0` rather than an error, which is a *wrong amount reported as
+     * verified* on any installation that does not promote warnings.
+     *
+     * Failing loudly and specifically is the only safe answer. The caller
+     * already treats a thrown exception as "this did not complete", which is
+     * the conservative outcome; being told which field the provider omitted is
+     * what makes it diagnosable.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireField(array $data, string $key, string $operation): mixed
+    {
+        if (! array_key_exists($key, $data) || $data[$key] === null) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] omitted the required field [$key] from its $operation response. ".
+                'The request may still have been accepted by the provider - verify before retrying.',
+                ['provider' => $this->getName(), 'missing_field' => $key, 'operation' => $operation],
+            );
+        }
+
+        return $data[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireString(array $data, string $key, string $operation): string
+    {
+        $value = $this->requireField($data, $key, $operation);
+
+        if (! is_string($value) && ! is_numeric($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-string value for [$key] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $key, 'operation' => $operation],
+            );
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * A monetary amount, which must never be allowed to default.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireAmount(array $data, string $key, string $operation): float
+    {
+        return $this->requireAmountValue($this->requireField($data, $key, $operation), $key, $operation);
+    }
+
+    /**
+     * The same guarantee for an amount already pulled out of a response.
+     *
+     * Needed because not every provider hands back an array: the Stripe SDK
+     * returns objects, so the value has to be read before it can be checked.
+     *
+     * @throws ChargeException
+     */
+    protected function requireAmountValue(mixed $value, string $field, string $operation): float
+    {
+        if ($value === null) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] omitted the amount [$field] from its $operation response. ".
+                'Reporting this as a zero-value payment would be worse than failing.',
+                ['provider' => $this->getName(), 'field' => $field, 'operation' => $operation],
+            );
+        }
+
+        if (! is_numeric($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-numeric amount for [$field] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $field, 'operation' => $operation],
+            );
+        }
+
+        return (float) $value;
+    }
+
+    /**
+     * Narrow a decoded response to the array PayZephyr expects to map from.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     *
+     * @throws ChargeException
+     */
+    protected function requireArray(array $data, string $key, string $operation): array
+    {
+        $value = $this->requireField($data, $key, $operation);
+
+        if (! is_array($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-array value for [$key] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $key, 'operation' => $operation],
+            );
+        }
+
+        /** @var array<string, mixed> */
+        return $value;
+    }
+
+    /**
      * Convert the HTTP response body from JSON to a PHP array.
      *
      * @return array<string, mixed>
@@ -438,22 +553,31 @@ abstract class AbstractDriver implements DriverInterface
      *
      * @param  string  $level  Log level: 'info', 'warning', 'error', etc.
      * @param  string  $message  The log message
-     * @param  array<string, mixed>  $context  Extra data to include in the log
+     * @param  array<string, mixed>  $context
      */
     protected function log(string $level, string $message, array $context = []): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        if (! ($config['logging']['enabled'] ?? true)) {
-            return;
-        }
-
-        $sanitizedContext = $this->sanitizeLogContext($context);
-        $channelName = $config['logging']['channel'] ?? 'payments';
-
         try {
-            Log::channel($channelName)->{$level}("[{$this->getName()}] $message", $sanitizedContext);
-        } catch (InvalidArgumentException) {
-            Log::{$level}("[{$this->getName()}] $message", $sanitizedContext);
+            $config = app('payments.config') ?? config('payments', []);
+            if (! ($config['logging']['enabled'] ?? true)) {
+                return;
+            }
+
+            $sanitizedContext = $this->sanitizeLogContext($context);
+            $channelName = $config['logging']['channel'] ?? 'payments';
+            $prefixed = "[{$this->getName()}] $message";
+
+            try {
+                Log::channel($channelName)->{$level}($prefixed, $sanitizedContext);
+
+                return;
+            } catch (InvalidArgumentException) {
+                // No such channel configured - fall back to the default logger.
+            }
+
+            Log::{$level}($prefixed, $sanitizedContext);
+        } catch (Throwable) {
+            // Nothing left to try, and nothing worth failing a payment over.
         }
     }
 

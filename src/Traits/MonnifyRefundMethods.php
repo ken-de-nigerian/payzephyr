@@ -58,8 +58,12 @@ trait MonnifyRefundMethods
                 refundReference: $result['refundReference'] ?? $refundReference,
                 transactionReference: $result['transactionReference'] ?? $request->transactionReference,
                 status: $result['refundStatus'] ?? 'pending',
-                amount: (float) ($result['refundAmount'] ?? $request->amount ?? 0),
-                currency: $result['currencyCode'] ?? 'NGN',
+                // Falling back to the requested amount is a defensible
+                // inference for a refund the provider just accepted. Falling
+                // back to zero is not - it records a refund that did happen as
+                // one worth nothing.
+                amount: $this->requireAmountValue($result['refundAmount'] ?? $request->amount, 'refundAmount', 'refund'),
+                currency: $this->requireString($result, 'currencyCode', 'refund'),
                 reason: $result['refundReason'] ?? $request->reason,
                 metadata: $request->metadata,
                 provider: $this->getName(),
@@ -116,8 +120,8 @@ trait MonnifyRefundMethods
                 refundReference: $result['refundReference'] ?? $refundReference,
                 transactionReference: $result['transactionReference'] ?? '',
                 status: $result['refundStatus'] ?? 'unknown',
-                amount: (float) ($result['refundAmount'] ?? 0),
-                currency: $result['currencyCode'] ?? 'NGN',
+                amount: $this->requireAmount($result, 'refundAmount', 'fetch refund'),
+                currency: $this->requireString($result, 'currencyCode', 'fetch refund'),
                 reason: $result['refundReason'] ?? null,
                 metadata: [],
                 provider: $this->getName(),

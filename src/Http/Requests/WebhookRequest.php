@@ -58,9 +58,6 @@ class WebhookRequest extends FormRequest
             $driver = $manager->driver($provider);
 
             if ($driver instanceof RequiresAsyncWebhookVerification && $driver->requiresAsyncVerification()) {
-                // Deferred to ProcessWebhook. The payload-size cap above
-                // still applies; only the (I/O-bound) signature check
-                // itself is skipped here.
                 return true;
             }
 

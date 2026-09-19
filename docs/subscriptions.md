@@ -81,7 +81,7 @@ $subscription->subscriptionCode;   // save this - it's how you reference this su
 $subscription->status;             // "active", "cancelled", "non-renewing", etc.
 $subscription->customer;
 $subscription->plan;
-$subscription->amount;
+$subscription->amount;             // ?float - null for a metered or usage-based plan, never 0 in its place
 $subscription->nextPaymentDate;
 $subscription->emailToken;         // Paystack-specific, see below
 
@@ -159,10 +159,20 @@ Available filters: `forCustomer()`, `forPlan()`, `whereStatus()`, `active()`, `c
 ## Managing plans
 
 ```php
-Payment::subscription()->code($plan->planCode)->with('stripe')->fetchPlan();
-Payment::subscription()->code($plan->planCode)->planUpdates(['name' => 'Pro Monthly (New Price)'])->with('stripe')->updatePlan();
+Payment::subscription()->plan($plan->planCode)->with('stripe')->fetchPlan();
+Payment::subscription()->plan($plan->planCode)->planUpdates(['name' => 'Pro Monthly (New Price)'])->with('stripe')->updatePlan();
 Payment::subscription()->with('stripe')->listPlans();
 ```
+
+An update is held to the same rules as creating a plan, and is refused before the provider is
+contacted if it breaks them: the interval must be one of `daily`, `weekly`, `monthly` or
+`annually` (not `yearly`), and an amount must be greater than zero. On Stripe, changing the amount
+or interval of a metered price, or only the interval of a tiered price, is refused as well -
+PayZephyr would have to clone a price it cannot represent, so create those in Stripe directly.
+
+A fetched plan's `amount` is `null` when the provider has no single price for it, such as a
+tiered or usage-based Stripe price. That is not the same as a free plan, so check for `null`
+before doing arithmetic with it.
 
 **Mollie has no server-side plan concept at all**: every other provider stores your plan on their servers and gives you back an ID that references it, but Mollie subscriptions carry their amount/interval/description directly. PayZephyr works around this by encoding the plan into a self-describing string client-side rather than calling Mollie's API for `createPlan()`. The practical effect: `listPlans()` isn't meaningful for Mollie (there's nothing server-side to list) and throws a clear exception explaining why, rather than silently returning an empty array.
 

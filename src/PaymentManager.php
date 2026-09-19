@@ -6,13 +6,16 @@ namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
+use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Events\PaymentInitiated;
 use KenDeNigerian\PayZephyr\Events\PaymentVerificationFailed;
 use KenDeNigerian\PayZephyr\Events\PaymentVerificationSuccess;
@@ -24,12 +27,15 @@ use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
+use Random\RandomException;
 use Throwable;
 
 final class PaymentManager
 {
     use LogsToPaymentChannel;
     use NormalizesMetadata;
+    use RecordsTraceEvents;
 
     /** @var array<string, DriverInterface> */
     protected array $drivers = [];
@@ -90,8 +96,15 @@ final class PaymentManager
      */
     public function chargeWithFallback(ChargeRequestDTO $request, ?array $providers = null): ChargeResponseDTO
     {
+        $request = $this->resolveChargeReference($request);
         $providers = $providers ?? $this->getFallbackChain();
         $exceptions = [];
+
+        $this->trace($request->reference, TraceEvent::PAYMENT_INITIATED, payload: [
+            'amount' => $request->amount,
+            'currency' => $request->currency,
+            'provider_chain' => array_values($providers),
+        ]);
 
         $claimed = $this->claimChargeInFlight($request);
 
@@ -104,6 +117,51 @@ final class PaymentManager
 
             throw $e;
         }
+    }
+
+    /**
+     * Guarantee the request carries a reference before anything else sees it.
+     *
+     * Every driver resolves its own reference inside charge(), as
+     * `$request->reference ?? $this->generateReference(...)`. That is fine for
+     * a single provider and wrong for a chain: with no caller-supplied
+     * reference, each fallback attempt invented its own, so a payment that
+     * failed on Paystack and succeeded on Stripe left two attempts with no
+     * shared identifier - and the failed attempt's reference, never stored or
+     * returned, was unrecoverable.
+     *
+     * Resolving here, before claimChargeInFlight() and before the loop, gives
+     * the whole chain one identity, and makes the in-flight claim reachable at
+     * all for these requests - claimChargeInFlight() returns early on a null
+     * reference, so an auto-referenced charge previously took no claim and
+     * released none.
+     *
+     * That does not make two independent auto-referenced submissions
+     * deduplicable: each still mints its own reference, and nothing ties them
+     * together. It makes the charge claimable *once it has a reference*, so a
+     * caller who re-submits the reference PayZephyr handed back is now
+     * rejected rather than charged twice.
+     *
+     * @throws RandomException If the platform cannot produce secure randomness.
+     */
+    private function resolveChargeReference(ChargeRequestDTO $request): ChargeRequestDTO
+    {
+        if ($request->reference !== null && $request->reference !== '') {
+            return $request;
+        }
+
+        return $request->withReference($this->generateReference());
+    }
+
+    /**
+     * Mint a chain-wide reference, in the same shape drivers produce
+     * (PREFIX_TIMESTAMP_RANDOMHEX) but under a provider-neutral prefix.
+     *
+     * @throws RandomException If the platform cannot produce secure randomness.
+     */
+    private function generateReference(): string
+    {
+        return PaymentConstants::REFERENCE_PREFIX.'_'.time().'_'.bin2hex(random_bytes(8));
     }
 
     /**
@@ -125,6 +183,10 @@ final class PaymentManager
                 if ($this->config['health_check']['enabled'] ?? true) {
                     if (! $this->driverIsHealthy($driver)) {
                         $this->log('warning', "Provider [$providerName] failed health check, skipping");
+                        $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                            payload: ['reason' => 'failed_health_check'],
+                            provider: $providerName,
+                        );
 
                         continue;
                     }
@@ -132,11 +194,15 @@ final class PaymentManager
 
                 if (! $this->driverSupportsCurrency($driver, $request->currency)) {
                     $this->log('info', "Provider [$providerName] does not support currency $request->currency");
+                    $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                        payload: ['reason' => 'unsupported_currency', 'currency' => $request->currency],
+                        provider: $providerName,
+                    );
 
                     continue;
                 }
 
-                $response = $driver->charge($request);
+                $response = $this->chargeWithTraceContext($driver, $request);
                 $this->completeSuccessfulCharge($request, $response, $providerName);
 
                 return $response;
@@ -147,6 +213,10 @@ final class PaymentManager
                         'provider' => $providerName,
                         'reference' => $request->reference,
                     ]);
+                    $this->trace($request->reference, TraceEvent::CHARGE_AMBIGUOUS,
+                        payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
+                        provider: $providerName,
+                    );
 
                     throw ProviderException::withContext(
                         "Charge via [$providerName] timed out or lost its response before payment status could be confirmed. ".
@@ -173,13 +243,107 @@ final class PaymentManager
                         'enabled' => ($this->config['providers'][$providerName]['enabled'] ?? true),
                     ],
                 ]);
+
+                $this->trace($request->reference, TraceEvent::PROVIDER_ERROR,
+                    payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
+                    provider: $providerName,
+                );
             }
         }
+
+        $this->trace($request->reference, TraceEvent::PAYMENT_FAILED, payload: [
+            'providers_tried' => array_keys($exceptions),
+            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+        ]);
 
         throw ProviderException::withContext(
             'All payment providers failed',
             ['exceptions' => array_map(fn ($e) => $e->getMessage(), $exceptions)]
         );
+    }
+
+    /**
+     * Call the driver's charge() inside a fresh trace context.
+     *
+     * The reference is passed explicitly rather than left to $currentRequest
+     * so that both operations go through the same door; see withTraceContext()
+     * for why the manager owns this boundary at all.
+     *
+     * @throws Throwable Whatever the driver's charge() throws, untouched.
+     */
+    private function chargeWithTraceContext(DriverInterface $driver, ChargeRequestDTO $request): ChargeResponseDTO
+    {
+        return $this->withTraceContext(
+            $driver,
+            (string) $request->reference,
+            fn (): ChargeResponseDTO => $driver->charge($request)
+        );
+    }
+
+    /**
+     * The verification counterpart of chargeWithTraceContext().
+     *
+     * A verification carries no ChargeRequestDTO, so AbstractDriver cannot
+     * recover the reference from $currentRequest the way it does during a
+     * charge. Supplying it here is what puts the provider round-trip of a
+     * verify - its URL, status code and latency - onto the same timeline as
+     * the charge that created the payment.
+     *
+     * @throws Throwable Whatever the driver's verify() throws, untouched.
+     */
+    private function verifyWithTraceContext(
+        DriverInterface $driver,
+        string $reference,
+        string $verificationId
+    ): VerificationResponseDTO {
+        return $this->withTraceContext(
+            $driver,
+            $reference,
+            fn (): VerificationResponseDTO => $driver->verify($verificationId)
+        );
+    }
+
+    /**
+     * Run one provider attempt with a fresh correlation group around it.
+     *
+     * One reference spans the whole payment; one correlation id spans a single
+     * provider attempt within it. That is what makes a fallback chain readable
+     * rather than a flat pile of events: three attempts against three
+     * providers produce three correlation groups under one reference.
+     *
+     * Cleared in a finally, always. DriverFactory hands back a new instance
+     * per create() today, but PaymentManager caches drivers by name in
+     * $this->drivers, so a second operation in the same process reuses the
+     * same object. Leaked context would file one customer's provider
+     * round-trip under another customer's attempt - the only way this feature
+     * could leak data between payments, and the reason this is not simply set
+     * inside the drivers.
+     *
+     * Guarded by instanceof for the same reason driverIsHealthy() is: a driver
+     * implementing only DriverInterface is legitimate and documented, and must
+     * not blow up on a method the contract never promised. Such a driver
+     * simply records no HTTP-level steps.
+     *
+     * @template TResult
+     *
+     * @param  callable(): TResult  $operation
+     * @return TResult
+     *
+     * @throws Throwable Whatever $operation throws, untouched.
+     */
+    private function withTraceContext(DriverInterface $driver, string $reference, callable $operation): mixed
+    {
+        if (! $driver instanceof AbstractDriver) {
+            return $operation();
+        }
+
+        $driver->setTraceContext($reference, $this->startTraceCorrelation());
+
+        try {
+            return $operation();
+        } finally {
+            $driver->setTraceContext();
+        }
     }
 
     /**
@@ -248,8 +412,15 @@ final class PaymentManager
      * Atomically claim a logical payment before any provider is contacted.
      *
      * Returns the claim key on success, or null when the request carries no
-     * stable identity to claim (no caller-supplied reference) - in which case
-     * no protection is possible and the charge proceeds unguarded.
+     * stable identity to claim.
+     *
+     * chargeWithFallback() now runs resolveChargeReference() first, so that
+     * null branch is unreachable from the charge path. It stays because PHP
+     * cannot express "a ChargeRequestDTO whose reference is set" in the
+     * signature: without it, a future second call site handing over an
+     * unresolved request would build a claim key from an empty identifier and
+     * silently collide with every other such request. Failing to claim is the
+     * safe outcome; claiming the wrong thing is not.
      *
      * @throws ProviderException when the same logical payment is already in flight.
      */
@@ -278,6 +449,7 @@ final class PaymentManager
             $this->log('warning', 'Rejected a duplicate in-flight charge submission', [
                 'reference' => $reference,
             ]);
+            $this->trace($reference, TraceEvent::CHARGE_DUPLICATE_REJECTED);
 
             throw ProviderException::withContext(
                 "A charge for reference [$reference] is already in progress or was recently submitted. ".
@@ -334,6 +506,11 @@ final class PaymentManager
         ChargeResponseDTO $response,
         string $providerName
     ): void {
+        $this->trace($response->reference, TraceEvent::PAYMENT_COMPLETED,
+            payload: ['status' => $response->status],
+            provider: $providerName,
+        );
+
         try {
             $this->cacheSessionData($response->reference, $providerName, $response->accessCode);
         } catch (Throwable $e) {
@@ -379,11 +556,6 @@ final class PaymentManager
             return;
         }
 
-        // Deliberately unguarded: the single caller already runs this inside
-        // the post-success try/catch that absorbs and logs any failure here.
-        // A second catch would just duplicate that, and made the caller's
-        // guard unreachable - which meant the guard protecting the package's
-        // central invariant could never actually be exercised by a test.
         $rawMetadata = array_merge($request->metadata, $response->metadata, [
             '_provider_id' => $response->accessCode,
         ]);
@@ -416,11 +588,21 @@ final class PaymentManager
 
         $exceptions = [];
 
+        $this->trace($reference, TraceEvent::VERIFICATION_STARTED, payload: [
+            'providers_to_try' => $providers,
+            'provider_was_explicit' => $provider !== null,
+        ]);
+
         foreach ($providers as $providerName) {
             try {
                 $driver = $this->driver($providerName);
-                $response = $driver->verify($verificationId);
+                $response = $this->verifyWithTraceContext($driver, $reference, $verificationId);
                 $this->updateTransactionFromVerification($reference, $response);
+
+                $this->trace($reference, TraceEvent::VERIFICATION_COMPLETED,
+                    payload: ['status' => $response->status, 'channel' => $response->channel],
+                    provider: $providerName,
+                );
 
                 try {
                     if ($response->isSuccessful()) {
@@ -455,8 +637,18 @@ final class PaymentManager
                     'provider' => $providerName,
                     'trace' => $e->getTraceAsString(),
                 ]);
+
+                $this->trace($reference, TraceEvent::PROVIDER_ERROR,
+                    payload: ['error' => $e->getMessage(), 'error_class' => $e::class, 'during' => 'verification'],
+                    provider: $providerName,
+                );
             }
         }
+
+        $this->trace($reference, TraceEvent::VERIFICATION_FAILED, payload: [
+            'providers_tried' => array_keys($exceptions),
+            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+        ]);
 
         throw ProviderException::withContext(
             "Unable to verify payment reference: $reference",
@@ -498,8 +690,6 @@ final class PaymentManager
         }
 
         try {
-            // auth() returns the Auth Factory, which only exposes guard()/
-            // shouldUse() - check()/id() live on the Guard it resolves.
             if (function_exists('auth') && auth()->guard()->check()) {
                 $this->cachedContext = 'user_'.auth()->guard()->id();
 
@@ -621,6 +811,12 @@ final class PaymentManager
             $this->log('error', 'Failed to update transaction from verification', [
                 'error' => $e->getMessage(),
                 'reference' => $reference,
+            ]);
+
+            $this->trace($reference, TraceEvent::VERIFICATION_NOT_PERSISTED, payload: [
+                'error' => $e->getMessage(),
+                'error_class' => $e::class,
+                'provider_status' => $response->status,
             ]);
         }
     }

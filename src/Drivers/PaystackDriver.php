@@ -73,11 +73,13 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
         $this->setCurrentRequest($request);
 
         try {
+            $reference = $request->reference ?? $this->generateReference();
+
             $payload = [
                 'email' => $request->email,
                 'amount' => $request->getAmountInMinorUnits(),
                 'currency' => $request->currency,
-                'reference' => $request->reference ?? $this->generateReference(),
+                'reference' => $reference,
                 'callback_url' => $request->callbackUrl,
                 'metadata' => $request->metadata,
             ];
@@ -99,16 +101,16 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 );
             }
 
-            $result = $data['data'];
+            $result = is_array($data['data'] ?? null) ? $data['data'] : [];
 
             $this->log('info', 'Charge initialized successfully', [
-                'reference' => $result['reference'],
+                'reference' => $reference,
             ]);
 
             return new ChargeResponseDTO(
-                reference: $result['reference'],
-                authorizationUrl: $result['authorization_url'],
-                accessCode: $result['access_code'],
+                reference: $reference,
+                authorizationUrl: $this->requireString($result, 'authorization_url', 'charge'),
+                accessCode: $this->requireString($result, 'access_code', 'charge'),
                 status: 'pending',
                 metadata: $request->metadata,
                 provider: $this->getName(),
@@ -145,18 +147,18 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 );
             }
 
-            $result = $data['data'];
+            $result = is_array($data['data'] ?? null) ? $data['data'] : [];
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
-                'status' => $result['status'],
+                'status' => $result['status'] ?? null,
             ]);
 
             return new VerificationResponseDTO(
-                reference: $result['reference'],
-                status: $result['status'],
-                amount: ($result['amount'] ?? 0) / 100,
-                currency: $result['currency'],
+                reference: $this->requireString($result, 'reference', 'verify'),
+                status: $this->requireString($result, 'status', 'verify'),
+                amount: $this->requireAmount($result, 'amount', 'verify') / 100,
+                currency: $this->requireString($result, 'currency', 'verify'),
                 paidAt: $result['paid_at'] ?? null,
                 metadata: self::normalizeMetadata($result['metadata'] ?? null),
                 provider: $this->getName(),

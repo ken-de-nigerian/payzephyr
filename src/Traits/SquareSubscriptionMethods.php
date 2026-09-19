@@ -99,6 +99,8 @@ trait SquareSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         try {
             [$planObject, $variationObject] = $this->fetchSquareCatalogObjects($planCode);
 
@@ -532,8 +534,9 @@ trait SquareSubscriptionMethods
         return match ($interval) {
             'daily' => 'DAILY',
             'weekly' => 'WEEKLY',
+            'monthly' => 'MONTHLY',
             'annually' => 'ANNUAL',
-            default => 'MONTHLY',
+            default => throw new PlanException("Unsupported billing interval [$interval]."),
         };
     }
 
@@ -577,7 +580,7 @@ trait SquareSubscriptionMethods
         return new PlanResponseDTO(
             planCode: $variation['id'] ?? '',
             name: $plan['subscription_plan_data']['name'] ?? $variation['subscription_plan_variation_data']['name'] ?? '',
-            amount: ($price['amount'] ?? 0) / 100,
+            amount: isset($price['amount']) ? (float) $price['amount'] / 100 : null,
             interval: $this->mapIntervalFromSquare($phase['cadence'] ?? 'MONTHLY'),
             currency: strtoupper($price['currency'] ?? 'USD'),
             metadata: array_filter(['plan_id' => $plan['id'] ?? null]),
@@ -609,7 +612,7 @@ trait SquareSubscriptionMethods
             status: $this->mapSquareSubscriptionStatus($subscription['status'] ?? 'ACTIVE'),
             customer: $customer['email_address'] ?? '',
             plan: $subscription['plan_variation_id'] ?? '',
-            amount: ($priceMoney['amount'] ?? 0) / 100,
+            amount: isset($priceMoney['amount']) ? (float) $priceMoney['amount'] / 100 : null,
             currency: strtoupper($priceMoney['currency'] ?? 'USD'),
             nextPaymentDate: $subscription['charged_through_date'] ?? null,
             metadata: array_filter(['customer_id' => $subscription['customer_id'] ?? null]),

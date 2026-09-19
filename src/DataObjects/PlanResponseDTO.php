@@ -17,7 +17,7 @@ final readonly class PlanResponseDTO implements JsonSerializable
     public function __construct(
         public string $planCode,
         public string $name,
-        public float $amount,
+        public ?float $amount,
         public string $interval,
         public string $currency,
         public ?string $description = null,
@@ -34,7 +34,7 @@ final readonly class PlanResponseDTO implements JsonSerializable
         return new self(
             planCode: $data['plan_code'] ?? $data['id'] ?? '',
             name: $data['name'] ?? '',
-            amount: (float) ($data['amount'] ?? 0) / 100,
+            amount: isset($data['amount']) ? (float) $data['amount'] / 100 : null,
             interval: $data['interval'] ?? 'monthly',
             currency: $data['currency'] ?? 'NGN',
             description: $data['description'] ?? null,
@@ -70,9 +70,11 @@ final readonly class PlanResponseDTO implements JsonSerializable
     }
 
     /**
-     * Get amount in major units (already in major units, but provided for consistency)
+     * Get amount in major units (already in major units, but provided for consistency).
+     *
+     * Null for a plan with no fixed price - see the constructor.
      */
-    public function getAmountInMajorUnits(): float
+    public function getAmountInMajorUnits(): ?float
     {
         return $this->amount;
     }

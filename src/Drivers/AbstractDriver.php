@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
+use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -14,6 +16,8 @@ use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\Enums\TraceDirection;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
@@ -22,8 +26,10 @@ use KenDeNigerian\PayZephyr\Traits\HasLogSanitization;
 use KenDeNigerian\PayZephyr\Traits\HasNetworkErrorHandling;
 use KenDeNigerian\PayZephyr\Traits\HasWebhookValidation;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Psr\Http\Message\ResponseInterface;
 use Random\RandomException;
+use Throwable;
 
 /**
  * AbstractDriver - Base Class for All Payment Providers
@@ -38,6 +44,7 @@ abstract class AbstractDriver implements DriverInterface
     use HasNetworkErrorHandling;
     use HasWebhookValidation;
     use NormalizesMetadata;
+    use RecordsTraceEvents;
 
     protected Client $client;
 
@@ -51,6 +58,26 @@ abstract class AbstractDriver implements DriverInterface
      * Used to access the idempotency key when making API requests.
      */
     protected ?ChargeRequestDTO $currentRequest = null;
+
+    /**
+     * Groups the HTTP steps of a single provider attempt.
+     *
+     * Set and cleared by PaymentManager around each attempt, rather than by
+     * the drivers themselves: PaymentManager caches driver instances by name,
+     * so a value left behind here would attach one customer's provider
+     * round-trip to another customer's attempt.
+     */
+    protected ?string $traceCorrelationId = null;
+
+    /**
+     * The payment the HTTP steps in progress belong to.
+     *
+     * Only needed where $currentRequest cannot supply it. A charge sets
+     * $currentRequest and the reference comes from there; a verification has
+     * no ChargeRequestDTO at all, so without this its provider round-trips
+     * would go unrecorded.
+     */
+    protected ?string $traceReference = null;
 
     /**
      * Status normalizer instance.
@@ -153,11 +180,39 @@ abstract class AbstractDriver implements DriverInterface
             }
         }
 
+        $reference = $this->traceReference ?? $this->currentRequest?->reference;
+        $traceable = $reference !== null && $reference !== '';
+        $withBodies = $traceable && $this->traceRecordsHttpBodies();
+
+        $startedAt = microtime(true);
+
+        if ($traceable) {
+            $this->trace($reference, TraceEvent::PROVIDER_REQUEST_SENT, TraceDirection::OUTBOUND,
+                payload: $withBodies ? $this->arrayBody($options['json'] ?? $options['form_params'] ?? null) : [],
+                provider: $this->getName(),
+                correlationId: $this->traceCorrelationId,
+                httpMethod: $method,
+                httpUrl: $this->absoluteUri($uri),
+            );
+        }
+
         try {
-            return $this->client->request($method, $uri, $options);
+            $response = $this->client->request($method, $uri, $options);
         } catch (GuzzleException $e) {
 
             $this->handleNetworkError($e, $method, $uri);
+
+            if ($traceable) {
+                $this->trace($reference, $this->traceEventForNetworkError($e), TraceDirection::INBOUND,
+                    payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
+                    provider: $this->getName(),
+                    correlationId: $this->traceCorrelationId,
+                    httpMethod: $method,
+                    httpUrl: $this->absoluteUri($uri),
+                    httpStatusCode: $e instanceof RequestException ? $e->getResponse()?->getStatusCode() : null,
+                    responseTimeMs: (int) round((microtime(true) - $startedAt) * 1000),
+                );
+            }
 
             $context = [
                 'method' => $method,
@@ -171,6 +226,97 @@ abstract class AbstractDriver implements DriverInterface
                 $e
             );
         }
+
+        if ($traceable) {
+            $this->trace($reference, TraceEvent::PROVIDER_RESPONSE_RECEIVED, TraceDirection::INBOUND,
+                payload: $withBodies ? $this->peekResponseBody($response) : [],
+                provider: $this->getName(),
+                correlationId: $this->traceCorrelationId,
+                httpMethod: $method,
+                httpUrl: $this->absoluteUri($uri),
+                httpStatusCode: $response->getStatusCode(),
+                responseTimeMs: (int) round((microtime(true) - $startedAt) * 1000),
+            );
+        }
+
+        return $response;
+    }
+
+    /**
+     * Classify a Guzzle failure into the trace event that describes it.
+     *
+     * ConnectException covers connection refused, DNS failure and connect
+     * timeouts alike, so it is PROVIDER_TIMEOUT only when Guzzle actually says
+     * the word - otherwise someone reading the timeline goes looking for a
+     * slow provider when the real answer is a bad host or a closed port.
+     */
+    private function traceEventForNetworkError(GuzzleException $e): TraceEvent
+    {
+        if ($e instanceof ConnectException) {
+            return str_contains(strtolower($e->getMessage()), 'timed out')
+                ? TraceEvent::PROVIDER_TIMEOUT
+                : TraceEvent::PROVIDER_EXCEPTION;
+        }
+
+        if ($e instanceof RequestException && $e->getResponse() !== null) {
+            return TraceEvent::PROVIDER_ERROR;
+        }
+
+        return TraceEvent::PROVIDER_EXCEPTION;
+    }
+
+    /**
+     * Read a response body without consuming it for the caller.
+     *
+     * parseResponse() reads the same stream immediately afterwards, so this
+     * rewinds. A non-seekable body is left untouched: draining it would break
+     * the charge in order to record a description of the charge.
+     *
+     * Wrapped, because this runs on the payment path and a stream that
+     * misbehaves is worth strictly less than the payment. An unreadable body
+     * costs the timeline its payload, nothing more.
+     *
+     * @return array<string, mixed>
+     */
+    private function peekResponseBody(ResponseInterface $response): array
+    {
+        try {
+            $stream = $response->getBody();
+
+            if (! $stream->isSeekable()) {
+                return [];
+            }
+
+            $body = (string) $stream;
+            $stream->rewind();
+
+            return $this->arrayBody(json_decode($body, true));
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function arrayBody(mixed $body): array
+    {
+        return is_array($body) ? $body : [];
+    }
+
+    /**
+     * Resolve a relative request URI against the client's base_uri, so the
+     * timeline shows where the request actually went.
+     */
+    private function absoluteUri(string $uri): string
+    {
+        $base = (string) ($this->config['base_url'] ?? '');
+
+        if ($base === '' || str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
+            return $uri;
+        }
+
+        return rtrim($base, '/').'/'.ltrim($uri, '/');
     }
 
     /**
@@ -199,6 +345,135 @@ abstract class AbstractDriver implements DriverInterface
     protected function clearCurrentRequest(): void
     {
         $this->currentRequest = null;
+    }
+
+    /**
+     * Set (or clear, by passing nothing) the trace context for the attempt in
+     * progress.
+     *
+     * Public because PaymentManager owns the attempt boundary; see the
+     * property docblocks for why the drivers do not manage this themselves.
+     * Always cleared in a finally by whoever set it.
+     */
+    public function setTraceContext(?string $reference = null, ?string $correlationId = null): void
+    {
+        $this->traceReference = $reference;
+        $this->traceCorrelationId = $correlationId;
+    }
+
+    /**
+     * Read a field the provider is contractually required to return.
+     *
+     * Reading these directly off the array is how PayZephyr used to do it, and
+     * it fails badly in two different ways when a provider returns a shape
+     * nobody expected. An absent key raises "Undefined array key", which the
+     * driver rewraps into a message naming PHP rather than the provider. And
+     * where the value feeds a cast - `(float) $data['amount']` - a missing key
+     * becomes `0.0` rather than an error, which is a *wrong amount reported as
+     * verified* on any installation that does not promote warnings.
+     *
+     * Failing loudly and specifically is the only safe answer. The caller
+     * already treats a thrown exception as "this did not complete", which is
+     * the conservative outcome; being told which field the provider omitted is
+     * what makes it diagnosable.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireField(array $data, string $key, string $operation): mixed
+    {
+        if (! array_key_exists($key, $data) || $data[$key] === null) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] omitted the required field [$key] from its $operation response. ".
+                'The request may still have been accepted by the provider - verify before retrying.',
+                ['provider' => $this->getName(), 'missing_field' => $key, 'operation' => $operation],
+            );
+        }
+
+        return $data[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireString(array $data, string $key, string $operation): string
+    {
+        $value = $this->requireField($data, $key, $operation);
+
+        if (! is_string($value) && ! is_numeric($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-string value for [$key] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $key, 'operation' => $operation],
+            );
+        }
+
+        return (string) $value;
+    }
+
+    /**
+     * A monetary amount, which must never be allowed to default.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws ChargeException
+     */
+    protected function requireAmount(array $data, string $key, string $operation): float
+    {
+        return $this->requireAmountValue($this->requireField($data, $key, $operation), $key, $operation);
+    }
+
+    /**
+     * The same guarantee for an amount already pulled out of a response.
+     *
+     * Needed because not every provider hands back an array: the Stripe SDK
+     * returns objects, so the value has to be read before it can be checked.
+     *
+     * @throws ChargeException
+     */
+    protected function requireAmountValue(mixed $value, string $field, string $operation): float
+    {
+        if ($value === null) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] omitted the amount [$field] from its $operation response. ".
+                'Reporting this as a zero-value payment would be worse than failing.',
+                ['provider' => $this->getName(), 'field' => $field, 'operation' => $operation],
+            );
+        }
+
+        if (! is_numeric($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-numeric amount for [$field] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $field, 'operation' => $operation],
+            );
+        }
+
+        return (float) $value;
+    }
+
+    /**
+     * Narrow a decoded response to the array PayZephyr expects to map from.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     *
+     * @throws ChargeException
+     */
+    protected function requireArray(array $data, string $key, string $operation): array
+    {
+        $value = $this->requireField($data, $key, $operation);
+
+        if (! is_array($value)) {
+            throw ChargeException::withContext(
+                "[{$this->getName()}] returned a non-array value for [$key] in its $operation response.",
+                ['provider' => $this->getName(), 'field' => $key, 'operation' => $operation],
+            );
+        }
+
+        /** @var array<string, mixed> */
+        return $value;
     }
 
     /**
@@ -278,22 +553,31 @@ abstract class AbstractDriver implements DriverInterface
      *
      * @param  string  $level  Log level: 'info', 'warning', 'error', etc.
      * @param  string  $message  The log message
-     * @param  array<string, mixed>  $context  Extra data to include in the log
+     * @param  array<string, mixed>  $context
      */
     protected function log(string $level, string $message, array $context = []): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        if (! ($config['logging']['enabled'] ?? true)) {
-            return;
-        }
-
-        $sanitizedContext = $this->sanitizeLogContext($context);
-        $channelName = $config['logging']['channel'] ?? 'payments';
-
         try {
-            Log::channel($channelName)->{$level}("[{$this->getName()}] $message", $sanitizedContext);
-        } catch (InvalidArgumentException) {
-            Log::{$level}("[{$this->getName()}] $message", $sanitizedContext);
+            $config = app('payments.config') ?? config('payments', []);
+            if (! ($config['logging']['enabled'] ?? true)) {
+                return;
+            }
+
+            $sanitizedContext = $this->sanitizeLogContext($context);
+            $channelName = $config['logging']['channel'] ?? 'payments';
+            $prefixed = "[{$this->getName()}] $message";
+
+            try {
+                Log::channel($channelName)->{$level}($prefixed, $sanitizedContext);
+
+                return;
+            } catch (InvalidArgumentException) {
+                // No such channel configured - fall back to the default logger.
+            }
+
+            Log::{$level}($prefixed, $sanitizedContext);
+        } catch (Throwable) {
+            // Nothing left to try, and nothing worth failing a payment over.
         }
     }
 

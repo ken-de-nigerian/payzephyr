@@ -163,8 +163,6 @@ final class Payment
 
     protected function getRateLimitKey(): string
     {
-        // auth() returns the Auth Factory, which only exposes guard()/
-        // shouldUse() - check()/id() live on the Guard the factory resolves.
         if (function_exists('auth') && auth()->guard()->check()) {
             return 'payment_charge:user_'.auth()->guard()->id();
         }

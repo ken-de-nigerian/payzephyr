@@ -36,6 +36,20 @@ php artisan queue:restart
 
 This signals workers to finish their current job and then exit gracefully; your process supervisor (Supervisor, your platform's worker management) should then start fresh ones automatically.
 
+## Scheduled tasks
+
+Only if you've enabled [Tracing](tracing.md). It's the one PayZephyr table that grows per *step* rather than per payment - roughly six to ten rows where the rest of the package writes one - and nothing prunes it on its own:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('payzephyr:trace:prune')->daily();
+```
+
+That needs Laravel's scheduler actually running (a single `* * * * * php artisan schedule:run` cron entry, or your platform's equivalent), which is easy to forget on a box that didn't previously need one. Check it with `php artisan schedule:list`.
+
+If the table does get away from you, `PAYZEPHYR_FEATURE_TRACE=false` stops the writing on the next request - no deploy needed - while you catch up.
+
 ## Config caching
 
 If your deployment pipeline runs `php artisan config:cache` (common, and recommended for production performance), do this *after* all your environment variables are actually set: `config:cache` bakes the current environment's values into a cached file, so setting an environment variable afterward without re-caching won't take effect. If you ever change a `PAYMENTS_*` environment variable in production, remember to re-run `config:cache` (or `config:clear` if you're not using config caching) afterward.

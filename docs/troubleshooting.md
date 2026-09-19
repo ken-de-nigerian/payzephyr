@@ -2,6 +2,14 @@
 
 Each entry here follows the same shape: what you're seeing, why it happens, how to fix it, and how to confirm the fix actually worked.
 
+> **Debugging one specific payment?** If you have [Tracing](tracing.md) enabled, start there rather than here:
+>
+> ```bash
+> php artisan payzephyr:trace <reference> --detailed
+> ```
+>
+> It reconstructs everything that happened to that payment in order - which providers were tried and why any were skipped, every request and its timing, every webhook including duplicates and retries - and flags what's worth attention. The entries below are for classes of problem; that command is for *this* problem.
+
 ## Webhooks not processing
 
 **Symptom:** Payments complete successfully on the provider's side, your callback route works fine, but orders that rely on a webhook (subscription renewals, or orders where the customer never made it back to your callback) never update.

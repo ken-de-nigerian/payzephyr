@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('status')->index();
             $table->string('plan_code')->index();
             $table->string('customer_email');
-            $table->decimal('amount', 15);
+            $table->decimal('amount', 15)->nullable();
             $table->string('currency', 3);
             $table->date('next_payment_date')->nullable();
             $table->json('metadata')->nullable();

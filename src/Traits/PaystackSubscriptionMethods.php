@@ -90,6 +90,8 @@ trait PaystackSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         try {
             $response = $this->makeRequest('PUT', "/plan/$planCode", [
                 'json' => $updates,
@@ -258,7 +260,7 @@ trait PaystackSubscriptionMethods
                 status: $result['status'],
                 customer: $result['customer']['email'] ?? $request->customer,
                 plan: $result['plan']['name'] ?? $request->plan,
-                amount: ($result['amount'] ?? 0) / 100,
+                amount: isset($result['amount']) ? (float) $result['amount'] / 100 : null,
                 currency: $result['currency'] ?? 'NGN',
                 nextPaymentDate: $result['next_payment_date'] ?? null,
                 emailToken: $result['email_token'] ?? null,
@@ -316,7 +318,7 @@ trait PaystackSubscriptionMethods
                 status: $result['status'] ?? 'unknown',
                 customer: $result['customer']['email'] ?? '',
                 plan: $result['plan']['name'] ?? '',
-                amount: ($result['amount'] ?? 0) / 100,
+                amount: isset($result['amount']) ? (float) $result['amount'] / 100 : null,
                 currency: $result['currency'] ?? 'NGN',
                 nextPaymentDate: $result['next_payment_date'] ?? null,
                 emailToken: $result['email_token'] ?? null,

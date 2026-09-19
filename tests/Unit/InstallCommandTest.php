@@ -21,6 +21,7 @@ function cleanPublishedInstallerState(): void
         '*_create_subscription_transactions_table.php',
         '*_create_webhook_events_table.php',
         '*_create_refund_transactions_table.php',
+        '*_create_payment_trace_events_table.php',
     ] as $pattern) {
         foreach (glob(database_path('migrations/'.$pattern)) ?: [] as $file) {
             @unlink($file);
@@ -45,6 +46,7 @@ function featureMultiselectOptions(): array
     return [
         'subscriptions' => 'Subscriptions - Recurring billing (create/cancel/renew) on Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie',
         'refunds' => 'Refunds - Full and partial refunds across every bundled provider',
+        'trace' => 'Trace - Step-by-step forensic timeline of every payment - what happened, in order, and why',
     ];
 }
 
@@ -55,6 +57,7 @@ function installedMigrationFiles(): array
         'webhooks' => glob(database_path('migrations/*_create_webhook_events_table.php')) ?: [],
         'subscriptions' => glob(database_path('migrations/*_create_subscription_transactions_table.php')) ?: [],
         'refunds' => glob(database_path('migrations/*_create_refund_transactions_table.php')) ?: [],
+        'trace' => glob(database_path('migrations/*_create_payment_trace_events_table.php')) ?: [],
     ];
 }
 

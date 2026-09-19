@@ -68,6 +68,7 @@ all of this without you implementing any of it:
 | Events | The same events fire, so your listeners keep working. |
 | Health checks | Cached, so a slow provider does not slow every charge. |
 | Secret-safe logging | Keys and tokens stripped before anything is written. |
+| Tracing | Opt-in, step-by-step record of what happened to each payment. |
 
 You write what is genuinely specific to your provider: how to build its request, and how to read
 its response. That is the part nobody else can write for you.

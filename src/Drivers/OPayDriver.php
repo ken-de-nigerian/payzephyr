@@ -205,8 +205,8 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             return new VerificationResponseDTO(
                 reference: $result['reference'] ?? $result['orderNo'] ?? $reference,
                 status: $status,
-                amount: ($result['amount']['total'] ?? 0) / 100,
-                currency: $result['amount']['currency'] ?? 'NGN',
+                amount: $this->requireAmount($this->requireArray($result, 'amount', 'verify'), 'total', 'verify') / 100,
+                currency: $this->requireString($this->requireArray($result, 'amount', 'verify'), 'currency', 'verify'),
                 paidAt: isset($result['createTime']) ? date('Y-m-d H:i:s', $result['createTime']) : null,
                 metadata: self::normalizeMetadata($result['metadata'] ?? null),
                 provider: $this->getName(),

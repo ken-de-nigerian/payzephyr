@@ -21,6 +21,7 @@ function uninstallTestCleanState(): void
         '*_create_subscription_transactions_table.php',
         '*_create_webhook_events_table.php',
         '*_create_refund_transactions_table.php',
+        '*_create_payment_trace_events_table.php',
     ] as $pattern) {
         foreach (glob(database_path('migrations/'.$pattern)) ?: [] as $file) {
             @unlink($file);
@@ -41,6 +42,7 @@ function uninstallTestMigrationFiles(): array
         'webhooks' => glob(database_path('migrations/*_create_webhook_events_table.php')) ?: [],
         'subscriptions' => glob(database_path('migrations/*_create_subscription_transactions_table.php')) ?: [],
         'refunds' => glob(database_path('migrations/*_create_refund_transactions_table.php')) ?: [],
+        'trace' => glob(database_path('migrations/*_create_payment_trace_events_table.php')) ?: [],
     ];
 }
 

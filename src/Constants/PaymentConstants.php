@@ -15,6 +15,16 @@ final class PaymentConstants
     public const MAX_REFERENCE_LENGTH = 255;
 
     /**
+     * Prefix for references PayZephyr generates on the caller's behalf.
+     *
+     * Deliberately provider-neutral. A reference minted before the fallback
+     * chain runs cannot name the provider that will end up fulfilling it, and
+     * a reference prefixed with the wrong provider is worse than one that
+     * names none - ProviderDetector would resolve it confidently and wrongly.
+     */
+    public const REFERENCE_PREFIX = 'PZ';
+
+    /**
      * Maximum length for metadata keys.
      */
     public const MAX_KEY_LENGTH = 255;

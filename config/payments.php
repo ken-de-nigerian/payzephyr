@@ -11,15 +11,13 @@ return [
     |
     | Tracks which optional PayZephyr features `php artisan payzephyr:install`
     | has enabled for this app (payment logging and webhook processing are
-    | core and always available, not listed here). This is informational -
-    | set by the installer, readable by your own code - and does not gate
-    | Payment::subscription()/Payment::refund() at runtime; see
-    | docs/installation.md#core-vs-optional-features.
+    | core and always available, not listed here).
     |
     */
     'features' => [
         'subscriptions' => env('PAYZEPHYR_FEATURE_SUBSCRIPTIONS', false),
         'refunds' => env('PAYZEPHYR_FEATURE_REFUNDS', false),
+        'trace' => env('PAYZEPHYR_FEATURE_TRACE', false),
     ],
 
     /*
@@ -206,6 +204,52 @@ return [
         'enabled' => env('PAYMENTS_LOGGING_ENABLED', true),
         'table' => 'payment_transactions',
         'channel' => env('PAYMENTS_LOG_CHANNEL', 'payments'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payment Tracing
+    |--------------------------------------------------------------------------
+    |
+    | Records every step of a payment - provider requests and responses,
+    | fallback decisions, webhooks, retries - as its own row, so the whole
+    | lifecycle can be replayed afterwards. Where 'logging' above keeps a
+    | payment's current state, this keeps the sequence that produced it.
+    |
+    */
+    'trace' => [
+        'table' => env('PAYZEPHYR_TRACE_TABLE', 'payment_trace_events'),
+        'connection' => env('PAYZEPHYR_TRACE_CONNECTION'),
+
+        // Recommended in production: keeps the write off the request path.
+        'async' => env('PAYZEPHYR_TRACE_ASYNC', false),
+
+        'queue' => [
+            'connection' => env('PAYZEPHYR_TRACE_QUEUE_CONNECTION'),
+            'name' => env('PAYZEPHYR_TRACE_QUEUE_NAME', 'default'),
+        ],
+
+        'redact_fields' => [
+            'card_number',
+            'cvv',
+            'cvc',
+            'card_cvv',
+            'card_cvc',
+            'secret',
+            'password',
+            'api_key',
+            'secret_key',
+            'private_key',
+            'authorization',
+            'token',
+            'access_token',
+            'refresh_token',
+        ],
+
+        'redaction_max_depth' => env('PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH', 10),
+        'record_http_bodies' => env('PAYZEPHYR_TRACE_RECORD_HTTP_BODIES', true),
+        'retention_days' => env('PAYZEPHYR_TRACE_RETENTION_DAYS', 90),
+        'slow_response_ms' => env('PAYZEPHYR_TRACE_SLOW_RESPONSE_MS', 5000),
     ],
 
     /*

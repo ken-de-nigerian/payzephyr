@@ -9,12 +9,15 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Console\NormalizeRefundStatusCommand;
+use KenDeNigerian\PayZephyr\Console\PruneTraceEventsCommand;
+use KenDeNigerian\PayZephyr\Console\TraceCommand;
 use KenDeNigerian\PayZephyr\Console\UninstallCommand;
 use KenDeNigerian\PayZephyr\Contracts\ChannelMapperInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
 use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
+use KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
@@ -27,8 +30,12 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Services\NullTraceRecorder;
+use KenDeNigerian\PayZephyr\Services\PayloadRedactor;
 use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Services\TraceRecorder;
+use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
 use Throwable;
 
 final class PaymentServiceProvider extends ServiceProvider
@@ -49,6 +56,15 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(MetadataSanitizer::class);
 
         $this->app->singleton(DriverFactory::class);
+
+        $this->app->singleton(PayloadRedactor::class);
+        $this->app->singleton(TraceTimelineBuilder::class);
+
+        $this->app->singleton(TraceRecorderInterface::class, function ($app) {
+            return data_get($app->make('payments.config'), 'features.trace') ?? false
+                ? $app->make(TraceRecorder::class)
+                : $app->make(NullTraceRecorder::class);
+        });
 
         $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
         $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);
@@ -93,10 +109,16 @@ final class PaymentServiceProvider extends ServiceProvider
                 __DIR__.'/../database/migrations/2024_01_02_000000_create_refund_transactions_table.php' => database_path('migrations/2024_01_02_000000_create_refund_transactions_table.php'),
             ], 'payzephyr-migrations-refunds');
 
+            $this->publishes([
+                __DIR__.'/../database/migrations/2024_01_03_000000_create_payment_trace_events_table.php' => database_path('migrations/2024_01_03_000000_create_payment_trace_events_table.php'),
+            ], 'payzephyr-migrations-trace');
+
             $this->commands([
                 InstallCommand::class,
                 UninstallCommand::class,
                 NormalizeRefundStatusCommand::class,
+                TraceCommand::class,
+                PruneTraceEventsCommand::class,
             ]);
         }
 
@@ -109,11 +131,6 @@ final class PaymentServiceProvider extends ServiceProvider
 
     protected function registerRoutes(): void
     {
-        // routesAreCached() is only on the concrete Foundation Application,
-        // not the contract ServiceProvider::$app is typed to - so narrow
-        // before calling it. If the container is something else (Lumen, a
-        // custom kernel), fall through and register: routes present when they
-        // could have been cached is harmless, routes missing is not.
         if ($this->app instanceof FoundationApplication && $this->app->routesAreCached()) {
             return;
         }

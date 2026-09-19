@@ -8,7 +8,403 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+
+- **Payment tracing has moved into PayZephyr**, folded in from the separate `payzephyr-trace`
+  package, which is being retired. Where `logging` keeps a payment's current state, tracing
+  keeps the sequence that produced it: one append-only row per step, so a payment's whole
+  lifecycle can be replayed afterwards.
+
+  The charge, webhook and verification paths are all instrumented, and `payzephyr:trace` reads a
+  timeline back. The feature is off unless `PAYZEPHYR_FEATURE_TRACE=true`.
+
+  New: a `trace` block in `config/payments.php`, a `payment_trace_events` migration,
+  `Models\PaymentTraceEvent`, `DataObjects\TraceEventDTO`, `Enums\TraceEvent`,
+  `Enums\TraceDirection`, `Services\TraceRecorder`, `Services\PayloadRedactor`,
+  `Services\Timeline`, `Services\TraceTimelineBuilder`, `Jobs\RecordTraceEvent`, and a
+  `Facades\Trace` for recording your own steps. `TraceRecorderInterface` is bound in the
+  container, so a custom recorder can be swapped in.
+
+  The trace table's timestamps are millisecond-precision (`timestamps(3)`), unlike PayZephyr's
+  other tables. Several steps of one payment routinely land inside the same second, and the gap
+  between them is the thing a timeline is read for.
+
+- **The charge path now records what it did and why.** This is the part that earns the feature.
+  PayZephyr can silently route a payment to a provider the caller never chose, and until now the
+  only durable record of that was a single `payment_transactions` row saying which provider
+  eventually won. A failed first attempt left nothing behind at all.
+
+  A charge now records: `payment.initiated` with the provider chain it intends to try;
+  `provider.skipped` with a reason whenever a provider is passed over without being contacted
+  (failed health check, or unsupported currency); `provider.request.sent` and
+  `provider.response.received` for each HTTP round trip, with method, URL, status code and
+  elapsed milliseconds; `provider.error` when a provider fails and the chain moves on;
+  `charge.ambiguous` when the outcome is genuinely unknown; `charge.duplicate_rejected` when the
+  in-flight claim turns a resubmission away; and `payment.completed` or `payment.failed` at the
+  end.
+
+  Every one of those is keyed by the single reference the chain shares, so a payment that failed
+  on one provider and succeeded on another reads as one timeline rather than two unrelated
+  halves.
+
+  Two classification decisions worth knowing about, because getting them wrong would make
+  timelines lie:
+
+  - A single provider failing inside a fallback chain is `provider.error`, **not**
+    `payment.failed`. `Timeline::terminal()` returns the *first* terminal event, so marking an
+    individual provider's failure terminal would report a payment that was successfully
+    recovered by the next provider as having failed. `payment.failed` is reserved for the chain
+    giving up.
+  - `charge.ambiguous` is terminal and counts as an error, but makes neither
+    `Timeline::succeeded()` nor `Timeline::failed()` true. Nobody knows yet whether the customer
+    was charged, and a timeline that guessed would be worse than one that says so.
+
+- **HTTP tracing is instrumented once, in `AbstractDriver::makeRequest()`**, which is the single
+  chokepoint every one of the eight bundled drivers already routes through. A driver that
+  implements `DriverInterface` directly rather than extending `AbstractDriver` remains entirely
+  valid and simply records no HTTP-level steps.
+
+  Reading a response body for the timeline never costs the charge: the stream is rewound
+  afterwards, a non-seekable body is left untouched rather than drained, and a body that cannot
+  be read at all costs the timeline its payload and nothing else.
+
+  Guzzle reports connection refused, DNS failure and connect timeouts all as the same
+  `ConnectException`, so PayZephyr records `provider.timeout` only when the underlying error
+  actually says it timed out. Everything else is `provider.exception` - otherwise whoever reads
+  the timeline goes hunting for a slow provider when the real answer is a bad host.
+
+  `payments.trace.record_http_bodies` (default `true`) turns body capture off on its own,
+  keeping the timing, status codes and event sequence. Worth turning off if provider bodies in
+  your integration carry more customer data than you want at rest.
+
+- **The verification path is recorded too, which is what finally answers the redirect-versus-webhook
+  question.** A verification records `verification.started` with the providers it is about to ask,
+  then `verification.completed` with the status the provider gave, or `verification.failed` once
+  nobody could answer. Individual providers that cannot answer are `provider.error` - the same
+  split the charge chain uses, so one provider being unreachable is never mistaken for the
+  verification itself having failed.
+
+  "Completed" means PayZephyr got a definitive answer, not that the payment succeeded. A provider
+  replying "this payment failed" is a verification that worked, and the status in the payload says
+  which.
+
+  Because a charge and its later verification share one reference, they now share one timeline -
+  with millisecond timestamps. Which of the redirect and the webhook actually arrived first stops
+  being a guess.
+
+- **`verification.not_persisted` is new, for the quietest failure in the package.** The provider
+  confirms a payment, the local `payment_transactions` update then fails, and the caller is told
+  the payment succeeded while the database still says otherwise. That divergence used to surface
+  weeks later as a reconciliation mismatch with nothing anywhere to explain it. It is an error but
+  not terminal, and it carries the status the provider actually reported.
+
+- **Provider round trips made during a verification are now recorded.** A verification carries no
+  `ChargeRequestDTO`, so `AbstractDriver` could not recover the reference from `$currentRequest`
+  the way it does during a charge, and these calls went unrecorded. `setTraceCorrelationId()` has
+  been replaced by `setTraceContext(?string $reference, ?string $correlationId)`, and both the
+  charge and verification paths go through one `withTraceContext()` helper that clears it in a
+  `finally`. A driver implementing only `DriverInterface` is unaffected and simply records no
+  HTTP-level steps.
+
+- **`php artisan payzephyr:trace <reference>`** reads a timeline back, which is the point of
+  recording one. Keyed by reference - the same string `Payment::charge()` returned and
+  `Payment::verify()` takes - so there is nothing new to look up first. `--provider` narrows it to
+  one provider, `--json` gives a machine-readable version for piping elsewhere, and `--detailed`
+  adds the analysis below.
+
+  An unknown reference is not an error. A payment made before tracing was switched on has no
+  events and never will, so the command says which of those it is - including telling you that
+  tracing is off, and how to turn it on - rather than implying the payment does not exist.
+
+- **One analyser, one vocabulary.** The package this was folded in from shipped two overlapping
+  ones, `analyze()` and `detectAnomalies()`, which both reported slow responses and both reported
+  missing responses, using different thresholds and different wording for the same finding.
+  `Timeline::analyze()` is now the only one.
+
+  It reports, in severity order: an ambiguous charge outcome, a verification the provider
+  confirmed but the database did not record, provider timeouts, abandoned webhook retries,
+  webhooks that were never queued, duplicate deliveries, failed signature checks, requests that
+  were sent and never answered, and provider responses slower than
+  `payments.trace.slow_response_ms`. Repeated problems are counted rather than listed one by one,
+  and a clean timeline says so - a report that flags ordinary events teaches people to skim past
+  it.
+
+  Orphaned requests are matched within a correlation group, which is what that identifier is for:
+  one group is one provider round trip, so a group holding a request and no reply is a call that
+  went out and vanished.
+
+- **`php artisan payzephyr:trace:prune`** deletes trace events past
+  `payments.trace.retention_days` (90 by default). **Nothing prunes on its own.** This is the only
+  PayZephyr table that grows per *step* rather than per payment - six to ten rows where there used
+  to be one - so it is the one that needs scheduling:
+
+  ```php
+  Schedule::command('payzephyr:trace:prune')->daily();
+  ```
+
+  `--dry-run` reports the count and the span it would remove without touching anything, `--days`
+  overrides the window for a one-off, `--chunk` sets the batch size, and `--force` skips the
+  confirmation.
+
+  The unattended path is an explicit branch rather than a prompt falling through to its default
+  value - this command exists to run on a schedule, and "it proceeds because `confirm()` returns
+  its default when there is no TTY" is a behaviour nobody chose. Interactively it asks, and
+  defaults to no. It also refuses a window of less than a day, and rejects a non-numeric `--days`
+  instead of quietly pruning against the configured window.
+
+  Deletion selects ids and deletes by primary key, re-running the filter on each pass, rather than
+  chunking a cursor over the rows being deleted underneath it. That also keeps it portable:
+  `LIMIT` on a `DELETE` is a MySQL extension SQLite refuses unless it was compiled to allow it.
+
+- **Both commands are registered whether or not tracing is on**, and explain themselves when it
+  is not. Registering them conditionally would mean someone who has not enabled the feature gets
+  "command not found", which tells them nothing - and would have made the command's own "tracing
+  is switched off, here is how to turn it on" message unreachable. A missing table is reported
+  with the one command that fixes it, rather than as a driver-level complaint.
+
+- **`Traits\RecordsTraceEvents`** is how every call site records. `TraceRecorder::record()`
+  already promised not to throw, but that promise started too late: building a `TraceEventDTO`
+  happens at the call site, and the DTO refuses a reference that cannot key a timeline. On the
+  webhook path that reference comes out of a provider payload, so the wrapper closes the gap
+  where a malformed body could otherwise have taken down payment handling through the tracing
+  code.
+
+- **The webhook path now records what arrived, including what a duplicate said.** `webhook_events`
+  stores a provider and a dedup key and nothing else, so until now you could tell that a duplicate
+  delivery had happened but had no way to see whether it agreed with the first one. That content
+  is kept now, under the same reference the charge used, so the redirect and the webhook land on
+  one timeline instead of two.
+
+  A delivery records `webhook.received` once it passes deduplication, `webhook.duplicate` when it
+  does not, `webhook.validation_failed` when a deferred signature check rejects it,
+  `webhook.processing_failed` with the attempt number when the job throws, `retry.scheduled` when
+  another attempt is genuinely coming, and `retry.abandoned` once PayZephyr gives up. Bodies are
+  governed by the same `payments.trace.record_http_bodies` switch as provider request and response
+  bodies, since it is the same category of data.
+
+  `retry.abandoned` is recorded from the job's `failed()` hook rather than inferred in the catch
+  block, because that is the only point at which "abandoned" is a fact rather than a guess.
+  `retry.scheduled` is claimed only when the job is really running on a queue - `attempts()`
+  reports `0` off one, which would otherwise promise a retry that never arrives.
+
+- **A webhook that is accepted but never queued is recorded as `webhook.queue_failed`.** It is the
+  one failure the job cannot report on its own, because the job never runs - and unlike a
+  processing failure, no retry is coming. The controller stays ignorant of the payload on the
+  happy path and only resolves the reference inside its catch block, so this costs nothing until
+  something has already gone wrong.
+
+  **Two limits worth knowing.** `webhook.validation_failed` only fires for drivers that defer
+  verification (Mollie and PayPal). Every other driver's signature is checked in
+  `WebhookRequest::authorize()`, which returns `403` before the controller or the job runs, so
+  those rejections leave no trace row at all.
+
+  And because the reference is now read before the deferred signature check - it has to be, or a
+  rejected delivery could not be attributed to anything - a `webhook.validation_failed` row is
+  keyed by a reference taken from an **unverified** payload. Someone sending forged webhooks could
+  therefore write rows into a timeline they do not own. It is bounded by the route's rate limit,
+  the payload size cap and trace retention, and the forensic value is real, but it is an
+  unauthenticated write path and you should decide whether you want it.
+
+- **`payzephyr:install --features=trace`** installs it, and `payzephyr:uninstall --features=trace`
+  removes it, alongside `subscriptions` and `refunds`. Interactive installs list it as a third
+  checkbox, and `--all` includes it. Nothing in `InstallCommand` or `UninstallCommand` needed
+  changing: both iterate the `Features` registry, so trace is one entry rather than a special
+  case.
+
+  The switch lives at `payments.features.trace` - one key, one meaning. An earlier draft of
+  this release had a second `payments.trace.enabled`, which would have let a published config
+  file disagree with itself about whether tracing was on.
+
+- **`PAYZEPHYR_FEATURE_TRACE` is a real kill switch.** Tracing is the only PayZephyr feature
+  that writes on the hot path of every charge, verification and webhook, so switching it off
+  has to mean *nothing runs* - not "a disabled check runs first". With the flag off the
+  container hands out `Services\NullTraceRecorder`, which touches no database, no queue, no
+  config and no container. It takes effect on the next request: no deploy, and no migration to
+  roll back.
+
+  This makes `trace` the first `PAYZEPHYR_FEATURE_*` flag that is read at runtime rather than
+  only by the installer. `subscriptions` and `refunds` remain installer bookkeeping.
+
+- **Recording a trace event can never fail a payment.** A trace event describes something that
+  has already happened; if storing that description fails, the payment is still exactly as true
+  as it was, and the caller must hear about the payment rather than about PayZephyr's
+  bookkeeping. `TraceRecorder::record()` is now guaranteed not to throw - a missing table, an
+  unreachable database, a dead queue backend and a broken log channel all end in a log line and
+  a `null` return. It takes the same position, for the same reason, as
+  `PaymentManager::completeSuccessfulCharge()`.
+
+  The most likely version of this in practice is the flag being switched on before
+  `payzephyr:install --features=trace` has been run, so the table does not exist yet. That
+  degrades to "no timeline", not "no payments".
+
+- **`TraceEventDTO` now normalizes what it is given instead of refusing it.** Several of its
+  fields arrive from outside PayZephyr's control: the webhook route is `POST /{provider}` with
+  no constraint on the segment, and payloads are provider response bodies that are not
+  guaranteed to be valid UTF-8. An over-long provider slug is trimmed to the column width, an
+  unrecognised HTTP method or an out-of-range status code is dropped, and a payload or metadata
+  array that is too large or not encodable is replaced by a `_payzephyr_dropped` marker
+  explaining why. In every case the event survives with its timestamp, event type and timing
+  intact, which is most of what a timeline is for.
+
+  The single exception is the reference. It is the key the whole timeline hangs off, and a
+  coerced one would file this payment's history under a different payment, so that still
+  throws - and `TraceRecorder` catches it. The payload ceiling matches
+  `payments.webhook.max_payload_size` rather than being a number of its own.
+
+### Fixed
+
+- **A provider response missing its amount was reported as a payment worth nothing.** Every
+  driver mapped provider responses with defaults - `?? 0` for amounts, `?? 'USD'` or `?? 'NGN'`
+  for currencies. On any installation that does not promote PHP warnings to exceptions, a
+  response without an amount became `(float) null`, and PayZephyr reported a *verified* payment of
+  0.00 as fact. A defaulted currency was worse in its own way: a merchant trading in anything but
+  the guessed currency had the payment silently mis-denominated.
+
+  Absence now fails loudly and by name, through new `require*` helpers on `AbstractDriver`, on
+  every path where a wrong number is a wrong answer about money: every `verify()` mapping, and
+  every refund create and fetch mapping, across all eight drivers. The exception says what the
+  provider left out and warns that the provider may still have accepted the request - the
+  conservative reading, since the call has already happened. A genuine zero still passes; the
+  guard is against absence, not against zero. Where a refund response omits its amount, the
+  amount you requested is kept as a defensible inference; only the fall-through to zero is gone.
+
+  The OPay test suite had been passing with this exact bug in it. A fixture sent `amount` as a
+  scalar where OPay actually returns `{total, currency}`, the driver reported 0.0, and the test
+  passed because it only asserted the status. It now uses the real shape and asserts the amount.
+
+- **A plan update could bill customers twelve times as often as intended.** `updatePlan()`
+  takes a raw array, so none of the validation `createPlan()` applies ever ran on it. An
+  interval outside the four PayZephyr understands - `yearly`, `quarterly`, or Stripe's own
+  `year` - fell through Stripe's, Square's, Mollie's and PayPal's interval mappers to a monthly
+  default: a plan meant to bill once a year was moved to billing every month, silently. An amount
+  of zero, which creation refuses, produced a free plan just as silently.
+
+  Every driver's `updatePlan()` now checks the update against the same rules as creation, through
+  `SubscriptionPlanDTO::assertValidUpdates()`, *before* contacting the provider - so a rejected
+  update changes nothing anywhere. The valid intervals live in one place,
+  `SubscriptionPlanDTO::INTERVALS`, shared by creation and update. As a second line of defence,
+  every driver's outbound interval mapper now names all four intervals explicitly and refuses
+  anything else; `monthly` had been working in four of them only because it was the fallback.
+
+- **Changing a Stripe plan's interval could turn it into a free plan, or change how it bills.**
+  Stripe prices are immutable, so PayZephyr changes an amount or interval by cloning the price.
+  A tiered price has no `unit_amount`, and changing only its interval cloned it with
+  `(int) null` - a free fixed-price plan. A metered price was cloned without its `usage_type`,
+  so Stripe created a licensed one and every subscriber moved onto it was billed a flat amount
+  rather than for what they used. Both now refuse with an explanation and create nothing. A
+  tiered price can still be given a fixed amount when you pass one explicitly.
+
+- **A Stripe refund whose response could not be read escaped as a `ChargeException`.** The
+  mapping runs after `refunds->create()` has already succeeded, and it can throw - a missing
+  amount raises `ChargeException` from the new guards, a missing status is a `TypeError` - but
+  Stripe's `refund()` and `fetchRefund()` caught only `ApiErrorException`. A caller catching
+  `RefundException` missed it entirely, and could retry past it: without an idempotency key, that
+  retry is a second refund. Every other driver already rewrapped `Throwable`; Stripe now does
+  too, and says the refund may already exist.
+
+- **Flutterwave and Mollie still read the verified amount unguarded.** Both used a bare
+  `(float) $result['amount']` rather than a `?? 0` default, so a search for defaults missed them,
+  and they kept reporting a missing amount as 0.00 after every other driver was fixed. A test now
+  puts the same missing-amount and missing-currency response through all six HTTP drivers, which
+  is the test whose absence let this happen. PayPal's verify also read `status` unguarded.
+
+- **A broken log channel could fail a charge.** `log()` on `LogsToPaymentChannel` and on
+  `AbstractDriver` resolved its config outside its `try`, and its `InvalidArgumentException`
+  fallback could itself throw. Drivers log from inside their catch blocks while mapping provider
+  responses, and `PaymentManager::getCacheContext()` logs before the in-flight claim is taken -
+  so a log channel failing for any reason other than a bad channel name (a full disk on a file
+  driver would do it) surfaced as a failed payment for a customer whose card was fine. Both are
+  now guaranteed not to throw. The trade is that a genuinely broken log channel goes unreported
+  by PayZephyr, which is the right side of it: a lost log line is recoverable, a payment reported
+  as failed after the money moved is not.
+
+- **Paystack read the payment reference back out of the provider's response** rather than
+  returning the one it had sent, unlike the other seven drivers. Paystack echoes what it is sent,
+  so this was latent - but it was the one place a provider could split a payment's timeline in
+  two, and the read was unguarded, so a response without `data.reference` was a `TypeError`
+  rewrapped as a charge failure.
+
+- **`payzephyr:uninstall --features=…` refused to remove anything whose migration file was
+  gone.** It decided what to act on by globbing `database/migrations`, which is a poor proxy
+  for what an app actually has: deleting a migration file by hand does not drop the table it
+  created, and the table would then survive every subsequent uninstall. Naming features
+  explicitly is now treated as an instruction rather than a question, and the command acts on
+  exactly what you asked for. `removeResource()` was already idempotent, so a resource that
+  turns out to be absent costs nothing.
+
+  A bare `payzephyr:uninstall` still reports "nothing to do" when there is genuinely nothing
+  installed - that check is what the glob was for.
+
+  This matters more for trace than for the other two features, because
+  `PAYZEPHYR_FEATURE_TRACE` is read at runtime: an app left with the flag on and no table
+  would keep attempting a trace write on every payment. It degrades to a log line rather than
+  a failed payment, but "uninstall" should mean it stops.
+
+- **A payment that failed over to another provider had no single reference.** Every driver
+  resolved its own reference inside `charge()`, as
+  `$request->reference ?? $this->generateReference(...)`. That is fine for one provider and
+  wrong for a chain: when the caller supplied no reference, each fallback attempt invented its
+  own. A payment that failed on Paystack and succeeded on Stripe left two attempts with nothing
+  in common, and the failed attempt's reference - never stored, never returned - could not be
+  recovered at all. Anything trying to reconstruct what happened to that payment had two
+  unrelated halves and no way to know they belonged together.
+
+  `chargeWithFallback()` now resolves the reference once, before the fallback loop and before
+  the in-flight claim. Every provider in the chain is handed the same reference, and it is the
+  reference you get back.
+
+  A knock-on effect: `claimChargeInFlight()` returns early when the request carries no
+  reference, so charges without a caller-supplied one previously took no double-submission
+  claim at all and released none. They do now. This does **not** make two independent
+  auto-referenced submissions deduplicable - each still mints its own reference, and nothing
+  ties them together - but re-submitting the reference PayZephyr just handed back is now
+  rejected instead of charging the customer a second time.
+
 ### Changed
+
+- **Breaking: `PlanResponseDTO::$amount` and `SubscriptionResponseDTO::$amount` are now
+  `?float`**, and `PlanResponseDTO::getAmountInMajorUnits()` returns `?float`. Stripe returns a
+  null `unit_amount` for tiered, metered and usage-based prices - a plan like that has no single
+  price by design - and every subscription mapping collapsed it to `0.0`. That is
+  indistinguishable from a plan that is genuinely free, so a customer on metered billing
+  appeared, in PayZephyr's own records, to be paying nothing.
+
+  Every subscription and plan mapping across all six subscription-capable drivers now maps an
+  absent amount to `null` rather than zero, and `fromArray()` on both DTOs does the same. A
+  provider reporting a genuine `0` still comes through as `0.0` - the change is about absence.
+
+  Subscriptions deliberately did not get the fail-loudly treatment verify and refunds received
+  above. A metered plan with no fixed price is a legitimate answer, not a malformed response, so
+  throwing would have made those plans unusable. Null is what represents it truthfully.
+
+  `subscription_transactions.amount` is now nullable to match, since a metered subscription would
+  otherwise have failed on insert. **Existing installations need a one-line migration** - see
+  Upgrading below.
+
+  Subscription *currencies* still fall back to a default when a provider omits one. That is the
+  same class of problem, left for a separate change because fixing it means making
+  `$currency` nullable too, a second break to the same DTOs.
+
+- **Auto-generated references now carry a provider-neutral `PZ_` prefix** rather than the
+  fulfilling provider's name (`PAYSTACK_`, `STRIPE_`, and so on). A reference minted before the
+  chain runs cannot know which provider will settle it, and naming the wrong one is worse than
+  naming none: `ProviderDetector` resolves prefixes confidently, so a `PAYSTACK_` reference
+  ultimately settled by Stripe would send a later `verify()` to the wrong provider. The shape is
+  otherwise unchanged - `PREFIX_TIMESTAMP_RANDOMHEX`.
+
+  **The trade this accepts:** `ProviderDetector::detectFromReference()` cannot resolve a
+  provider from a `PZ_` reference, by design. That matters only on the last-resort branch of
+  `verify()` - no cached session, no `payment_transactions` row, and no provider passed
+  explicitly - where `verify()` now tries each enabled provider in turn rather than going
+  straight to one. Slower in that narrow case, and still correct. Transaction logging is on by
+  default and its table is part of the core install, so most applications never reach it.
+
+  References you supply yourself are untouched, and so are references already stored.
+
+- `ChargeRequestDTO::withReference()` is new. It returns a copy of the request carrying the
+  given reference, preserving every other field including the idempotency key - the key
+  identifies the logical submission, and stamping a reference onto a request must not change
+  which submissions a provider treats as duplicates of each other.
 
 - Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square
   drivers. Comment-only: no logic changed, and the behaviour is exactly as before. PayPal
@@ -18,6 +414,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **No user-facing impact.** Listed here for completeness rather than because it changes
   anything you can observe.
+
+### Upgrading
+
+**This release contains a breaking change**, so it should ship as a major version. Two things are
+required of apps that use subscriptions; everything else is optional.
+
+#### Required, if you use subscriptions
+
+1. **Make `subscription_transactions.amount` nullable.** New installs get this from the published
+   migration. Existing ones need a migration of their own, or a metered subscription will fail on
+   insert:
+
+   ```php
+   Schema::table(config('payments.subscriptions.logging.table', 'subscription_transactions'), function (Blueprint $table) {
+       $table->decimal('amount', 15)->nullable()->change();
+   });
+   ```
+
+2. **Handle a null amount wherever you read one.** `PlanResponseDTO::$amount`,
+   `SubscriptionResponseDTO::$amount` and `PlanResponseDTO::getAmountInMajorUnits()` are now
+   `?float`. Arithmetic, `number_format()` and typed parameters that received them will need a
+   null check. A null means the provider reported no fixed price - it is not zero, and treating it
+   as zero reintroduces the bug this fixes.
+
+#### Behaviour you may notice
+
+- **`verify()` and refunds now throw where they used to report zero.** If a provider's response
+  is missing its amount or currency, you get a `VerificationException` or `RefundException`
+  naming the missing field, where PayZephyr previously returned an amount of 0.00. That exception
+  means the provider's answer was incomplete - not that the payment failed. Verify again before
+  treating it as a failure.
+
+- **`updatePlan()` now throws `PlanException` for updates it used to accept.** An interval other
+  than `daily`, `weekly`, `monthly` or `annually`, an amount of zero or less, or an empty name is
+  refused before the provider is contacted. If you pass `yearly`, switch to `annually` - `yearly`
+  was being billed monthly. On Stripe, changing the amount or interval of a metered price, or only
+  the interval of a tiered price, is also refused: create those prices in Stripe directly.
+
+- **Stripe refunds now throw `RefundException` where they could throw `ChargeException`.** If
+  you catch `ChargeException` around refunds, catch `RefundException` instead. When the message
+  says the refund may already have been created, check the Stripe dashboard before retrying.
+
+#### Also worth a look before you deploy
+
+1. **If you let PayZephyr generate references**, new ones look like `PZ_1755000000_a1b2c3d4`
+   instead of `STRIPE_1755000000_a1b2c3d4`. Anything that parses a provider out of a reference
+   you did not supply - dashboards, reconciliation scripts, support tooling - needs updating to
+   read the `provider` column on `payment_transactions` instead. Existing references are
+   unchanged.
+
+2. **If you charge without a reference and re-submit the returned one**, that second submission
+   is now rejected with a `ProviderException` while the first is still in flight, where it
+   previously reached a provider. That is the fix working, but it is a new exception on a path
+   that used to succeed.
+
+3. **If you supply your own references**, nothing changes.
+
+#### If you want tracing
+
+```bash
+php artisan payzephyr:install --features=trace
+```
+
+Then schedule the prune, in the same breath - this is the only PayZephyr table that grows per
+step rather than per payment, and nothing prunes it on its own:
+
+```php
+Schedule::command('payzephyr:trace:prune')->daily();
+```
+
+`PAYZEPHYR_TRACE_ASYNC=true` is recommended in production to keep the write off the request path,
+and `php artisan payzephyr:trace <reference> --detailed` is the thing you'll actually reach for.
+Read [Tracing](tracing.md) before turning it on in production, particularly
+[what it stores](security.md#what-tracing-stores) - by default that includes provider request and
+response bodies, redacted.
+
+If it ever needs to stop, `PAYZEPHYR_FEATURE_TRACE=false` takes effect on the next request. No
+deploy, no migration rollback.
 
 ---
 

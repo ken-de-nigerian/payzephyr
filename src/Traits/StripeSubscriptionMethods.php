@@ -74,6 +74,8 @@ trait StripeSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         try {
             $existingPrice = $this->stripe->prices->retrieve($planCode, ['expand' => ['product']]);
             $existingProduct = $existingPrice->product;
@@ -87,6 +89,33 @@ trait StripeSubscriptionMethods
             }
 
             if (isset($updates['amount']) || isset($updates['interval'])) {
+                // Stripe prices are immutable, so changing the amount or the
+                // interval means cloning this price into a new one. Two kinds of
+                // price cannot be cloned faithfully from the fields below, and
+                // both used to be cloned anyway - silently:
+                //
+                // - A metered price. The clone carried no usage_type, so Stripe
+                //   created a licensed price: customers moved onto it are billed
+                //   a flat amount per interval instead of for what they used.
+                // - A tiered price with no amount supplied. It has no unit_amount,
+                //   which `(int)` turned into 0 - a free fixed-price plan.
+                //
+                // Neither is something PayZephyr can model, so both are refused
+                // with an explanation rather than approximated.
+                if (($existingPrice->recurring->usage_type ?? null) === 'metered') {
+                    throw new PlanException(
+                        "Cannot change the amount or interval of metered plan [$planCode] through PayZephyr: cloning it would ".
+                        'create a flat, licensed price and change how every subscriber on it is billed. Create the new metered price in Stripe directly.'
+                    );
+                }
+
+                if (! isset($updates['amount']) && $existingPrice->unit_amount === null) {
+                    throw new PlanException(
+                        "Cannot change the interval of plan [$planCode] without an amount: it has no fixed unit amount ".
+                        '(a tiered price), and cloning it would create a free plan. Pass an amount, or create the new price in Stripe directly.'
+                    );
+                }
+
                 $price = $this->stripe->prices->create([
                     'unit_amount' => isset($updates['amount']) ? (int) round($updates['amount'] * 100) : (int) $existingPrice->unit_amount,
                     'currency' => $existingPrice->currency,
@@ -415,8 +444,9 @@ trait StripeSubscriptionMethods
         return match ($interval) {
             'daily' => 'day',
             'weekly' => 'week',
+            'monthly' => 'month',
             'annually' => 'year',
-            default => 'month',
+            default => throw new PlanException("Unsupported billing interval [$interval]."),
         };
     }
 
@@ -435,7 +465,7 @@ trait StripeSubscriptionMethods
         return new PlanResponseDTO(
             planCode: $price->id,
             name: $product->name ?? '',
-            amount: ($price->unit_amount ?? 0) / 100,
+            amount: isset($price->unit_amount) ? (float) $price->unit_amount / 100 : null,
             interval: $this->mapIntervalFromStripe($price->recurring->interval ?? 'month'),
             currency: strtoupper($price->currency),
             description: $product->description ?? null,
@@ -456,7 +486,7 @@ trait StripeSubscriptionMethods
                 ?? (is_object($subscription->customer ?? null) ? $subscription->customer->email : '')
                 ?? '',
             plan: is_object($price) ? $price->id : $item->price ?? '',
-            amount: is_object($price) ? ($price->unit_amount ?? 0) / 100 : 0,
+            amount: is_object($price) && isset($price->unit_amount) ? (float) $price->unit_amount / 100 : null,
             currency: is_object($price) ? strtoupper($price->currency) : 'USD',
             nextPaymentDate: isset($subscription->current_period_end)
                 ? date('Y-m-d H:i:s', $subscription->current_period_end)

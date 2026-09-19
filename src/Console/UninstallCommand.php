@@ -26,7 +26,9 @@ use function Laravel\Prompts\warning;
  *   customization, and Laravel has no "unpublish" concept for vendor:publish
  *   output, so removing it automatically is a judgment call this command
  *   does not make on the developer's behalf.
- * - Never removes a feature that was never installed (see isInstalled()).
+ * - With no --features=, never reports or removes a feature that was never
+ *   installed (see isInstalled()). With --features=, acts on exactly what
+ *   was named, since a missing migration file does not mean a missing table.
  * - Never runs without either an explicit interactive confirmation
  *   (including typing "UNINSTALL") or --force in a non-interactive
  *   environment - see confirmDestruction().
@@ -49,7 +51,9 @@ final class UninstallCommand extends Command
             return self::FAILURE;
         }
 
-        $installed = array_filter($resources, fn (array $resource) => $this->isInstalled($resource));
+        $installed = $this->option('features') !== null
+            ? $resources
+            : array_filter($resources, fn (array $resource) => $this->isInstalled($resource));
 
         if ($installed === []) {
             $this->info('PayZephyr does not appear to be installed (no matching migrations were found) - nothing to do.');

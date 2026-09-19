@@ -94,6 +94,8 @@ trait PayPalSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         try {
             if (isset($updates['description'])) {
                 $this->makeRequest('PATCH', "/v1/billing/plans/$planCode", [
@@ -384,8 +386,9 @@ trait PayPalSubscriptionMethods
         return match ($interval) {
             'daily' => ['interval_unit' => 'DAY', 'interval_count' => 1],
             'weekly' => ['interval_unit' => 'WEEK', 'interval_count' => 1],
+            'monthly' => ['interval_unit' => 'MONTH', 'interval_count' => 1],
             'annually' => ['interval_unit' => 'YEAR', 'interval_count' => 1],
-            default => ['interval_unit' => 'MONTH', 'interval_count' => 1],
+            default => throw new PlanException("Unsupported billing interval [$interval]."),
         };
     }
 
@@ -431,7 +434,7 @@ trait PayPalSubscriptionMethods
         return new PlanResponseDTO(
             planCode: $data['id'],
             name: $data['name'] ?? '',
-            amount: (float) ($price['value'] ?? 0),
+            amount: isset($price['value']) ? (float) $price['value'] : null,
             interval: $this->mapIntervalFromPayPal($cycle['frequency'] ?? []),
             currency: $price['currency_code'] ?? 'USD',
             description: $data['description'] ?? null,
@@ -455,7 +458,7 @@ trait PayPalSubscriptionMethods
             status: $this->mapPayPalSubscriptionStatus($data['status'] ?? 'APPROVAL_PENDING'),
             customer: $data['subscriber']['email_address'] ?? $fallbackCustomerEmail ?? '',
             plan: $data['plan_id'] ?? '',
-            amount: (float) ($data['billing_info']['last_payment']['amount']['value'] ?? 0),
+            amount: isset($data['billing_info']['last_payment']['amount']['value']) ? (float) $data['billing_info']['last_payment']['amount']['value'] : null,
             currency: $data['billing_info']['last_payment']['amount']['currency_code'] ?? 'USD',
             nextPaymentDate: $data['billing_info']['next_billing_time'] ?? null,
             metadata: $metadata,

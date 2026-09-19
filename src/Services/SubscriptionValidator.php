@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Throwable;
 
-class SubscriptionValidator
+final readonly class SubscriptionValidator
 {
     /**
      * Validate subscription creation request

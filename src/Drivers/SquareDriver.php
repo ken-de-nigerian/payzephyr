@@ -458,6 +458,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      * Map Square payment data to VerificationResponseDTO.
      *
      * @param  array<string, mixed>  $payment
+     *
+     * @throws ChargeException
      */
     private function mapFromPayment(array $payment, string $reference): VerificationResponseDTO
     {
@@ -466,8 +468,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         return new VerificationResponseDTO(
             reference: $payment['reference_id'] ?? $reference,
             status: $status,
-            amount: ($payment['amount_money']['amount'] ?? 0) / 100,
-            currency: strtoupper($payment['amount_money']['currency'] ?? 'USD'),
+            amount: $this->requireAmount($this->requireArray($payment, 'amount_money', 'verify'), 'amount', 'verify') / 100,
+            currency: strtoupper($this->requireString($this->requireArray($payment, 'amount_money', 'verify'), 'currency', 'verify')),
             paidAt: $status === 'success' ? ($payment['updated_at'] ?? $payment['created_at'] ?? null) : null,
             metadata: [
                 'payment_id' => $payment['id'] ?? null,

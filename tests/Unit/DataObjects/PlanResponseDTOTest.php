@@ -63,7 +63,10 @@ test('fromArray applies defaults for missing keys', function () {
 
     expect($dto->planCode)->toBe('')
         ->and($dto->name)->toBe('')
-        ->and($dto->amount)->toBe(0.0)
+        // Null, not 0.0. An absent amount means the provider reported no
+        // fixed price - a metered or usage-based plan - and 0.0 is
+        // indistinguishable from a plan that is genuinely free.
+        ->and($dto->amount)->toBeNull()
         ->and($dto->interval)->toBe('monthly')
         ->and($dto->currency)->toBe('NGN')
         ->and($dto->description)->toBeNull()

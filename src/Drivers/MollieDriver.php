@@ -177,19 +177,21 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
             $data = $this->parseResponse($response);
+            $status = $this->requireString($data, 'status', 'verify');
+            $amount = $this->requireArray($data, 'amount', 'verify');
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
-                'status' => $data['status'],
+                'status' => $status,
             ]);
 
             $actualReference = $data['metadata']['reference'] ?? $reference;
 
             return new VerificationResponseDTO(
                 reference: $actualReference,
-                status: $this->normalizeStatus($data['status']),
-                amount: (float) $data['amount']['value'],
-                currency: $data['amount']['currency'],
+                status: $this->normalizeStatus($status),
+                amount: $this->requireAmount($amount, 'value', 'verify'),
+                currency: $this->requireString($amount, 'currency', 'verify'),
                 paidAt: $data['paidAt'] ?? null,
                 metadata: self::normalizeMetadata($data['metadata'] ?? null),
                 provider: $this->getName(),

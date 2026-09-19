@@ -272,7 +272,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 throw new VerificationException("PayPal order not found: $reference");
             }
 
-            $status = strtoupper($data['status']);
+            $status = strtoupper($this->requireString($data, 'status', 'verify'));
             $purchaseUnit = $data['purchase_units'][0] ?? [];
             $amount = $purchaseUnit['amount'] ?? [];
 
@@ -294,10 +294,6 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return new VerificationResponseDTO(
                 reference: $purchaseUnit['custom_id'] ?? $reference,
                 status: $this->normalizeStatus($status),
-                // Was `: 0` and `?? 'USD'`. Between them, an order PayPal
-                // returned without an amount block verified as a completed
-                // payment of zero dollars - for a merchant who may not even
-                // be trading in dollars.
                 amount: $this->requireAmount($amount, 'value', 'verify'),
                 currency: $this->requireString($amount, 'currency_code', 'verify'),
                 paidAt: $capture['create_time'] ?? null,

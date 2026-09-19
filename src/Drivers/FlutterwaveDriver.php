@@ -169,18 +169,19 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
                 );
             }
 
-            $result = $data['data'];
+            $result = $this->requireArray($data, 'data', 'verify');
+            $status = $this->requireString($result, 'status', 'verify');
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
-                'status' => $result['status'],
+                'status' => $status,
             ]);
 
             return new VerificationResponseDTO(
-                reference: $result['tx_ref'],
-                status: $this->normalizeStatus($result['status']),
-                amount: (float) $result['amount'],
-                currency: $result['currency'],
+                reference: $this->requireString($result, 'tx_ref', 'verify'),
+                status: $this->normalizeStatus($status),
+                amount: $this->requireAmount($result, 'amount', 'verify'),
+                currency: $this->requireString($result, 'currency', 'verify'),
                 paidAt: $result['created_at'] ?? null,
                 metadata: self::normalizeMetadata($result['meta'] ?? null),
                 provider: $this->getName(),

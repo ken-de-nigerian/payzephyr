@@ -791,3 +791,142 @@ test('stripe fetchSubscription maps trialing, incomplete and incomplete_expired 
     ['incomplete', 'attention'],
     ['incomplete_expired', 'expired'],
 ]);
+
+// ---------------------------------------------------------------------
+// Prices PayZephyr cannot clone faithfully are refused, not approximated
+// ---------------------------------------------------------------------
+
+/**
+ * Changing a Stripe price's amount or interval clones it into a new price.
+ * Two kinds used to be cloned anyway: a tiered price with no amount supplied
+ * became a free plan via `(int) null`, and a metered price lost its
+ * usage_type and came back licensed. Both now refuse, and nothing is created.
+ *
+ * @param  array<string, mixed>  $price
+ * @return array{0: object, 1: object}
+ */
+function stripePlanCloneClient(array $price): array
+{
+    $prices = new class($price)
+    {
+        /** @var array<int, array<string, mixed>> */
+        public array $created = [];
+
+        public function __construct(private array $price) {}
+
+        public function retrieve($id, $params = [])
+        {
+            return stripeObj2(array_merge(['id' => $id], $this->price));
+        }
+
+        public function create(array $params)
+        {
+            $this->created[] = $params;
+
+            return stripeObj2([
+                'id' => 'price_new',
+                'unit_amount' => $params['unit_amount'],
+                'currency' => $params['currency'],
+                'recurring' => ['interval' => $params['recurring']['interval']],
+                'metadata' => $params['metadata'] ?? [],
+            ]);
+        }
+    };
+
+    $products = new class
+    {
+        public function retrieve($id)
+        {
+            return stripeObj2(['id' => $id, 'name' => 'Plan']);
+        }
+    };
+
+    $client = new class($products, $prices)
+    {
+        public function __construct(public object $products, public object $prices) {}
+    };
+
+    return [$client, $prices];
+}
+
+test('changing only the interval of a tiered price is refused rather than creating a free plan', function () {
+    [$client, $prices] = stripePlanCloneClient([
+        'unit_amount' => null,
+        'currency' => 'usd',
+        'recurring' => ['interval' => 'month', 'usage_type' => 'licensed'],
+        'metadata' => [],
+        'product' => 'prod_123',
+    ]);
+
+    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_tiered', ['interval' => 'annually']))
+        ->toThrow(PlanException::class, 'would create a free plan');
+
+    expect($prices->created)->toBe([]);
+});
+
+test('changing the interval of a metered price is refused rather than making it licensed', function () {
+    [$client, $prices] = stripePlanCloneClient([
+        'unit_amount' => 5,
+        'currency' => 'usd',
+        'recurring' => ['interval' => 'month', 'usage_type' => 'metered'],
+        'metadata' => [],
+        'product' => 'prod_123',
+    ]);
+
+    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['interval' => 'annually']))
+        ->toThrow(PlanException::class, 'metered plan');
+
+    expect($prices->created)->toBe([]);
+});
+
+test('changing the amount of a metered price is refused as well', function () {
+    [$client, $prices] = stripePlanCloneClient([
+        'unit_amount' => 5,
+        'currency' => 'usd',
+        'recurring' => ['interval' => 'month', 'usage_type' => 'metered'],
+        'metadata' => [],
+        'product' => 'prod_123',
+    ]);
+
+    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['amount' => 20.00]))
+        ->toThrow(PlanException::class, 'metered plan');
+
+    expect($prices->created)->toBe([]);
+});
+
+test('a tiered price can still be given a fixed amount explicitly', function () {
+    // The refusal is about PayZephyr inventing a number. Asked for one, it
+    // creates the price as instructed.
+    [$client, $prices] = stripePlanCloneClient([
+        'unit_amount' => null,
+        'currency' => 'usd',
+        'recurring' => ['interval' => 'month'],
+        'metadata' => [],
+        'product' => 'prod_123',
+    ]);
+
+    makeStripeDriverWithClient2($client)->updatePlan('price_tiered', ['amount' => 25.00]);
+
+    expect($prices->created)->toHaveCount(1)
+        ->and($prices->created[0]['unit_amount'])->toBe(2500);
+});
+
+test('an ordinary licensed price still clones on an interval change', function () {
+    [$client, $prices] = stripePlanCloneClient([
+        'unit_amount' => 1000,
+        'currency' => 'usd',
+        'recurring' => ['interval' => 'month', 'usage_type' => 'licensed'],
+        'metadata' => [],
+        'product' => 'prod_123',
+    ]);
+
+    makeStripeDriverWithClient2($client)->updatePlan('price_basic', [
+        'interval' => 'annually',
+        'metadata' => ['tier' => 'gold'],
+    ]);
+
+    expect($prices->created)->toHaveCount(1)
+        ->and($prices->created[0]['unit_amount'])->toBe(1000)
+        ->and($prices->created[0]['recurring']['interval'])->toBe('year')
+        ->and($prices->created[0]['metadata'])->toBe(['tier' => 'gold']);
+});

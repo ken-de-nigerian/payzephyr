@@ -70,6 +70,8 @@ trait FlutterwaveSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         try {
             $payload = array_filter([
                 'name' => $updates['name'] ?? null,
@@ -331,8 +333,9 @@ trait FlutterwaveSubscriptionMethods
     private function mapIntervalToFlutterwave(string $interval): string
     {
         return match ($interval) {
+            'daily', 'weekly', 'monthly' => $interval,
             'annually' => 'yearly',
-            default => $interval,
+            default => throw new PlanException("Unsupported billing interval [$interval]."),
         };
     }
 
@@ -358,7 +361,7 @@ trait FlutterwaveSubscriptionMethods
         return new PlanResponseDTO(
             planCode: (string) $data['id'],
             name: $data['name'] ?? '',
-            amount: (float) ($data['amount'] ?? 0),
+            amount: isset($data['amount']) ? (float) $data['amount'] : null,
             interval: $this->mapIntervalFromFlutterwave($data['interval'] ?? 'monthly'),
             currency: $data['currency'] ?? 'NGN',
             metadata: array_filter(['duration' => $data['duration'] ?? null]),
@@ -378,7 +381,7 @@ trait FlutterwaveSubscriptionMethods
             status: strtolower((string) ($data['status'] ?? 'active')),
             customer: $data['customer']['email'] ?? '',
             plan: is_array($plan) ? (string) ($plan['id'] ?? '') : (string) $plan,
-            amount: (float) ($data['amount'] ?? 0),
+            amount: isset($data['amount']) ? (float) $data['amount'] : null,
             currency: $data['customer']['currency'] ?? 'NGN',
             nextPaymentDate: null,
             metadata: [],

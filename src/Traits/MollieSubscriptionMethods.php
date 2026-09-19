@@ -72,6 +72,8 @@ trait MollieSubscriptionMethods
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
+        SubscriptionPlanDTO::assertValidUpdates($updates);
+
         $existing = $this->decodeMolliePlanData($planCode);
 
         $name = $updates['name'] ?? $existing['name'];
@@ -334,11 +336,6 @@ trait MollieSubscriptionMethods
      */
     private function findMollieCustomerByEmail(string $email): ?array
     {
-        // Mollie's list-customers endpoint has no server-side email filter,
-        // so this scans up to 250 most-recent customers client-side. A
-        // known limitation for accounts with more customers than that -
-        // acceptable here since the alternative (creating a duplicate
-        // customer on every call) is worse.
         $response = $this->makeRequest('GET', '/v2/customers', ['query' => ['limit' => 250]]);
         $data = $this->parseResponse($response);
 
@@ -378,8 +375,9 @@ trait MollieSubscriptionMethods
         return match ($interval) {
             'daily' => '1 day',
             'weekly' => '1 week',
+            'monthly' => '1 month',
             'annually' => '12 months',
-            default => '1 month',
+            default => throw new PlanException("Unsupported billing interval [$interval]."),
         };
     }
 
@@ -480,7 +478,7 @@ trait MollieSubscriptionMethods
             status: $this->mapMollieSubscriptionStatus($data['status'] ?? 'pending'),
             customer: $customerEmail ?? '',
             plan: $this->molliePlanCodeFromSubscriptionData($data),
-            amount: (float) ($amount['value'] ?? 0),
+            amount: isset($amount['value']) ? (float) $amount['value'] : null,
             currency: $amount['currency'] ?? 'EUR',
             nextPaymentDate: $data['nextPaymentDate'] ?? null,
             metadata: array_filter(['mandate_id' => $data['mandateId'] ?? null]),

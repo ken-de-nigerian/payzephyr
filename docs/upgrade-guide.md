@@ -2,6 +2,63 @@
 
 This chapter walks through what changes when you move between PayZephyr's major versions. For the complete, exhaustive list of every change (not just breaking ones), see [CHANGELOG.md](CHANGELOG.md): this chapter is the narrative, tutorial version of the same information, focused on *what you need to actually do*.
 
+## Upgrading to the next major release (unreleased)
+
+This release contains breaking changes, all of them in service of one rule: **PayZephyr no
+longer invents a number when a provider does not send one.** Most apps that do not use
+subscriptions need to do nothing. The full list is in the [CHANGELOG](CHANGELOG.md).
+
+### If you use subscriptions: two required steps
+
+**1. Make `subscription_transactions.amount` nullable.** New installs get this from the published
+migration. An existing install needs a migration of its own, or the first metered subscription
+will fail on insert:
+
+```php
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::table(config('payments.subscriptions.logging.table', 'subscription_transactions'), function (Blueprint $table) {
+            $table->decimal('amount', 15)->nullable()->change();
+        });
+    }
+};
+```
+
+**2. Handle a null amount.** `PlanResponseDTO::$amount`, `SubscriptionResponseDTO::$amount` and
+`PlanResponseDTO::getAmountInMajorUnits()` are now `?float`. A null means the provider reported
+no fixed price - a tiered, metered or usage-based plan. It is not zero, and treating it as zero
+reintroduces exactly the bug this fixes: those customers appear to be paying nothing.
+
+```php
+$plan = Payment::subscription()->plan('price_123')->with('stripe')->fetchPlan();
+
+$label = $plan->amount === null
+    ? 'Priced by usage'
+    : number_format($plan->amount, 2).' '.$plan->currency;
+```
+
+### If you call `updatePlan()`: check your intervals
+
+`updatePlan()` now applies the same rules as `createPlan()` and refuses anything else *before*
+contacting the provider. If you have been passing `'yearly'`, change it to `'annually'` - on
+Stripe, Square, Mollie and PayPal, `'yearly'` was being billed **monthly**. It is worth checking
+any plan previously updated that way in your provider's dashboard.
+
+### Exceptions you may now see
+
+| Where | Now throws | Used to | What to do |
+|---|---|---|---|
+| `verify()` | `VerificationException` naming a missing field | report an amount of 0.00 | Verify again; it means the answer was incomplete, not that payment failed |
+| Refunds | `RefundException` naming a missing field | report a refund of 0.00 | Check the provider before retrying |
+| Stripe refunds | `RefundException` | sometimes `ChargeException` | Catch `RefundException` |
+| `updatePlan()` | `PlanException` | accept the update | Use one of the four intervals and an amount above zero |
+
 ## Upgrading to v3.0.0
 
 Most applications upgrade to v3.0.0 with **no code changes at all**. There is one breaking

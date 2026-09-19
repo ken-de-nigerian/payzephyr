@@ -64,7 +64,8 @@ test('fromArray applies defaults for missing keys', function () {
         ->and($dto->status)->toBe('unknown')
         ->and($dto->customer)->toBe('')
         ->and($dto->plan)->toBe('')
-        ->and($dto->amount)->toBe(0.0)
+        // Null, not 0.0 - see PlanResponseDTO for why.
+        ->and($dto->amount)->toBeNull()
         ->and($dto->currency)->toBe('NGN')
         ->and($dto->nextPaymentDate)->toBeNull()
         ->and($dto->emailToken)->toBeNull()

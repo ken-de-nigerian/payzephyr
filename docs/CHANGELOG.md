@@ -253,6 +253,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A provider response missing its amount was reported as a payment worth nothing.** Every
+  driver mapped provider responses with defaults - `?? 0` for amounts, `?? 'USD'` or `?? 'NGN'`
+  for currencies. On any installation that does not promote PHP warnings to exceptions, a
+  response without an amount became `(float) null`, and PayZephyr reported a *verified* payment of
+  0.00 as fact. A defaulted currency was worse in its own way: a merchant trading in anything but
+  the guessed currency had the payment silently mis-denominated.
+
+  Absence now fails loudly and by name, through new `require*` helpers on `AbstractDriver`, on
+  every path where a wrong number is a wrong answer about money: every `verify()` mapping, and
+  every refund create and fetch mapping, across all eight drivers. The exception says what the
+  provider left out and warns that the provider may still have accepted the request - the
+  conservative reading, since the call has already happened. A genuine zero still passes; the
+  guard is against absence, not against zero. Where a refund response omits its amount, the
+  amount you requested is kept as a defensible inference; only the fall-through to zero is gone.
+
+  The OPay test suite had been passing with this exact bug in it. A fixture sent `amount` as a
+  scalar where OPay actually returns `{total, currency}`, the driver reported 0.0, and the test
+  passed because it only asserted the status. It now uses the real shape and asserts the amount.
+
+- **A plan update could bill customers twelve times as often as intended.** `updatePlan()`
+  takes a raw array, so none of the validation `createPlan()` applies ever ran on it. An
+  interval outside the four PayZephyr understands - `yearly`, `quarterly`, or Stripe's own
+  `year` - fell through Stripe's, Square's, Mollie's and PayPal's interval mappers to a monthly
+  default: a plan meant to bill once a year was moved to billing every month, silently. An amount
+  of zero, which creation refuses, produced a free plan just as silently.
+
+  Every driver's `updatePlan()` now checks the update against the same rules as creation, through
+  `SubscriptionPlanDTO::assertValidUpdates()`, *before* contacting the provider - so a rejected
+  update changes nothing anywhere. The valid intervals live in one place,
+  `SubscriptionPlanDTO::INTERVALS`, shared by creation and update. As a second line of defence,
+  every driver's outbound interval mapper now names all four intervals explicitly and refuses
+  anything else; `monthly` had been working in four of them only because it was the fallback.
+
+- **Changing a Stripe plan's interval could turn it into a free plan, or change how it bills.**
+  Stripe prices are immutable, so PayZephyr changes an amount or interval by cloning the price.
+  A tiered price has no `unit_amount`, and changing only its interval cloned it with
+  `(int) null` - a free fixed-price plan. A metered price was cloned without its `usage_type`,
+  so Stripe created a licensed one and every subscriber moved onto it was billed a flat amount
+  rather than for what they used. Both now refuse with an explanation and create nothing. A
+  tiered price can still be given a fixed amount when you pass one explicitly.
+
+- **A Stripe refund whose response could not be read escaped as a `ChargeException`.** The
+  mapping runs after `refunds->create()` has already succeeded, and it can throw - a missing
+  amount raises `ChargeException` from the new guards, a missing status is a `TypeError` - but
+  Stripe's `refund()` and `fetchRefund()` caught only `ApiErrorException`. A caller catching
+  `RefundException` missed it entirely, and could retry past it: without an idempotency key, that
+  retry is a second refund. Every other driver already rewrapped `Throwable`; Stripe now does
+  too, and says the refund may already exist.
+
+- **Flutterwave and Mollie still read the verified amount unguarded.** Both used a bare
+  `(float) $result['amount']` rather than a `?? 0` default, so a search for defaults missed them,
+  and they kept reporting a missing amount as 0.00 after every other driver was fixed. A test now
+  puts the same missing-amount and missing-currency response through all six HTTP drivers, which
+  is the test whose absence let this happen. PayPal's verify also read `status` unguarded.
+
+- **A broken log channel could fail a charge.** `log()` on `LogsToPaymentChannel` and on
+  `AbstractDriver` resolved its config outside its `try`, and its `InvalidArgumentException`
+  fallback could itself throw. Drivers log from inside their catch blocks while mapping provider
+  responses, and `PaymentManager::getCacheContext()` logs before the in-flight claim is taken -
+  so a log channel failing for any reason other than a bad channel name (a full disk on a file
+  driver would do it) surfaced as a failed payment for a customer whose card was fine. Both are
+  now guaranteed not to throw. The trade is that a genuinely broken log channel goes unreported
+  by PayZephyr, which is the right side of it: a lost log line is recoverable, a payment reported
+  as failed after the money moved is not.
+
+- **Paystack read the payment reference back out of the provider's response** rather than
+  returning the one it had sent, unlike the other seven drivers. Paystack echoes what it is sent,
+  so this was latent - but it was the one place a provider could split a payment's timeline in
+  two, and the read was unguarded, so a response without `data.reference` was a `TypeError`
+  rewrapped as a charge failure.
+
 - **`payzephyr:uninstall --features=…` refused to remove anything whose migration file was
   gone.** It decided what to act on by globbing `database/migrations`, which is a poor proxy
   for what an app actually has: deleting a migration file by hand does not drop the table it
@@ -291,6 +362,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking: `PlanResponseDTO::$amount` and `SubscriptionResponseDTO::$amount` are now
+  `?float`**, and `PlanResponseDTO::getAmountInMajorUnits()` returns `?float`. Stripe returns a
+  null `unit_amount` for tiered, metered and usage-based prices - a plan like that has no single
+  price by design - and every subscription mapping collapsed it to `0.0`. That is
+  indistinguishable from a plan that is genuinely free, so a customer on metered billing
+  appeared, in PayZephyr's own records, to be paying nothing.
+
+  Every subscription and plan mapping across all six subscription-capable drivers now maps an
+  absent amount to `null` rather than zero, and `fromArray()` on both DTOs does the same. A
+  provider reporting a genuine `0` still comes through as `0.0` - the change is about absence.
+
+  Subscriptions deliberately did not get the fail-loudly treatment verify and refunds received
+  above. A metered plan with no fixed price is a legitimate answer, not a malformed response, so
+  throwing would have made those plans unusable. Null is what represents it truthfully.
+
+  `subscription_transactions.amount` is now nullable to match, since a metered subscription would
+  otherwise have failed on insert. **Existing installations need a one-line migration** - see
+  Upgrading below.
+
+  Subscription *currencies* still fall back to a default when a provider omits one. That is the
+  same class of problem, left for a separate change because fixing it means making
+  `$currency` nullable too, a second break to the same DTOs.
+
 - **Auto-generated references now carry a provider-neutral `PZ_` prefix** rather than the
   fulfilling provider's name (`PAYSTACK_`, `STRIPE_`, and so on). A reference minted before the
   chain runs cannot know which provider will settle it, and naming the wrong one is worse than
@@ -323,10 +417,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upgrading
 
-**Nothing is required.** Tracing is off unless you install it, no existing signature changed, and
-an app that upgrades and does nothing else behaves exactly as before.
+**This release contains a breaking change**, so it should ship as a major version. Two things are
+required of apps that use subscriptions; everything else is optional.
 
-Three things worth a look before you deploy:
+#### Required, if you use subscriptions
+
+1. **Make `subscription_transactions.amount` nullable.** New installs get this from the published
+   migration. Existing ones need a migration of their own, or a metered subscription will fail on
+   insert:
+
+   ```php
+   Schema::table(config('payments.subscriptions.logging.table', 'subscription_transactions'), function (Blueprint $table) {
+       $table->decimal('amount', 15)->nullable()->change();
+   });
+   ```
+
+2. **Handle a null amount wherever you read one.** `PlanResponseDTO::$amount`,
+   `SubscriptionResponseDTO::$amount` and `PlanResponseDTO::getAmountInMajorUnits()` are now
+   `?float`. Arithmetic, `number_format()` and typed parameters that received them will need a
+   null check. A null means the provider reported no fixed price - it is not zero, and treating it
+   as zero reintroduces the bug this fixes.
+
+#### Behaviour you may notice
+
+- **`verify()` and refunds now throw where they used to report zero.** If a provider's response
+  is missing its amount or currency, you get a `VerificationException` or `RefundException`
+  naming the missing field, where PayZephyr previously returned an amount of 0.00. That exception
+  means the provider's answer was incomplete - not that the payment failed. Verify again before
+  treating it as a failure.
+
+- **`updatePlan()` now throws `PlanException` for updates it used to accept.** An interval other
+  than `daily`, `weekly`, `monthly` or `annually`, an amount of zero or less, or an empty name is
+  refused before the provider is contacted. If you pass `yearly`, switch to `annually` - `yearly`
+  was being billed monthly. On Stripe, changing the amount or interval of a metered price, or only
+  the interval of a tiered price, is also refused: create those prices in Stripe directly.
+
+- **Stripe refunds now throw `RefundException` where they could throw `ChargeException`.** If
+  you catch `ChargeException` around refunds, catch `RefundException` instead. When the message
+  says the refund may already have been created, check the Stripe dashboard before retrying.
+
+#### Also worth a look before you deploy
 
 1. **If you let PayZephyr generate references**, new ones look like `PZ_1755000000_a1b2c3d4`
    instead of `STRIPE_1755000000_a1b2c3d4`. Anything that parses a provider out of a reference

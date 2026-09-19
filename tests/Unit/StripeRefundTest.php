@@ -139,3 +139,81 @@ test('stripe fetchRefund retrieves and maps a refund', function () {
         ->and($result->status)->toBe('pending')
         ->and($result->amount)->toBe(25.0);
 });
+
+/**
+ * A Stripe refund whose response cannot be read must surface as a
+ * RefundException.
+ *
+ * The response is mapped after refunds->create() has succeeded, and the
+ * mapping can throw: requireAmountValue() raises ChargeException on a missing
+ * amount. refund() used to catch only ApiErrorException, so that escaped as a
+ * ChargeException. A caller catching RefundException would miss it and could
+ * retry - and without an idempotency key that retry is a second refund.
+ */
+function stripeRefundClientReturning(array $refund): object
+{
+    $refunds = new class($refund)
+    {
+        public function __construct(private array $refund) {}
+
+        public function create(array $params, array $options = []): object
+        {
+            return stripeRefundObj($this->refund);
+        }
+
+        public function retrieve(string $id): object
+        {
+            return stripeRefundObj($this->refund);
+        }
+    };
+
+    return new class($refunds)
+    {
+        public function __construct(public object $refunds) {}
+    };
+}
+
+test('a stripe refund with no amount surfaces as a RefundException, not a ChargeException', function () {
+    $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
+        'id' => 're_noamount',
+        'payment_intent' => 'pi_123',
+        'status' => 'succeeded',
+        'currency' => 'usd',
+    ]));
+
+    $thrown = null;
+
+    try {
+        $driver->refund(new RefundRequestDTO(transactionReference: 'pi_123', amount: 50.00));
+    } catch (Throwable $e) {
+        $thrown = $e;
+    }
+
+    expect($thrown)->toBeInstanceOf(RefundException::class)
+        ->and($thrown->getMessage())->toContain('may already have been created')
+        ->and($thrown->getPrevious())->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+});
+
+test('a stripe refund with no status surfaces as a RefundException, not a TypeError', function () {
+    $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
+        'id' => 're_nostatus',
+        'payment_intent' => 'pi_123',
+        'amount' => 5000,
+        'currency' => 'usd',
+    ]));
+
+    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'pi_123', amount: 50.00)))
+        ->toThrow(RefundException::class);
+});
+
+test('fetching a stripe refund with no amount surfaces as a RefundException', function () {
+    $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
+        'id' => 're_noamount',
+        'payment_intent' => 'pi_123',
+        'status' => 'succeeded',
+        'currency' => 'usd',
+    ]));
+
+    expect(fn () => $driver->fetchRefund('re_noamount'))
+        ->toThrow(RefundException::class, 'Failed to read refund from Stripe');
+});

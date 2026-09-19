@@ -6,8 +6,10 @@ namespace KenDeNigerian\PayZephyr\Traits;
 
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Stripe\Exception\ApiErrorException;
+use Throwable;
 
 /**
  * Refund support for StripeDriver.
@@ -46,6 +48,19 @@ trait StripeRefundMethods
         } catch (ApiErrorException $e) {
             $this->log('error', 'Failed to create refund', ['error' => $e->getMessage()]);
             throw new RefundException('Failed to create refund: '.$e->getMessage(), 0, $e);
+        } catch (Throwable $e) {
+            $this->log('error', 'Refund response could not be read', [
+                'transaction_reference' => $request->transactionReference,
+                'error' => $e->getMessage(),
+                'error_class' => $e::class,
+            ]);
+
+            throw new RefundException(
+                'The refund may already have been created at Stripe, but its response could not be read. '.
+                'Check the Stripe dashboard before retrying: '.$e->getMessage(),
+                0,
+                $e
+            );
         }
     }
 
@@ -64,11 +79,21 @@ trait StripeRefundMethods
                 'error' => $e->getMessage(),
             ]);
             throw new RefundException('Failed to fetch refund: '.$e->getMessage(), 0, $e);
+        } catch (Throwable $e) {
+            $this->log('error', 'Refund response could not be read', [
+                'refund_reference' => $refundReference,
+                'error' => $e->getMessage(),
+                'error_class' => $e::class,
+            ]);
+
+            throw new RefundException('Failed to read refund from Stripe: '.$e->getMessage(), 0, $e);
         }
     }
 
     /**
      * @param  object{id: string, payment_intent?: string|null, status: string, amount?: int|null, currency: string, metadata?: array<string, mixed>|object}  $refund
+     *
+     * @throws ChargeException
      */
     private function mapStripeRefundToResponse(object $refund, ?string $reason = null): RefundResponseDTO
     {

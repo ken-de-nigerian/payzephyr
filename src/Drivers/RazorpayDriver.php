@@ -195,7 +195,8 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     {
         try {
             $link = $this->fetchPaymentLink($reference);
-            $currency = strtoupper((string) ($link['currency'] ?? ''));
+            $currency = strtoupper($this->requireString($link, 'currency', 'verify'));
+            $amount = $this->requireAmount($link, 'amount', 'verify');
             $payment = $this->findSettledPayment($link);
             $customer = is_array($link['customer'] ?? null) ? $link['customer'] : [];
 
@@ -207,7 +208,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             return new VerificationResponseDTO(
                 reference: (string) ($link['reference_id'] ?? $reference),
                 status: $this->normalizeStatus((string) ($link['status'] ?? 'unknown')),
-                amount: $this->fromMinorUnits($link['amount'] ?? 0, $currency),
+                amount: $this->fromMinorUnits($amount, $currency),
                 currency: $currency,
                 paidAt: isset($payment['created_at']) ? date('c', (int) $payment['created_at']) : null,
                 metadata: self::normalizeMetadata($link['notes'] ?? null),
@@ -355,7 +356,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     /**
      * Razorpay's own event id arrives in the `x-razorpay-event-id` header,
      * which never reaches this method, so the key is built from the event
-     * name and the ids it concerns. The key is also the replay defence (see
+     * name and the ids it concerns. The key is also the replay defense (see
      * validateWebhook()), so it leaves out the envelope's `created_at`, which
      * is the entity's creation time rather than the event's.
      *
@@ -387,7 +388,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      *
      * @return array<string, mixed>
      *
-     * @throws VerificationException
+     * @throws VerificationException|ChargeException
      */
     protected function fetchPaymentLink(string $identifier): array
     {
@@ -416,8 +417,6 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             );
         }
 
-        // Links in a list response always carry an empty `payments` array,
-        // even once paid, so the match is re-fetched by id for the full entity.
         $linkId = (string) ($links[0]['id'] ?? '');
 
         if (! str_starts_with($linkId, 'plink_')) {

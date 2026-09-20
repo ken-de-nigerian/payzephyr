@@ -35,10 +35,6 @@ trait RazorpayRefundMethods
             $currency = $payment['currency'];
 
             $payload = [
-                // Always explicit. Omitting it asks Razorpay for a full refund;
-                // sending what is still unrefunded, read from the payment above,
-                // keeps a full refund after a partial one well defined and
-                // checked locally before anything is sent.
                 'amount' => $request->amount !== null
                     ? $this->toMinorUnits($request->amount, $currency)
                     : $payment['refundable'],
@@ -50,7 +46,15 @@ trait RazorpayRefundMethods
             ];
 
             $requestOptions = ['json' => $payload];
-            if ($request->idempotencyKey !== null && preg_match('/^[A-Za-z0-9_-]{10,}$/', $request->idempotencyKey) === 1) {
+            if ($request->idempotencyKey !== null) {
+                if (preg_match('/^[A-Za-z0-9_-]{10,}$/', $request->idempotencyKey) !== 1) {
+                    throw new RefundException(
+                        'Razorpay will not accept this idempotency key, and PayZephyr will not send a refund '.
+                        'without the protection you asked for. Keys must be at least 10 characters of letters, '.
+                        'digits, hyphens or underscores.'
+                    );
+                }
+
                 $requestOptions['headers'] = ['X-Refund-Idempotency' => $request->idempotencyKey];
             }
 
@@ -62,6 +66,7 @@ trait RazorpayRefundMethods
             }
 
             $responseCurrency = strtoupper((string) ($data['currency'] ?? $currency));
+            $refundedMinorUnits = $data['amount'] ?? $payload['amount'];
 
             $this->log('info', 'Refund created', [
                 'refund_reference' => (string) $data['id'],
@@ -73,7 +78,7 @@ trait RazorpayRefundMethods
                 refundReference: (string) $data['id'],
                 transactionReference: $request->transactionReference,
                 status: (string) ($data['status'] ?? 'pending'),
-                amount: $this->fromMinorUnits($data['amount'] ?? 0, $responseCurrency),
+                amount: $this->fromMinorUnits($refundedMinorUnits, $responseCurrency),
                 currency: $responseCurrency,
                 reason: $request->reason,
                 metadata: $request->metadata,
@@ -101,18 +106,15 @@ trait RazorpayRefundMethods
                 throw new RefundException("Razorpay refund [$refundReference] not found");
             }
 
-            $currency = strtoupper((string) ($data['currency'] ?? ''));
+            $currency = strtoupper($this->requireString($data, 'currency', 'refund'));
+            $amount = $this->requireAmount($data, 'amount', 'refund');
             $notes = is_array($data['notes'] ?? null) ? $data['notes'] : [];
 
             $refundResponse = new RefundResponseDTO(
                 refundReference: (string) $data['id'],
-                // The package reference from notes, not payment_id: the local
-                // row is upserted by refund_reference, and replacing its
-                // transaction_reference with a pay_ id would detach it from
-                // the over-refund and in-flight guards.
                 transactionReference: (string) ($notes['payzephyr_reference'] ?? $data['payment_id'] ?? ''),
-                status: (string) ($data['status'] ?? 'unknown'),
-                amount: $this->fromMinorUnits($data['amount'] ?? 0, $currency),
+                status: (string) ($data['status'] ?? 'pending'),
+                amount: $this->fromMinorUnits($amount, $currency),
                 currency: $currency,
                 reason: isset($notes['reason']) ? (string) $notes['reason'] : null,
                 metadata: [],
@@ -183,7 +185,7 @@ trait RazorpayRefundMethods
 
         return [
             'id' => $paymentId,
-            'currency' => strtoupper((string) ($payment['currency'] ?? '')),
+            'currency' => strtoupper($this->requireString($payment, 'currency', 'refund')),
             'refundable' => $refundable,
         ];
     }
@@ -203,9 +205,6 @@ trait RazorpayRefundMethods
         try {
             return $lookup();
         } catch (Throwable $e) {
-            // Deliberately not chained. Nothing has been refunded yet, and a
-            // chained read timeout from this lookup would make Refund::refund()
-            // report the refund as possibly processed and keep its lock.
             throw new RefundException(
                 "Could not look up the Razorpay payment for [$transactionReference] before refunding: ".$this->describeFailure($e)
             );

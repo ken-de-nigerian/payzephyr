@@ -25,11 +25,6 @@ final class ChannelMapper implements ChannelMapperInterface
             'flutterwave' => $this->mapToFlutterwave($channels),
             'stripe' => $this->mapToStripe($channels),
             'paypal' => null,
-            // Paddle's transaction API has no payment-method restriction
-            // parameter either - which methods appear is a Paddle Checkout
-            // setting, not a per-transaction field - so there is nothing to
-            // map on the way out. Incoming method types are still mapped back
-            // to unified channels by mapFromPaddle().
             'paddle' => null,
             'square' => $this->mapToSquare($channels),
             'opay' => $this->mapToOpay($channels),

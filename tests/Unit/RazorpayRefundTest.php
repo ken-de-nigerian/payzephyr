@@ -122,16 +122,23 @@ test('razorpay refunds a pay_ id directly, reading its currency first', function
         ->and($result->amount)->toBe(300.0);
 });
 
-test('razorpay refund skips an idempotency key razorpay would reject', function () {
+test('razorpay refund refuses an idempotency key razorpay would reject', function () {
+    // Changed in review: this used to drop the key and send the refund anyway.
+    // The caller asked for protection against double-refunding, and a refund
+    // sent without it looks identical on the way out - so the request fails
+    // rather than quietly downgrading to no protection at all.
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(),
         razorpayRefundResponse(),
     ], $history);
 
-    $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123', idempotencyKey: 'short'));
+    expect(fn () => $driver->refund(new RefundRequestDTO(
+        transactionReference: 'plink_Abc123', idempotencyKey: 'short'
+    )))->toThrow(RefundException::class, 'at least 10 characters');
 
-    expect($history[2]['request']->hasHeader('X-Refund-Idempotency'))->toBeFalse();
+    // Nothing was sent: the payment lookups happened, the refund did not.
+    expect(collect($history)->filter(fn ($h) => $h['request']->getMethod() === 'POST'))->toHaveCount(0);
 });
 
 test('razorpay refund uses the configured refund speed', function () {

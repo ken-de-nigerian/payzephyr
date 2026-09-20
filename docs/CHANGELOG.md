@@ -253,6 +253,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Paddle refunds could report an amount and currency Paddle never sent.** The adjustment
+  mapper read `currency_code` with a `?? 'USD'` default and the refund total with `?? 0`. That
+  currency is not cosmetic: it decides whether the amount is divided by 100, so a JPY refund
+  read as USD was recorded at a hundredth of its value, and a refund whose total was absent was
+  stored as a completed refund of 0.00. Both now fail by name through the same `require*`
+  guards every other driver uses, and Paddle is covered by the cross-driver test that proves no
+  driver turns a provider's silence into a number.
+
+  The adjustment's own `id` is required too. An empty refund reference persists happily, and
+  `fetchRefund('')` would later query the list endpoint rather than look anything up.
+
+- **A refund whose Paddle response was lost said nothing about what had happened to the money.**
+  Paddle Billing accepts no client-supplied idempotency key, and its own guidance for a create
+  whose response never arrived is to list the entity and check. PayZephyr now does that listing
+  for you: when a refund's outcome is ambiguous, the exception names the refund adjustments
+  Paddle currently holds against the transaction, with their amounts and statuses.
+
+  It deliberately stops there rather than deduplicating. An adjustment carries no `custom_data`
+  and no idempotency field, so a retry of one $10 refund and a deliberate second $10 refund are
+  indistinguishable; collapsing them automatically would be its own money bug, with the merchant
+  believing two refunds went out and the customer receiving one. The exception says plainly that
+  PayZephyr will not retry and that the adjustments above need reconciling first. If the lookup
+  itself fails, the message says so rather than replacing the original error.
+
+- **Paddle mishandled currencies with no minor unit.** `ZERO_DECIMAL_CURRENCIES` listed four
+  entries where PayPal's equivalent list has seventeen. A merchant billing in KRW, ISK, XOF or
+  any of the other thirteen had every amount sent to Paddle a hundred times too large, and every
+  amount read back a hundred times too small. The two lists now match.
+
+- **A non-transaction Paddle notification could overwrite a pending payment's status.**
+  `PaddleDriver` correctly reports `unknown` for subscription and adjustment events, but
+  `ProcessWebhook` then wrote that string into the transaction row. The result matched no
+  `PaymentStatus`, so `paid_at` was never set and reconciliation saw a payment that was neither
+  pending nor complete. A webhook carrying no recognisable payment status now leaves the
+  transaction untouched and logs that it did.
+
 - **A provider response missing its amount was reported as a payment worth nothing.** Every
   driver mapped provider responses with defaults - `?? 0` for amounts, `?? 'USD'` or `?? 'NGN'`
   for currencies. On any installation that does not promote PHP warnings to exceptions, a

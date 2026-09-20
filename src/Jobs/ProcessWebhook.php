@@ -276,6 +276,16 @@ final class ProcessWebhook implements ShouldQueue
     ): void {
         try {
             $status = $this->determineStatus($manager, $statusNormalizer);
+
+            if ($status === 'unknown') {
+                $this->log('info', 'Webhook carried no recognisable payment status - transaction left unchanged', [
+                    'provider' => $this->provider,
+                    'reference' => $reference,
+                ]);
+
+                return;
+            }
+
             $updateData = ['status' => $status];
 
             $statusEnum = PaymentStatus::tryFromString($status);

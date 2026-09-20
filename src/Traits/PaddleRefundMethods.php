@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Throwable;
 
@@ -41,16 +42,6 @@ trait PaddleRefundMethods
             if ($request->amount === null) {
                 $payload['type'] = 'full';
             } else {
-                // Paddle is the only bundled provider where the currency
-                // changes the numeric amount sent (zero-decimal currencies are
-                // not multiplied by 100), and it accepts any partial amount
-                // under the line-item total without complaint. Guessing the
-                // currency from config would therefore turn a $25.50 refund
-                // into a silent $0.25 one whenever a zero-decimal currency
-                // happens to sit first in the configured list. The
-                // transaction's own currency_code is authoritative, and
-                // resolveRefundTarget() is already fetching that transaction
-                // for the line item, so it costs no extra call.
                 [$itemId, $transactionCurrency] = $this->resolveRefundTarget($request->transactionReference);
 
                 $payload['type'] = 'partial';
@@ -77,7 +68,79 @@ trait PaddleRefundMethods
             throw $e;
         } catch (Throwable $e) {
             $this->log('error', 'Failed to create refund', ['error' => $e->getMessage()]);
+
+            if ($e instanceof ChargeException && $e->isAmbiguousProviderOutcome()) {
+                throw new RefundException(
+                    'The refund request reached Paddle but its response was lost, so it may already have been '.
+                    'created. '.$this->describeExistingRefunds($request->transactionReference).' '.
+                    'Paddle has no idempotency key, so PayZephyr will not retry this for you - reconcile against '.
+                    'the adjustments above before issuing another refund. Original error: '.$e->getMessage(),
+                    0,
+                    $e
+                );
+            }
+
             throw new RefundException('Failed to create refund: '.$e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Report what refunds Paddle currently holds against a transaction.
+     *
+     * Paddle's own guidance for a create whose response was lost is to "list
+     * or get the entity to check whether it already exists", because the API
+     * accepts no client-supplied idempotency key. PayZephyr cannot act on that
+     * automatically: an adjustment carries no custom_data and no idempotency
+     * field, so a retry of one $10 refund and a deliberate second $10 refund
+     * are indistinguishable. Silently collapsing the second into the first
+     * would be its own money bug - the merchant believes two refunds went out
+     * and the customer received one.
+     *
+     * So this gathers the facts and puts them in the exception instead, and a
+     * human decides. Guarded throughout: this runs while an error is already
+     * being reported, and must not replace it with a different one.
+     */
+    private function describeExistingRefunds(string $transactionId): string
+    {
+        try {
+            $response = $this->makeRequest('GET', '/adjustments', [
+                'query' => ['transaction_id' => $transactionId],
+            ]);
+
+            $adjustments = $this->parseResponse($response)['data'] ?? [];
+
+            $refunds = array_values(array_filter(
+                is_array($adjustments) ? $adjustments : [],
+                fn ($adjustment): bool => is_array($adjustment) && ($adjustment['action'] ?? null) === 'refund'
+            ));
+
+            if ($refunds === []) {
+                return "Paddle currently reports no refund adjustments against transaction [$transactionId], which suggests the refund was not created.";
+            }
+
+            $described = implode(', ', array_map(
+                fn (array $r): string => sprintf(
+                    '%s (%s %s, %s)',
+                    $r['id'] ?? 'unknown id',
+                    $r['totals']['total'] ?? '?',
+                    $r['currency_code'] ?? '?',
+                    $r['status'] ?? 'unknown status',
+                ),
+                $refunds
+            ));
+
+            return sprintf(
+                'Paddle currently reports %d refund adjustment(s) against transaction [%s]: %s.',
+                count($refunds),
+                $transactionId,
+                $described
+            );
+        } catch (Throwable $lookupError) {
+            return sprintf(
+                'PayZephyr could not list the existing adjustments for transaction [%s] to tell you either way (%s).',
+                $transactionId,
+                $lookupError->getMessage()
+            );
         }
     }
 
@@ -139,10 +202,6 @@ trait PaddleRefundMethods
         $currency = strtoupper((string) ($transaction['currency_code'] ?? ''));
 
         if ($currency === '') {
-            // Without the transaction's currency the minor-unit conversion is
-            // a guess, and guessing wrong under-refunds silently (see the
-            // comment in refund()). Refuse rather than send a number that may
-            // be off by a factor of 100.
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: the transaction did not report a currency_code, so the refund amount cannot be converted safely.");
         }
 
@@ -151,16 +210,19 @@ trait PaddleRefundMethods
 
     /**
      * @param  array<string, mixed>  $adjustment
+     *
+     * @throws ChargeException
      */
     private function mapAdjustmentToResponse(array $adjustment, ?string $reason = null): RefundResponseDTO
     {
-        $currency = strtoupper((string) ($adjustment['currency_code'] ?? 'USD'));
+        $currency = strtoupper($this->requireString($adjustment, 'currency_code', 'refund'));
+        $totals = $this->requireArray($adjustment, 'totals', 'refund');
 
         return new RefundResponseDTO(
-            refundReference: (string) ($adjustment['id'] ?? ''),
-            transactionReference: (string) ($adjustment['transaction_id'] ?? ''),
+            refundReference: $this->requireString($adjustment, 'id', 'refund'),
+            transactionReference: $this->requireString($adjustment, 'transaction_id', 'refund'),
             status: $this->mapAdjustmentStatus((string) ($adjustment['status'] ?? '')),
-            amount: $this->fromMinorUnits($adjustment['totals']['total'] ?? 0, $currency),
+            amount: $this->fromMinorUnits($this->requireAmount($totals, 'total', 'refund'), $currency),
             currency: $currency,
             reason: $adjustment['reason'] ?? $reason,
             metadata: [

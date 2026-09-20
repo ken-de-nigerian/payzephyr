@@ -38,7 +38,10 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      *
      * @var array<int, string>
      */
-    private const ZERO_DECIMAL_CURRENCIES = ['JPY', 'KRW', 'CLP', 'VND'];
+    private const ZERO_DECIMAL_CURRENCIES = [
+        'BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'MGA',
+        'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+    ];
 
     /**
      * @throws InvalidConfigurationException
@@ -125,11 +128,6 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
 
             $transactionId = $data['id'] ?? null;
             if (! $transactionId) {
-                // The transaction id is the only thing verify() can query by,
-                // so accepting a response without one would hand back a
-                // ChargeResponseDTO whose accessCode is empty - and
-                // verify('') would then hit the transactions *list* endpoint
-                // rather than a single transaction.
                 throw new ChargeException('Paddle returned a transaction without an id; the payment cannot be verified later.');
             }
 
@@ -173,9 +171,9 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
         try {
             $response = $this->makeRequest('GET', '/transactions/'.rawurlencode($reference));
             $data = $this->parseResponse($response)['data'] ?? [];
-
-            $currency = strtoupper((string) ($data['currency_code'] ?? ''));
-            $grandTotal = $data['details']['totals']['grand_total'] ?? 0;
+            $currency = strtoupper($this->requireString($data, 'currency_code', 'verify'));
+            $totals = $this->requireArray($this->requireArray($data, 'details', 'verify'), 'totals', 'verify');
+            $grandTotal = $this->requireAmount($totals, 'grand_total', 'verify');
             $customData = self::normalizeMetadata($data['custom_data'] ?? null);
             $payment = $data['payments'][0] ?? [];
 

@@ -8,6 +8,7 @@ use KenDeNigerian\PayZephyr\Events\RefundCreated;
 use KenDeNigerian\PayZephyr\Events\RefundFailed;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
+use Tests\Helpers\RazorpayDriverTestHelper;
 
 beforeEach(function () {
     app()->forgetInstance('payments.config');
@@ -187,4 +188,53 @@ test('a refund webhook missing a refund reference is skipped without dispatching
     Event::assertNotDispatched(RefundCompleted::class);
     Event::assertNotDispatched(RefundCreated::class);
     Event::assertNotDispatched(RefundFailed::class);
+});
+
+test('a razorpay refund.processed webhook reads the nested refund entity and reports the package reference', function () {
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    RefundTransaction::create([
+        'refund_reference' => 'rfnd_Abc123',
+        'transaction_reference' => 'ORDER_1001',
+        'provider' => 'razorpay',
+        'status' => 'pending',
+        'amount' => 499.50,
+        'currency' => 'INR',
+    ]);
+
+    $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.processed', 'rfnd_Abc123', 'processed'));
+    app()->call([$job, 'handle']);
+
+    Event::assertDispatched(RefundCompleted::class, function (RefundCompleted $event) {
+        return $event->refundReference === 'rfnd_Abc123'
+            && $event->transactionReference === 'ORDER_1001'
+            && $event->provider === 'razorpay';
+    });
+
+    expect(RefundTransaction::where('refund_reference', 'rfnd_Abc123')->first()->status)->toBe('completed');
+});
+
+test('a razorpay refund.failed webhook dispatches RefundFailed', function () {
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.failed', 'rfnd_Fail123', 'failed'));
+    app()->call([$job, 'handle']);
+
+    Event::assertDispatched(RefundFailed::class, function (RefundFailed $event) {
+        return $event->refundReference === 'rfnd_Fail123'
+            && $event->transactionReference === 'ORDER_1001';
+    });
+    Event::assertNotDispatched(RefundCompleted::class);
+});
+
+test('a razorpay refund webhook without a package reference falls back to the payment id', function () {
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.created', 'rfnd_Ext123', 'pending', []));
+    app()->call([$job, 'handle']);
+
+    Event::assertDispatched(RefundCreated::class, function (RefundCreated $event) {
+        return $event->refundReference === 'rfnd_Ext123'
+            && $event->transactionReference === 'pay_Abc123';
+    });
 });

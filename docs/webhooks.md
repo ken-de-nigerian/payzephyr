@@ -54,6 +54,7 @@ PayZephyr's webhook URL follows the pattern `https://yourdomain.com/payments/web
 | OPay | `https://yourdomain.com/payments/webhook/opay` |
 | Mollie | `https://yourdomain.com/payments/webhook/mollie` |
 | Paddle | `https://yourdomain.com/payments/webhook/paddle` |
+| Razorpay | `https://yourdomain.com/payments/webhook/razorpay` |
 
 While developing locally, your machine isn't reachable from the internet, so providers can't reach it either: use a tunneling tool like [ngrok](https://ngrok.com) to expose your local server temporarily, and point the provider's webhook URL at the tunnel's public URL instead.
 

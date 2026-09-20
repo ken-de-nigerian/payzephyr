@@ -1,6 +1,6 @@
 {
     "name": "kendenigerian/payzephyr",
-    "description": "A unified payment abstraction layer for Laravel supporting multiple providers (Paystack, Flutterwave, Monnify, Stripe, PayPal, Square, OPay, Mollie, Paddle) with automatic fallback and webhooks.",
+    "description": "A unified payment abstraction layer for Laravel supporting multiple providers (Paystack, Flutterwave, Monnify, Stripe, PayPal, Square, OPay, Mollie, Paddle, Razorpay) with automatic fallback and webhooks.",
     "keywords": [
         "laravel",
         "payment",
@@ -13,6 +13,7 @@
         "square",
         "opay",
         "paddle",
+        "razorpay",
         "payment-gateway",
         "payments",
         "webhook",

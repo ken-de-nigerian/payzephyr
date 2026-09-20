@@ -2,7 +2,7 @@
 
 ## Why support more than one provider at all?
 
-The simplest reason: **different providers are strong in different regions and currencies.** Paystack, Flutterwave, Monnify, and OPay are built around African markets and Naira-denominated payments; Stripe, PayPal, and Square are strongest for US/EU cards; Mollie specializes in European payment methods. If your customers span more than one of these regions, you likely need more than one provider, and PayZephyr's whole point is that supporting a second one doesn't mean writing a second, parallel checkout implementation.
+The simplest reason: **different providers are strong in different regions and currencies.** Paystack, Flutterwave, Monnify, and OPay are built around African markets and Naira-denominated payments; Stripe, PayPal, and Square are strongest for US/EU cards; Mollie specializes in European payment methods; Razorpay is built around Indian payments (INR, UPI, netbanking). If your customers span more than one of these regions, you likely need more than one provider, and PayZephyr's whole point is that supporting a second one doesn't mean writing a second, parallel checkout implementation.
 
 The second reason is resilience: if your primary provider has an outage, [automatic fallback](#automatic-fallback) means your checkout keeps working through a backup provider instead of going down with it.
 
@@ -174,6 +174,25 @@ MOLLIE_ENABLED=true
 - **Refunds:** ✅ full support; refund references are also composite (`"{paymentId}:{refundId}"`), the same reasoning as Mollie's subscription codes
 - If `MOLLIE_WEBHOOK_SECRET` isn't set, PayZephyr falls back to verifying webhooks by calling Mollie's API directly instead of checking a local signature; functionally fine, but slower per webhook, and specifically why Mollie is one of the providers whose webhook handling depends on a correctly running [queue worker](queues.md)
 
+### Razorpay
+
+```env
+RAZORPAY_KEY_ID=rzp_test_xxxxx
+RAZORPAY_KEY_SECRET=xxxxx
+RAZORPAY_WEBHOOK_SECRET=xxxxx
+RAZORPAY_ENABLED=true
+```
+
+- **Currencies:** INR by default. Razorpay accepts many more once international payments are enabled on your account; add them to the `currencies` list in `config/payments.php`. Amounts are sent with each currency's own exponent, so zero-decimal currencies (JPY, KRW, ...) and three-decimal ones (KWD, BHD, OMR, ...) are converted correctly.
+- **Channels:** card, netbanking, UPI, and wallet. `bank_transfer`/`bank_account` map to netbanking, `mobile_money`/`qr_code` to UPI, and `digital_wallet` to wallet; USSD and PayPal have no Razorpay equivalent.
+- **Subscriptions:** ❌ not supported yet. Razorpay has a subscriptions API (plans, an authorization link, cancel/pause/resume); the driver doesn't wrap it in this release.
+- **Refunds:** ✅ supported, and usually asynchronous: the initial response is normally `pending` (an instant refund can already be `processed`), and the final status arrives on the `refund.processed`/`refund.failed` webhook. Pass the charge's reference as usual; PayZephyr finds the payment behind it, takes the currency from Razorpay, and refuses a payment with nothing left to refund before sending anything. Razorpay refunds at least INR 1.00.
+- **A charge is a Payment Link.** PayZephyr creates a [Payment Link](https://razorpay.com/docs/payments/payment-links/) and redirects the customer to its `short_url`. Your `reference` becomes the link's `reference_id`, which Razorpay requires to be unique and at most **40 characters**; a longer reference fails before any request is sent. Payment Links are available to Razorpay accounts in India, Malaysia, Singapore, and the US.
+- **Test or live is decided by the keys**, not the URL: `rzp_test_` keys use test mode on the same `https://api.razorpay.com` host.
+- **`RAZORPAY_WEBHOOK_SECRET` is the secret you enter when creating the webhook in the Razorpay Dashboard**, not your API key secret. Without it every webhook is rejected. Subscribe to `payment_link.paid`, `payment_link.expired`, `payment_link.cancelled`, `refund.processed`, and `refund.failed`. Leave `refund.created` off: an instant refund arrives on it already processed, so your `RefundCompleted` listeners would run twice.
+- **No timestamp window on webhooks.** Razorpay's webhook `created_at` is when the link or refund was created, not when the event happened, so a link paid ten minutes after it was created would fail a five-minute replay window. Webhooks are verified by signature, and a replayed delivery is skipped by [duplicate-delivery deduplication](webhooks.md#duplicate-deliveries), the same approach as Mollie's signature path.
+- **A lookup by reference can briefly miss a brand-new link.** Razorpay's reference search trails link creation by a few seconds. `Payment::verify()` normally uses the stored link id and is unaffected.
+
 ## Subscription and refund support at a glance
 
 | Provider | Subscriptions | Refunds |
@@ -187,6 +206,7 @@ MOLLIE_ENABLED=true
 | Paddle | ❌ | ✅ |
 | Monnify | ❌ | ✅ |
 | OPay | ❌ | ✅ |
+| Razorpay | ❌ | ✅ |
 
 ## Next steps
 

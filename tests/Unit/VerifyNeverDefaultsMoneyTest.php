@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Drivers\OPayDriver;
+use KenDeNigerian\PayZephyr\Drivers\PaddleDriver;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -93,6 +94,16 @@ function verifyScenario(string $provider, ?string $omit = null): array
             ['id' => 'tr_1', 'status' => 'paid', 'amount' => ['value' => '10.00', 'currency' => 'EUR']],
             'tr_1',
         ],
+        'paddle' => [
+            new PaddleDriver(['api_key' => 'pdl_sdbx_x', 'currencies' => ['USD']]),
+            [],
+            ['data' => [
+                'id' => 'txn_1', 'status' => 'completed', 'currency_code' => 'USD',
+                'details' => ['totals' => ['grand_total' => '1000']],
+                'custom_data' => ['reference' => 'PZ_1_aa'],
+            ]],
+            'txn_1',
+        ],
     };
 
     if ($omit !== null) {
@@ -115,6 +126,9 @@ dataset('drivers with an amount and currency to lose', [
     'paypal currency' => ['paypal', 'purchase_units.0.amount.currency_code', 'currency_code'],
     'mollie amount' => ['mollie', 'amount.value', 'value'],
     'mollie currency' => ['mollie', 'amount.currency', 'currency'],
+    'paddle amount' => ['paddle', 'data.details.totals.grand_total', 'grand_total'],
+    'paddle currency' => ['paddle', 'data.currency_code', 'currency_code'],
+    'paddle totals block' => ['paddle', 'data.details.totals', 'totals'],
 ]);
 
 test('the complete response verifies, so the fixture is sound', function (string $provider) {
@@ -124,7 +138,7 @@ test('the complete response verifies, so the fixture is sound', function (string
 
     expect($result->amount)->toBeGreaterThan(0.0)
         ->and($result->currency)->not->toBe('');
-})->with(['paystack', 'flutterwave', 'monnify', 'opay', 'paypal', 'mollie']);
+})->with(['paystack', 'flutterwave', 'monnify', 'opay', 'paypal', 'mollie', 'paddle']);
 
 test('a verify response missing a money field is refused, never reported', function (string $provider, string $omit, string $field) {
     [$driver, $reference] = verifyScenario($provider, $omit);

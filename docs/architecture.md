@@ -61,7 +61,7 @@ src/
 
 ## Why a fluent builder instead of passing arrays or DTOs directly
 
-`Payment::amount(100)->email('a@b.com')->redirect()` reads close to plain English, and (more importantly for a package with many providers) the builder methods are the same regardless of which provider ends up handling the request. If PayZephyr instead required you to construct a `ChargeRequestDTO` by hand and pass it to a provider-specific method, adding a ninth provider (or your own [custom driver](custom-drivers.md)) would mean learning a new call shape rather than reusing muscle memory you already have.
+`Payment::amount(100)->email('a@b.com')->redirect()` reads close to plain English, and (more importantly for a package with many providers) the builder methods are the same regardless of which provider ends up handling the request. If PayZephyr instead required you to construct a `ChargeRequestDTO` by hand and pass it to a provider-specific method, adding a tenth provider (or your own [custom driver](custom-drivers.md)) would mean learning a new call shape rather than reusing muscle memory you already have.
 
 ## Why drivers extend an abstract base rather than each being fully independent
 

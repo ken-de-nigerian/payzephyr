@@ -187,3 +187,38 @@ test('process webhook job uses database transactions', function () {
     $transaction->refresh();
     expect($transaction->status)->toBe('success');
 });
+
+test('a webhook carrying no recognisable status leaves the transaction alone', function () {
+    // Paddle sends notifications for entities that are not transactions at all
+    // - subscription.updated, price.created. Those normalize to 'unknown', and
+    // writing that over a pending row loses the real state: the row no longer
+    // matches any PaymentStatus, so paid_at is never set and reconciliation
+    // sees a payment that is neither pending nor complete.
+    $transaction = PaymentTransaction::create([
+        'reference' => 'ref_123',
+        'provider' => 'paddle',
+        'status' => 'pending',
+        'amount' => 10000,
+        'currency' => 'USD',
+        'email' => 'test@example.com',
+    ]);
+
+    $job = new ProcessWebhook('paddle', [
+        'event_type' => 'subscription.updated',
+        'data' => ['id' => 'sub_1'],
+    ]);
+
+    $manager = app(PaymentManager::class);
+    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver->shouldReceive('extractWebhookReference')->andReturn('ref_123');
+    $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('unknown');
+    $mockDriver->shouldReceive('extractWebhookChannel')->andReturn(null);
+
+    $driversProperty = (new \ReflectionClass($manager))->getProperty('drivers');
+    $driversProperty->setAccessible(true);
+    $driversProperty->setValue($manager, ['paddle' => $mockDriver]);
+
+    app()->call([$job, 'handle']);
+
+    expect($transaction->fresh()->status)->toBe('pending');
+});

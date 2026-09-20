@@ -141,6 +141,26 @@ OPAY_ENABLED=true
 - **Refunds:** ✅ full support; authenticated the same HMAC-SHA512-signed way as the status API
 - `OPAY_SECRET_KEY` is specifically required for webhook signature validation, separate from the public key used for charges
 
+### Paddle
+
+```env
+PADDLE_API_KEY=pdl_sdbx_apikey_xxxxx
+PADDLE_WEBHOOK_SECRET=pdl_ntfset_xxxxx
+PADDLE_BASE_URL=https://sandbox-api.paddle.com
+PADDLE_ENABLED=true
+```
+
+- **Currencies:** USD, EUR, GBP, CAD, AUD, JPY, CHF, SGD, SEK (Paddle supports more; extend the `currencies` list in `config/payments.php` if you bill in one of them)
+- **Subscriptions:** ❌ not supported: Paddle subscriptions can't be created through the API at all — they're created by Paddle when a recurring-price checkout completes, and only then can be updated. That's not the same shape as `Payment::subscription()->create()`, so `PaddleDriver` deliberately doesn't claim subscription support rather than pretending to. Use a recurring catalog price plus the `subscription.*` webhooks instead.
+- **Refunds:** ✅ supported, but Paddle has no refunds resource: a refund is an **adjustment** with `action: refund`, and for live accounts most start as `pending_approval` until Paddle reviews them. So a Paddle refund response is normally `pending` even when nothing went wrong; the terminal status arrives via the `adjustment.updated` webhook. Sandbox accounts auto-approve roughly every ten minutes.
+- **This is Paddle Billing, not Paddle Classic.** The two are separate products with different APIs; Classic credentials will not work here.
+- **`PADDLE_BASE_URL` is the environment switch.** Sandbox is `https://sandbox-api.paddle.com`, live is `https://api.paddle.com`, and the default is sandbox so an unconfigured install can't accidentally charge real cards.
+- **A charge needs an approved default payment link.** PayZephyr creates a transaction with a single non-catalog item and returns Paddle's `checkout.url`; Paddle only populates that URL once you've set and had approved a default payment link under **Paddle > Checkout > Checkout settings**. Without it the charge fails with a clear error rather than silently returning nothing.
+- **Partial refunds only work on single-item transactions.** Paddle requires a partial adjustment to name the transaction item it applies to. Charges PayZephyr creates always have exactly one item, so this is transparent — but a transaction created elsewhere (a subscription renewal, a multi-item checkout) will be rejected with an explanatory error instead of PayZephyr guessing which item you meant. The refund amount is converted to minor units using the *transaction's* currency, read from that same lookup, so `->currency()` is not required on a Paddle partial refund and cannot make it wrong.
+- **Paddle has no idempotency key.** Unlike every other bundled provider, Paddle Billing accepts no client-supplied idempotency key, so PayZephyr sends none. The in-flight claim and ambiguous-outcome protections still apply; see [Idempotency](idempotency.md#per-provider-support).
+- **Only `transaction.*` webhooks set a payment status.** Paddle sends transaction, subscription and adjustment events to one endpoint and copies `custom_data` between transactions and subscriptions, so PayZephyr scopes payment-status extraction to transaction events rather than letting a subscription's `active` land on a payment row.
+- **`PADDLE_WEBHOOK_SECRET` is per notification destination, not per account.** Each destination you create in **Developer tools > Notifications** gets its own secret key; the one you configure must belong to the destination that's actually sending to your endpoint.
+
 ### Mollie
 
 ```env
@@ -164,6 +184,7 @@ MOLLIE_ENABLED=true
 | Flutterwave | ✅ | ✅ |
 | Square | ✅ | ✅ |
 | Mollie | ✅ | ✅ |
+| Paddle | ❌ | ✅ |
 | Monnify | ❌ | ✅ |
 | OPay | ❌ | ✅ |
 
@@ -172,4 +193,4 @@ MOLLIE_ENABLED=true
 - [Configuration](configuration.md#provider-credentials): the exact required keys per provider, in table form
 - [Subscriptions](subscriptions.md): provider-specific subscription quirks, in depth
 - [Refunds](refunds.md): provider-specific refund quirks, in depth
-- [Custom Drivers](custom-drivers.md): adding a ninth provider yourself
+- [Custom Drivers](custom-drivers.md): adding a tenth provider yourself

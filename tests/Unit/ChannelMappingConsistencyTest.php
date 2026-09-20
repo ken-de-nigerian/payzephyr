@@ -53,6 +53,7 @@ class ChannelMappingConsistencyTest extends TestCase
             ['square'],
             ['opay'],
             ['mollie'],
+            ['paddle'],
         ];
     }
 
@@ -220,6 +221,13 @@ class ChannelMappingConsistencyTest extends TestCase
                     'url' => "https://checkout.{$provider}.com/abc123",
                 ],
             ])),
+            'paddle' => new \GuzzleHttp\Psr7\Response(201, [], json_encode([
+                'data' => [
+                    'id' => "txn_{$provider}_123",
+                    'status' => 'ready',
+                    'checkout' => ['url' => "https://checkout.{$provider}.com/abc123"],
+                ],
+            ])),
             'mollie' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
                 'id' => "ref_{$provider}_123",
                 'status' => 'open',
@@ -248,7 +256,7 @@ class ChannelMappingConsistencyTest extends TestCase
 
         // Use appropriate currency for provider
         $currency = match ($provider) {
-            'stripe', 'paypal', 'square' => 'USD',
+            'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
             default => 'NGN',
         };
@@ -316,6 +324,7 @@ class ChannelMappingConsistencyTest extends TestCase
             'paystack' => ['card', 'bank', 'ussd', 'qr', 'mobile_money'],
             'stripe' => ['card', 'bank_account'],
             'flutterwave' => ['card', 'bank', 'ussd', 'mobilemoney', 'mpesa'],
+            'paddle' => ['card', 'paypal', 'apple_pay', 'wire_transfer', 'ideal'],
             default => ['card'], // Default fallback
         };
     }
@@ -333,6 +342,13 @@ class ChannelMappingConsistencyTest extends TestCase
                 'data' => [
                     'channel' => 'card',
                     'reference' => 'test_ref',
+                ],
+            ],
+            'paddle' => [
+                'event_type' => 'transaction.completed',
+                'data' => [
+                    'id' => 'txn_1',
+                    'payments' => [['method_details' => ['type' => 'card']]],
                 ],
             ],
             'stripe' => [

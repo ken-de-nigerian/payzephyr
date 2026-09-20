@@ -91,6 +91,15 @@ abstract class TestCase extends Orchestra
             'currencies' => ['NGN'],
         ]);
 
+        $app['config']->set('payments.providers.paddle', [
+            'driver' => 'paddle',
+            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\PaddleDriver::class,
+            'api_key' => 'pdl_sdbx_apikey_test',
+            'webhook_secret' => 'pdl_ntfset_test_secret',
+            'enabled' => true,
+            'currencies' => ['USD', 'EUR'],
+        ]);
+
         $app['config']->set('payments.providers.mollie', [
             'driver' => 'mollie',
             'driver_class' => \KenDeNigerian\PayZephyr\Drivers\MollieDriver::class,
@@ -106,11 +115,11 @@ abstract class TestCase extends Orchestra
         $app['config']->set('payments.health_check.enabled', false);
 
         // Ensure all providers have proper currency support configured
-        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie'] as $provider) {
+        foreach (['paystack', 'stripe', 'flutterwave', 'monnify', 'paypal', 'square', 'opay', 'mollie', 'paddle'] as $provider) {
             $providerConfig = $app['config']->get("payments.providers.{$provider}", []);
             if (empty($providerConfig['currencies'])) {
                 $app['config']->set("payments.providers.{$provider}.currencies", match ($provider) {
-                    'stripe', 'paypal', 'square' => ['USD', 'EUR'],
+                    'stripe', 'paypal', 'square', 'paddle' => ['USD', 'EUR'],
                     'mollie' => ['EUR', 'USD'],
                     default => ['NGN', 'USD'],
                 });
@@ -139,7 +148,7 @@ abstract class TestCase extends Orchestra
 
         // Ensure provider is enabled and has proper currency support
         $currency = match ($provider) {
-            'stripe', 'paypal', 'square' => 'USD',
+            'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
             default => 'NGN',
         };
@@ -185,7 +194,7 @@ abstract class TestCase extends Orchestra
         $freshConfig['providers'][$provider]['enabled'] = true;
         // Ensure currency is supported
         $currency = match ($provider) {
-            'stripe', 'paypal', 'square' => 'USD',
+            'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
             default => 'NGN',
         };
@@ -530,7 +539,7 @@ abstract class TestCase extends Orchestra
         $currentConfig['providers'][$provider]['enabled'] = true;
         // Ensure currency is supported
         $currency = match ($provider) {
-            'stripe', 'paypal', 'square' => 'USD',
+            'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
             default => 'NGN',
         };

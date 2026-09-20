@@ -132,6 +132,19 @@ return [
             'enabled' => env('OPAY_ENABLED', false),
         ],
 
+        'paddle' => [
+            'driver' => 'paddle',
+            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\PaddleDriver::class,
+            'api_key' => env('PADDLE_API_KEY'),
+            'client_token' => env('PADDLE_CLIENT_TOKEN'), // Paddle.js only; unused server-side
+            'webhook_secret' => env('PADDLE_WEBHOOK_SECRET'), // Notification destination secret key
+            'base_url' => env('PADDLE_BASE_URL', 'https://sandbox-api.paddle.com'), // Sandbox: https://sandbox-api.paddle.com | Live: https://api.paddle.com
+            'tax_category' => env('PADDLE_TAX_CATEGORY', 'standard'),
+            'product_name' => env('PADDLE_PRODUCT_NAME'),
+            'currencies' => ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'SGD', 'SEK'],
+            'enabled' => env('PADDLE_ENABLED', false),
+        ],
+
         'mollie' => [
             'driver' => 'mollie',
             'driver_class' => \KenDeNigerian\PayZephyr\Drivers\MollieDriver::class,

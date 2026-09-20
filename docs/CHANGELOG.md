@@ -251,7 +251,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   throws - and `TraceRecorder` catches it. The payload ceiling matches
   `payments.webhook.max_payload_size` rather than being a number of its own.
 
+- **Razorpay support** as a tenth provider: `RazorpayDriver` with charge, verify, webhook
+  signature validation, health check, and refunds. Enable it with `RAZORPAY_ENABLED=true` plus
+  `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET`; see
+  [Providers](providers.md#razorpay) for what is different about it, and
+  [ADR-0014](architecture/adr/0014-razorpay-driver.md) for why.
+
+  - **A charge is a Payment Link.** PayZephyr redirects to the link's `short_url` and sends
+    your reference as its `reference_id`, which Razorpay limits to 40 characters. A longer
+    reference fails with `ChargeException` before any request is sent, so fallback to another
+    provider still applies.
+  - **Amounts use each currency's exponent.** Zero-decimal (JPY, KRW, ...) and three-decimal
+    (KWD, BHD, OMR, ...) currencies are converted correctly rather than multiplied by 100.
+  - **Refunds find the payment behind your reference**, take the currency from Razorpay
+    rather than from config, always send an explicit amount (the unrefunded remainder for a
+    full refund), and settle through the `refund.processed` / `refund.failed` webhooks.
+  - **Subscriptions are not wrapped yet.** Razorpay has a subscriptions API; it is left for a
+    follow-up.
+
+  Webhooks are verified as HMAC-SHA256 of the raw body (`X-Razorpay-Signature`) with the
+  webhook secret. No timestamp window is applied: Razorpay's `created_at` is when the link or
+  refund was created, not when the event happened, so replays are stopped by the existing
+  duplicate-delivery deduplication instead. With no `RAZORPAY_WEBHOOK_SECRET`, webhooks are
+  rejected. Only `payment_link.*` events update `payment_transactions`.
+
+  Checked against a Razorpay test account as well as mocked HTTP; ADR-0014 lists what was
+  and was not verified.
+
 ### Fixed
+
+- **Razorpay could refund a hundred times too much.** The refund path took the currency from
+  the payment with `?? ''`, and that currency chooses the exponent the outbound amount is
+  multiplied by. A payment whose `currency` was absent fell through to two decimals, so a
+  refund of JPY 500 was sent as 50,000 minor units - a real, hundredfold over-refund that
+  Razorpay has no reason to reject. The currency is now required, by name.
+
+- **Razorpay could report a verified payment worth nothing.** `verify()` read the amount with
+  `?? 0` and the currency with `?? ''`, so a Payment Link response missing either was reported
+  as a *successful verified payment* of 0.00, or in an unnamed currency at a hundredth of its
+  value. `fetchRefund()` had the same pair of defaults, and `refund()` fell through to zero when
+  Razorpay did not echo the amount back.
+
+  All four now fail by name through the same `require*` guards the other nine drivers use. Where
+  a refund response omits an amount PayZephyr itself sent, that amount is kept as a defensible
+  inference - only the fall-through to zero is gone. Razorpay is now covered by the cross-driver
+  test that proves no driver turns a provider's silence into a number.
+
+  This contribution predates those guards; it was written against a base where `?? 0` was the
+  house style throughout.
+
+- **Razorpay refunds could go out without the idempotency protection the caller asked for.** An
+  idempotency key that did not match Razorpay's format (at least 10 characters of letters,
+  digits, hyphens or underscores) was dropped and the refund sent anyway. Nothing would then
+  deduplicate a retry, while the caller had every reason to believe otherwise. Such a key is now
+  refused before anything is sent. A valid key is still sent as `X-Refund-Idempotency`.
+
+- **A fetched Razorpay refund with no status was reported as `unknown`**, which maps to no
+  `RefundStatus` at all and dropped the refund out of the over-refund guard's accounting. It is
+  now treated as still in flight.
 
 - **Paddle refunds could report an amount and currency Paddle never sent.** The adjustment
   mapper read `currency_code` with a `?? 'USD'` default and the refund total with `?? 0`. That
@@ -508,6 +565,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   given reference, preserving every other field including the idempotency key - the key
   identifies the logical submission, and stamping a reference onto a request must not change
   which submissions a provider treats as duplicates of each other.
+
+- `ProcessWebhook` now also finds a refund nested under `payload.refund.entity`, and reads its
+  transaction reference from `notes.payzephyr_reference`, which is where PayZephyr writes it on
+  every refund it creates through Razorpay. Both are checked after every existing field.
+
+  A refund created in Razorpay's own dashboard has no notes, so it falls back to `payment_id` -
+  but only for Razorpay. Square's refund webhooks carry a `payment_id` too, and reading it there
+  would have changed the transaction reference those events dispatch from `''` to a Square
+  payment id. That scoping is enforced by a test.
 
 - Removed the explanatory comments from `extractWebhookChannel()` in the PayPal and Square
   drivers. Comment-only: no logic changed, and the behaviour is exactly as before. PayPal

@@ -17,7 +17,7 @@ Payment::amount(100.00)->email('customer@example.com')->redirect();
 
 and PayZephyr handles the fact that, underneath, this might be talking to Paystack today and Stripe tomorrow. You don't write provider-specific code, and you don't have to think about it again until you actually need to: for example, if a provider goes down and you want to fail over to another one automatically, which PayZephyr also does for you.
 
-**Currently supported providers:** Paystack, Stripe, PayPal, Flutterwave, Square, Monnify, OPay, Mollie, and Paddle.
+**Currently supported providers:** Paystack, Stripe, PayPal, Flutterwave, Square, Monnify, OPay, Mollie, Paddle, and Razorpay.
 
 ## Is this for you?
 

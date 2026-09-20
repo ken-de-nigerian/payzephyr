@@ -270,8 +270,9 @@ class UnifiedSubscriptionAbstractionTest extends TestCase
         // changes, point this at another provider that genuinely lacks
         // support rather than let providerSupportsSubscriptions() silently
         // skip every provider in this list and leave this test asserting
-        // nothing.
-        $nonSubscriptionProviders = ['monnify', 'opay'];
+        // nothing. Razorpay does have a subscriptions API; its driver just
+        // doesn't wrap it yet (ADR-0014).
+        $nonSubscriptionProviders = ['monnify', 'opay', 'razorpay'];
 
         foreach ($nonSubscriptionProviders as $provider) {
             if (! $this->isProviderEnabled($provider)) {

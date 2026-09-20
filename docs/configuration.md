@@ -50,6 +50,7 @@ Here's exactly what each provider requires: these are the keys PayZephyr's own v
 | OPay | `OPAY_` | `MERCHANT_ID`, `PUBLIC_KEY` | `OPAY_ENABLED` |
 | Mollie | `MOLLIE_` | `API_KEY` | `MOLLIE_ENABLED` |
 | Paddle | `PADDLE_` | `API_KEY` | `PADDLE_ENABLED` |
+| Razorpay | `RAZORPAY_` | `KEY_ID`, `KEY_SECRET` | `RAZORPAY_ENABLED` |
 
 A couple of things worth calling out that aren't obvious from the table:
 

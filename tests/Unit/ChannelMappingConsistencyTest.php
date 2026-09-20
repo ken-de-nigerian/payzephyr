@@ -54,6 +54,7 @@ class ChannelMappingConsistencyTest extends TestCase
             ['opay'],
             ['mollie'],
             ['paddle'],
+            ['razorpay'],
         ];
     }
 
@@ -228,6 +229,11 @@ class ChannelMappingConsistencyTest extends TestCase
                     'checkout' => ['url' => "https://checkout.{$provider}.com/abc123"],
                 ],
             ])),
+            'razorpay' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                'id' => 'plink_test123',
+                'status' => 'created',
+                'short_url' => "https://checkout.{$provider}.com/abc123",
+            ])),
             'mollie' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
                 'id' => "ref_{$provider}_123",
                 'status' => 'open',
@@ -258,6 +264,7 @@ class ChannelMappingConsistencyTest extends TestCase
         $currency = match ($provider) {
             'stripe', 'paypal', 'square', 'paddle' => 'USD',
             'mollie' => 'EUR',
+            'razorpay' => 'INR',
             default => 'NGN',
         };
 
@@ -325,6 +332,7 @@ class ChannelMappingConsistencyTest extends TestCase
             'stripe' => ['card', 'bank_account'],
             'flutterwave' => ['card', 'bank', 'ussd', 'mobilemoney', 'mpesa'],
             'paddle' => ['card', 'paypal', 'apple_pay', 'wire_transfer', 'ideal'],
+            'razorpay' => ['card', 'netbanking', 'upi', 'wallet', 'emi'],
             default => ['card'], // Default fallback
         };
     }
@@ -357,6 +365,12 @@ class ChannelMappingConsistencyTest extends TestCase
                     'object' => [
                         'payment_method_types' => ['card'],
                     ],
+                ],
+            ],
+            'razorpay' => [
+                'event' => 'payment_link.paid',
+                'payload' => [
+                    'payment' => ['entity' => ['id' => 'pay_test123', 'method' => 'upi']],
                 ],
             ],
             default => [

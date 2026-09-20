@@ -117,7 +117,7 @@ PAYSTACK_PUBLIC_KEY=pk_test_xxxxx
 PAYSTACK_ENABLED=true
 ```
 
-Paystack is used here as an example because it's the default provider out of the box, but you can use any of the eight supported providers instead; see [Configuration](configuration.md) for every provider's required keys, and [Multiple Providers](providers.md) for the full list.
+Paystack is used here as an example because it's the default provider out of the box, but you can use any of the nine supported providers instead; see [Configuration](configuration.md) for every provider's required keys, and [Multiple Providers](providers.md) for the full list.
 
 > **Where do I get these keys?** From your payment provider's own dashboard, under something like "API Keys" or "Developers." Always start with *test* or *sandbox* keys while you're building: they let you simulate payments without moving real money. Switch to live keys only when you're ready to go to production (see the [Production Checklist](production-checklist.md)).
 

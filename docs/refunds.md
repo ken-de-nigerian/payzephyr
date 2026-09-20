@@ -6,7 +6,7 @@ A charge moves money toward you; a refund moves some or all of it back. That sou
 
 ## Which providers support this
 
-All nine supported providers: **Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify, OPay, and Paddle.** Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally — Paddle being the one that calls it something else (an *adjustment*, see [Providers](providers.md#paddle)).
+All ten supported providers: **Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify, OPay, Paddle, and Razorpay.** Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally — Paddle being the one that calls it something else (an *adjustment*, see [Providers](providers.md#paddle)).
 
 ```php
 use KenDeNigerian\PayZephyr\Facades\Payment;
@@ -80,6 +80,7 @@ This is the most important thing to understand before you build a refund flow: n
 | Paddle | `pending` (Paddle reviews most live refunds before approving them) | `adjustment.updated` webhook |
 | Monnify | `PENDING` | Refund status webhook |
 | OPay | `PENDING` | Refund status webhook |
+| Razorpay | `pending` (instant refunds can already be `processed`) | `refund.processed` / `refund.failed` webhook |
 
 If `$refund->isPending()` after calling `refund()`, don't treat the refund as done yet. Either poll with `fetch()` or (better) listen for the webhook-driven events below.
 

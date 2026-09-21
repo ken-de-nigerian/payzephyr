@@ -522,6 +522,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking (config): four subscription config blocks that nothing read have been removed.**
+  `subscriptions.retry` (`enabled`, `max_attempts`, `delay_hours`), `subscriptions.grace_period`,
+  `subscriptions.notifications`, and `subscriptions.webhook_events` were shipped in
+  `config/payments.php` but no code in the package ever read any of them.
+
+  That made them worse than dead weight. A merchant who set
+  `PAYMENTS_SUBSCRIPTIONS_RETRY_ENABLED=true` with `..._MAX_ATTEMPTS=3` had every reason to
+  believe failed renewals were being retried three times. Nothing retried them, and nothing said
+  so. The subscription webhook routing has always matched hardcoded event names rather than
+  `subscriptions.webhook_events`.
+
+  Removing them changes no runtime behavior, because nothing consulted them. Renewal retry, grace
+  periods and renewal notifications remain the application's responsibility: subscribe to
+  `SubscriptionRenewed` and `SubscriptionPaymentFailed` and decide there. The corresponding
+  `PAYMENTS_SUBSCRIPTIONS_RETRY_*`, `PAYMENTS_SUBSCRIPTIONS_GRACE_PERIOD` and
+  `PAYMENTS_SUBSCRIPTIONS_NOTIFICATIONS_ENABLED` environment variables are now inert and can be
+  deleted from your `.env`.
+
+  `subscriptions.prevent_duplicates`, `subscriptions.validation` and `subscriptions.logging` are
+  unaffected and still honored.
+
 - **Breaking: `PlanResponseDTO::$amount` and `SubscriptionResponseDTO::$amount` are now
   `?float`**, and `PlanResponseDTO::getAmountInMajorUnits()` returns `?float`. Stripe returns a
   null `unit_amount` for tiered, metered and usage-based prices - a plan like that has no single

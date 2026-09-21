@@ -15,9 +15,9 @@ use Throwable;
  * Paystack's refund endpoint (POST /refund) queues the refund for
  * asynchronous processing - the initial response status is typically
  * "pending"/"processing", not a final state. Final confirmation arrives via
- * the refund.processed / refund.failed webhook events (see
- * config('payments.refunds.webhook_events') and
- * ProcessWebhook::processRefundWebhook()).
+ * the refund.processed / refund.failed webhook events, which
+ * ProcessWebhook::processRefundWebhook() turns into RefundCompleted or
+ * RefundFailed and writes back to the local refund row.
  */
 trait PaystackRefundMethods
 {

@@ -91,16 +91,8 @@ final class PaymentTransaction extends Model
      */
     public function scopeSuccessful(Builder $query): Builder
     {
-        $successStatuses = [
-            PaymentStatus::SUCCESS->value,
-            'succeeded',
-            'completed',
-            'successful',
-            'paid',
-        ];
-
         /** @var Builder<self> */
-        return $query->whereIn('status', $successStatuses);
+        return $query->whereIn('status', self::statusVocabulary(PaymentStatus::SUCCESS->value));
     }
 
     /**
@@ -109,18 +101,13 @@ final class PaymentTransaction extends Model
      */
     public function scopeFailed(Builder $query): Builder
     {
-        $failedStatuses = [
-            PaymentStatus::FAILED->value,
-            PaymentStatus::CANCELLED->value,
-            'declined',
-            'rejected',
-            'denied',
-            'voided',
-            'expired',
-        ];
+        $statuses = array_unique(array_merge(
+            self::statusVocabulary(PaymentStatus::FAILED->value),
+            [PaymentStatus::CANCELLED->value],
+        ));
 
         /** @var Builder<self> */
-        return $query->whereIn('status', $failedStatuses);
+        return $query->whereIn('status', array_values($statuses));
     }
 
     /**
@@ -129,60 +116,76 @@ final class PaymentTransaction extends Model
      */
     public function scopePending(Builder $query): Builder
     {
-        return $query->where('status', PaymentStatus::PENDING->value);
+        /** @var Builder<self> */
+        return $query->whereIn('status', self::statusVocabulary(PaymentStatus::PENDING->value));
     }
 
     public function isSuccessful(): bool
     {
-        try {
-            if (function_exists('app')) {
-                $normalizer = app(StatusNormalizerInterface::class);
-                $normalizedStatus = $normalizer->normalize($this->status);
-            } else {
-                $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
-            }
-        } catch (Throwable) {
-            $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
-        }
-
-        $status = PaymentStatus::tryFromString($normalizedStatus);
-
-        return $status?->isSuccessful() ?? false;
+        return $this->normalizedStatus()?->isSuccessful() ?? false;
     }
 
     public function isFailed(): bool
     {
-        try {
-            if (function_exists('app')) {
-                $normalizer = app(StatusNormalizerInterface::class);
-                $normalizedStatus = $normalizer->normalize($this->status);
-            } else {
-                $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
-            }
-        } catch (Throwable) {
-            $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
-        }
-
-        $status = PaymentStatus::tryFromString($normalizedStatus);
-
-        return $status?->isFailed() ?? false;
+        return $this->normalizedStatus()?->isFailed() ?? false;
     }
 
     public function isPending(): bool
     {
+        return $this->normalizedStatus()?->isPending() ?? false;
+    }
+
+    /**
+     * This row's status as a PaymentStatus, or null when the provider sent
+     * something the package has no meaning for.
+     *
+     * The container is preferred so an application's registered provider
+     * mappings apply, with the static vocabulary as the fallback for a model
+     * used outside a booted Laravel application.
+     */
+    private function normalizedStatus(): ?PaymentStatus
+    {
+        return PaymentStatus::tryFromString($this->resolveNormalizedStatus());
+    }
+
+    private function resolveNormalizedStatus(): string
+    {
+        try {
+            if (function_exists('app')) {
+                // The row knows which provider wrote it, and that decides what
+                // an ambiguous status means: APPROVED is success for Square
+                // and pending for PayPal. Normalizing without it silently
+                // answered "none of the above" for any provider-specific
+                // status that reached the column.
+                return app(StatusNormalizerInterface::class)->normalize($this->status, $this->provider);
+            }
+        } catch (Throwable) {
+            // fall through to the static vocabulary
+        }
+
+        return StatusNormalizer::normalizeStatic($this->status);
+    }
+
+    /**
+     * Every stored status that means $normalized, so a query scope and its
+     * matching predicate cannot disagree about the same row.
+     *
+     * @return array<int, string>
+     */
+    private static function statusVocabulary(string $normalized): array
+    {
         try {
             if (function_exists('app')) {
                 $normalizer = app(StatusNormalizerInterface::class);
-                $normalizedStatus = $normalizer->normalize($this->status);
-            } else {
-                $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
+
+                if ($normalizer instanceof StatusNormalizer) {
+                    return $normalizer->statusesNormalizingTo($normalized);
+                }
             }
         } catch (Throwable) {
-            $normalizedStatus = StatusNormalizer::normalizeStatic($this->status);
+            // fall through to the static vocabulary
         }
 
-        $status = PaymentStatus::tryFromString($normalizedStatus);
-
-        return $status?->isPending() ?? false;
+        return (new StatusNormalizer)->statusesNormalizingTo($normalized);
     }
 }

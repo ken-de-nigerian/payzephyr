@@ -88,7 +88,9 @@ final class ProcessWebhook implements ShouldQueue
 
             $eventKey = $this->resolveEventKey($manager);
 
-            if (! $webhookEventRepository->recordIfNew($this->provider, $eventKey)) {
+            $claimed = $webhookEventRepository->recordIfNew($this->provider, $eventKey);
+
+            if (! $claimed && ! $this->isRetryOfThisDelivery()) {
                 $this->log('info', 'Duplicate webhook delivery skipped', [
                     'provider' => $this->provider,
                     'event_key' => $eventKey,
@@ -101,6 +103,17 @@ final class ProcessWebhook implements ShouldQueue
                 );
 
                 return;
+            }
+
+            if (! $claimed) {
+                // The marker is this job's own, left behind by an attempt that
+                // died before its catch block could release it. Reclaim it
+                // rather than mistaking our own footprint for a duplicate.
+                $this->log('warning', 'Reclaiming an idempotency marker left by a previous attempt', [
+                    'provider' => $this->provider,
+                    'event_key' => $eventKey,
+                    'attempt' => $this->attempts(),
+                ]);
             }
 
             $this->trace($reference, TraceEvent::WEBHOOK_RECEIVED, TraceDirection::INBOUND,
@@ -166,6 +179,32 @@ final class ProcessWebhook implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Whether this execution is a retry of a delivery this job already claimed.
+     *
+     * The idempotency marker is written before the work is done and released in
+     * a catch block if the work throws. A worker that dies without unwinding -
+     * SIGKILL on job timeout, an OOM kill, a PHP fatal - never reaches that
+     * catch, so the marker survives with nothing having been processed. The
+     * retry then read its own leftover marker as somebody else's duplicate and
+     * returned, and the webhook was dropped for good: a charge.success that
+     * left the transaction pending forever while the provider recorded a
+     * successful delivery.
+     *
+     * The first attempt of a genuine duplicate delivery is a different job, so
+     * its attempt count is 1 and it still skips, which is the behaviour the
+     * marker exists for. Only attempt two onwards may reclaim.
+     *
+     * The trade-off is deliberate: reprocessing may re-dispatch events a first
+     * attempt already fired. Queues are at-least-once, so listeners have to
+     * tolerate that in any case, and a duplicated event is recoverable in a way
+     * that a silently discarded payment confirmation is not.
+     */
+    private function isRetryOfThisDelivery(): bool
+    {
+        return $this->job !== null && $this->attempts() > 1;
     }
 
     /**

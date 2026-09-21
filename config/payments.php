@@ -212,6 +212,12 @@ return [
     |
     */
     'health_check' => [
+        // On by default. PaymentManager has always read this with a `?? true`
+        // fallback, but the key was never declared here, so the behaviour was
+        // invisible in the published config and could only be found in the
+        // source. Turning it off means a charge is attempted against a
+        // provider without asking whether it is reachable first.
+        'enabled' => env('PAYMENTS_HEALTH_CHECK_ENABLED', true),
         'cache_ttl' => env('PAYMENTS_HEALTH_CHECK_CACHE_TTL', 300), // 5 minutes
         'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', false),
         'allowed_ips' => $paymentsHealthCheckAllowedIps ? explode(',', $paymentsHealthCheckAllowedIps) : [],

@@ -47,6 +47,11 @@ test('chargeWithFallback skips a provider that fails its health check', function
     // through the interface's own healthCheck(). See
     // PaymentManager::driverIsHealthy() and CustomDriverCompatibilityTest.
     $driver = Mockery::mock(DriverInterface::class);
+    // The currency question is asked first, and it has to be answered before
+    // the health check is reached at all - otherwise this test passes because
+    // the provider was skipped for the wrong reason. See
+    // ChargeChainSkipOrderTest for why that order is deliberate.
+    $driver->shouldReceive('getSupportedCurrencies')->andReturn(['NGN']);
     $driver->shouldReceive('healthCheck')->once()->andReturn(false);
     $driver->shouldNotReceive('charge');
 

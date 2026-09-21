@@ -180,6 +180,21 @@ final class PaymentManager
             try {
                 $driver = $this->driver($providerName);
 
+                // Currency before health, deliberately. Currency support is a
+                // static array comparison; a health check can be a live HTTP
+                // round trip on a cache miss. Asking the cheap question first
+                // means a provider that could never take this currency is
+                // skipped without a network call on the checkout path.
+                if (! $this->driverSupportsCurrency($driver, $request->currency)) {
+                    $this->log('info', "Provider [$providerName] does not support currency $request->currency");
+                    $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                        payload: ['reason' => 'unsupported_currency', 'currency' => $request->currency],
+                        provider: $providerName,
+                    );
+
+                    continue;
+                }
+
                 if ($this->config['health_check']['enabled'] ?? true) {
                     if (! $this->driverIsHealthy($driver)) {
                         $this->log('warning', "Provider [$providerName] failed health check, skipping");
@@ -190,16 +205,6 @@ final class PaymentManager
 
                         continue;
                     }
-                }
-
-                if (! $this->driverSupportsCurrency($driver, $request->currency)) {
-                    $this->log('info', "Provider [$providerName] does not support currency $request->currency");
-                    $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
-                        payload: ['reason' => 'unsupported_currency', 'currency' => $request->currency],
-                        provider: $providerName,
-                    );
-
-                    continue;
                 }
 
                 $response = $this->chargeWithTraceContext($driver, $request);

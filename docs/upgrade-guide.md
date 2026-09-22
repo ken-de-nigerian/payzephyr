@@ -59,6 +59,75 @@ any plan previously updated that way in your provider's dashboard.
 | Stripe refunds | `RefundException` | sometimes `ChargeException` | Catch `RefundException` |
 | `updatePlan()` | `PlanException` | accept the update | Use one of the four intervals and an amount above zero |
 
+### Reporting queries may return more rows than before
+
+`PaymentTransaction::successful()`, `failed()` and `pending()` used to match hand-maintained
+lists of status strings that had drifted from the normalizer. A row stored as `captured`,
+`overpaid`, `paidout` or `complete` answered `true` to `$transaction->isSuccessful()` while
+`PaymentTransaction::successful()` did not return it - so a reconciliation query built on the
+scope silently under-counted. `captured` arrived with Razorpay; `overpaid` and `paidout` with
+Mollie.
+
+Both sides now derive from the same vocabulary. **If you reconcile revenue with
+`PaymentTransaction::successful()->sum('amount')`, expect the figure to go up**, and to be
+correct this time. Nothing changed about the rows themselves.
+
+The status predicates also read the row's own `provider` column now. The same string can mean
+different things - `APPROVED` is success for Square and pending for PayPal - and the predicates
+previously ignored that, answering "none of the above" for any provider-specific status that
+reached the column. The query scopes deliberately do **not** do this: across mixed providers, at
+SQL level, the string alone cannot answer the question.
+
+### If your webhook listeners are not idempotent, make them so
+
+A worker killed mid-webhook - a job timeout, an OOM kill, a PHP fatal - used to leave its
+idempotency marker behind, and the retry then mistook its own marker for a duplicate delivery and
+discarded the webhook. A `charge.success` could be lost permanently, leaving the transaction
+pending while the provider's dashboard showed a successful delivery.
+
+A retry may now reclaim a marker left by its own earlier attempt. A genuine duplicate delivery
+from the provider still skips, because it arrives as a new job on its first attempt.
+
+The trade-off: **a reclaiming retry reprocesses, so an event a dead attempt already dispatched can
+fire twice.** Queues are at-least-once, so listeners had to tolerate this already, but it is worth
+checking any listener that sends email, charges something, or increments a counter. A duplicated
+event is recoverable; a silently discarded payment confirmation is not.
+
+### Config keys that no longer exist
+
+None of these were ever read by the package, so removing them changes no behaviour. They are
+listed so you can delete them from your `.env` rather than wonder why they do nothing:
+
+| Removed | What people reasonably assumed it did |
+|---|---|
+| `PAYMENTS_SUBSCRIPTIONS_RETRY_ENABLED` / `_MAX_ATTEMPTS` / `_DELAY_HOURS` | Retried failed renewals. Nothing retried them |
+| `PAYMENTS_SUBSCRIPTIONS_GRACE_PERIOD` | Kept access alive after a failed renewal |
+| `PAYMENTS_SUBSCRIPTIONS_NOTIFICATIONS_ENABLED` | Sent subscription emails |
+| `PAYMENTS_REFUNDS_NOTIFICATIONS_ENABLED` | Sent refund emails |
+| `subscriptions.webhook_events`, `refunds.webhook_events` | Chose which webhook events were handled. The routing has always matched event names in code |
+
+Renewal retry, grace periods and notifications remain your application's responsibility.
+Subscribe to `SubscriptionRenewed` and `SubscriptionPaymentFailed` and decide there.
+
+`health_check.enabled` went the other way: the package has always read it, defaulting to `true`,
+but never declared it. It is now in the published config as
+`PAYMENTS_HEALTH_CHECK_ENABLED`. Same default, same behaviour - you can now see it and switch it.
+
+### If you run with webhook signature verification disabled
+
+`PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=false` now writes an `error`-level log, once an hour, outside
+`local` and `testing`. Nothing else changed, and the switch still works. If those lines are new
+in your production logs, they are not a new fault - they are describing an endpoint that will
+accept a forged `charge.success` from anyone who can reach it. See [Security](security.md).
+
+### Razorpay: an unusable idempotency key is now refused
+
+Passing `idempotencyKey` to a Razorpay refund used to drop the key and send the refund anyway
+when it did not match Razorpay's format, which left the caller believing a retry was protected
+against double-refunding when nothing would deduplicate it. It now throws `RefundException`
+before anything is sent. Keys must be at least 10 characters of letters, digits, hyphens or
+underscores.
+
 ## Upgrading to v3.0.0
 
 Most applications upgrade to v3.0.0 with **no code changes at all**. There is one breaking

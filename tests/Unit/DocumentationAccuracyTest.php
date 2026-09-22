@@ -112,6 +112,59 @@ test('every provider in the matrix is a driver that actually exists', function (
         ->and(array_diff($documented, bundledProviders()))->toBe([]);
 });
 
+test('every exception the package can throw is in the catalogue', function () {
+    // RefundException went undocumented through ten drivers' worth of refund
+    // support, which is how a caller ends up not knowing that an ambiguous
+    // refund must not be retried.
+    $catalogue = (string) file_get_contents(dirname(__DIR__, 2).'/docs/error-handling.md');
+
+    $undocumented = [];
+
+    foreach (glob(dirname(__DIR__, 2).'/src/Exceptions/*.php') as $exception) {
+        $name = basename($exception, '.php');
+
+        if (! str_contains($catalogue, $name)) {
+            $undocumented[] = $name;
+        }
+    }
+
+    expect($undocumented)->toBe([], 'Missing from docs/error-handling.md: '.implode(', ', $undocumented));
+});
+
+test('every event the package dispatches is in the events reference', function () {
+    $reference = (string) file_get_contents(dirname(__DIR__, 2).'/docs/events.md');
+
+    $undocumented = [];
+
+    foreach (glob(dirname(__DIR__, 2).'/src/Events/*.php') as $event) {
+        $name = basename($event, '.php');
+
+        if (! str_contains($reference, $name)) {
+            $undocumented[] = $name;
+        }
+    }
+
+    expect($undocumented)->toBe([], 'Missing from docs/events.md: '.implode(', ', $undocumented));
+});
+
+test('every queued job is described in the queue chapter', function () {
+    // A job the application has to run a worker for, but does not know exists,
+    // is a promise the documentation failed to keep.
+    $chapter = (string) file_get_contents(dirname(__DIR__, 2).'/docs/queues.md');
+
+    $undocumented = [];
+
+    foreach (glob(dirname(__DIR__, 2).'/src/Jobs/*.php') as $job) {
+        $name = basename($job, '.php');
+
+        if (! str_contains($chapter, $name)) {
+            $undocumented[] = $name;
+        }
+    }
+
+    expect($undocumented)->toBe([], 'Missing from docs/queues.md: '.implode(', ', $undocumented));
+});
+
 test('every environment variable the config ships is documented somewhere', function () {
     $config = (string) file_get_contents(dirname(__DIR__, 2).'/config/payments.php');
     preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", $config, $matches);

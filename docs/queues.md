@@ -14,6 +14,12 @@ This is a deliberate design choice, not an accident, for two reasons:
 
 **Some providers' verification itself requires an extra network call.** PayPal and, in one specific configuration, Mollie verify webhook signatures by calling back to the provider's own API rather than checking a local HMAC; that's inherently slower than a local signature check, and doing it inside the initial request would make the endpoint even more likely to time out. PayZephyr defers this kind of verification to the queued job specifically to keep the initial HTTP response fast regardless.
 
+**The second queued job is optional.** If you enable tracing with
+`PAYZEPHYR_TRACE_ASYNC=true`, `KenDeNigerian\PayZephyr\Jobs\RecordTraceEvent` writes trace rows
+off the request too. Payloads are redacted *before* the job is queued, so nothing sensitive sits
+in the queue backend waiting to be written, and a trace failure never breaks a payment. It can
+use its own connection and queue - see [Tracing](tracing.md#every-trace-setting).
+
 ## The consequence: a worker has to be running
 
 A queued job doesn't process itself: something has to actually pick it up off the queue and run it. In local development, Laravel's default `sync` queue driver runs jobs immediately, in the same request, which is why webhooks can appear to "just work" while you're building without you ever having thought about queues. **That's not what happens in production**, where you should be using a real queue driver (database, Redis, SQS, or similar), and a real queue driver needs a worker process actually running to consume from it:
@@ -36,6 +42,23 @@ PAYMENTS_WEBHOOK_RETRY_BACKOFF=60
 ```
 
 Three attempts by default, 60 seconds apart, using Laravel's standard job-retry mechanism. If all retries are exhausted, the job is marked failed and lands in your `failed_jobs` table like any other failed queued job; worth monitoring, since a webhook stuck there means that specific event never got processed.
+
+### Is a retry safe?
+
+Yes, and there is one thing to know about it.
+
+Duplicate deliveries are refused by an idempotency marker recorded before the work begins and
+released if the work throws. A worker that dies *without unwinding* - a job timeout, an OOM kill,
+a PHP fatal - never releases it, so a retry is allowed to reclaim a marker left by its own earlier
+attempt. Without that, the retry would read its own leftover marker as somebody else's duplicate
+and discard the webhook permanently. A genuine duplicate delivery from the provider still skips,
+because it arrives as a new job on its first attempt.
+
+The consequence is that **a reclaiming retry reprocesses, so an event the dead attempt already
+dispatched can fire twice.** Writes are guarded against this - a successful transaction is never
+overwritten, and refund rows are upserted by reference - but your listeners are yours. Anything
+that sends email, charges something or increments a counter should be idempotent. That is true of
+any at-least-once queue; it is simply more likely to be exercised here.
 
 ## Which queue connection does PayZephyr use?
 

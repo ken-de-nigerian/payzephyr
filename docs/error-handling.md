@@ -16,6 +16,8 @@ flowchart TD
     A --> G[InvalidConfigurationException]
     A --> H[DriverNotFoundException]
     A --> I[ProviderException]
+    A --> J[RefundException]
+    A --> K[InvalidTraceDataException]
 ```
 
 This means you can catch broadly (`catch (PaymentException $e)`) when you don't care which specific thing went wrong, or narrowly (`catch (ChargeException $e)`) when you need to handle one failure mode differently from another: for example, showing "your card was declined" specifically for a charge failure, versus "we couldn't process your request" for something more generic.
@@ -31,9 +33,54 @@ This means you can catch broadly (`catch (PaymentException $e)`) when you don't 
 | `WebhookException` | Internal webhook-processing failure |
 | `InvalidConfigurationException` | A provider is missing required configuration (see [Configuration](configuration.md#provider-credentials)): this is a setup mistake, not something to catch at runtime; fix your `.env` instead |
 | `DriverNotFoundException` | You referenced a provider name PayZephyr doesn't recognize, or that isn't enabled |
-| `ProviderException` | A lower-level provider-communication failure that doesn't fit the categories above |
+| `RefundException` | A refund operation fails: creating one, fetching one, or a guard refusing to send it (see below) |
+| `ProviderException` | A lower-level provider-communication failure that doesn't fit the categories above. Also the duplicate in-flight charge rejection |
+| `InvalidTraceDataException` | A trace event could not be recorded because its reference was unusable. Only reachable with tracing enabled, and `TraceRecorder` catches it - tracing never breaks a payment |
 
 Two of these (`InvalidConfigurationException` and `DriverNotFoundException`) are really configuration bugs, not conditions you should be catching and handling gracefully in production. If you're seeing them outside of local development, the fix is almost always in your `.env` or `config/payments.php`, not in a `try`/`catch` block. See [Troubleshooting](troubleshooting.md#provider-not-found) if you hit one unexpectedly.
+
+## `RefundException` deserves its own paragraph
+
+Refunds have more ways to fail than charges, and several of them are PayZephyr refusing to act
+rather than the provider rejecting something. All of them arrive as `RefundException`:
+
+| Reason | Message contains | Why |
+|---|---|---|
+| Over-refund | `exceeds` the refundable balance | The sum of this transaction's refunds would be more than it was charged |
+| Duplicate in flight | `already in progress` | Another refund on the same transaction has not resolved yet. Wait, do not retry |
+| Ambiguous outcome | `timed out or lost its response` | The request reached the provider but no answer came back. **Not retried on purpose** - see below |
+| Missing money field | `omitted the required field` | The provider's response had no amount or currency. Reporting zero would be worse than failing |
+| Unusable idempotency key | `at least 10 characters` | Razorpay only. The key would have been ignored, leaving the retry unprotected |
+| Provider refused | provider's own text | The provider itself rejected the refund |
+
+The ambiguous case is the one to handle deliberately. PayZephyr has **not** retried, and will not,
+because the provider may already have moved the money:
+
+```php
+use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+
+try {
+    $refund = Payment::refund()->transaction($reference)->amount(25.00)->create();
+} catch (RefundException $e) {
+    if ($e->isAmbiguousProviderOutcome()) {
+        // Do not retry. Reconcile first: the refund may already exist.
+        ReconcileRefund::dispatch($reference);
+
+        return back()->with('warning', 'The refund is being confirmed with the provider.');
+    }
+
+    return back()->withErrors($e->getMessage());
+}
+```
+
+`isAmbiguousProviderOutcome()` is available on `ChargeException` and `RefundException`. It walks
+the exception chain rather than looking one level deep, so it still answers correctly after the
+exception has been re-wrapped. A connection that was never established returns `false` - nothing
+reached the provider, so that failure is safe to retry.
+
+For Paddle, which accepts no idempotency key at all, the message additionally lists the refund
+adjustments the provider currently holds against that transaction, so you can reconcile without
+leaving your logs.
 
 ## A realistic handling pattern
 

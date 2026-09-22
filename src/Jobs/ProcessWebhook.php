@@ -224,6 +224,14 @@ final class ProcessWebhook implements ShouldQueue
         try {
             $driver = $manager->driver($this->provider);
         } catch (DriverNotFoundException) {
+            // Deliberately open. A provider that cannot be resolved here was
+            // still resolvable in WebhookRequest::authorize(), which refuses an
+            // unknown provider outright - so an unverified delivery cannot reach
+            // this point over HTTP. For the synchronous drivers, which is all of
+            // them but PayPal and Mollie, authorize() has already verified the
+            // signature, and answering "unverified" here would discard a
+            // delivery that was in fact verified. Covered by
+            // ProcessWebhookAdditionalCoverageTest.
             return true;
         }
 

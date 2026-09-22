@@ -55,12 +55,37 @@ final class HealthEndpointMiddleware
                 ?? $request->header('X-Health-Token')
                 ?? $request->query('token');
 
-            if (empty($token) || ! in_array($token, $allowedTokens, true)) {
+            if (empty($token) || ! $this->tokenIsAllowed((string) $token, $allowedTokens)) {
                 return response()->json(['error' => 'Unauthorized'], HttpStatusCodes::UNAUTHORIZED);
             }
         }
 
         return $next($request);
+    }
+
+    /**
+     * Compare the presented token against the allow list in constant time.
+     *
+     * in_array() with strict comparison short-circuits on the first differing
+     * byte, which leaks the length and prefix of a valid token to an attacker
+     * who can time the response. The package already verifies every webhook
+     * signature with hash_equals; this is the same secret-comparison problem
+     * and gets the same treatment. Every candidate is compared so the work does
+     * not depend on which entry matches.
+     *
+     * @param  array<int, string>  $allowedTokens
+     */
+    private function tokenIsAllowed(string $token, array $allowedTokens): bool
+    {
+        $allowed = false;
+
+        foreach ($allowedTokens as $candidate) {
+            if (hash_equals((string) $candidate, $token)) {
+                $allowed = true;
+            }
+        }
+
+        return $allowed;
     }
 
     private function ipMatches(string $ip, string $pattern): bool

@@ -207,18 +207,22 @@ RAZORPAY_ENABLED=true
 
 ## Subscription and refund support at a glance
 
+Generated from the drivers on disk by `php artisan payzephyr:docs`; edit the drivers, not this table.
+
+<!-- generated:provider-matrix:start -->
 | Provider | Subscriptions | Refunds |
 |---|---|---|
-| Paystack | ✅ | ✅ |
-| Stripe | ✅ | ✅ |
-| PayPal | ✅ | ✅ |
 | Flutterwave | ✅ | ✅ |
-| Square | ✅ | ✅ |
 | Mollie | ✅ | ✅ |
-| Paddle | ❌ | ✅ |
+| PayPal | ✅ | ✅ |
+| Paystack | ✅ | ✅ |
+| Square | ✅ | ✅ |
+| Stripe | ✅ | ✅ |
 | Monnify | ❌ | ✅ |
 | OPay | ❌ | ✅ |
+| Paddle | ❌ | ✅ |
 | Razorpay | ❌ | ✅ |
+<!-- generated:provider-matrix:end -->
 
 ## Next steps
 

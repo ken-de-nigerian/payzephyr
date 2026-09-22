@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr;
 use Illuminate\Foundation\Application as FoundationApplication;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use KenDeNigerian\PayZephyr\Console\GenerateDocsCommand;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Console\NormalizeRefundStatusCommand;
 use KenDeNigerian\PayZephyr\Console\PruneTraceEventsCommand;
@@ -118,6 +119,7 @@ final class PaymentServiceProvider extends ServiceProvider
                 UninstallCommand::class,
                 NormalizeRefundStatusCommand::class,
                 TraceCommand::class,
+                GenerateDocsCommand::class,
                 PruneTraceEventsCommand::class,
             ]);
         }

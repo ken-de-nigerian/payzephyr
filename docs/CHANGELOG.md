@@ -539,6 +539,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The provider list and capability matrix are generated from the drivers, not maintained by
+  hand.** `php artisan payzephyr:docs` reads `src/Drivers` - each driver's own `$name` and the
+  capability interfaces it implements - and rewrites the matrix in
+  [Providers](providers.md#subscription-and-refund-support-at-a-glance) and the provider list in
+  the README between markers.
+
+  `payzephyr:docs --check` writes nothing and exits non-zero when the committed documentation no
+  longer matches the code. It runs in CI and in the test suite, so a provider cannot be added
+  with the docs left behind. Verified the way the requirement asks: adding a driver made the
+  check fail, and regenerating picked it up in both documents with no manual edits.
+
+  It refuses rather than guesses. A document whose markers are missing is left untouched with an
+  error, and a build presenting no drivers is refused rather than publishing a README announcing
+  that PayZephyr supports nothing.
+
 - **Documentation no longer states how many providers there are, and a test enforces it.**
   Counts rot: "8 providers" became wrong when Paddle landed and wrong again with Razorpay, and
   the second sweep still left "nine" in two files and "ten" in a third. Prose now names

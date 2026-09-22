@@ -34,6 +34,24 @@ jobs:
       - name: Check code style
         run: vendor/bin/pint --test
 
+      # laravel/framework "replace"s every illuminate/* package, so the
+      # components composer.json requires are never physically installed and
+      # their symbols cannot be resolved. composer-require-checker.json
+      # whitelists exactly what the tool structurally cannot see, enumerated
+      # rather than wildcarded: adding a new Illuminate class means editing that
+      # file, which is when someone should notice the framework coupling grew.
+      - name: Check for undeclared dependencies
+        run: |
+          composer global require --no-interaction maglnet/composer-require-checker
+          "$(composer global config home)/vendor/bin/composer-require-checker" check             --config-file=composer-require-checker.json composer.json
+
+      # The provider list and capability matrix are generated from src/Drivers.
+      # This fails the build if a driver was added or its capabilities changed
+      # without regenerating, which is what stopped the docs drifting from
+      # "8 providers" to nine to ten by hand.
+      - name: Check generated documentation is current
+        run: vendor/bin/testbench payzephyr:docs --check
+
   test:
     runs-on: ubuntu-latest
 

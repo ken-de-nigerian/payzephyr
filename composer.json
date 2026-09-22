@@ -36,11 +36,23 @@
     },
     "require": {
         "php": "^8.2",
+        "ext-ctype": "*",
+        "ext-filter": "*",
+        "ext-mbstring": "*",
         "guzzlehttp/guzzle": "^7.8",
+        "illuminate/bus": "^12.0|^13.0",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/contracts": "^12.0|^13.0",
         "illuminate/database": "^12.0|^13.0",
         "illuminate/http": "^12.0|^13.0",
+        "illuminate/queue": "^12.0|^13.0",
+        "illuminate/routing": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",
-        "stripe/stripe-php": "^21.0"
+        "laravel/prompts": "^0.3",
+        "nesbot/carbon": "^3.0",
+        "psr/http-message": "^1.1|^2.0",
+        "stripe/stripe-php": "^21.0",
+        "symfony/http-foundation": "^7.0|^8.0"
     },
     "require-dev": {
         "ext-pdo": "*",

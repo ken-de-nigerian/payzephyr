@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
@@ -177,4 +178,38 @@ test('the boolean helpers answer false for a status the package does not recogni
     expect($transaction->isSuccessful())->toBeFalse()
         ->and($transaction->isFailed())->toBeFalse()
         ->and($transaction->isPending())->toBeFalse();
+});
+
+test('a custom normalizer that is not StatusNormalizer falls back to the shipped vocabulary', function () {
+    // The scopes need the concrete vocabulary, which only StatusNormalizer can
+    // supply. An application that binds its own StatusNormalizerInterface is
+    // entitled to do so, and the scopes must still work rather than throwing on
+    // a method the interface does not promise.
+    app()->bind(StatusNormalizerInterface::class, fn () => new class implements StatusNormalizerInterface
+    {
+        public function normalize(string $status, ?string $provider = null): string
+        {
+            return strtolower($status);
+        }
+
+        public function registerProviderMappings(string $provider, array $mappings): self
+        {
+            return $this;
+        }
+
+        public function getProviderMappings(): array
+        {
+            return [];
+        }
+
+        public function getDefaultMappings(): array
+        {
+            return [];
+        }
+    });
+
+    storeTransactionWithStatus('success', 0);
+    storeTransactionWithStatus('captured', 1);
+
+    expect(PaymentTransaction::successful()->count())->toBe(2);
 });

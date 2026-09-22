@@ -42,7 +42,7 @@ trait PayPalRefundMethods
                 $requestOptions['headers']['PayPal-Request-Id'] = $request->idempotencyKey;
             }
 
-            $response = $this->makeRequest('POST', "/v2/payments/captures/$request->transactionReference/refund", $requestOptions);
+            $response = $this->makeRequest('POST', '/v2/payments/captures/'.rawurlencode($request->transactionReference).'/refund', $requestOptions);
             $data = $this->parseResponse($response);
 
             if (! isset($data['id'])) {
@@ -79,7 +79,7 @@ trait PayPalRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/v2/payments/refunds/$refundReference", [
+            $response = $this->makeRequest('GET', '/v2/payments/refunds/'.rawurlencode($refundReference), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
             $data = $this->parseResponse($response);

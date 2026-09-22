@@ -41,7 +41,7 @@ trait MollieRefundMethods
                 $requestOptions['headers'] = ['Idempotency-Key' => $request->idempotencyKey];
             }
 
-            $response = $this->makeRequest('POST', "/v2/payments/$paymentId/refunds", $requestOptions);
+            $response = $this->makeRequest('POST', '/v2/payments/'.rawurlencode($paymentId).'/refunds', $requestOptions);
             $data = $this->parseResponse($response);
 
             if (! isset($data['id'])) {
@@ -84,7 +84,7 @@ trait MollieRefundMethods
                 throw new RefundException("Invalid Mollie refund reference [$refundReference]. Expected format \"{paymentId}:{refundId}\".");
             }
 
-            $response = $this->makeRequest('GET', "/v2/payments/$paymentId/refunds/$refundId");
+            $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId).'/refunds/'.rawurlencode($refundId));
             $data = $this->parseResponse($response);
 
             $refundResponse = new RefundResponseDTO(

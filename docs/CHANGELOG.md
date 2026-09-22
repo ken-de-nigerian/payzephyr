@@ -280,6 +280,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **An identifier could reshape the API call it was looked up with.** Every driver but Paddle and
+  Razorpay interpolated references, plan codes and subscription codes straight into provider URLs.
+  Applications routinely pass whatever arrived in the callback query string to `verify()`, so
+  those values are attacker-influenced: a reference of `../methods` or `tr_1/refunds` redirected
+  the request to a different endpoint on the merchant's own account, and Monnify, which passes the
+  reference as a query value, stripped anything after a `?` but never stopped an `&` from
+  appending a parameter.
+
+  All 45 remaining sites, across 16 files, now use `rawurlencode()` - the convention the two
+  newest drivers already followed. A test asserts on the URL that actually leaves the HTTP client
+  for a traversal attempt, for an `&` injection, and for an ordinary reference that must not be
+  mangled; a second test fails the build if a raw interpolated path is ever reintroduced.
+
+  Impact was bounded - same host, the merchant's own API key, and the `require*` guards turn an
+  unexpected response shape into an exception rather than a wrong amount - so this is hardening
+  rather than a reported incident.
+
 - **Razorpay could refund a hundred times too much.** The refund path took the currency from
   the payment with `?? ''`, and that currency chooses the exponent the outbound amount is
   multiplied by. A payment whose `currency` was absent fell through to two decimals, so a

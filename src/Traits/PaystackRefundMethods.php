@@ -81,7 +81,7 @@ trait PaystackRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/refund/$refundReference");
+            $response = $this->makeRequest('GET', '/refund/'.rawurlencode($refundReference));
             $data = $this->parseResponse($response);
 
             if (! ($data['status'] ?? false)) {

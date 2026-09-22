@@ -93,7 +93,7 @@ trait PaystackSubscriptionMethods
         SubscriptionPlanDTO::assertValidUpdates($updates);
 
         try {
-            $response = $this->makeRequest('PUT', "/plan/$planCode", [
+            $response = $this->makeRequest('PUT', '/plan/'.rawurlencode($planCode), [
                 'json' => $updates,
             ]);
 
@@ -137,7 +137,7 @@ trait PaystackSubscriptionMethods
     public function fetchPlan(string $planCode): PlanResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/plan/$planCode");
+            $response = $this->makeRequest('GET', '/plan/'.rawurlencode($planCode));
 
             $data = $this->parseResponse($response);
 
@@ -295,7 +295,7 @@ trait PaystackSubscriptionMethods
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/subscription/$subscriptionCode");
+            $response = $this->makeRequest('GET', '/subscription/'.rawurlencode($subscriptionCode));
 
             $data = $this->parseResponse($response);
 

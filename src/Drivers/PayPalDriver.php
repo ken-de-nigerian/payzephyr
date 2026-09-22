@@ -262,7 +262,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     {
         try {
 
-            $response = $this->makeRequest('GET', "/v2/checkout/orders/$reference", [
+            $response = $this->makeRequest('GET', '/v2/checkout/orders/'.rawurlencode($reference), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
 
@@ -463,7 +463,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     private function captureOrder(string $orderId): ?array
     {
         try {
-            $response = $this->makeRequest('POST', "/v2/checkout/orders/$orderId/capture", [
+            $response = $this->makeRequest('POST', '/v2/checkout/orders/'.rawurlencode($orderId).'/capture', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
 

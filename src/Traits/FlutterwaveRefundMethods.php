@@ -33,7 +33,7 @@ trait FlutterwaveRefundMethods
                 $requestOptions['headers'] = ['Idempotency-Key' => $request->idempotencyKey];
             }
 
-            $response = $this->makeRequest('POST', "transactions/$request->transactionReference/refund", $requestOptions);
+            $response = $this->makeRequest('POST', 'transactions/'.rawurlencode($request->transactionReference).'/refund', $requestOptions);
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {
@@ -77,7 +77,7 @@ trait FlutterwaveRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "refunds/$refundReference");
+            $response = $this->makeRequest('GET', 'refunds/'.rawurlencode($refundReference));
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {

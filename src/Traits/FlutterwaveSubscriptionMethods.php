@@ -79,7 +79,7 @@ trait FlutterwaveSubscriptionMethods
             ], fn ($value) => $value !== null);
 
             if ($payload !== []) {
-                $this->makeRequest('PUT', "payment-plans/$planCode", ['json' => $payload]);
+                $this->makeRequest('PUT', 'payment-plans/'.rawurlencode($planCode), ['json' => $payload]);
             }
 
             $this->log('info', 'Subscription plan updated', ['plan_code' => $planCode]);
@@ -97,7 +97,7 @@ trait FlutterwaveSubscriptionMethods
     public function fetchPlan(string $planCode): PlanResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "payment-plans/$planCode");
+            $response = $this->makeRequest('GET', 'payment-plans/'.rawurlencode($planCode));
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {
@@ -167,7 +167,7 @@ trait FlutterwaveSubscriptionMethods
 
             $reference = $this->generateReference('FLW_SUB');
 
-            $chargeResponse = $this->makeRequest('POST', "tokenized-charges/$request->authorization", [
+            $chargeResponse = $this->makeRequest('POST', 'tokenized-charges/'.rawurlencode($request->authorization), [
                 'json' => array_filter([
                     'currency' => $request->metadata['currency'] ?? null,
                     'email' => $request->customer,
@@ -205,7 +205,7 @@ trait FlutterwaveSubscriptionMethods
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "subscriptions/$subscriptionCode");
+            $response = $this->makeRequest('GET', 'subscriptions/'.rawurlencode($subscriptionCode));
             $data = $this->parseResponse($response);
 
             if (($data['status'] ?? '') !== 'success') {
@@ -230,7 +230,7 @@ trait FlutterwaveSubscriptionMethods
     public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $this->makeRequest('PUT', "subscriptions/$action->subscriptionCode/cancel");
+            $this->makeRequest('PUT', 'subscriptions/'.rawurlencode($action->subscriptionCode).'/cancel');
 
             $this->log('info', 'Subscription cancelled', ['subscription_code' => $action->subscriptionCode]);
 
@@ -253,7 +253,7 @@ trait FlutterwaveSubscriptionMethods
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $this->makeRequest('PUT', "subscriptions/$action->subscriptionCode/activate");
+            $this->makeRequest('PUT', 'subscriptions/'.rawurlencode($action->subscriptionCode).'/activate');
 
             $this->log('info', 'Subscription enabled', ['subscription_code' => $action->subscriptionCode]);
 

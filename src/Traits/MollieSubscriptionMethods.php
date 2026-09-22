@@ -166,7 +166,7 @@ trait MollieSubscriptionMethods
                 'metadata' => $request->metadata ?: null,
             ], fn ($value) => $value !== null);
 
-            $response = $this->makeRequest('POST', "/v2/customers/$customerId/subscriptions", [
+            $response = $this->makeRequest('POST', '/v2/customers/'.rawurlencode($customerId).'/subscriptions', [
                 'json' => $payload,
             ]);
             $data = $this->parseResponse($response);
@@ -196,7 +196,7 @@ trait MollieSubscriptionMethods
         try {
             [$customerId, $subscriptionId] = $this->decodeMollieSubscriptionCode($subscriptionCode);
 
-            $response = $this->makeRequest('GET', "/v2/customers/$customerId/subscriptions/$subscriptionId");
+            $response = $this->makeRequest('GET', '/v2/customers/'.rawurlencode($customerId).'/subscriptions/'.rawurlencode($subscriptionId));
             $data = $this->parseResponse($response);
 
             return $this->mapMollieSubscriptionToResponse($data, $customerId);
@@ -219,7 +219,7 @@ trait MollieSubscriptionMethods
         try {
             [$customerId, $subscriptionId] = $this->decodeMollieSubscriptionCode($action->subscriptionCode);
 
-            $response = $this->makeRequest('DELETE', "/v2/customers/$customerId/subscriptions/$subscriptionId");
+            $response = $this->makeRequest('DELETE', '/v2/customers/'.rawurlencode($customerId).'/subscriptions/'.rawurlencode($subscriptionId));
             $data = $this->parseResponse($response);
 
             $this->log('info', 'Subscription cancelled', ['subscription_code' => $action->subscriptionCode]);
@@ -288,7 +288,7 @@ trait MollieSubscriptionMethods
             }
             $customerId = $customerObject['id'];
 
-            $response = $this->makeRequest('GET', "/v2/customers/$customerId/subscriptions", [
+            $response = $this->makeRequest('GET', '/v2/customers/'.rawurlencode($customerId).'/subscriptions', [
                 'query' => array_filter(['limit' => $perPage ?? 50]),
             ]);
             $data = $this->parseResponse($response);

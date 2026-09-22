@@ -175,7 +175,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
         try {
             $paymentId = $reference;
 
-            $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+            $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
             $data = $this->parseResponse($response);
             $status = $this->requireString($data, 'status', 'verify');
             $amount = $this->requireArray($data, 'amount', 'verify');
@@ -321,7 +321,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $paymentId = $payload['id'];
 
-            $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+            $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
             $paymentData = $this->parseResponse($response);
 
             if (! isset($paymentData['id']) || $paymentData['id'] !== $paymentId) {

@@ -173,7 +173,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
         $cleanReference = explode('?', $reference)[0];
 
         try {
-            $response = $this->makeRequest('GET', "/api/v2/merchant/transactions/query?paymentReference=$cleanReference", [
+            $response = $this->makeRequest('GET', '/api/v2/merchant/transactions/query?paymentReference='.rawurlencode($cleanReference), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
 

@@ -105,7 +105,7 @@ trait MonnifyRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/api/v1/refunds/$refundReference", [
+            $response = $this->makeRequest('GET', '/api/v1/refunds/'.rawurlencode($refundReference), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
             $data = $this->parseResponse($response);

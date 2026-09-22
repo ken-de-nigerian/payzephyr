@@ -255,7 +255,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         try {
-            $response = $this->makeRequest('GET', "/v2/payments/$reference");
+            $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($reference));
             $data = $this->parseResponse($response);
 
             if (isset($data['payment'])) {
@@ -288,7 +288,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     private function verifyByPaymentLinkId(string $reference): ?VerificationResponseDTO
     {
         try {
-            $paymentLinkResponse = $this->makeRequest('GET', "/v2/online-checkout/payment-links/$reference");
+            $paymentLinkResponse = $this->makeRequest('GET', '/v2/online-checkout/payment-links/'.rawurlencode($reference));
             $paymentLinkData = $this->parseResponse($paymentLinkResponse);
 
             $orderId = $paymentLinkData['payment_link']['order_id'] ?? null;
@@ -391,7 +391,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     private function getOrderById(string $orderId): array
     {
-        $response = $this->makeRequest('GET', "/v2/orders/$orderId");
+        $response = $this->makeRequest('GET', '/v2/orders/'.rawurlencode($orderId));
         $data = $this->parseResponse($response);
 
         $order = $data['order'] ?? null;
@@ -434,7 +434,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     private function getPaymentDetails(string $paymentId): array
     {
-        $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+        $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
 
         return $this->parseResponse($response);
     }

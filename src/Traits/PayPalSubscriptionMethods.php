@@ -98,7 +98,7 @@ trait PayPalSubscriptionMethods
 
         try {
             if (isset($updates['description'])) {
-                $this->makeRequest('PATCH', "/v1/billing/plans/$planCode", [
+                $this->makeRequest('PATCH', '/v1/billing/plans/'.rawurlencode($planCode), [
                     'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                     'json' => [[
                         'op' => 'replace',
@@ -111,7 +111,7 @@ trait PayPalSubscriptionMethods
             if (isset($updates['amount'])) {
                 $currency = $updates['currency'] ?? $this->fetchPlan($planCode)->currency;
 
-                $this->makeRequest('POST', "/v1/billing/plans/$planCode/update-pricing-schemes", [
+                $this->makeRequest('POST', '/v1/billing/plans/'.rawurlencode($planCode).'/update-pricing-schemes', [
                     'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                     'json' => [
                         'pricing_schemes' => [[
@@ -142,7 +142,7 @@ trait PayPalSubscriptionMethods
     public function fetchPlan(string $planCode): PlanResponseDTO
     {
         try {
-            $data = $this->parseResponse($this->makeRequest('GET', "/v1/billing/plans/$planCode", [
+            $data = $this->parseResponse($this->makeRequest('GET', '/v1/billing/plans/'.rawurlencode($planCode), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]));
 
@@ -258,7 +258,7 @@ trait PayPalSubscriptionMethods
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO
     {
         try {
-            $data = $this->parseResponse($this->makeRequest('GET', "/v1/billing/subscriptions/$subscriptionCode", [
+            $data = $this->parseResponse($this->makeRequest('GET', '/v1/billing/subscriptions/'.rawurlencode($subscriptionCode), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]));
 
@@ -290,7 +290,7 @@ trait PayPalSubscriptionMethods
             $reason = (string) $action->option('reason', 'Cancelled by merchant');
             $endpoint = $permanent ? 'cancel' : 'suspend';
 
-            $this->makeRequest('POST', "/v1/billing/subscriptions/$action->subscriptionCode/$endpoint", [
+            $this->makeRequest('POST', '/v1/billing/subscriptions/'.rawurlencode($action->subscriptionCode).'/'.rawurlencode($endpoint), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => ['reason' => $reason],
             ]);
@@ -326,7 +326,7 @@ trait PayPalSubscriptionMethods
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $current = $this->parseResponse($this->makeRequest('GET', "/v1/billing/subscriptions/$action->subscriptionCode", [
+            $current = $this->parseResponse($this->makeRequest('GET', '/v1/billing/subscriptions/'.rawurlencode($action->subscriptionCode), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]));
 
@@ -337,7 +337,7 @@ trait PayPalSubscriptionMethods
                 );
             }
 
-            $this->makeRequest('POST', "/v1/billing/subscriptions/$action->subscriptionCode/activate", [
+            $this->makeRequest('POST', '/v1/billing/subscriptions/'.rawurlencode($action->subscriptionCode).'/activate', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => ['reason' => (string) $action->option('reason', 'Reactivated by merchant')],
             ]);

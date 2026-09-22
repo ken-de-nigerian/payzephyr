@@ -271,7 +271,7 @@ trait SquareSubscriptionMethods
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/v2/subscriptions/$subscriptionCode");
+            $response = $this->makeRequest('GET', '/v2/subscriptions/'.rawurlencode($subscriptionCode));
             $data = $this->parseResponse($response);
 
             if (! isset($data['subscription'])) {
@@ -306,7 +306,7 @@ trait SquareSubscriptionMethods
                 'pause_cycle_duration' => $action->option('pause_cycle_duration'),
             ], fn ($value) => $value !== null);
 
-            $response = $this->makeRequest('POST', "/v2/subscriptions/$action->subscriptionCode/pause", [
+            $response = $this->makeRequest('POST', '/v2/subscriptions/'.rawurlencode($action->subscriptionCode).'/pause', [
                 'json' => $payload,
             ]);
             $data = $this->parseResponse($response);
@@ -342,7 +342,7 @@ trait SquareSubscriptionMethods
                 'resume_change_timing' => $action->option('resume_change_timing'),
             ], fn ($value) => $value !== null);
 
-            $response = $this->makeRequest('POST', "/v2/subscriptions/$action->subscriptionCode/resume", [
+            $response = $this->makeRequest('POST', '/v2/subscriptions/'.rawurlencode($action->subscriptionCode).'/resume', [
                 'json' => $payload,
             ]);
             $data = $this->parseResponse($response);
@@ -421,7 +421,7 @@ trait SquareSubscriptionMethods
      */
     private function fetchSquareCatalogObjects(string $variationId): array
     {
-        $response = $this->makeRequest('GET', "/v2/catalog/object/$variationId", [
+        $response = $this->makeRequest('GET', '/v2/catalog/object/'.rawurlencode($variationId), [
             'query' => ['include_related_objects' => 'true'],
         ]);
         $data = $this->parseResponse($response);
@@ -520,7 +520,7 @@ trait SquareSubscriptionMethods
         }
 
         try {
-            $response = $this->makeRequest('GET', "/v2/customers/$customerId");
+            $response = $this->makeRequest('GET', '/v2/customers/'.rawurlencode($customerId));
             $data = $this->parseResponse($response);
 
             return $data['customer'] ?? null;

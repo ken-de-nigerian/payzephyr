@@ -138,7 +138,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
     public function verify(string $reference): VerificationResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/transaction/verify/$reference");
+            $response = $this->makeRequest('GET', '/transaction/verify/'.rawurlencode($reference));
             $data = $this->parseResponse($response);
 
             if (! ($data['status'] ?? false)) {

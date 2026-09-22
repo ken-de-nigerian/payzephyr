@@ -83,7 +83,7 @@ trait SquareRefundMethods
     private function fetchOriginalPaymentAmountMoney(string $paymentId): array
     {
         try {
-            $response = $this->makeRequest('GET', "/v2/payments/$paymentId");
+            $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
             $data = $this->parseResponse($response);
         } catch (Throwable $e) {
             throw new RefundException(
@@ -110,7 +110,7 @@ trait SquareRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $response = $this->makeRequest('GET', "/v2/refunds/$refundReference");
+            $response = $this->makeRequest('GET', '/v2/refunds/'.rawurlencode($refundReference));
             $data = $this->parseResponse($response);
 
             if (! isset($data['refund'])) {

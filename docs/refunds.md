@@ -6,7 +6,7 @@ A charge moves money toward you; a refund moves some or all of it back. That sou
 
 ## Which providers support this
 
-All ten supported providers: **Paystack, Stripe, PayPal, Flutterwave, Square, Mollie, Monnify, OPay, Paddle, and Razorpay.** Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally — Paddle being the one that calls it something else (an *adjustment*, see [Providers](providers.md#paddle)).
+**Every bundled provider.** See the [provider matrix](providers.md#subscription-and-refund-support-at-a-glance) for the current list. Unlike subscriptions, every provider PayZephyr talks to has a real refund endpoint, so refund support shipped to every driver in the same release rather than rolling out incrementally — Paddle being the one that calls it something else (an *adjustment*, see [Providers](providers.md#paddle)).
 
 ```php
 use KenDeNigerian\PayZephyr\Facades\Payment;

@@ -8,7 +8,7 @@ That's why subscriptions lean much more heavily on [webhooks](webhooks.md) and [
 
 ## Which providers support this
 
-**Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie**: six of the nine supported providers. Razorpay has a subscriptions API that its driver doesn't wrap yet. Monnify and OPay don't have a provider-managed subscription product to wrap (Monnify's recurring-payment tools are merchant-triggered repeat-charge primitives, not a provider-tracked subscription entity; OPay has no subscription API in its documentation at all), so PayZephyr doesn't claim support for them. If you specifically need Monnify or OPay subscriptions, see [Custom Drivers](custom-drivers.md), though be aware you'd be building a scheduling/retry engine yourself, not wrapping something the provider already does for you.
+**Paystack, Stripe, PayPal, Flutterwave, Square, and Mollie.** The [provider matrix](providers.md#subscription-and-refund-support-at-a-glance) is the current list; it is the one place that tracks which provider supports what, so it cannot fall out of step with prose elsewhere. Razorpay has a subscriptions API that its driver doesn't wrap yet. Monnify and OPay don't have a provider-managed subscription product to wrap (Monnify's recurring-payment tools are merchant-triggered repeat-charge primitives, not a provider-tracked subscription entity; OPay has no subscription API in its documentation at all), so PayZephyr doesn't claim support for them. If you specifically need Monnify or OPay subscriptions, see [Custom Drivers](custom-drivers.md), though be aware you'd be building a scheduling/retry engine yourself, not wrapping something the provider already does for you.
 
 ```php
 use KenDeNigerian\PayZephyr\Facades\Payment;

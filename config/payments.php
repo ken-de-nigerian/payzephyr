@@ -324,20 +324,6 @@ return [
             'enabled' => env('PAYMENTS_REFUNDS_LOGGING_ENABLED', true),
             'table' => env('PAYMENTS_REFUNDS_LOGGING_TABLE', 'refund_transactions'),
         ],
-        'webhook_events' => [
-            'refund.processed',
-            'refund.failed',
-            'charge.refunded',
-            'refund.updated',
-        ],
-        'notifications' => [
-            'enabled' => env('PAYMENTS_REFUNDS_NOTIFICATIONS_ENABLED', false),
-            'events' => [
-                'created',
-                'completed',
-                'failed',
-            ],
-        ],
     ],
 
     /*

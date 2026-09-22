@@ -522,6 +522,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Documentation no longer states how many providers there are, and a test enforces it.**
+  Counts rot: "8 providers" became wrong when Paddle landed and wrong again with Razorpay, and
+  the second sweep still left "nine" in two files and "ten" in a third. Prose now names
+  providers or links the matrix in [Providers](providers.md), and
+  `DocumentationAccuracyTest` fails the build on any sentence that counts them.
+
+  The same test checks the other direction: every bundled driver appears in the matrix, every
+  provider in the matrix is a driver that exists, the README names them all, and every
+  environment variable the shipped config defines is documented somewhere. Architecture
+  decision records and dated release audits are exempt — "5 of 9 providers" was true when that
+  decision was made, and rewriting history to match the present would destroy the record.
+
+  Nineteen environment variables were shipped but documented nowhere, including
+  `PAYMENTS_HEALTH_CHECK_ENABLED`, every provider's `*_BASE_URL`, and four tracing settings.
+  All are now documented.
+
+
+- **Breaking (config): `refunds.webhook_events` and `refunds.notifications` have been removed**,
+  for the same reason as the subscription blocks below: nothing in the package ever read either
+  of them. `PAYMENTS_REFUNDS_NOTIFICATIONS_ENABLED` is now inert and can be deleted from your
+  `.env`. `refunds.prevent_duplicates`, `refunds.validation` and `refunds.logging` are
+  unaffected and still honored.
+
+  These were missed on the first pass because the check matched key names as substrings, and
+  `enabled`, `events` and `notifications` all appear elsewhere in the package. The scan is now
+  path-aware and strips comments, so a key named only in a doc-block no longer counts as read.
+
 - **Breaking (config): four subscription config blocks that nothing read have been removed.**
   `subscriptions.retry` (`enabled`, `max_attempts`, `delay_hours`), `subscriptions.grace_period`,
   `subscriptions.notifications`, and `subscriptions.webhook_events` were shipped in

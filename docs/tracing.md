@@ -217,6 +217,21 @@ PAYZEPHYR_TRACE_CONNECTION=analytics
 
 Timestamps are millisecond-precision, unlike PayZephyr's other tables. Several steps of one payment routinely land inside the same second, and the gap between them is the thing a timeline is read for.
 
+## Every trace setting
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PAYZEPHYR_FEATURE_TRACE` | `false` | The kill switch. Off means nothing is recorded at all |
+| `PAYZEPHYR_TRACE_ASYNC` | `false` | Write trace rows from a queued job instead of in the request |
+| `PAYZEPHYR_TRACE_QUEUE_NAME` | default queue | Which queue those jobs go on |
+| `PAYZEPHYR_TRACE_QUEUE_CONNECTION` | default connection | Which queue *connection* those jobs go on, when it differs from the application's |
+| `PAYZEPHYR_TRACE_CONNECTION` | default connection | Which database connection trace rows are written to |
+| `PAYZEPHYR_TRACE_TABLE` | `payment_trace_events` | The table name, if it collides with something you already have |
+| `PAYZEPHYR_TRACE_RECORD_HTTP_BODIES` | `true` | Whether provider request and response bodies are stored, after redaction |
+| `PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH` | `10` | How deep redaction walks a nested payload. Bounded on purpose: trace payloads are attacker-influenced, and unbounded recursion over hostile JSON is a memory-exhaustion vector |
+| `PAYZEPHYR_TRACE_SLOW_RESPONSE_MS` | `5000` | The threshold, in milliseconds, above which a provider response is marked slow on its timeline |
+| `PAYZEPHYR_TRACE_RETENTION_DAYS` | `90` | How much history `payzephyr:prune-trace-events` keeps |
+
 ## What isn't traced yet
 
 Worth knowing so an empty stretch doesn't read as a bug:

@@ -114,12 +114,15 @@ These control the endpoint PayZephyr registers to receive webhook deliveries fro
 
 ```php
 'health_check' => [
+    'enabled' => env('PAYMENTS_HEALTH_CHECK_ENABLED', true),
     'cache_ttl' => env('PAYMENTS_HEALTH_CHECK_CACHE_TTL', 300),
     'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', false),
     'allowed_ips' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS')) : [],
     'allowed_tokens' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS')) : [],
 ],
 ```
+
+`enabled` controls whether the fallback chain asks a provider if it is reachable *before* attempting a charge against it. Leaving it on is strongly recommended: it is what lets a charge skip a provider that is down and move to the next one instead of failing. Turning it off removes that round trip, at the cost of discovering the outage by failing the customer's payment. Results are cached either way, and the currency check runs first, so a provider that cannot take the request's currency is skipped without a health request at all.
 
 PayZephyr exposes `/payments/health`, which reports whether it can currently reach each enabled provider, useful for uptime monitoring. Checking a provider's health means making a real HTTP request to it, which is slow to do on every hit, so results are cached for `cache_ttl` seconds.
 
@@ -149,7 +152,6 @@ Every charge you initiate through PayZephyr gets a row written to `payment_trans
         'enabled' => env('PAYMENTS_SUBSCRIPTIONS_LOGGING_ENABLED', true),
         'table' => env('PAYMENTS_SUBSCRIPTIONS_LOGGING_TABLE', 'subscription_transactions'),
     ],
-    // ...
 ],
 ```
 
@@ -167,7 +169,6 @@ Covered in full in [Subscriptions](subscriptions.md), since it needs the context
         'enabled' => env('PAYMENTS_REFUNDS_LOGGING_ENABLED', true),
         'table' => env('PAYMENTS_REFUNDS_LOGGING_TABLE', 'refund_transactions'),
     ],
-    // ...
 ],
 ```
 
@@ -182,6 +183,36 @@ Covered in full in [Refunds](refunds.md). Quick summary: when `validation.enable
 ```
 
 Some providers (PayPal, notably) require an OAuth-style access token that PayZephyr fetches and reuses rather than requesting on every single API call. This controls how long that token is cached before PayZephyr fetches a fresh one.
+
+## Provider base URLs and per-provider options
+
+Every provider accepts a `<PROVIDER>_BASE_URL` override:
+
+| Variable | Points at |
+|---|---|
+| `PAYSTACK_BASE_URL` | Paystack's API host |
+| `STRIPE_BASE_URL` | Stripe's API host |
+| `PAYPAL_BASE_URL` | PayPal's API host (see also `PAYPAL_MODE`) |
+| `FLUTTERWAVE_BASE_URL` | Flutterwave's API host |
+| `SQUARE_BASE_URL` | Square's API host |
+| `MONNIFY_BASE_URL` | Monnify's API host |
+| `OPAY_BASE_URL` | OPay's API host |
+| `MOLLIE_BASE_URL` | Mollie's API host |
+| `PADDLE_BASE_URL` | Paddle's API host — **defaults to sandbox** |
+| `RAZORPAY_BASE_URL` | Razorpay's API host (one host for both modes; the key prefix decides) |
+
+You rarely need these. They exist for sandbox hosts that differ from production, for
+regional endpoints, and for pointing a test suite at a local mock. Setting one to a host you
+do not control hands that host your API credentials, so treat it as a credential setting.
+
+A few providers take options beyond credentials:
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PADDLE_TAX_CATEGORY` | `standard` | Paddle's tax category for the ad-hoc price a charge creates |
+| `PADDLE_PRODUCT_NAME` | the charge description | The product name shown on Paddle's hosted checkout |
+| `PADDLE_CLIENT_TOKEN` | — | Not used server-side. Kept here so Paddle.js credentials live with the rest of your Paddle config |
+| `RAZORPAY_REFUND_SPEED` | `normal` | `normal` or `optimum`; `optimum` asks Razorpay to use the fastest available rail |
 
 ## Security
 

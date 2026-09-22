@@ -84,6 +84,13 @@ curl -H "Authorization: Bearer your-token-here" https://yourdomain.com/payments/
 
 **Fix:** make "mark paid" an idempotent operation: `$order->update(['status' => 'paid'])` is safe to run any number of times; something like `$wallet->increment('balance', $amount)` triggered from *both* the callback and the webhook is not, and will double-credit. Guard it: only apply the side effect if the order wasn't already marked paid.
 
+**A second cause, since v4.0.0:** a webhook job whose worker was killed mid-processing - a job
+timeout, an OOM kill - is allowed to reclaim its own idempotency marker and reprocess on retry.
+Without that, the retry would mistake its own leftover marker for a duplicate delivery and
+discard the webhook, losing a `charge.success` permanently. The trade-off is that an event the
+dead attempt already dispatched can fire a second time. The fix is the same: make the side
+effect idempotent. See [Queues](queues.md#is-a-retry-safe).
+
 **Verify:** manually trigger both the callback and a webhook for the same reference in a test environment and confirm the side effect (balance credited, email sent, whatever it is) only happened once.
 
 ## Amounts look 100x too large or too small

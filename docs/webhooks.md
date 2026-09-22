@@ -131,6 +131,9 @@ PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=false
 
 **Never do this in an environment with real credentials.** Without signature verification, anyone who discovers your webhook URL can send fake "payment succeeded" events. See [Security](security.md).
 
+Outside `local` and `testing`, this logs an `error` once an hour for as long as it stays off, so
+it cannot be turned on for a debugging session and quietly forgotten.
+
 ## Next steps
 
 - [Events](events.md): the full list of events PayZephyr dispatches, including the subscription-specific ones

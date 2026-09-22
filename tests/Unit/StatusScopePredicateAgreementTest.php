@@ -139,3 +139,42 @@ test('an ambiguous status is read differently for each provider that claims it',
     expect(PaymentTransaction::where('reference', 'ref_square')->first()->isSuccessful())->toBeTrue()
         ->and(PaymentTransaction::where('reference', 'ref_paypal')->first()->isPending())->toBeTrue();
 });
+
+// ---------------------------------------------------------------------------
+// The status vocabulary documented in docs/verification.md
+// ---------------------------------------------------------------------------
+
+test('a status the normalizer does not recognise is passed through, not forced into the enum', function () {
+    // docs/verification.md used to promise "always one of four values". It is
+    // not a closed set: an unmapped provider vocabulary comes back as the
+    // provider's own string, lowercased. A reader who wrote a four-arm match on
+    // it would hit UnhandledMatchError in production, so the docs now say so
+    // and this pins the behaviour they describe.
+    $normalizer = new StatusNormalizer;
+
+    expect($normalizer->normalize('abandoned', 'paystack'))->toBe('abandoned')
+        ->and($normalizer->normalize('queued'))->toBe('queued')
+        ->and(PaymentStatus::tryFromString('abandoned'))->toBeNull();
+});
+
+test('a cancellation normalizes to failed, so verify() never reports cancelled', function () {
+    // PaymentStatus::CANCELLED exists and is used on stored rows and refunds,
+    // but every cancellation vocabulary collapses into failed on the way
+    // through the normalizer. The docs said otherwise.
+    $normalizer = new StatusNormalizer;
+
+    expect($normalizer->normalize('cancelled'))->toBe('failed')
+        ->and($normalizer->normalize('canceled'))->toBe('failed')
+        ->and($normalizer->normalize('CANCELLED'))->toBe('failed');
+});
+
+test('the boolean helpers answer false for a status the package does not recognise', function () {
+    // The safe reading: an unrecognised status is not a successful payment.
+    storeTransactionWithStatus('abandoned', 0);
+
+    $transaction = PaymentTransaction::first();
+
+    expect($transaction->isSuccessful())->toBeFalse()
+        ->and($transaction->isFailed())->toBeFalse()
+        ->and($transaction->isPending())->toBeFalse();
+});

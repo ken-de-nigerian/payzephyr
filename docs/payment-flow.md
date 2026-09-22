@@ -79,7 +79,7 @@ A few things worth knowing about this before you build a handler:
 
 - **Webhooks are verified before anything else happens**: an unsigned or incorrectly-signed request never reaches your application code. See [Security](security.md).
 - **Processing happens on a queue**, not synchronously during the HTTP request: this is why a queue worker (`php artisan queue:work`) isn't optional for a production PayZephyr app. See [Queues](queues.md) for why.
-- **Providers routinely send the same webhook more than once**: that's normal behavior on their end (a retry after a slow response from you, for instance), not a bug. PayZephyr deduplicates automatically so your listener only ever runs once per actual event.
+- **Providers routinely send the same webhook more than once**: that's normal behavior on their end (a retry after a slow response from you, for instance), not a bug. PayZephyr deduplicates them, so a redelivery does not run your listener again. The exception is a worker killed mid-processing: that delivery is reprocessed on retry, so a listener with side effects should still be idempotent. See [Queues](queues.md#is-a-retry-safe).
 - **You react to webhooks via a single Laravel event**, `WebhookReceived`, regardless of which provider sent it. Covered fully in [Webhooks](webhooks.md) and [Events](events.md).
 
 ## Next steps

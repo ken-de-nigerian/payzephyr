@@ -30,7 +30,9 @@ No, and this is important enough that it has [its own explanation](payment-flow.
 
 **What happens if a provider sends the same webhook twice?**
 
-Nothing bad: this is normal provider behavior (a retry after a slow response, typically), and PayZephyr deduplicates automatically so your listener only runs once per actual event. See [Webhooks](webhooks.md#duplicate-deliveries).
+Nothing bad: this is normal provider behavior (a retry after a slow response, typically), and PayZephyr deduplicates them, so a redelivered event does not run your listener a second time.
+
+One caveat worth knowing rather than discovering: if the worker processing a webhook is killed outright, the retry reprocesses that delivery, and an event the dead attempt already dispatched can fire twice. Queues are at-least-once, so listeners with side effects should be idempotent regardless. See [Webhooks](webhooks.md#duplicate-deliveries).
 
 **Which PHP and Laravel versions are supported?**
 

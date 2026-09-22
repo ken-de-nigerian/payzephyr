@@ -24,6 +24,11 @@ PAYMENTS_WEBHOOK_VERIFY_SIGNATURE=false
 
 This exists purely as an escape hatch for local development against a sandbox that doesn't sign its test webhooks correctly. If this is `false` in any environment with real API keys, your webhook endpoint will accept and act on forged requests. Double-check this setting specifically as part of your [production checklist](production-checklist.md) before going live.
 
+Outside `local` and `testing`, PayZephyr writes an `error`-level log line saying so, at most once
+an hour. If you see it, it is not a new fault - it is describing an endpoint that will accept a
+forged `charge.success` for any reference an attacker can guess or read out of their own callback
+URL. The switch still works; it just refuses to be silent.
+
 ## Replay-attack protection
 
 Even a *correctly signed* webhook can be a problem if it's a genuine, previously-valid request being resent later by someone who intercepted it, a "replay attack." PayZephyr guards against this by checking the timestamp embedded in each webhook payload and rejecting anything older than a configurable tolerance window:

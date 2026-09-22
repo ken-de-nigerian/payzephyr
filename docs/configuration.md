@@ -31,7 +31,7 @@ PAYMENTS_DEFAULT_PROVIDER=paystack
 PAYMENTS_FALLBACK_PROVIDER=stripe
 ```
 
-You can also override which provider(s) to use for a single call, without touching config at all: see [Multiple Providers](providers.md#fallback-chains-per-call).
+You can also override which provider(s) to use for a single call, without touching config at all: see [Multiple Providers](providers.md#choosing-a-provider-for-a-call).
 
 ## Provider credentials
 

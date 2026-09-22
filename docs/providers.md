@@ -34,6 +34,18 @@ Payment::amount(100.00)
 
 If the first provider's request fails (a network error, the provider's API returning an error), PayZephyr automatically tries the next one in the list, without you writing any retry logic. This also happens implicitly using `PAYMENTS_FALLBACK_PROVIDER` from [Configuration](configuration.md#default-and-fallback-providers) when you don't specify a list explicitly.
 
+**Fallback is not unconditional, and the exception matters.** If a provider's outcome is
+*ambiguous* - the request was transmitted but no usable response came back, so it may already
+have charged the customer - PayZephyr throws immediately and does **not** try the next provider.
+Falling back there could charge the customer twice. You get a `ProviderException` naming the
+provider to reconcile with; verify with `Payment::verify($reference)` before charging again. A
+connection that was never established is a definitive failure, not an ambiguous one, and does
+fall back normally. See [Idempotency](idempotency.md#3-ambiguous-outcome-detection-never-fall-back-after-a-maybe-success).
+
+A provider can also be passed over before it is ever contacted: if it does not support the
+request's currency, or if it fails its health check. Both are recorded on the payment's timeline
+with the reason, when [tracing](tracing.md) is on.
+
 **One thing this doesn't protect against:** if the customer already completed payment on provider A's checkout page and something fails on *your side* afterward, falling back to provider B doesn't "undo" or "retry" that payment; fallback only applies to the *initial charge request*, before the customer has been sent anywhere.
 
 ## The bundled providers

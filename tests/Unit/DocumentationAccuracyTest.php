@@ -165,6 +165,89 @@ test('every queued job is described in the queue chapter', function () {
     expect($undocumented)->toBe([], 'Missing from docs/queues.md: '.implode(', ', $undocumented));
 });
 
+test('every artisan command named in the docs actually exists', function () {
+    // The production checklist tells an operator to schedule a command. If the
+    // name is wrong they find out at 3am, or never. One wrong name reached the
+    // docs during this audit - written by the audit itself.
+    $signatures = [];
+
+    foreach (glob(dirname(__DIR__, 2).'/src/Console/*.php') as $command) {
+        $source = (string) file_get_contents($command);
+
+        if (preg_match("/protected \\\$signature = '([a-z0-9:_-]+)/", $source, $match)) {
+            $signatures[] = $match[1];
+        }
+    }
+
+    expect($signatures)->not->toBeEmpty();
+
+    $named = [];
+
+    foreach (liveDocs() as $file) {
+        preg_match_all('/payzephyr:[a-z0-9:_-]+/', (string) file_get_contents($file), $found);
+
+        foreach ($found[0] as $name) {
+            $named[$name][] = basename($file);
+        }
+    }
+
+    $ghosts = [];
+
+    foreach ($named as $name => $files) {
+        if (! in_array($name, $signatures, true)) {
+            $ghosts[] = $name.' ('.implode(', ', array_unique($files)).')';
+        }
+    }
+
+    expect($ghosts)->toBe([], 'Commands named in the docs that do not exist: '.implode('; ', $ghosts));
+});
+
+test('no documented link points at a file or anchor that does not exist', function () {
+    $broken = [];
+
+    foreach (liveDocs() as $file) {
+        $body = (string) file_get_contents($file);
+        preg_match_all('/\[[^\]]*\]\(([^)]+)\)/', $body, $links);
+
+        foreach ($links[1] as $target) {
+            if (str_starts_with($target, 'http') || str_starts_with($target, 'mailto')) {
+                continue;
+            }
+
+            [$path, $anchor] = array_pad(explode('#', $target, 2), 2, null);
+
+            $resolved = $path === ''
+                ? $file
+                : realpath(dirname($file).DIRECTORY_SEPARATOR.$path);
+
+            if ($resolved === false || ! file_exists($resolved)) {
+                $broken[] = basename($file).' -> '.$target.' (no such file)';
+
+                continue;
+            }
+
+            if ($anchor === null || $anchor === '') {
+                continue;
+            }
+
+            preg_match_all('/^#{1,6} +(.*)$/m', (string) file_get_contents($resolved), $headings);
+
+            $slugs = array_map(static function (string $heading): string {
+                $slug = strtolower(str_replace('`', '', trim($heading)));
+                $slug = preg_replace('/[^a-z0-9 \-]/', '', $slug);
+
+                return str_replace(' ', '-', (string) $slug);
+            }, $headings[1]);
+
+            if (! in_array(strtolower($anchor), $slugs, true)) {
+                $broken[] = basename($file).' -> '.$target.' (no such anchor)';
+            }
+        }
+    }
+
+    expect($broken)->toBe([], "Broken documentation links:\n  ".implode("\n  ", $broken));
+});
+
 test('every environment variable the config ships is documented somewhere', function () {
     $config = (string) file_get_contents(dirname(__DIR__, 2).'/config/payments.php');
     preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", $config, $matches);

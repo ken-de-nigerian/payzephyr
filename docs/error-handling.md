@@ -37,7 +37,7 @@ This means you can catch broadly (`catch (PaymentException $e)`) when you don't 
 | `ProviderException` | A lower-level provider-communication failure that doesn't fit the categories above. Also the duplicate in-flight charge rejection |
 | `InvalidTraceDataException` | A trace event could not be recorded because its reference was unusable. Only reachable with tracing enabled, and `TraceRecorder` catches it - tracing never breaks a payment |
 
-Two of these (`InvalidConfigurationException` and `DriverNotFoundException`) are really configuration bugs, not conditions you should be catching and handling gracefully in production. If you're seeing them outside of local development, the fix is almost always in your `.env` or `config/payments.php`, not in a `try`/`catch` block. See [Troubleshooting](troubleshooting.md#provider-not-found) if you hit one unexpectedly.
+Two of these (`InvalidConfigurationException` and `DriverNotFoundException`) are really configuration bugs, not conditions you should be catching and handling gracefully in production. If you're seeing them outside of local development, the fix is almost always in your `.env` or `config/payments.php`, not in a `try`/`catch` block. See [Troubleshooting](troubleshooting.md#driver-x-not-found--drivernotfoundexception) if you hit one unexpectedly.
 
 ## `RefundException` deserves its own paragraph
 

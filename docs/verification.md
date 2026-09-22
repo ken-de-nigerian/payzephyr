@@ -54,16 +54,35 @@ Why check the amount at all, if the provider already confirmed success? Because 
 
 Every provider uses different words for the same thing: Paystack says `"success"`, Stripe's payment intents report `"succeeded"`, and so on. If PayZephyr handed you each provider's raw status string, your code would need a big `match` statement per provider just to answer "did this work or not," defeating the entire point of a unified API.
 
-Instead, `$verification->status` is always one of four normalized values, backed by the `PaymentStatus` enum:
+Instead, `$verification->status` is normalized into a vocabulary PayZephyr understands:
 
 | Status | Meaning |
 |---|---|
 | `success` | Payment completed successfully |
-| `failed` | Payment did not complete |
+| `failed` | Payment did not complete. A cancellation normalizes to `failed`, not to `cancelled` |
 | `pending` | Still processing (common for bank transfers, USSD) |
-| `cancelled` | Customer abandoned or explicitly cancelled |
 
-Use the boolean helpers rather than string-comparing `$verification->status` yourself where you can (`isSuccessful()`, `isFailed()`, `isPending()`) since they're less error-prone than typing the string literal `'success'` correctly every time:
+**This set is not closed, and that matters if you write a `match`.** A status PayZephyr has no
+mapping for - a provider vocabulary it does not know, or one added since your version - is passed
+through as the provider's own value, lowercased. `abandoned` stays `abandoned`. So this will
+throw `UnhandledMatchError` in production the first time an unmapped status arrives:
+
+```php
+// Don't: the set is open, and a fourth value will eventually turn up.
+match ($verification->status) {
+    'success' => $order->markPaid(),
+    'failed' => $order->markFailed(),
+    'pending' => $order->markProcessing(),
+};
+```
+
+`PaymentStatus` has a fourth case, `cancelled`, but `verify()` does not produce it: the
+normalizer maps every cancellation vocabulary into `failed`. You will see `cancelled` on stored
+rows and refunds, not on a verification result.
+
+Use the boolean helpers rather than string-comparing `$verification->status` yourself
+(`isSuccessful()`, `isFailed()`, `isPending()`). They answer `false` for a status PayZephyr does
+not recognize, which is the safe reading - an unrecognized status is not a successful payment:
 
 ```php
 match (true) {

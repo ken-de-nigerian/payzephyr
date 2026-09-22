@@ -79,7 +79,9 @@ A few design choices look odd until you know what they are protecting against. H
 
 If PayZephyr waited until processing finished, two copies of the same webhook arriving at the same instant would both start work before either had finished, and both would run your listener. Marking first makes the second copy stop immediately.
 
-The cost of marking first is that a failure halfway through leaves a mark behind for something that never actually completed. PayZephyr handles that by clearing the mark when processing fails, so a retry gets a genuine second attempt. See [Webhooks](webhooks.md) for the full lifecycle.
+The cost of marking first is that a failure halfway through leaves a mark behind for something that never actually completed. PayZephyr clears the mark when processing throws, so a retry gets a genuine second attempt.
+
+That only covers failures the job can catch. A worker killed outright - a job timeout, an OOM kill, a PHP fatal - never reaches that clean-up, and the mark survives with nothing processed. So a retry is additionally allowed to reclaim a mark left by its own earlier attempt, rather than reading its own footprint as somebody else's duplicate and discarding the delivery. A genuine duplicate arrives as a new job on its first attempt and is still refused. The trade-off is that a reclaiming retry reprocesses, so an event the dead attempt already dispatched can fire twice. See [Webhooks](webhooks.md) for the full lifecycle.
 
 ### Why a lost connection and a lost response are treated differently
 

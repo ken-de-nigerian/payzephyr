@@ -230,7 +230,7 @@ Timestamps are millisecond-precision, unlike PayZephyr's other tables. Several s
 | `PAYZEPHYR_TRACE_RECORD_HTTP_BODIES` | `true` | Whether provider request and response bodies are stored, after redaction |
 | `PAYZEPHYR_TRACE_REDACTION_MAX_DEPTH` | `10` | How deep redaction walks a nested payload. Bounded on purpose: trace payloads are attacker-influenced, and unbounded recursion over hostile JSON is a memory-exhaustion vector |
 | `PAYZEPHYR_TRACE_SLOW_RESPONSE_MS` | `5000` | The threshold, in milliseconds, above which a provider response is marked slow on its timeline |
-| `PAYZEPHYR_TRACE_RETENTION_DAYS` | `90` | How much history `payzephyr:prune-trace-events` keeps |
+| `PAYZEPHYR_TRACE_RETENTION_DAYS` | `90` | How much history `payzephyr:trace:prune` keeps |
 
 ## What isn't traced yet
 

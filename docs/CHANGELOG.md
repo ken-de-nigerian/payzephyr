@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [4.0.0] - 2026-09-23
+
 ### Added
 
 - **Payment tracing has moved into PayZephyr**, folded in from the separate `payzephyr-trace`

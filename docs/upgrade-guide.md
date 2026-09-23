@@ -2,7 +2,7 @@
 
 This chapter walks through what changes when you move between PayZephyr's major versions. For the complete, exhaustive list of every change (not just breaking ones), see [CHANGELOG.md](CHANGELOG.md): this chapter is the narrative, tutorial version of the same information, focused on *what you need to actually do*.
 
-## Upgrading to the next major release (unreleased)
+## Upgrading to v4.0.0
 
 This release contains breaking changes, all of them in service of one rule: **PayZephyr no
 longer invents a number when a provider does not send one.** Most apps that do not use

@@ -99,7 +99,7 @@ final class PruneTraceEventsCommand extends Command
     {
         $override = $this->option('days');
 
-        if ($override !== null && $override !== '' && is_numeric($override)) {
+        if ($override !== '' && is_numeric($override)) {
             return (int) $override;
         }
 
@@ -139,7 +139,7 @@ final class PruneTraceEventsCommand extends Command
      * The non-interactive path is spelled out rather than left to a prompt's
      * default value. This command's whole purpose is to run unattended on a
      * schedule, and "it happens to proceed because confirm() returns its
-     * default when there is no TTY" is a behaviour nobody chose.
+     * default when there is no TTY" is a behavior nobody chose.
      */
     private function shouldProceed(int $count, int $days): bool
     {

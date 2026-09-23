@@ -21,6 +21,41 @@ and PayZephyr handles the fact that, underneath, this might be talking to Paysta
 **Currently supported providers:** Flutterwave, Mollie, Monnify, OPay, Paddle, PayPal, Paystack, Razorpay, Square, and Stripe.
 <!-- generated:provider-list:end -->
 
+## When a payment goes wrong, you get the whole story
+
+Every payment library can tell you a charge succeeded. PayZephyr can tell you **what happened on
+the way there** - including the parts that left no other trace.
+
+Say a customer's payment came through, eventually. Your transactions table says
+`provider: stripe, status: success`. True, and complete, and it tells you nothing about the fact
+that Paystack was tried first, failed its health check, and was skipped - because that attempt
+never existed anywhere durable. Turn tracing on and it does:
+
+```
+14:22:07.104 • payment.initiated          chain: paystack, stripe
+14:22:07.106 • provider.skipped           paystack - failed_health_check
+14:22:07.241 → provider.request.sent      stripe   POST /v1/checkout/sessions
+14:22:08.402 ← provider.response.received stripe   HTTP 200   1161ms
+14:22:08.404 • payment.completed          stripe
+```
+
+One append-only row per step, keyed by the reference you already have, redacted before it is
+written, and readable from the command line:
+
+```bash
+php artisan payzephyr:trace PZ_1758000000_ab12cd
+```
+
+This is the part that is genuinely hard to add afterwards. Normalizing providers behind one API
+is table stakes - several packages do it. Reconstructing *why* a payment took the path it took,
+across a fallback chain, with per-attempt correlation IDs and millisecond gaps, is the thing you
+cannot bolt on once the decisions have already been made and forgotten.
+
+It is off by default, costs nothing when off, and can be turned off again on the next request
+with no deploy. **Today it covers charges, verifications and inbound webhooks.** Refunds and
+subscriptions are not instrumented yet - that is planned, not shipped, and
+[Tracing](docs/tracing.md) says so where you would look for it.
+
 ## Is this for you?
 
 PayZephyr is a good fit if:
@@ -70,7 +105,7 @@ all of this without you implementing any of it:
 | Events | The same events fire, so your listeners keep working. |
 | Health checks | Cached, so a slow provider does not slow every charge. |
 | Secret-safe logging | Keys and tokens stripped before anything is written. |
-| Tracing | Opt-in, step-by-step record of what happened to each payment. |
+| Tracing | Extend `AbstractDriver` and your HTTP round trips appear on the same timeline as everyone else's. |
 
 You write what is genuinely specific to your provider: how to build its request, and how to read
 its response. That is the part nobody else can write for you.
@@ -149,36 +184,37 @@ The chapters below are written to be read roughly in order if you're new to PayZ
 
 6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on most bundled providers
 7. [Refunds](docs/refunds.md): full and partial refunds, supported on every bundled provider
-8. [Webhooks](docs/webhooks.md): why they exist and how to handle them
-9. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
-10. [Testing](docs/testing.md): testing code that charges money, without charging money
-11. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
-12. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
-13. [Queues](docs/queues.md): why a queue worker is required, not optional
+8. [Tracing](docs/tracing.md): the step-by-step record of why a payment took the path it took
+9. [Webhooks](docs/webhooks.md): why they exist and how to handle them
+10. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
+11. [Testing](docs/testing.md): testing code that charges money, without charging money
+12. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
+13. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
+14. [Queues](docs/queues.md): why a queue worker is required, not optional
 
 **Going further**
 
-14. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
-15. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
-16. [Extending a Driver](docs/extending-drivers.md): add refunds and subscriptions to a custom driver
-17. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
+15. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
+16. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
+17. [Extending a Driver](docs/extending-drivers.md): add refunds and subscriptions to a custom driver
+18. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
 
 **Shipping it**
 
-18. [Production Checklist](docs/production-checklist.md): what to double-check before going live
-19. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
-20. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
+19. [Production Checklist](docs/production-checklist.md): what to double-check before going live
+20. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
+21. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
 
 **When things go wrong**
 
-21. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
-22. [FAQ](docs/faq.md)
+22. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
+23. [FAQ](docs/faq.md)
 
 **Reference**
 
-23. [API Reference](docs/api-reference.md): every public method, documented
-24. [Architecture](docs/architecture.md): how the package is put together internally
-25. [Contributing](docs/contributing.md)
+24. [API Reference](docs/api-reference.md): every public method, documented
+25. [Architecture](docs/architecture.md): how the package is put together internally
+26. [Contributing](docs/contributing.md)
 
 The full table of contents, if you'd rather browse than read linearly, is in [docs/INDEX.md](docs/INDEX.md).
 

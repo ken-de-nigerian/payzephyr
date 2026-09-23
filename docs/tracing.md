@@ -10,6 +10,13 @@ Consider a payment PayZephyr recovered for you. Paystack was down, so the fallba
 
 Tracing fills that in. Where logging keeps a payment's current **state**, tracing keeps the **sequence** that produced it: one append-only row per step, keyed by the same reference you already have.
 
+**What it covers today:** charges, verifications and inbound webhooks - every decision the
+fallback chain makes, every HTTP round trip to a provider, and every webhook that arrives.
+**Refunds and subscriptions are not instrumented yet.** A refund writes no trace rows at all,
+not a shortened timeline. That is planned work, and it is said here rather than in a footnote
+because a reader deciding whether to depend on this deserves to know its edges before they
+depend on it, not after.
+
 ```
 14:22:07.104 • payment.initiated
 14:22:07.106 • provider.skipped (paystack)
@@ -236,7 +243,7 @@ Timestamps are millisecond-precision, unlike PayZephyr's other tables. Several s
 
 Worth knowing so an empty stretch doesn't read as a bug:
 
-- **Refunds and subscriptions.** Both are separate optional features with their own tables, and neither is instrumented yet.
+- **Refunds and subscriptions.** Neither is instrumented yet, and the gap is total rather than partial: a refund produces no trace rows at all. The mechanism is that `AbstractDriver::makeRequest()` only records a round trip when a trace reference is in scope, and the reference is set on the charge path alone - so a refund's HTTP calls fall outside it. `TraceEvent::PAYMENT_REFUNDED` exists in the vocabulary for that future work and is currently never emitted. This is the next thing worth instrumenting: a refund is the operation most likely to need a forensic record, because it moves money outward, settles asynchronously on most providers, and is what a dispute is argued over.
 - **Synchronous signature failures.** For most providers a bad webhook signature is rejected with a 403 in `WebhookRequest::authorize()`, before the controller or the queued job runs - so it leaves no trace row. `webhook.validation_failed` only fires for providers that defer verification into the job (Mollie and PayPal).
 - **Custom drivers that don't extend `AbstractDriver`.** Implementing `DriverInterface` directly is fully supported and always will be; such a driver simply records no HTTP-level steps. Everything the manager decides around it is still recorded.
 

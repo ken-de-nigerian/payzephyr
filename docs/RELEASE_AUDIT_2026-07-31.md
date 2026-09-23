@@ -1,5 +1,21 @@
 # PayZephyr Release Readiness Report
 
+> **Superseded, and kept only as engineering history.** This is an internal QA pass from
+> before v2.0.0. It is not documentation, it is not current, and it is excluded from the
+> distributed package.
+>
+> Much of it is now wrong. H-2 says no refund support exists anywhere in the codebase;
+> refunds ship on every bundled provider. S-1 discusses `stripe/stripe-php ^13.0`, which is
+> now `^21`. Its CRITICAL and HIGH findings were fixed in v2.0.0, and the MEDIUM items were
+> addressed across v3.x and v4.0.0 - M-1's `composer audit` recommendation and M-3's SQLite
+> guidance both landed, and M-2's `catch (Exception)` sites are gone.
+>
+> It is still here because [ADR-0011](architecture/adr/0011-refund-driver-mapping.md) cites
+> it as the origin of refund support, and three test files reference its finding IDs to
+> record why they exist. For the current state of the package see
+> [CHANGELOG](CHANGELOG.md) and the [upgrade guide](upgrade-guide.md).
+
+
 **Date:** 2026-07-31
 **Scope:** Full-package release audit ahead of the v2.0.0 cut
 **Auditor role:** Adversarial QA / release engineering pass: code review, static analysis, and behavioral testing against the actual API surface, not just "do the existing tests pass."

@@ -15,3 +15,10 @@
 /DEPLOYMENT_CHECKLIST.md export-ignore
 /PROJECT_SUMMARY.md export-ignore
 /QUICK_REFERENCE.md export-ignore
+
+# Internal engineering history. Kept in the repository - ADR-0011 cites it as
+# the origin of refund support, and three tests reference its finding IDs as
+# provenance - but not shipped to consumers. It is a pre-v2.0.0 QA report whose
+# claims are long superseded, and it documents reproduction steps for defects
+# that were fixed three majors ago.
+/docs/RELEASE_AUDIT_2026-07-31.md export-ignore

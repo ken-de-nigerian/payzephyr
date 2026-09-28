@@ -204,7 +204,7 @@ final class ProcessWebhook implements ShouldQueue
      * successful delivery.
      *
      * The first attempt of a genuine duplicate delivery is a different job, so
-     * its attempt count is 1 and it still skips, which is the behaviour the
+     * its attempt count is 1 and it still skips, which is the behavior the
      * marker exists for. Only attempt two onwards may reclaim.
      *
      * The trade-off is deliberate: reprocessing may re-dispatch events a first
@@ -364,12 +364,13 @@ final class ProcessWebhook implements ShouldQueue
                 $updateData['paid_at'] = now();
             }
 
-            try {
-                $channel = $manager->driver($this->provider)->extractWebhookChannel($this->payload);
-                if ($channel) {
-                    $updateData['channel'] = $channel;
-                }
-            } catch (DriverNotFoundException) {
+            // No DriverNotFoundException guard: $reference came from this same
+            // driver (extractReference() returns null when it cannot be
+            // resolved), and the manager caches it, so resolving it again
+            // here cannot fail.
+            $channel = $manager->driver($this->provider)->extractWebhookChannel($this->payload);
+            if ($channel) {
+                $updateData['channel'] = $channel;
             }
 
             $updated = $transactionRepository->updateIfNotSuccessful($reference, $updateData);

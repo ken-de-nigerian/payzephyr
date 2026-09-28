@@ -546,13 +546,11 @@ final class PaymentManager
             ]);
         }
 
-        try {
-            $this->log('info', "Payment charged successfully via [$providerName]", [
-                'reference' => $response->reference,
-            ]);
-        } catch (Throwable) {
-            // Even the logger failing must not surface as a charge failure.
-        }
+        // Unguarded on purpose: LogsToPaymentChannel::log() swallows every
+        // failure itself, so a broken logger cannot surface as a charge failure.
+        $this->log('info', "Payment charged successfully via [$providerName]", [
+            'reference' => $response->reference,
+        ]);
     }
 
     protected function logTransaction(ChargeRequestDTO $request, ChargeResponseDTO $response, string $provider): void

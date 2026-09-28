@@ -65,21 +65,18 @@ final readonly class TraceRecorder implements TraceRecorderInterface
     /**
      * Report a dropped trace event to the payment log channel.
      *
-     * Guarded in turn: a misconfigured log channel must not convert a failed
-     * trace write into a failed payment either.
+     * A misconfigured log channel must not convert a failed trace write into a
+     * failed payment either; LogsToPaymentChannel::log() swallows its own
+     * failures, which is what guarantees that.
      */
     private function reportFailure(TraceEventDTO $event, Throwable $e): void
     {
-        try {
-            $this->log('error', 'Failed to record a payment trace event', [
-                'reference' => $event->reference,
-                'event' => $event->event->value,
-                'error' => $e->getMessage(),
-                'error_class' => $e::class,
-            ]);
-        } catch (Throwable) {
-            // Nothing left to try. Losing a trace event is not worth an exception.
-        }
+        $this->log('error', 'Failed to record a payment trace event', [
+            'reference' => $event->reference,
+            'event' => $event->event->value,
+            'error' => $e->getMessage(),
+            'error_class' => $e::class,
+        ]);
     }
 
     public function startCorrelation(): string

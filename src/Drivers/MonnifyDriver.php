@@ -189,10 +189,6 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 reference: $result['paymentReference'] ?? $reference,
                 status: $this->normalizeStatus($this->requireString($result, 'paymentStatus', 'verify')),
                 amount: $this->requireAmount($result, 'amountPaid', 'verify'),
-                // Monnify names this either way depending on the endpoint, so
-                // collapse the two and then insist on one of them. Defaulting
-                // to NGN would silently mis-denominate every non-Naira
-                // Monnify account.
                 currency: $this->requireString(
                     ['currency' => $result['currency'] ?? $result['currencyCode'] ?? null],
                     'currency',
@@ -283,7 +279,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
             return true;
 
-        } catch (ChargeException $e) {
+        } catch (Throwable $e) {
             $previous = $e;
             while ($previous = $previous->getPrevious()) {
                 if ($previous instanceof ClientException) {
@@ -291,11 +287,6 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 }
             }
 
-            $this->log('error', 'Health check failed', ['error' => $e->getMessage()]);
-
-            return false;
-
-        } catch (Throwable $e) {
             $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
 
             return false;

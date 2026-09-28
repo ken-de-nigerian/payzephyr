@@ -447,7 +447,10 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return true;
 
-        } catch (ChargeException $e) {
+        } catch (Throwable $e) {
+            // getAccessToken() wraps every failure in a ChargeException, so the
+            // cause worth inspecting is somewhere down the previous-chain. A 4xx
+            // means PayPal answered, which is all a health check asks.
             $previous = $e;
             while ($previous = $previous->getPrevious()) {
                 if ($previous instanceof ClientException) {
@@ -455,9 +458,6 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 }
             }
 
-            return false;
-
-        } catch (Throwable) {
             return false;
         }
     }

@@ -238,3 +238,84 @@ test('a razorpay refund webhook without a package reference falls back to the pa
             && $event->transactionReference === 'pay_Abc123';
     });
 });
+
+/*
+ * A refund's outcome is announced once. Razorpay reports an instant refund
+ * twice - refund.created already processed, then refund.processed - and
+ * listeners that credit a wallet or email a customer would do it twice.
+ */
+
+function enableRazorpayForRefundWebhooks(): void
+{
+    config(['payments.providers.razorpay' => [
+        'driver' => 'razorpay',
+        'key_id' => 'rzp_test_x',
+        'key_secret' => 'secret',
+        'webhook_secret' => 'whsec',
+        'enabled' => true,
+        'currencies' => ['INR'],
+    ]]);
+    app()->forgetInstance('payments.config');
+    app()->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+}
+
+test('an instant razorpay refund reported as created and as processed fires RefundCompleted once', function () {
+    enableRazorpayForRefundWebhooks();
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class, \KenDeNigerian\PayZephyr\Events\WebhookReceived::class]);
+
+    app()->call([new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.created', 'rfnd_instant', 'processed')), 'handle']);
+    app()->call([new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.processed', 'rfnd_instant', 'processed')), 'handle']);
+
+    // Two distinct deliveries, both processed...
+    Event::assertDispatchedTimes(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class, 2);
+    // ...but one refund, completed once.
+    Event::assertDispatchedTimes(RefundCompleted::class, 1);
+});
+
+test('a refund failure reported twice fires RefundFailed once', function () {
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    $failed = fn (string $event) => ['event' => $event, 'data' => ['id' => 777, 'status' => 'failed', 'transaction' => ['reference' => 'txn_777']]];
+
+    app()->call([new ProcessWebhook('paystack', $failed('refund.failed')), 'handle']);
+    app()->call([new ProcessWebhook('paystack', $failed('refund.processed')), 'handle']);
+
+    Event::assertDispatchedTimes(RefundFailed::class, 1);
+});
+
+test('different refunds each announce their own outcome', function () {
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    foreach ([101, 102] as $id) {
+        app()->call([new ProcessWebhook('paystack', ['event' => 'refund.processed', 'data' => ['id' => $id, 'status' => 'processed']]), 'handle']);
+    }
+
+    Event::assertDispatchedTimes(RefundCompleted::class, 2);
+});
+
+test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the retry announces it', function () {
+    // The outcome claim is written before the listener runs. If the listener
+    // throws and the claim stayed, the queue's retry would find it and never
+    // announce the refund at all.
+    Event::fakeExcept([RefundCompleted::class]);
+
+    $shouldThrow = true;
+    $announced = 0;
+    Event::listen(RefundCompleted::class, function () use (&$shouldThrow, &$announced) {
+        if ($shouldThrow) {
+            throw new RuntimeException('wallet service down');
+        }
+        $announced++;
+    });
+
+    $payload = ['event' => 'refund.processed', 'data' => ['id' => 555, 'status' => 'processed']];
+
+    expect(fn () => app()->call([new ProcessWebhook('paystack', $payload), 'handle']))
+        ->toThrow(RuntimeException::class, 'wallet service down');
+    expect(\KenDeNigerian\PayZephyr\Models\WebhookEvent::where('event_key', 'refund.completed:555')->exists())->toBeFalse();
+
+    $shouldThrow = false;
+    app()->call([new ProcessWebhook('paystack', $payload), 'handle']);
+
+    expect($announced)->toBe(1);
+});

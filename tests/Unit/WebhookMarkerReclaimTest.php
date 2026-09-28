@@ -106,3 +106,26 @@ test('a first attempt with no marker present processes normally', function () {
 
     expect(PaymentTransaction::first()->status)->toBe('success');
 });
+
+test('a retry reclaims the refund outcome claim its dead attempt left, and announces the refund', function () {
+    // The attempt claimed the delivery key and the outcome key, then died
+    // before its catch block could release either. On retry both are its own.
+    Event::fake([\KenDeNigerian\PayZephyr\Events\RefundCompleted::class]);
+    $payload = ['event' => 'refund.processed', 'data' => ['id' => 9001, 'status' => 'processed']];
+    $repository = app(WebhookEventRepositoryInterface::class);
+    $repository->recordIfNew('paystack', claimMarkerFor($payload));
+    $repository->recordIfNew('paystack', 'refund.completed:9001');
+
+    app()->call([webhookJobOnAttempt($payload, 2), 'handle']);
+
+    Event::assertDispatchedTimes(\KenDeNigerian\PayZephyr\Events\RefundCompleted::class, 1);
+});
+
+test('a first attempt does not reclaim an outcome another delivery already announced', function () {
+    Event::fake([\KenDeNigerian\PayZephyr\Events\RefundCompleted::class]);
+    app(WebhookEventRepositoryInterface::class)->recordIfNew('paystack', 'refund.completed:9002');
+
+    app()->call([webhookJobOnAttempt(['event' => 'refund.processed', 'data' => ['id' => 9002, 'status' => 'processed']], 1), 'handle']);
+
+    Event::assertNotDispatched(\KenDeNigerian\PayZephyr\Events\RefundCompleted::class);
+});

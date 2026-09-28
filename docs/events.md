@@ -185,6 +185,8 @@ public readonly string $reason;
 public readonly array $data;
 ```
 
+`RefundCompleted` and `RefundFailed` fire once per refund, even when a provider reports the same outcome in more than one webhook (Razorpay sends an instant refund as both `refund.created` and `refund.processed`). If your listener throws, the claim is released with the delivery, so the queue's retry announces it again.
+
 A realistic example: crediting a customer's account balance once a refund is confirmed, rather than assuming `refund()`'s initial response was final:
 
 ```php

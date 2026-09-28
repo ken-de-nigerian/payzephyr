@@ -54,6 +54,14 @@ final class ProcessWebhook implements ShouldQueue
     public ?int $receivedAt = null;
 
     /**
+     * Refund outcome keys this attempt has claimed (see claimRefundOutcome()),
+     * released alongside the delivery's own key if the attempt fails.
+     *
+     * @var array<int, string>
+     */
+    private array $outcomeKeys = [];
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, array<int, string>>  $headers  Only used by
      *                                                      drivers implementing RequiresAsyncWebhookVerification;
@@ -81,6 +89,7 @@ final class ProcessWebhook implements ShouldQueue
     ): void {
         $eventKey = null;
         $reference = null;
+        $this->outcomeKeys = [];
 
         try {
             $reference = $this->extractReference($manager);
@@ -149,7 +158,7 @@ final class ProcessWebhook implements ShouldQueue
             }
 
             if ($this->isRefundWebhook($this->payload)) {
-                $this->processRefundWebhook($this->payload, $this->provider, $refundRepository);
+                $this->processRefundWebhook($this->payload, $this->provider, $refundRepository, $webhookEventRepository);
             }
 
             WebhookReceived::dispatch($this->provider, $this->payload, $reference);
@@ -182,13 +191,13 @@ final class ProcessWebhook implements ShouldQueue
                 );
             }
 
-            if ($eventKey !== null) {
+            foreach (array_filter([$eventKey, ...$this->outcomeKeys]) as $key) {
                 try {
-                    $webhookEventRepository->forget($this->provider, $eventKey);
+                    $webhookEventRepository->forget($this->provider, $key);
                 } catch (Throwable $forgetError) {
                     $this->log('error', 'Failed to clear the webhook idempotency marker after a failed delivery', [
                         'provider' => $this->provider,
-                        'event_key' => $eventKey,
+                        'event_key' => $key,
                         'error' => $forgetError->getMessage(),
                     ]);
                 }
@@ -574,8 +583,12 @@ final class ProcessWebhook implements ShouldQueue
      *
      * @param  array<string, mixed>  $payload
      */
-    protected function processRefundWebhook(array $payload, string $provider, RefundRepositoryInterface $refundRepository): void
-    {
+    protected function processRefundWebhook(
+        array $payload,
+        string $provider,
+        RefundRepositoryInterface $refundRepository,
+        WebhookEventRepositoryInterface $webhookEventRepository
+    ): void {
         $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
         $data = $payload['data'] ?? $payload['resource'] ?? $payload;
         $object = $data['object'] ?? $payload['payload']['refund']['entity'] ?? $data;
@@ -612,13 +625,15 @@ final class ProcessWebhook implements ShouldQueue
 
             $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::FAILED);
 
-            RefundFailed::dispatch(
-                (string) $refundReference,
-                (string) ($transactionReference ?? ''),
-                $provider,
-                (string) $reason,
-                $data
-            );
+            if ($this->claimRefundOutcome($webhookEventRepository, (string) $refundReference, RefundStatus::FAILED)) {
+                RefundFailed::dispatch(
+                    (string) $refundReference,
+                    (string) ($transactionReference ?? ''),
+                    $provider,
+                    (string) $reason,
+                    $data
+                );
+            }
         } elseif (
             str_contains($eventType, 'processed') ||
             str_contains($eventType, 'refunded') ||
@@ -627,12 +642,14 @@ final class ProcessWebhook implements ShouldQueue
         ) {
             $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::COMPLETED);
 
-            RefundCompleted::dispatch(
-                (string) $refundReference,
-                (string) ($transactionReference ?? ''),
-                $provider,
-                $data
-            );
+            if ($this->claimRefundOutcome($webhookEventRepository, (string) $refundReference, RefundStatus::COMPLETED)) {
+                RefundCompleted::dispatch(
+                    (string) $refundReference,
+                    (string) ($transactionReference ?? ''),
+                    $provider,
+                    $data
+                );
+            }
         } else {
             RefundCreated::dispatch(
                 (string) $refundReference,
@@ -664,6 +681,40 @@ final class ProcessWebhook implements ShouldQueue
      * fails - a webhook must never fail webhook processing over a
      * bookkeeping write.
      */
+    /**
+     * Claim the right to announce a refund's outcome, so RefundCompleted or
+     * RefundFailed fires once per refund however many webhooks report it.
+     *
+     * Providers routinely report one outcome more than once: Razorpay sends an
+     * instant refund as refund.created already processed, then again as
+     * refund.processed. Those are different deliveries - both are processed -
+     * but the refund completed once. The claim reuses the webhook_events table
+     * with a key of its own, and is released with the delivery's if this
+     * attempt fails, so a retry can still announce it. A retry of this same
+     * delivery reclaims its own leftover claim, as it does the delivery key.
+     */
+    protected function claimRefundOutcome(
+        WebhookEventRepositoryInterface $webhookEventRepository,
+        string $refundReference,
+        RefundStatus $outcome
+    ): bool {
+        $key = 'refund.'.$outcome->value.':'.$refundReference;
+
+        if ($webhookEventRepository->recordIfNew($this->provider, $key) || $this->isRetryOfThisDelivery()) {
+            $this->outcomeKeys[] = $key;
+
+            return true;
+        }
+
+        $this->log('info', 'Refund outcome already reported - not dispatching it again', [
+            'provider' => $this->provider,
+            'refund_reference' => $refundReference,
+            'outcome' => $outcome->value,
+        ]);
+
+        return false;
+    }
+
     protected function persistRefundStatus(RefundRepositoryInterface $refundRepository, string $refundReference, RefundStatus $status): void
     {
         $config = app('payments.config') ?? config('payments', []);

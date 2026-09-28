@@ -1,6 +1,6 @@
 # ADR-0014: Razorpay driver
 
-- **Status**: Accepted; its pruning concern resolved by ADR-0017
+- **Status**: Accepted; its pruning concern resolved by ADR-0017, its double `RefundCompleted` by outcome claims in `ProcessWebhook`
 - **Date**: 2026-09-15
 
 ## Problem

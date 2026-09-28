@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`RefundCompleted` could fire twice for one refund.** Razorpay reports an instant refund as
+  `refund.created`, already processed, and again as `refund.processed`. Both deliveries are
+  genuine and both are processed, and each dispatched `RefundCompleted`, so a listener that
+  credits a wallet or emails the customer did it twice; the only defence was advice to leave
+  `refund.created` unsubscribed. `RefundCompleted` and `RefundFailed` now fire once per refund,
+  whichever provider repeats the outcome. The claim is released if the delivery fails, so a
+  listener that throws still gets its retry.
+
 - **No genuine Square webhook could pass signature verification.** Square signs the
   notification URL followed by the body, with HMAC-SHA256, in the
   `x-square-hmacsha256-signature` header. The driver read the legacy `x-square-signature`

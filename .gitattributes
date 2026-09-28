@@ -5,16 +5,13 @@
 /.vscode export-ignore
 /.idea export-ignore
 /tests export-ignore
-/examples export-ignore
 /.editorconfig export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
 /phpunit.xml export-ignore
 /phpstan.neon export-ignore
 /pint.json export-ignore
-/DEPLOYMENT_CHECKLIST.md export-ignore
-/PROJECT_SUMMARY.md export-ignore
-/QUICK_REFERENCE.md export-ignore
+/composer-require-checker.json export-ignore
 
 # Internal engineering history. Kept in the repository - ADR-0011 cites it as
 # the origin of refund support, and three tests reference its finding IDs as

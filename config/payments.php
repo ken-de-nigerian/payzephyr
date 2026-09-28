@@ -116,6 +116,9 @@ return [
             'access_token' => env('SQUARE_ACCESS_TOKEN'),
             'location_id' => env('SQUARE_LOCATION_ID'),
             'webhook_signature_key' => env('SQUARE_WEBHOOK_SIGNATURE_KEY'),
+            // The notification URL exactly as registered in the Square dashboard. Square signs it
+            // along with the body, so it must match byte for byte. Defaults to this app's webhook route.
+            'webhook_url' => env('SQUARE_WEBHOOK_URL'),
             'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareupsandbox.com'), // Sandbox: https://connect.squareupsandbox.com | Live: https://connect.squareup.com,
             'currencies' => ['USD', 'CAD', 'GBP', 'AUD'],
             'enabled' => env('SQUARE_ENABLED', false),

@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **No genuine Square webhook could pass signature verification.** Square signs the
+  notification URL followed by the body, with HMAC-SHA256, in the
+  `x-square-hmacsha256-signature` header. The driver read the legacy `x-square-signature`
+  header and signed the body alone, which matches neither of Square's schemes. Its tests built
+  their signatures the same wrong way, so they agreed with it. Square webhooks are now verified
+  the documented way. Set `SQUARE_WEBHOOK_URL` to the notification URL registered in the Square
+  dashboard; left unset, the package's own webhook route is used. See
+  [Providers](providers.md#square).
+
 - **Webhook deduplication dropped real events as duplicates.** A delivery is recorded under a
   key and a later delivery with the same key is skipped. For Paystack, Flutterwave, Monnify and
   OPay the key was the id of the *object* an event is about - the transaction, subscription or

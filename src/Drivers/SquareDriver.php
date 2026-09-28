@@ -487,13 +487,20 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Validate the webhook signature.
      *
-     * Square uses HMAC SHA256 with base64 encoding for webhook signatures.
-     * The signature is sent in the 'x-square-signature' header.
+     * Square signs the notification URL followed by the raw body - HMAC
+     * SHA-256 with the subscription's signature key, base64-encoded - and
+     * sends it in `x-square-hmacsha256-signature`. The URL is part of what is
+     * signed, so it has to be byte-for-byte the one registered in the Square
+     * dashboard: see notificationUrl().
+     *
+     * This used to read the legacy `x-square-signature` header and sign the
+     * body alone, which matches neither of Square's schemes, so no genuine
+     * Square webhook could pass.
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        $signature = $headers['x-square-signature'][0]
-            ?? $headers['X-Square-Signature'][0]
+        $signature = $headers['x-square-hmacsha256-signature'][0]
+            ?? $headers['X-Square-HmacSha256-Signature'][0]
             ?? null;
 
         if (! $signature) {
@@ -513,14 +520,14 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         $expectedSignature = base64_encode(
-            hash_hmac('sha256', $body, $webhookSignatureKey, true)
+            hash_hmac('sha256', $this->notificationUrl().$body, $webhookSignatureKey, true)
         );
 
         $isValid = hash_equals($signature, $expectedSignature);
 
         if (! $isValid) {
             $this->log('warning', 'Webhook validation failed', [
-                'hint' => 'Ensure SQUARE_WEBHOOK_SIGNATURE_KEY matches the signature key from your Square webhook endpoint',
+                'hint' => 'Ensure SQUARE_WEBHOOK_SIGNATURE_KEY matches the signature key from your Square webhook endpoint, and that SQUARE_WEBHOOK_URL (or, if unset, this application\x27s webhook URL) is exactly the notification URL registered there - Square signs the URL along with the body.',
             ]);
 
             return false;
@@ -536,6 +543,26 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         $this->log('info', 'Webhook validated successfully');
 
         return true;
+    }
+
+    /**
+     * The notification URL Square signs along with each webhook body.
+     *
+     * Square computes the signature over the URL registered for the webhook
+     * subscription, so a mismatch in scheme, host, port, path or trailing
+     * slash fails every delivery. SQUARE_WEBHOOK_URL pins it; without it, the
+     * package's own route is used, which is right unless a proxy or a
+     * different public hostname sits in front of the application.
+     */
+    protected function notificationUrl(): string
+    {
+        $configured = $this->config['webhook_url'] ?? null;
+
+        if (is_string($configured) && $configured !== '') {
+            return $configured;
+        }
+
+        return route('payments.webhook', ['provider' => $this->getName()]);
     }
 
     public function healthCheck(): bool

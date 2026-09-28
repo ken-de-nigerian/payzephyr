@@ -117,6 +117,7 @@ FLUTTERWAVE_ENABLED=true
 SQUARE_ACCESS_TOKEN=xxxxx
 SQUARE_LOCATION_ID=xxxxx
 SQUARE_WEBHOOK_SIGNATURE_KEY=xxxxx
+SQUARE_WEBHOOK_URL=https://yourdomain.com/payments/webhook/square
 SQUARE_ENABLED=true
 ```
 
@@ -124,6 +125,7 @@ SQUARE_ENABLED=true
 - **Subscriptions:** ✅ supported; requires a Square card-on-file ID via `->authorization(...)`; cancelling pauses rather than permanently ending the subscription (see [Subscriptions](subscriptions.md#cancelling-and-re-enabling))
 - **Refunds:** ✅ full support, starts `PENDING` and confirms via webhook
 - Needs a `location_id` in addition to the usual access token: Square's API is organized around physical/logical business locations, and every charge and subscription needs to know which one it belongs to
+- **`SQUARE_WEBHOOK_URL` must be exactly the notification URL you registered in the Square dashboard.** Square signs that URL together with the webhook body, so any difference - `http` instead of `https`, another hostname, a trailing slash - makes every signature fail. Left unset, PayZephyr uses its own webhook route as your app sees it, which is right unless a proxy or a different public hostname sits in front of the app.
 
 ### Monnify
 

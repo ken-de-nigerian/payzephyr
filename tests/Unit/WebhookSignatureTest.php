@@ -235,10 +235,10 @@ test('it validates square webhook signature correctly', function () {
         'created_at' => now()->toIso8601String(),
         'data' => ['object' => ['id' => 'payment_123']],
     ]);
-    $signature = base64_encode(hash_hmac('sha256', $body, 'SQUARE_SIG_KEY', true));
+    $signature = squareWebhookSignature($body, 'SQUARE_SIG_KEY');
 
     $isValid = $driver->validateWebhook(
-        ['x-square-signature' => [$signature]],
+        ['x-square-hmacsha256-signature' => [$signature]],
         $body
     );
 

@@ -313,7 +313,7 @@ test('square driver validateWebhook returns false when signature key missing', f
         'currencies' => ['USD'],
     ]);
 
-    $result = $driver->validateWebhook(['x-square-signature' => ['signature']], 'test body');
+    $result = $driver->validateWebhook(['x-square-hmacsha256-signature' => ['signature']], 'test body');
 
     expect($result)->toBeFalse();
 });
@@ -328,9 +328,9 @@ test('square driver validateWebhook validates correct signature', function () {
 
     // Real Square envelopes carry a top-level 'created_at' - see ADR-0001.
     $body = json_encode(['test' => 'data', 'created_at' => now()->toIso8601String()]);
-    $expectedSignature = base64_encode(hash_hmac('sha256', $body, 'test_secret_key', true));
+    $expectedSignature = squareWebhookSignature($body, 'test_secret_key');
 
-    $result = $driver->validateWebhook(['x-square-signature' => [$expectedSignature]], $body);
+    $result = $driver->validateWebhook(['x-square-hmacsha256-signature' => [$expectedSignature]], $body);
 
     expect($result)->toBeTrue();
 });
@@ -346,7 +346,7 @@ test('square driver validateWebhook rejects invalid signature', function () {
     $body = '{"test": "data"}';
     $invalidSignature = 'invalid_signature';
 
-    $result = $driver->validateWebhook(['x-square-signature' => [$invalidSignature]], $body);
+    $result = $driver->validateWebhook(['x-square-hmacsha256-signature' => [$invalidSignature]], $body);
 
     expect($result)->toBeFalse();
 });
@@ -360,9 +360,9 @@ test('square driver validateWebhook handles case-insensitive header', function (
     ]);
 
     $body = json_encode(['test' => 'data', 'created_at' => now()->toIso8601String()]);
-    $expectedSignature = base64_encode(hash_hmac('sha256', $body, 'test_secret_key', true));
+    $expectedSignature = squareWebhookSignature($body, 'test_secret_key');
 
-    $result = $driver->validateWebhook(['X-Square-Signature' => [$expectedSignature]], $body);
+    $result = $driver->validateWebhook(['X-Square-HmacSha256-Signature' => [$expectedSignature]], $body);
 
     expect($result)->toBeTrue();
 });

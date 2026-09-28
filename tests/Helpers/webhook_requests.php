@@ -50,3 +50,16 @@ function makeWebhookRequestFor(string $provider, string $body, array $headers = 
 
     return $request;
 }
+
+/**
+ * A Square webhook signature, computed the way Square does it: HMAC-SHA256
+ * over the notification URL followed by the body, base64-encoded. The URL
+ * defaults to the package's own webhook route, which is what the driver
+ * signs against when SQUARE_WEBHOOK_URL is not set.
+ */
+function squareWebhookSignature(string $body, string $key, ?string $notificationUrl = null): string
+{
+    $notificationUrl ??= route('payments.webhook', ['provider' => 'square']);
+
+    return base64_encode(hash_hmac('sha256', $notificationUrl.$body, $key, true));
+}

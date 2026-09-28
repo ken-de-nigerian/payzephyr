@@ -161,9 +161,9 @@ test('square driver validateWebhook rejects a valid signature with an unrecogniz
 
     // Valid signature, but no recognizable timestamp field in the body.
     $body = json_encode(['test' => 'data']);
-    $expectedSignature = base64_encode(hash_hmac('sha256', $body, 'test_secret_key', true));
+    $expectedSignature = squareWebhookSignature($body, 'test_secret_key');
 
-    $result = $driver->validateWebhook(['x-square-signature' => [$expectedSignature]], $body);
+    $result = $driver->validateWebhook(['x-square-hmacsha256-signature' => [$expectedSignature]], $body);
 
     expect($result)->toBeFalse();
 });
@@ -200,4 +200,72 @@ test('square verify reports a server error from the order search as a verificati
             ->and($e->getMessage())->not->toBe('Payment not found')
             ->and($e->getPrevious())->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
     }
+});
+
+/*
+ * Square's documented scheme: base64(HMAC-SHA256(signature key, notification
+ * URL . body)) in x-square-hmacsha256-signature. The driver used to read the
+ * legacy x-square-signature header and sign the body alone - neither of
+ * Square's schemes - and these tests' predecessors built their signatures
+ * the same wrong way, so they agreed with the bug.
+ */
+
+function squareSignatureDriver(array $overrides = []): SquareDriver
+{
+    return new SquareDriver(array_merge([
+        'access_token' => 'EAAAxxx',
+        'location_id' => 'location_xxx',
+        'webhook_signature_key' => 'sq_sig_key',
+        'webhook_url' => 'https://shop.example.com/payments/webhook/square',
+        'currencies' => ['USD'],
+    ], $overrides));
+}
+
+function squareSignedBody(): string
+{
+    return (string) json_encode([
+        'merchant_id' => 'M1',
+        'type' => 'payment.updated',
+        'event_id' => 'evt-1',
+        'created_at' => now()->toIso8601String(),
+        'data' => ['type' => 'payment', 'id' => 'pay_1'],
+    ]);
+}
+
+test('square accepts a signature over the configured notification url and the body', function () {
+    $body = squareSignedBody();
+    $signature = base64_encode(hash_hmac('sha256', 'https://shop.example.com/payments/webhook/square'.$body, 'sq_sig_key', true));
+
+    expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue();
+});
+
+test('square rejects a signature over the body alone', function () {
+    $body = squareSignedBody();
+    $bodyOnly = base64_encode(hash_hmac('sha256', $body, 'sq_sig_key', true));
+
+    expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$bodyOnly]], $body))->toBeFalse();
+});
+
+test('square rejects a signature made for a different notification url', function () {
+    // Square signs the URL registered in its dashboard. A trailing slash, a
+    // different host or http instead of https is a different signature.
+    $body = squareSignedBody();
+    $signature = base64_encode(hash_hmac('sha256', 'https://shop.example.com/payments/webhook/square/'.$body, 'sq_sig_key', true));
+
+    expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeFalse();
+});
+
+test('square does not accept the legacy x-square-signature header in place of the sha256 one', function () {
+    $body = squareSignedBody();
+    $signature = base64_encode(hash_hmac('sha256', 'https://shop.example.com/payments/webhook/square'.$body, 'sq_sig_key', true));
+
+    expect(squareSignatureDriver()->validateWebhook(['x-square-signature' => [$signature]], $body))->toBeFalse();
+});
+
+test('square signs against the package webhook route when no notification url is configured', function () {
+    $body = squareSignedBody();
+    $signature = base64_encode(hash_hmac('sha256', route('payments.webhook', ['provider' => 'square']).$body, 'sq_sig_key', true));
+
+    expect(squareSignatureDriver(['webhook_url' => null])->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue()
+        ->and(squareSignatureDriver(['webhook_url' => ''])->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue();
 });

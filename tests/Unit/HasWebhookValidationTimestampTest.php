@@ -60,3 +60,63 @@ test('a real timestamp expressed as a date string is still accepted', function (
 
     expect(validateStripeTimestamp($payload))->toBeTrue();
 });
+
+function setWebhookTolerance(mixed $value): void
+{
+    config(['payments.security.webhook_timestamp_tolerance' => $value]);
+    app()->forgetInstance('payments.config');
+}
+
+test('the configured webhook_timestamp_tolerance widens the replay window', function () {
+    // Documented as the window for every provider, but only Paddle used to
+    // read it - widening it had no effect anywhere else.
+    $tenMinutesAgo = ['created' => time() - 600];
+
+    setWebhookTolerance(300);
+    expect(validateStripeTimestamp($tenMinutesAgo))->toBeFalse();
+
+    setWebhookTolerance(900);
+    expect(validateStripeTimestamp($tenMinutesAgo))->toBeTrue();
+});
+
+test('the configured webhook_timestamp_tolerance narrows the replay window', function () {
+    setWebhookTolerance(60);
+
+    expect(validateStripeTimestamp(['created' => time() - 120]))->toBeFalse();
+});
+
+test('the tolerance from env arrives as a string and is still honoured', function () {
+    setWebhookTolerance('900');
+
+    expect(validateStripeTimestamp(['created' => time() - 600]))->toBeTrue();
+});
+
+test('a tolerance that is not a positive number falls back to five minutes', function (mixed $value) {
+    // Zero would reject every webhook; a negative number would reject them
+    // all too, since abs() is never below it. Neither can be what was meant.
+    setWebhookTolerance($value);
+
+    expect(validateStripeTimestamp(['created' => time() - 240]))->toBeTrue()
+        ->and(validateStripeTimestamp(['created' => time() - 360]))->toBeFalse();
+})->with([
+    'zero' => [0],
+    'negative' => [-60],
+    'not a number' => ['five minutes'],
+    'null' => [null],
+]);
+
+test('paystack honours the configured tolerance end to end', function () {
+    $secret = 'sk_test_tolerance';
+    $body = (string) json_encode([
+        'event' => 'charge.success',
+        'data' => ['reference' => 'REF_TOL', 'paid_at' => date('c', time() - 600)],
+    ]);
+    $headers = ['x-paystack-signature' => [hash_hmac('sha512', $body, $secret)]];
+    $driver = new \KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => $secret, 'currencies' => ['NGN']]);
+
+    setWebhookTolerance(300);
+    expect($driver->validateWebhook($headers, $body))->toBeFalse();
+
+    setWebhookTolerance(900);
+    expect($driver->validateWebhook($headers, $body))->toBeTrue();
+});

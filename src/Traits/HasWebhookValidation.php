@@ -40,10 +40,12 @@ trait HasWebhookValidation
      * Validate webhook timestamp to prevent replay attacks.
      *
      * @param  array<string, mixed>  $payload  Webhook payload
-     * @param  int  $toleranceSeconds  Allowed time difference (default: 300 = 5 minutes)
+     * @param  int|null  $toleranceSeconds  Allowed time difference; null reads
+     *                                      payments.security.webhook_timestamp_tolerance
      */
-    protected function validateWebhookTimestamp(array $payload, int $toleranceSeconds = PaymentConstants::WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS): bool
+    protected function validateWebhookTimestamp(array $payload, ?int $toleranceSeconds = null): bool
     {
+        $toleranceSeconds ??= $this->webhookTimestampTolerance();
         $timestamp = $this->extractWebhookTimestamp($payload);
 
         if ($timestamp === null) {
@@ -169,6 +171,25 @@ trait HasWebhookValidation
     private function isPlausibleUnixTimestamp(int $candidate): bool
     {
         return $candidate >= 946684800 && $candidate < 4102444800;
+    }
+
+    /**
+     * The configured replay window, in seconds.
+     *
+     * `payments.security.webhook_timestamp_tolerance` was documented as the
+     * window for every provider while only Paddle read it; every other driver
+     * used the constant, so widening it did nothing. A value that is not a
+     * positive number falls back to the default rather than rejecting every
+     * webhook (0) or accepting any age (a negative abs() comparison).
+     */
+    protected function webhookTimestampTolerance(): int
+    {
+        $config = app('payments.config') ?? config('payments', []);
+        $configured = $config['security']['webhook_timestamp_tolerance'] ?? null;
+
+        return is_numeric($configured) && (int) $configured > 0
+            ? (int) $configured
+            : PaymentConstants::WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
     }
 
     /**

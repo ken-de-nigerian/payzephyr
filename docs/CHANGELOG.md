@@ -37,6 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PayPal's sandbox. They are replaced by tests that queue each HTTP response in order and
   assert the verification request was actually sent.
 
+- **`PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE` did nothing for nine of the ten providers.** It was
+  documented as the replay window for every webhook, but only Paddle read it; every other
+  driver used a hard-coded 300 seconds, so widening or narrowing it had no effect. All drivers
+  now read it. A value that is not a positive number (zero, negative, or not numeric) falls
+  back to 300 rather than rejecting every webhook.
+
 ---
 ## [4.0.0] - 2026-09-23
 

@@ -6,7 +6,6 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
-use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -260,8 +259,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $tolerance = (int) ($config['security']['webhook_timestamp_tolerance'] ?? PaymentConstants::WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS);
+        $tolerance = $this->webhookTimestampTolerance();
 
         if (abs(time() - (int) $timestamp) > $tolerance) {
             $this->log('warning', 'Webhook timestamp outside tolerance window - potential replay attack', [

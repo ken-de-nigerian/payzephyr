@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ordering. Completes the follow-up [ADR-0004](architecture/adr/0004-repository-layer.md)
   recorded.
 
+- **Re-running `payzephyr:install` never delivered new migrations for features you already
+  had.** It skipped installed features entirely, so the upgrade guide's "re-run the installer"
+  added nothing to them. It now re-publishes each installed feature without `--force`, which
+  adds only migrations that do not exist yet and never overwrites or removes one that does.
+
 - **`RefundCompleted` could fire twice for one refund.** Razorpay reports an instant refund as
   `refund.created`, already processed, and again as `refund.processed`. Both deliveries are
   genuine and both are processed, and each dispatched `RefundCompleted`, so a listener that

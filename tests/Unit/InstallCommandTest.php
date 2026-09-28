@@ -331,3 +331,28 @@ test('selecting both optional features installs both and neither is skipped', fu
         ->and($files['subscriptions'])->not->toBeEmpty()
         ->and($files['refunds'])->not->toBeEmpty();
 });
+
+test('re-running install publishes migrations a later version added to an installed feature', function () {
+    // An install from before the state_as_of migration existed: the feature's
+    // original migration is there, the newer one is not.
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
+    $added = glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')) ?: [];
+    array_map('unlink', $added);
+    expect(glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')))->toBeEmpty();
+
+    // The documented upgrade step, with no features named.
+    Artisan::call('payzephyr:install', ['--no-interaction' => true]);
+
+    expect(glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')))->not->toBeEmpty();
+});
+
+test('re-running install never overwrites a migration the application has edited', function () {
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
+    $file = (glob(database_path('migrations/*_create_subscription_transactions_table.php')) ?: [])[0];
+    file_put_contents($file, "<?php\n// edited by the application\n");
+
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
+
+    expect(file_get_contents($file))->toBe("<?php\n// edited by the application\n")
+        ->and(Artisan::output())->toContain('only migrations added since were published; existing files are never overwritten or removed.');
+});

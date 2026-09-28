@@ -69,8 +69,19 @@ final class InstallCommand extends Command
             $this->info("✓ {$feature['label']} migration published");
         }
 
-        foreach ($skippedAlreadyInstalled as $key) {
-            $this->comment(Features::get($key)['label'].' is already installed - skipping (PayZephyr never re-publishes or removes an installed feature automatically).');
+        // An installed feature is re-published without --force, whatever was
+        // selected this run: vendor:publish then adds only files that do not
+        // exist yet - a migration a later version introduced for it - and
+        // never touches one already there. Without this, upgrading left an
+        // installed feature without its new migrations, and the upgrade guide's
+        // "re-run payzephyr:install" did nothing for it.
+        foreach ($alreadyInstalled as $key) {
+            $feature = Features::get($key);
+            $this->call('vendor:publish', ['--tag' => $feature['migrationTag']]);
+
+            if (in_array($key, $skippedAlreadyInstalled, true)) {
+                $this->comment($feature['label'].' is already installed - only migrations added since were published; existing files are never overwritten or removed.');
+            }
         }
 
         if (! $this->option('no-interaction')) {

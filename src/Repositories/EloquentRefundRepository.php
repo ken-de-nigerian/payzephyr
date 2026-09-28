@@ -24,7 +24,7 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
                 ->first();
 
             if ($existing) {
-                $existing->update($attributes);
+                $existing->update($this->withoutStaleStatus($existing, $attributes));
 
                 return $existing;
             }
@@ -42,11 +42,36 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
                 $existing = RefundTransaction::where('refund_reference', $refundReference)
                     ->lockForUpdate()
                     ->firstOrFail();
-                $existing->update($attributes);
+                $existing->update($this->withoutStaleStatus($existing, $attributes));
 
                 return $existing;
             }
         });
+    }
+
+    /**
+     * Drop an incoming status that would move a refund out of a terminal one.
+     *
+     * A refund's outcome does not change once it is known, but the response
+     * carrying a status can arrive after a newer one has been written: a
+     * fetchRefund() that was sent while the refund was still pending, and
+     * answered after its refund.processed webhook had already been applied,
+     * would put it back to pending. updateStatusIfExists() has always refused
+     * to change a terminal refund; this makes the other write path agree. The
+     * remaining attributes are still applied.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function withoutStaleStatus(RefundTransaction $existing, array $attributes): array
+    {
+        $current = RefundStatus::tryFromString((string) $existing->status);
+
+        if ($current?->isTerminal() && isset($attributes['status']) && $attributes['status'] !== $current->value) {
+            unset($attributes['status']);
+        }
+
+        return $attributes;
     }
 
     /**

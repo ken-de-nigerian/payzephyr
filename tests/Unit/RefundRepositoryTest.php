@@ -171,3 +171,72 @@ test('sumRefundedAmount sums pending, processing, and completed refunds but excl
 test('sumRefundedAmount returns 0.0 for a transaction with no refunds', function () {
     expect($this->repository->sumRefundedAmount('TXN_NONE'))->toBe(0.0);
 });
+
+/*
+ * A response carrying a status can arrive after a newer status was written:
+ * a fetchRefund() sent while the refund was pending, answered after its
+ * refund.processed webhook landed. The terminal outcome must survive it.
+ */
+
+function seedRefundRow(string $reference, string $status): void
+{
+    RefundTransaction::create([
+        'refund_reference' => $reference, 'transaction_reference' => 'TXN_'.$reference,
+        'provider' => 'paystack', 'status' => $status, 'amount' => 1000, 'currency' => 'NGN',
+    ]);
+}
+
+test('a stale non-terminal status does not move a refund out of a terminal one', function () {
+    seedRefundRow('REF_STALE', 'completed');
+
+    $this->repository->updateOrCreateAtomic('REF_STALE', [
+        'status' => 'pending',
+        'reason' => 'customer request',
+    ]);
+
+    $row = RefundTransaction::where('refund_reference', 'REF_STALE')->first();
+    expect($row->status)->toBe('completed')
+        // The rest of the response is still applied.
+        ->and($row->reason)->toBe('customer request');
+});
+
+test('a terminal refund does not switch to a different terminal outcome', function () {
+    seedRefundRow('REF_DONE', 'completed');
+
+    $this->repository->updateOrCreateAtomic('REF_DONE', ['status' => 'failed']);
+
+    expect(RefundTransaction::where('refund_reference', 'REF_DONE')->first()->status)->toBe('completed');
+});
+
+test('a refund that is not yet terminal still moves forward', function () {
+    seedRefundRow('REF_MOVING', 'pending');
+
+    $this->repository->updateOrCreateAtomic('REF_MOVING', ['status' => 'processing']);
+    expect(RefundTransaction::where('refund_reference', 'REF_MOVING')->first()->status)->toBe('processing');
+
+    $this->repository->updateOrCreateAtomic('REF_MOVING', ['status' => 'completed']);
+    expect(RefundTransaction::where('refund_reference', 'REF_MOVING')->first()->status)->toBe('completed');
+});
+
+test('the create-race path also keeps a terminal outcome it lost the race to', function () {
+    // The select finds nothing, then a concurrent writer inserts the refund -
+    // already completed - before this create runs. The create hits the unique
+    // index and falls back to updating the row that won.
+    RefundTransaction::creating(function (RefundTransaction $refund) {
+        if ($refund->refund_reference === 'REF_RACE' && ! RefundTransaction::where('refund_reference', 'REF_RACE')->exists()) {
+            \Illuminate\Support\Facades\DB::table((new RefundTransaction)->getTable())->insert([
+                'refund_reference' => 'REF_RACE', 'transaction_reference' => 'TXN_RACE', 'provider' => 'paystack',
+                'status' => 'completed', 'amount' => 1000, 'currency' => 'NGN',
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+    });
+
+    $result = $this->repository->updateOrCreateAtomic('REF_RACE', [
+        'transaction_reference' => 'TXN_RACE', 'provider' => 'paystack',
+        'status' => 'pending', 'amount' => 1000, 'currency' => 'NGN',
+    ]);
+
+    expect($result->status)->toBe('completed')
+        ->and(RefundTransaction::where('refund_reference', 'REF_RACE')->count())->toBe(1);
+});

@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A slow response could overwrite newer subscription or refund state.** Rows are written
+  from provider responses, and a response can finish after a later request's did. A
+  `fetchSubscription()` sent before a `cancelSubscription()` committed, and answered after it,
+  put `active` back over `cancelled`; a `fetchRefund()` answered after the refund's
+  `refund.processed` webhook put it back to pending. Subscription rows now record when the
+  request that produced their state was sent (`state_as_of`, to the microsecond) and refuse a
+  write from an earlier request - ordered by time rather than by treating `cancelled` as
+  final, because re-enabling is legitimate. A refund that has reached a terminal status keeps
+  it, which the webhook path already enforced and the response path now does too. Needs the
+  new subscriptions migration; until it runs, subscriptions are logged as before, without
+  ordering. Completes the follow-up [ADR-0004](architecture/adr/0004-repository-layer.md)
+  recorded.
+
 - **`RefundCompleted` could fire twice for one refund.** Razorpay reports an instant refund as
   `refund.created`, already processed, and again as `refund.processed`. Both deliveries are
   genuine and both are processed, and each dispatched `RefundCompleted`, so a listener that
@@ -123,6 +136,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   window should return it, or its deduplication records are never pruned.
 
 - **`SQUARE_WEBHOOK_URL`**, the notification URL Square signs with each webhook.
+
+- **`subscription_transactions.state_as_of`**, in a new subscriptions migration. Run
+  `php artisan payzephyr:install` to publish it, then `php artisan migrate`.
 
 ---
 ## [4.0.0] - 2026-09-23

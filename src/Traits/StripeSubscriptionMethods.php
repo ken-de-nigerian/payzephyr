@@ -242,6 +242,9 @@ trait StripeSubscriptionMethods
 
             $options = $request->idempotencyKey ? ['idempotency_key' => $request->idempotencyKey] : [];
 
+            // Stripe goes through its SDK, not makeRequest(), so the send time
+            // that orders subscription writes is recorded here.
+            $this->markRequestSent();
             $subscription = $this->stripe->subscriptions->create($params, $options);
 
             $this->log('info', 'Subscription created', [
@@ -298,6 +301,7 @@ trait StripeSubscriptionMethods
         try {
             $atPeriodEnd = (bool) $action->option('at_period_end', false);
 
+            $this->markRequestSent();
             $subscription = $atPeriodEnd
                 ? $this->stripe->subscriptions->update($action->subscriptionCode, ['cancel_at_period_end' => true])
                 : $this->stripe->subscriptions->cancel($action->subscriptionCode);
@@ -343,6 +347,7 @@ trait StripeSubscriptionMethods
                 );
             }
 
+            $this->markRequestSent();
             $subscription = $this->stripe->subscriptions->update($action->subscriptionCode, [
                 'cancel_at_period_end' => false,
             ]);

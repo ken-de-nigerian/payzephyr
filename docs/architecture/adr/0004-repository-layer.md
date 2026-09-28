@@ -1,6 +1,6 @@
 # ADR-0004: Repository layer for transaction persistence, and the subscription race fix it enables
 
-- **Status**: Accepted
+- **Status**: Accepted; the event-ordering follow-up completed by request-time ordering (`state_as_of`) and terminal refund statuses
 - **Date**: 2026-07-31
 
 ## Problem

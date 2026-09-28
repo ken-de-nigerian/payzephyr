@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
+use Carbon\CarbonImmutable;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
@@ -58,6 +59,13 @@ abstract class AbstractDriver implements DriverInterface
      * Used to access the idempotency key when making API requests.
      */
     protected ?ChargeRequestDTO $currentRequest = null;
+
+    /**
+     * When the most recent request to the provider was sent. A response
+     * describes the provider's state as of then, which is what orders two
+     * writes of the same subscription row (see markRequestSent()).
+     */
+    private ?CarbonImmutable $lastRequestSentAt = null;
 
     /**
      * Groups the HTTP steps of a single provider attempt.
@@ -195,6 +203,8 @@ abstract class AbstractDriver implements DriverInterface
                 httpUrl: $this->absoluteUri($uri),
             );
         }
+
+        $this->markRequestSent();
 
         try {
             $response = $this->client->request($method, $uri, $options);
@@ -594,6 +604,29 @@ abstract class AbstractDriver implements DriverInterface
         $separator = parse_url($url, PHP_URL_QUERY) ? '&' : '?';
 
         return "$url$separator$key=$value";
+    }
+
+    /**
+     * Record that a request to the provider is about to be sent.
+     *
+     * makeRequest() calls this for every HTTP request; a driver that talks to
+     * its provider through an SDK instead (Stripe) calls it before the SDK call
+     * whose response it is about to log. What matters is the moment of
+     * sending, not of answering: a response describes the provider's state as
+     * of the request, and one sent earlier can arrive later.
+     */
+    protected function markRequestSent(): void
+    {
+        $this->lastRequestSentAt = CarbonImmutable::now();
+    }
+
+    /**
+     * When the most recent request to the provider was sent, or null if none
+     * has been.
+     */
+    protected function lastRequestSentAt(): ?CarbonImmutable
+    {
+        return $this->lastRequestSentAt;
     }
 
     /**

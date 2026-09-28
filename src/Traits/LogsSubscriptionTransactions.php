@@ -56,19 +56,25 @@ trait LogsSubscriptionTransactions
             $customerEmail = $customerEmail ?? $response->customer;
             $sanitizedMetadata = app(MetadataSanitizer::class)->sanitize($response->metadata);
 
-            $this->getSubscriptionRepository()->updateOrCreateAtomic(
-                $response->subscriptionCode,
-                [
-                    'provider' => $this->getName(),
-                    'status' => $response->status,
-                    'plan_code' => $planCode,
-                    'customer_email' => $customerEmail,
-                    'amount' => $response->amount,
-                    'currency' => $response->currency,
-                    'next_payment_date' => $response->nextPaymentDate ? Carbon::parse($response->nextPaymentDate)->format('Y-m-d') : null,
-                    'metadata' => $sanitizedMetadata,
-                ]
-            );
+            $attributes = [
+                'provider' => $this->getName(),
+                'status' => $response->status,
+                'plan_code' => $planCode,
+                'customer_email' => $customerEmail,
+                'amount' => $response->amount,
+                'currency' => $response->currency,
+                'next_payment_date' => $response->nextPaymentDate ? Carbon::parse($response->nextPaymentDate)->format('Y-m-d') : null,
+                'metadata' => $sanitizedMetadata,
+            ];
+
+            // The provider's state as of when the request was sent, so the
+            // repository can refuse a response that finished after a newer one.
+            $stateAsOf = $this->lastRequestSentAt();
+            if ($stateAsOf !== null) {
+                $attributes['state_as_of'] = $stateAsOf;
+            }
+
+            $this->getSubscriptionRepository()->updateOrCreateAtomic($response->subscriptionCode, $attributes);
         } catch (Throwable $e) {
             $this->log('error', 'Failed to log subscription transaction', [
                 'error' => $e->getMessage(),

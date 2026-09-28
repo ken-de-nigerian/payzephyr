@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Models;
 
 use ArrayObject;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\AsArrayObject;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\Traits\HasConfigurableTableName;
@@ -34,6 +37,7 @@ use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
  * @property array<string, mixed>|ArrayObject<string, mixed>|null $metadata
  * @property Carbon $created_at
  * @property Carbon $updated_at
+ * @property CarbonImmutable|null $state_as_of
  */
 final class SubscriptionTransaction extends Model
 {
@@ -51,6 +55,7 @@ final class SubscriptionTransaction extends Model
         'currency',
         'next_payment_date',
         'metadata',
+        'state_as_of',
     ];
 
     protected $table = 'subscription_transactions';
@@ -70,6 +75,22 @@ final class SubscriptionTransaction extends Model
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];
+    }
+
+    /**
+     * When the request that produced this row's state was sent, to the
+     * microsecond: two requests from one process routinely land in the same
+     * second, and the ordering is between them. Stored explicitly rather than
+     * through the model's date format, which drops the fraction.
+     */
+    protected function stateAsOf(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => $value === null ? null : CarbonImmutable::parse($value),
+            set: fn (CarbonInterface|string|null $value) => $value === null
+                ? null
+                : CarbonImmutable::parse($value)->format('Y-m-d H:i:s.u'),
+        );
     }
 
     public function getConnectionName(): ?string

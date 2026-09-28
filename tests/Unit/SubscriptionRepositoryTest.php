@@ -135,3 +135,150 @@ test('isUniqueConstraintViolation correctly classifies a unique index violation'
         expect($method->invoke($this->repository, $e))->toBeTrue();
     }
 });
+
+/*
+ * Rows are written from API responses, and a response can finish after a
+ * later request's did. state_as_of is when the producing request was sent;
+ * a write older than the stored state is refused (ADR-0004's follow-up).
+ */
+
+function subscriptionAttributes(string $status, ?Carbon\CarbonImmutable $stateAsOf): array
+{
+    return array_filter([
+        'provider' => 'paystack',
+        'status' => $status,
+        'plan_code' => 'PLN_1',
+        'customer_email' => 'test@example.com',
+        'amount' => 5000,
+        'currency' => 'NGN',
+        'state_as_of' => $stateAsOf,
+    ], fn ($value) => $value !== null);
+}
+
+test('a write whose request was sent before the stored state is refused', function () {
+    $sentAt = Carbon\CarbonImmutable::parse('2026-09-28 12:00:00');
+
+    // The cancel, sent second, was answered first and written.
+    $this->repository->updateOrCreateAtomic('SUB_ORDER', subscriptionAttributes('cancelled', $sentAt->addSeconds(2)));
+    // The fetch, sent first, is answered last and still says active.
+    $this->repository->updateOrCreateAtomic('SUB_ORDER', subscriptionAttributes('active', $sentAt));
+
+    $row = SubscriptionTransaction::where('subscription_code', 'SUB_ORDER')->first();
+    expect($row->status)->toBe('cancelled')
+        ->and($row->state_as_of->equalTo($sentAt->addSeconds(2)))->toBeTrue();
+});
+
+test('a later request\'s state is applied, including moving out of cancelled', function () {
+    // Re-enabling is legitimate, which is why this is ordered by time and
+    // not by treating cancelled as final.
+    $sentAt = Carbon\CarbonImmutable::parse('2026-09-28 12:00:00');
+
+    $this->repository->updateOrCreateAtomic('SUB_REENABLE', subscriptionAttributes('cancelled', $sentAt));
+    $this->repository->updateOrCreateAtomic('SUB_REENABLE', subscriptionAttributes('active', $sentAt->addMinute()));
+
+    expect(SubscriptionTransaction::where('subscription_code', 'SUB_REENABLE')->first()->status)->toBe('active');
+});
+
+test('requests sent within the same second are still ordered, to the microsecond', function () {
+    $first = Carbon\CarbonImmutable::parse('2026-09-28 12:00:00.100000');
+    $second = Carbon\CarbonImmutable::parse('2026-09-28 12:00:00.900000');
+
+    $this->repository->updateOrCreateAtomic('SUB_MICRO', subscriptionAttributes('cancelled', $second));
+    $this->repository->updateOrCreateAtomic('SUB_MICRO', subscriptionAttributes('active', $first));
+
+    $row = SubscriptionTransaction::where('subscription_code', 'SUB_MICRO')->first();
+    expect($row->status)->toBe('cancelled')
+        ->and($row->state_as_of->format('u'))->toBe('900000');
+});
+
+test('writes without a send time, or onto a row without one, are applied as before', function () {
+    $this->repository->updateOrCreateAtomic('SUB_LEGACY', subscriptionAttributes('active', null));
+    $this->repository->updateOrCreateAtomic('SUB_LEGACY', subscriptionAttributes('cancelled', Carbon\CarbonImmutable::parse('2026-01-01')));
+    $this->repository->updateOrCreateAtomic('SUB_LEGACY', subscriptionAttributes('active', null));
+
+    expect(SubscriptionTransaction::where('subscription_code', 'SUB_LEGACY')->first()->status)->toBe('active');
+});
+
+test('the create-race path refuses a stale write too', function () {
+    // The select finds nothing, then a concurrent writer inserts the row with
+    // newer state before this create runs; the fallback update must still
+    // compare send times.
+    SubscriptionTransaction::creating(function (SubscriptionTransaction $row) {
+        if ($row->subscription_code === 'SUB_RACE' && ! SubscriptionTransaction::where('subscription_code', 'SUB_RACE')->exists()) {
+            Illuminate\Support\Facades\DB::table((new SubscriptionTransaction)->getTable())->insert([
+                'subscription_code' => 'SUB_RACE', 'provider' => 'paystack', 'status' => 'cancelled',
+                'plan_code' => 'PLN_1', 'customer_email' => 'test@example.com', 'amount' => 5000, 'currency' => 'NGN',
+                'state_as_of' => '2026-09-28 12:00:05.000000', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+    });
+
+    $result = $this->repository->updateOrCreateAtomic('SUB_RACE', subscriptionAttributes('active', Carbon\CarbonImmutable::parse('2026-09-28 12:00:00')));
+
+    expect($result->status)->toBe('cancelled');
+});
+
+test('an install that has not added the state_as_of column keeps logging, without ordering', function () {
+    $table = (new SubscriptionTransaction)->getTable();
+    Illuminate\Support\Facades\Schema::table($table, fn (Illuminate\Database\Schema\Blueprint $t) => $t->dropColumn('state_as_of'));
+
+    $repository = new EloquentSubscriptionRepository;
+    $repository->updateOrCreateAtomic('SUB_NO_COLUMN', subscriptionAttributes('active', Carbon\CarbonImmutable::now()));
+
+    expect(SubscriptionTransaction::where('subscription_code', 'SUB_NO_COLUMN')->value('status'))->toBe('active');
+});
+
+test('a driver response logged after a newer one from another process does not overwrite it', function () {
+    // Two workers, one subscription: A fetches, B cancels. B's request is sent
+    // after A's but answered first. A's stale "active" must not win.
+    $makeDriver = fn () => new KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
+    $mark = new ReflectionMethod(KenDeNigerian\PayZephyr\Drivers\AbstractDriver::class, 'markRequestSent');
+    $log = new ReflectionMethod(KenDeNigerian\PayZephyr\Drivers\PaystackDriver::class, 'logSubscriptionFromResponse');
+    $response = fn (string $status) => new KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO(
+        subscriptionCode: 'SUB_TWO_WORKERS', status: $status, customer: 'test@example.com', plan: 'PLN_1',
+        amount: 50.0, currency: 'NGN', provider: 'paystack',
+    );
+
+    $workerA = $makeDriver();
+    $workerB = $makeDriver();
+
+    Carbon\CarbonImmutable::setTestNow('2026-09-28 12:00:00.000000');
+    $mark->invoke($workerA);
+    Carbon\CarbonImmutable::setTestNow('2026-09-28 12:00:00.400000');
+    $mark->invoke($workerB);
+    Carbon\CarbonImmutable::setTestNow();
+
+    $log->invoke($workerB, $response('cancelled'));
+    $log->invoke($workerA, $response('active'));
+
+    expect(SubscriptionTransaction::where('subscription_code', 'SUB_TWO_WORKERS')->value('status'))->toBe('cancelled');
+});
+
+test('makeRequest records when each request was sent', function () {
+    $driver = new KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
+    $driver->setClient(new GuzzleHttp\Client(['handler' => GuzzleHttp\HandlerStack::create(new GuzzleHttp\Handler\MockHandler([
+        new GuzzleHttp\Psr7\Response(200, [], '{"status":true}'),
+    ]))]));
+    $lastSent = new ReflectionMethod(KenDeNigerian\PayZephyr\Drivers\AbstractDriver::class, 'lastRequestSentAt');
+
+    expect($lastSent->invoke($driver))->toBeNull();
+
+    Carbon\CarbonImmutable::setTestNow('2026-09-28 09:30:00.250000');
+    (new ReflectionMethod($driver, 'makeRequest'))->invoke($driver, 'GET', '/bank');
+    Carbon\CarbonImmutable::setTestNow();
+
+    expect($lastSent->invoke($driver)->format('Y-m-d H:i:s.u'))->toBe('2026-09-28 09:30:00.250000');
+});
+
+test('state_as_of round-trips with its microseconds, and can be cleared', function () {
+    $row = SubscriptionTransaction::create(array_merge(
+        ['subscription_code' => 'SUB_ROUNDTRIP'],
+        subscriptionAttributes('active', Carbon\CarbonImmutable::parse('2026-09-28 12:00:00.123456')),
+    ));
+
+    expect($row->fresh()->state_as_of->format('Y-m-d H:i:s.u'))->toBe('2026-09-28 12:00:00.123456');
+
+    $row->update(['state_as_of' => null]);
+
+    expect($row->fresh()->state_as_of)->toBeNull();
+});

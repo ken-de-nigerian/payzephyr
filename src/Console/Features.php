@@ -45,7 +45,8 @@ final class Features
                 'migrationTag' => 'payzephyr-migrations-subscriptions',
                 'envVar' => 'PAYZEPHYR_FEATURE_SUBSCRIPTIONS',
                 'dependencies' => [],
-                'migrationPattern' => '*_create_subscription_transactions_table.php',
+                // Both the create migration and the later state_as_of one.
+                'migrationPattern' => '*_subscription_transactions_table.php',
                 'tableConfigKey' => 'subscriptions.logging.table',
                 'defaultTable' => 'subscription_transactions',
             ],

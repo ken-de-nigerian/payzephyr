@@ -106,6 +106,7 @@ final class PaymentServiceProvider extends ServiceProvider
 
             $this->publishes([
                 __DIR__.'/../database/migrations/2024_01_01_000001_create_subscription_transactions_table.php' => database_path('migrations/2024_01_01_000001_create_subscription_transactions_table.php'),
+                __DIR__.'/../database/migrations/2024_01_05_000000_add_state_as_of_to_subscription_transactions_table.php' => database_path('migrations/2024_01_05_000000_add_state_as_of_to_subscription_transactions_table.php'),
             ], 'payzephyr-migrations-subscriptions');
 
             $this->publishes([

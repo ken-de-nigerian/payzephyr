@@ -18,7 +18,7 @@ function cleanPublishedInstallerState(): void
 {
     foreach ([
         '*_create_payment_transactions_table.php',
-        '*_create_subscription_transactions_table.php',
+        '*_subscription_transactions_table.php',
         '*_webhook_events_table.php',
         '*_create_refund_transactions_table.php',
         '*_create_payment_trace_events_table.php',
@@ -55,7 +55,7 @@ function installedMigrationFiles(): array
     return [
         'payments' => glob(database_path('migrations/*_create_payment_transactions_table.php')) ?: [],
         'webhooks' => glob(database_path('migrations/*_webhook_events_table.php')) ?: [],
-        'subscriptions' => glob(database_path('migrations/*_create_subscription_transactions_table.php')) ?: [],
+        'subscriptions' => glob(database_path('migrations/*_subscription_transactions_table.php')) ?: [],
         'refunds' => glob(database_path('migrations/*_create_refund_transactions_table.php')) ?: [],
         'trace' => glob(database_path('migrations/*_create_payment_trace_events_table.php')) ?: [],
     ];

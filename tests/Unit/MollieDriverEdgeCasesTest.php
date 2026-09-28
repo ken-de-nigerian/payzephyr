@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -134,7 +135,9 @@ test('mollie driver handles verify with malformed response', function () {
     $driver->verify('tr_test');
 })->throws(VerificationException::class);
 
-test('mollie driver handles webhook validation with API timeout', function () {
+test('mollie driver throws rather than rejecting when the API times out during webhook validation', function () {
+    // Validation runs in the queued job, after Mollie has been answered. A
+    // false here would discard a genuine delivery; throwing lets the job retry.
     $mock = new MockHandler([
         new ConnectException(
             'Connection timeout',
@@ -150,9 +153,8 @@ test('mollie driver handles webhook validation with API timeout', function () {
         'createdAt' => date('c'),
     ]);
 
-    $isValid = $driver->validateWebhook([], $payload);
-
-    expect($isValid)->toBeFalse();
+    expect(fn () => $driver->validateWebhook([], $payload))
+        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
 });
 
 test('mollie driver handles webhook validation with payment ID mismatch', function () {
@@ -309,4 +311,55 @@ test('mollie driver handles charge with special characters in metadata', functio
 
     expect($response->metadata)->toHaveKey('special')
         ->and($response->metadata['special'])->toBe('Value with "quotes" & <tags>');
+});
+
+test('mollie rejects a webhook whose payment id does not exist on the account', function () {
+    // A 404 is Mollie answering: this id is not ours. That is what a forged
+    // ping looks like, and retrying would get the same answer.
+    $mock = new MockHandler([
+        new ClientException(
+            'Not Found',
+            new Request('GET', '/v2/payments/tr_forged'),
+            new Response(404, [], '{"status":404,"title":"Not Found"}'),
+        ),
+    ]);
+
+    $driver = new MollieDriver($this->config);
+    $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
+
+    expect($driver->validateWebhook([], '{"id":"tr_forged"}'))->toBeFalse();
+});
+
+test('mollie throws rather than rejecting when the API answers with a server error', function () {
+    $mock = new MockHandler([
+        new \GuzzleHttp\Exception\ServerException(
+            'Service Unavailable',
+            new Request('GET', '/v2/payments/tr_test'),
+            new Response(503),
+        ),
+    ]);
+
+    $driver = new MollieDriver($this->config);
+    $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
+
+    expect(fn () => $driver->validateWebhook([], '{"id":"tr_test"}'))
+        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+});
+
+test('mollie throws rather than rejecting when its own API key is refused', function () {
+    // A 401 is about our credentials, not the sender. Every genuine delivery
+    // would be discarded until someone noticed; a failing job gets noticed.
+    $mock = new MockHandler([
+        new ClientException(
+            'Unauthorized',
+            new Request('GET', '/v2/payments/tr_test'),
+            new Response(401),
+        ),
+    ]);
+
+    $driver = new MollieDriver($this->config);
+    $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
+
+    expect(fn () => $driver->validateWebhook([], '{"id":"tr_test"}'))
+        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
 });

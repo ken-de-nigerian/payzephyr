@@ -14,6 +14,8 @@ This is a deliberate design choice, not an accident, for two reasons:
 
 **Some providers' verification itself requires an extra network call.** PayPal and, in one specific configuration, Mollie verify webhook signatures by calling back to the provider's own API rather than checking a local HMAC; that's inherently slower than a local signature check, and doing it inside the initial request would make the endpoint even more likely to time out. PayZephyr defers this kind of verification to the queued job specifically to keep the initial HTTP response fast regardless.
 
+Because the provider has already been answered by the time the job runs, it will not send that delivery again, so the job is careful about what counts as a rejection. Only the provider saying the webhook is not genuine discards it. If the verification call cannot get an answer - a timeout, a server error, rate limiting, or your own credentials being refused - the job throws and Laravel retries it like any other failed job. The replay window is measured from when the webhook arrived, not from when a worker got to it, so a backed-up queue does not turn genuine deliveries into rejections. See [ADR-0015](architecture/adr/0015-deferred-verification-failure-semantics.md).
+
 **The second queued job is optional.** If you enable tracing with
 `PAYZEPHYR_TRACE_ASYNC=true`, `KenDeNigerian\PayZephyr\Jobs\RecordTraceEvent` writes trace rows
 off the request too. Payloads are redacted *before* the job is queued, so nothing sensitive sits

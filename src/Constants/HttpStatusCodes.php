@@ -21,6 +21,8 @@ final class HttpStatusCodes
 
     public const NOT_FOUND = 404;
 
+    public const REQUEST_TIMEOUT = 408;
+
     public const TOO_MANY_REQUESTS = 429;
 
     public const INTERNAL_SERVER_ERROR = 500;

@@ -16,6 +16,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 use KenDeNigerian\PayZephyr\Traits\MollieRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\MollieSubscriptionMethods;
 use Throwable;
@@ -289,8 +290,20 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      * This method is used when webhook_secret is not configured.
      * It fetches the payment from Mollie's API to verify it exists and is legitimate.
      *
+     * There is no replay window here. The body is only a payment id, and
+     * everything acted on is fetched from Mollie's authenticated API, so a
+     * replayed ping can do no more than re-read the payment's current state.
+     * The fetched Payment's `createdAt` is when the payment was created, not
+     * when this event happened: checking it rejected every payment paid,
+     * expired or refunded more than five minutes after it was created.
+     *
      * @param  string  $body  Raw request body
      * @return bool True if webhook is valid
+     *
+     * @throws WebhookException When Mollie could not be asked (network failure,
+     *                          5xx, rate limit, our API key rejected). This runs
+     *                          in the queued job, where false would discard a
+     *                          genuine delivery; throwing lets the job retry.
      */
     protected function validateWebhookViaAPI(string $body): bool
     {
@@ -333,12 +346,6 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 return false;
             }
 
-            if (! $this->validateWebhookTimestamp($paymentData)) {
-                $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-                return false;
-            }
-
             $this->log('info', 'Webhook validated successfully via API verification', [
                 'payment_id' => $paymentId,
                 'payment_status' => $paymentData['status'] ?? 'unknown',
@@ -347,12 +354,22 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return true;
         } catch (Throwable $e) {
-            $this->log('error', 'Webhook validation failed', [
+            if ($this->isDefinitiveVerificationRejection($e)) {
+                // Typically a 404: the pinged payment id does not exist on
+                // this account, which is what a forged ping looks like.
+                $this->log('warning', 'Webhook validation failed: Mollie rejected the payment lookup', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                return false;
+            }
+
+            $this->log('error', 'Webhook validation could not reach Mollie', [
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),
             ]);
 
-            return false;
+            throw new WebhookException('Mollie webhook verification failed: '.$e->getMessage(), 0, $e);
         }
     }
 

@@ -44,6 +44,15 @@ final class ProcessWebhook implements ShouldQueue
     public int $backoff;
 
     /**
+     * When the delivery reached the application: set at dispatch, inside the
+     * webhook request, and serialized with the job. A driver that verifies in
+     * the job measures its replay window from here, not from whenever a
+     * worker happens to pick the job up. Null only for a job queued by a
+     * version that did not record it.
+     */
+    public ?int $receivedAt = null;
+
+    /**
      * @param  array<string, mixed>  $payload
      * @param  array<string, array<int, string>>  $headers  Only used by
      *                                                      drivers implementing RequiresAsyncWebhookVerification;
@@ -57,6 +66,7 @@ final class ProcessWebhook implements ShouldQueue
         $config = app('payments.config') ?? config('payments', []);
         $webhookConfig = $config['webhook'] ?? [];
 
+        $this->receivedAt = time();
         $this->tries = (int) ($webhookConfig['max_retries'] ?? 3);
         $this->backoff = (int) ($webhookConfig['retry_backoff'] ?? 60);
     }
@@ -239,7 +249,21 @@ final class ProcessWebhook implements ShouldQueue
             return true;
         }
 
-        return $driver->validateWebhook($this->headers, (string) json_encode($this->payload));
+        $measuresFromReceipt = method_exists($driver, 'setWebhookReceivedAt');
+
+        if ($measuresFromReceipt) {
+            $driver->setWebhookReceivedAt($this->receivedAt);
+        }
+
+        try {
+            return $driver->validateWebhook($this->headers, (string) json_encode($this->payload));
+        } finally {
+            // Drivers live for the whole worker process; the next job must not
+            // inherit this delivery's receipt time.
+            if ($measuresFromReceipt) {
+                $driver->setWebhookReceivedAt(null);
+            }
+        }
     }
 
     /**

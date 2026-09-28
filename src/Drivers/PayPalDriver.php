@@ -322,6 +322,11 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
     /**
      * Validate PayPal webhook signature.
+     *
+     * @throws WebhookException When PayPal's verification API could not give
+     *                          an answer (network failure, 5xx, rate limit,
+     *                          or our own credentials rejected), as opposed
+     *                          to answering that the signature is invalid.
      */
     public function validateWebhook(array $headers, string $body): bool
     {
@@ -345,36 +350,30 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return false;
         }
 
-        try {
-            $isValid = $this->verifyWebhookSignatureViaAPI(
-                $transmissionId,
-                $transmissionTime,
-                $certUrl,
-                $authAlgo,
-                $transmissionSig,
-                $webhookId,
-                $body
-            );
+        // Deliberately not wrapped in a catch-all. verifyWebhookSignatureViaAPI()
+        // throws only when PayPal could not be asked; this runs in the queued
+        // job, where returning false would discard a genuine delivery that
+        // PayPal will never resend. Throwing lets the job retry it instead.
+        if (! $this->verifyWebhookSignatureViaAPI(
+            $transmissionId,
+            $transmissionTime,
+            $certUrl,
+            $authAlgo,
+            $transmissionSig,
+            $webhookId,
+            $body
+        )) {
+            return false;
+        }
 
-            if (! $isValid) {
-                return false;
-            }
-
-            $payload = json_decode($body, true) ?? [];
-            if (! $this->validateWebhookTimestamp($payload)) {
-                $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-                return false;
-            }
-
-            return true;
-        } catch (Throwable $e) {
-            $this->log('error', 'PayPal webhook validation failed', [
-                'error' => $e->getMessage(),
-            ]);
+        $payload = json_decode($body, true) ?? [];
+        if (! $this->validateWebhookTimestamp($payload)) {
+            $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 
             return false;
         }
+
+        return true;
     }
 
     /**
@@ -417,6 +416,14 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return $isValid;
         } catch (Throwable $e) {
+            if ($this->isDefinitiveVerificationRejection($e)) {
+                $this->log('warning', 'PayPal rejected the webhook verification request', [
+                    'error' => $e->getMessage(),
+                ]);
+
+                return false;
+            }
+
             $this->log('error', 'PayPal webhook verification API failed', [
                 'error' => $e->getMessage(),
                 'error_class' => get_class($e),

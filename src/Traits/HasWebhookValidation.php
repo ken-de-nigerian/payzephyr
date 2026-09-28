@@ -4,13 +4,38 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use GuzzleHttp\Exception\ClientException;
+use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use Throwable;
 
 /**
  * Trait providing webhook validation functionality.
  */
 trait HasWebhookValidation
 {
+    /**
+     * When the webhook being validated reached the application, if that was
+     * not just now. See setWebhookReceivedAt().
+     */
+    private ?int $webhookReceivedAt = null;
+
+    /**
+     * Measure the replay window from when a webhook was received rather than
+     * from the moment it is validated.
+     *
+     * Drivers that verify asynchronously do it in the queued job, which runs
+     * whenever a worker gets to it. Measured from then, a queue more than a
+     * few minutes behind - a backlog, a deploy, a restarted worker - pushes
+     * every genuine delivery outside the window, and the job discards it for
+     * good. ProcessWebhook sets this around its validateWebhook() call and
+     * clears it afterwards; pass null to measure from now again.
+     */
+    public function setWebhookReceivedAt(?int $timestamp): void
+    {
+        $this->webhookReceivedAt = $timestamp;
+    }
+
     /**
      * Validate webhook timestamp to prevent replay attacks.
      *
@@ -29,7 +54,7 @@ trait HasWebhookValidation
             return false;
         }
 
-        $currentTime = time();
+        $currentTime = $this->webhookReceivedAt ?? time();
         $timeDifference = abs($currentTime - $timestamp);
 
         if ($timeDifference > $toleranceSeconds) {
@@ -144,5 +169,33 @@ trait HasWebhookValidation
     private function isPlausibleUnixTimestamp(int $candidate): bool
     {
         return $candidate >= 946684800 && $candidate < 4102444800;
+    }
+
+    /**
+     * Whether a failed call to a provider's verification API was the provider
+     * answering "this is not genuine", as opposed to not answering at all.
+     *
+     * Drivers that verify by calling the provider (PayPal, and Mollie without
+     * a webhook secret) do it in the queued job, after the provider has
+     * already been told 202 and will not send the delivery again. Reading an
+     * outage as a rejection there discards a genuine webhook for good. So
+     * only a 4xx the request itself earned counts; a timeout, a 5xx, a 429, or
+     * a 401/403 against our own credentials is none of the sender's doing,
+     * and the caller should throw so the job's retries get another go.
+     */
+    protected function isDefinitiveVerificationRejection(Throwable $e): bool
+    {
+        for ($current = $e; $current !== null; $current = $current->getPrevious()) {
+            if ($current instanceof ClientException) {
+                return ! in_array($current->getResponse()->getStatusCode(), [
+                    HttpStatusCodes::UNAUTHORIZED,
+                    HttpStatusCodes::FORBIDDEN,
+                    HttpStatusCodes::REQUEST_TIMEOUT,
+                    HttpStatusCodes::TOO_MANY_REQUESTS,
+                ], true);
+            }
+        }
+
+        return false;
     }
 }

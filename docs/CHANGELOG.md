@@ -8,7 +8,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **A PayPal or Mollie webhook could be lost to a network blip.** Both verify a delivery by
+  calling the provider, and that happens in the queued job, after the provider has been told
+  202 and will not send it again. A timeout or a 5xx from the verification endpoint was caught
+  and returned as "invalid signature", so the job discarded a genuine delivery with nothing
+  left to retry it. Now only the provider answering "not genuine" rejects - a signature
+  `FAILURE`, or a 4xx such as Mollie's 404 for an unknown payment id - and anything else
+  (a timeout, a 5xx, a 408 or 429, or a 401/403 against your own credentials) throws, so the
+  job retries and, if it keeps failing, lands in `failed_jobs` where `queue:retry` can replay
+  it. See [ADR-0015](architecture/adr/0015-deferred-verification-failure-semantics.md).
+
+- **A backed-up queue made PayPal webhooks fail their replay check.** The five-minute window
+  was measured from when a worker ran the job, not from when the webhook arrived, so a queue
+  more than five minutes behind discarded every PayPal delivery in it. `ProcessWebhook` now
+  records the receipt time at dispatch and the window is measured from that.
+
+- **Mollie without a webhook secret rejected payments that took more than five minutes.** The
+  API-verification path checked the fetched Payment's `createdAt` - when the payment was
+  created, not when the event happened - so a customer who took six minutes over iDEAL, and
+  every later refund or expiry, was rejected as a replay. That path no longer applies a
+  window: the body is only a payment id, and everything acted on is fetched from Mollie, so a
+  replay can only re-read the payment's current state.
+
+  Three PayPal tests had been passing without exercising any of this: one had no assertion,
+  two failed at the OAuth step before the verification call, and one made a real HTTP call to
+  PayPal's sandbox. They are replaced by tests that queue each HTTP response in order and
+  assert the verification request was actually sent.
 
 ---
 ## [4.0.0] - 2026-09-23

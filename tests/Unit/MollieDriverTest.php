@@ -508,10 +508,10 @@ test('mollie driver handles webhook with invalid json', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver handles webhook timestamp validation', function () {
-    // Test with the fetched Payment's createdAt outside tolerance (1 hour
-    // ago) - checked against $paymentData (the API response), not the
-    // incoming ping body. See ADR-0001.
+test('mollie accepts a webhook for a payment created long before it was paid', function () {
+    // createdAt is when the payment was created, not when this event
+    // happened. A customer who took an hour to pay is not a replay, and the
+    // state acted on is fetched from Mollie, not taken from the ping.
     $oldTimestamp = date('c', time() - 3600);
 
     $mock = new MockHandler([
@@ -531,7 +531,8 @@ test('mollie driver handles webhook timestamp validation', function () {
 
     $isValid = $driver->validateWebhook([], $payload);
 
-    expect($isValid)->toBeFalse();
+    expect($isValid)->toBeTrue()
+        ->and($mock->count())->toBe(0);
 });
 
 test('mollie driver handles charge with custom reference', function () {

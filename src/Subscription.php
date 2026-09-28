@@ -12,11 +12,17 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Enums\TraceDirection;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Services\SubscriptionValidator;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
+use Throwable;
 
 final class Subscription
 {
+    use RecordsTraceEvents;
+
     protected PaymentManager $manager;
 
     /** @var array<string, mixed> */
@@ -193,6 +199,14 @@ final class Subscription
 
         $response = $driver->createSubscription($request);
 
+        // Recorded on the subscription code's timeline, which only exists
+        // once the provider has answered - so a create that fails leaves no
+        // row, having nothing yet to key one on.
+        $this->trace($response->subscriptionCode, TraceEvent::SUBSCRIPTION_CREATED, TraceDirection::INBOUND,
+            payload: ['status' => $response->status, 'plan' => $response->plan],
+            provider: $this->getProviderName(),
+        );
+
         if ($driver instanceof SubscriptionLifecycleHooks) {
             $driver->afterSubscriptionCreate($response);
         }
@@ -282,7 +296,12 @@ final class Subscription
             $validator->validateCancellation($this->subscriptionCode, $driver);
         }
 
-        $response = $driver->cancelSubscription($this->buildAction($this->subscriptionCode, $token));
+        $response = $this->traceSubscriptionOperation(
+            $driver,
+            'cancel',
+            TraceEvent::SUBSCRIPTION_CANCELLED,
+            fn () => $driver->cancelSubscription($this->buildAction($this->subscriptionCode, $token)),
+        );
 
         if ($driver instanceof SubscriptionLifecycleHooks) {
             $driver->afterSubscriptionCancel($response);
@@ -308,7 +327,43 @@ final class Subscription
             );
         }
 
-        return $driver->enableSubscription($this->buildAction($this->subscriptionCode, $token));
+        return $this->traceSubscriptionOperation(
+            $driver,
+            'enable',
+            TraceEvent::SUBSCRIPTION_ENABLED,
+            fn () => $driver->enableSubscription($this->buildAction($this->subscriptionCode, $token)),
+        );
+    }
+
+    /**
+     * Run a cancel or enable with its HTTP steps recorded on the subscription
+     * code's timeline, followed by its outcome - or the failure, rethrown.
+     *
+     * @param  callable(): SubscriptionResponseDTO  $operation
+     */
+    private function traceSubscriptionOperation(
+        Contracts\DriverInterface $driver,
+        string $name,
+        TraceEvent $success,
+        callable $operation
+    ): SubscriptionResponseDTO {
+        $code = (string) $this->subscriptionCode;
+        $provider = $this->getProviderName();
+
+        try {
+            $response = $this->withTraceContext($driver, $code, $operation);
+        } catch (Throwable $e) {
+            $this->trace($code, TraceEvent::SUBSCRIPTION_OPERATION_FAILED, TraceDirection::INBOUND,
+                payload: ['operation' => $name, 'error' => $e->getMessage(), 'error_class' => $e::class],
+                provider: $provider,
+            );
+
+            throw $e;
+        }
+
+        $this->trace($code, $success, TraceDirection::INBOUND, payload: ['status' => $response->status], provider: $provider);
+
+        return $response;
     }
 
     /**

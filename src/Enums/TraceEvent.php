@@ -48,6 +48,20 @@ enum TraceEvent: string
     case VERIFICATION_FAILED = 'verification.failed';
     case VERIFICATION_NOT_PERSISTED = 'verification.not_persisted';
 
+    // Refunds - recorded on the refunded payment's timeline
+    case REFUND_REQUESTED = 'refund.requested';
+    case REFUND_ACCEPTED = 'refund.accepted';
+    case REFUND_FAILED = 'refund.failed';
+    case REFUND_DUPLICATE_REJECTED = 'refund.duplicate_rejected';
+
+    // Subscriptions - recorded on the subscription code's timeline
+    case SUBSCRIPTION_CREATED = 'subscription.created';
+    case SUBSCRIPTION_CANCELLED = 'subscription.cancelled';
+    case SUBSCRIPTION_ENABLED = 'subscription.enabled';
+    case SUBSCRIPTION_RENEWED = 'subscription.renewed';
+    case SUBSCRIPTION_PAYMENT_FAILED = 'subscription.payment_failed';
+    case SUBSCRIPTION_OPERATION_FAILED = 'subscription.operation_failed';
+
     case CUSTOM = 'custom';
 
     public function description(): string
@@ -87,6 +101,18 @@ enum TraceEvent: string
             self::VERIFICATION_COMPLETED => 'Payment verification completed',
             self::VERIFICATION_FAILED => 'Payment verification failed',
             self::VERIFICATION_NOT_PERSISTED => 'Provider confirmed the payment but the local record could not be updated',
+
+            self::REFUND_REQUESTED => 'Refund requested',
+            self::REFUND_ACCEPTED => 'Refund accepted by the provider',
+            self::REFUND_FAILED => 'Refund could not be issued',
+            self::REFUND_DUPLICATE_REJECTED => 'Refund rejected while an earlier one for the same payment was still in flight',
+
+            self::SUBSCRIPTION_CREATED => 'Subscription created',
+            self::SUBSCRIPTION_CANCELLED => 'Subscription cancelled',
+            self::SUBSCRIPTION_ENABLED => 'Subscription re-enabled',
+            self::SUBSCRIPTION_RENEWED => 'Subscription renewed',
+            self::SUBSCRIPTION_PAYMENT_FAILED => 'Subscription renewal payment failed',
+            self::SUBSCRIPTION_OPERATION_FAILED => 'Subscription operation failed',
 
             self::CUSTOM => 'Custom trace event',
         };
@@ -137,6 +163,9 @@ enum TraceEvent: string
             self::AUTH_FAILED,
             self::VERIFICATION_FAILED,
             self::VERIFICATION_NOT_PERSISTED,
+            self::REFUND_FAILED,
+            self::SUBSCRIPTION_PAYMENT_FAILED,
+            self::SUBSCRIPTION_OPERATION_FAILED,
         ], true);
     }
 }

@@ -124,6 +124,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Tracing now covers refunds and subscriptions.** A refund used to leave no trace rows at
+  all. It is now recorded on the timeline of the payment it refunds - `refund.requested`, the
+  provider round trip, `refund.accepted` or `refund.failed` (with the stage, and whether a
+  provider failure left the outcome ambiguous), `refund.duplicate_rejected`, and
+  `payment.refunded` when it completes, synchronously or by webhook, once. Subscriptions get a
+  timeline of their own, keyed by subscription code: creation, cancellation, re-enabling,
+  renewals, failed renewal payments and failed operations, with the provider round trips of a
+  cancel or re-enable. Ten new `TraceEvent` cases; none is terminal, so a refunded payment
+  still reads as completed. See [Tracing](tracing.md).
+
+- **A webhook rejected for its signature is traced for every provider**, not only the two
+  verified in the queued job. `webhook.validation_failed` is recorded against the reference the
+  unverified body names, with the stage and source address and never the body itself.
+
 - **`php artisan payzephyr:webhooks:prune`**, for `webhook_events`, which grew by a row per
   webhook with nothing to remove them. A row is what stops a replay, so the command deletes a
   provider's rows only once they are older than both the retention period

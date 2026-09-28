@@ -7,14 +7,19 @@ namespace KenDeNigerian\PayZephyr\Http\Requests;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Cache;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Enums\TraceDirection;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
 
 class WebhookRequest extends FormRequest
 {
     use LogsToPaymentChannel;
+    use RecordsTraceEvents;
 
     private const UNVERIFIED_WARNING_CACHE_KEY = 'payzephyr:webhook:unverified_warning';
 
@@ -69,10 +74,16 @@ class WebhookRequest extends FormRequest
                 return true;
             }
 
-            return $driver->validateWebhook(
+            $valid = $driver->validateWebhook(
                 $this->headers->all(),
                 $this->getContent()
             );
+
+            if (! $valid) {
+                $this->traceRejectedSignature($driver, (string) $provider);
+            }
+
+            return $valid;
         } catch (Throwable $e) {
             $this->log('warning', "Webhook authorization failed for provider [$provider]", [
                 'error' => $e->getMessage(),
@@ -81,6 +92,32 @@ class WebhookRequest extends FormRequest
 
             return false;
         }
+    }
+
+    /**
+     * Record a synchronously rejected signature on the timeline of the payment
+     * the body claims to be about.
+     *
+     * Someone sending bad-signature webhooks for a payment is worth seeing
+     * next to that payment, and until now only the providers verified in the
+     * queued job recorded it. The reference comes from an unverified body, so
+     * this is an unauthenticated write, like the queued one: the route is
+     * rate-limited and payload-capped, and only the stage and source address
+     * are stored - never the body a forger chose.
+     */
+    private function traceRejectedSignature(DriverInterface $driver, string $provider): void
+    {
+        try {
+            $payload = json_decode($this->getContent(), true);
+            $reference = is_array($payload) ? $driver->extractWebhookReference($payload) : null;
+        } catch (Throwable) {
+            return;
+        }
+
+        $this->trace($reference, TraceEvent::WEBHOOK_VALIDATION_FAILED, TraceDirection::INBOUND,
+            payload: ['stage' => 'signature', 'ip' => $this->ip()],
+            provider: $provider,
+        );
     }
 
     /**

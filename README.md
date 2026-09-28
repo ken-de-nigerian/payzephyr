@@ -52,9 +52,8 @@ across a fallback chain, with per-attempt correlation IDs and millisecond gaps, 
 cannot bolt on once the decisions have already been made and forgotten.
 
 It is off by default, costs nothing when off, and can be turned off again on the next request
-with no deploy. **Today it covers charges, verifications and inbound webhooks.** Refunds and
-subscriptions are not instrumented yet - that is planned, not shipped, and
-[Tracing](docs/tracing.md) says so where you would look for it.
+with no deploy. It covers charges, verifications, refunds, subscriptions and inbound
+webhooks; the few edges that remain are listed in [Tracing](docs/tracing.md#what-isnt-traced).
 
 ## Is this for you?
 

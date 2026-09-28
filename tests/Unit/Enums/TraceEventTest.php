@@ -6,7 +6,17 @@ use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 
 test('the trace event taxonomy covers every recorded stage of a payment', function () {
-    expect(TraceEvent::cases())->toHaveCount(29)
+    expect(TraceEvent::cases())->toHaveCount(39)
+        ->and(TraceEvent::REFUND_REQUESTED->value)->toBe('refund.requested')
+        ->and(TraceEvent::REFUND_ACCEPTED->value)->toBe('refund.accepted')
+        ->and(TraceEvent::REFUND_FAILED->value)->toBe('refund.failed')
+        ->and(TraceEvent::REFUND_DUPLICATE_REJECTED->value)->toBe('refund.duplicate_rejected')
+        ->and(TraceEvent::SUBSCRIPTION_CREATED->value)->toBe('subscription.created')
+        ->and(TraceEvent::SUBSCRIPTION_CANCELLED->value)->toBe('subscription.cancelled')
+        ->and(TraceEvent::SUBSCRIPTION_ENABLED->value)->toBe('subscription.enabled')
+        ->and(TraceEvent::SUBSCRIPTION_RENEWED->value)->toBe('subscription.renewed')
+        ->and(TraceEvent::SUBSCRIPTION_PAYMENT_FAILED->value)->toBe('subscription.payment_failed')
+        ->and(TraceEvent::SUBSCRIPTION_OPERATION_FAILED->value)->toBe('subscription.operation_failed')
         ->and(TraceEvent::PAYMENT_INITIATED->value)->toBe('payment.initiated')
         ->and(TraceEvent::PROVIDER_SKIPPED->value)->toBe('provider.skipped')
         ->and(TraceEvent::CHARGE_DUPLICATE_REJECTED->value)->toBe('charge.duplicate_rejected')
@@ -63,7 +73,20 @@ test('error events are exactly the ones worth surfacing as a problem', function 
         TraceEvent::AUTH_FAILED,
         TraceEvent::VERIFICATION_FAILED,
         TraceEvent::VERIFICATION_NOT_PERSISTED,
+        TraceEvent::REFUND_FAILED,
+        TraceEvent::SUBSCRIPTION_PAYMENT_FAILED,
+        TraceEvent::SUBSCRIPTION_OPERATION_FAILED,
     ]);
+});
+
+test('no refund or subscription event is terminal', function () {
+    // A refunded payment still completed: Timeline::terminal() takes the
+    // first terminal event, so a refund marked terminal would misreport it.
+    foreach (TraceEvent::cases() as $case) {
+        if (str_starts_with($case->value, 'refund.') || str_starts_with($case->value, 'subscription.')) {
+            expect($case->isTerminal())->toBeFalse();
+        }
+    }
 });
 
 test('a successful payment is terminal without being an error', function () {

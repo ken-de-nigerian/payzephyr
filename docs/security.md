@@ -86,7 +86,7 @@ You keep every event, timestamp, status code and timing; you lose only the bodie
 Two other things worth knowing:
 
 - **Redaction happens before queueing.** With `PAYZEPHYR_TRACE_ASYNC=true`, payloads are scrubbed *before* the job is dispatched, so nothing sensitive sits in your queue backend waiting to be written.
-- **A rejected webhook can still write a row.** `webhook.validation_failed` is keyed by the reference read out of an unverified payload, so an attacker who knows a reference can cause rows attributed to it. The webhook route is rate-limited and payload-capped, and the forensic value of seeing "someone is sending bad-signature webhooks for this payment" is the reason it's recorded at all - but it is an unauthenticated write path, and worth knowing about.
+- **A rejected webhook can still write a row.** When tracing is on, `webhook.validation_failed` is recorded for every signature rejection, synchronous or queued, keyed by the reference read out of an unverified payload - and only the stage and source address are stored, never the body, so an attacker who knows a reference can cause rows attributed to it. The webhook route is rate-limited and payload-capped, and the forensic value of seeing "someone is sending bad-signature webhooks for this payment" is the reason it's recorded at all - but it is an unauthenticated write path, and worth knowing about.
 
 ## Health endpoint
 

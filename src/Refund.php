@@ -9,13 +9,19 @@ use Illuminate\Support\Str;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Enums\TraceDirection;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Services\RefundValidator;
+use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
 
 final class Refund
 {
+    use RecordsTraceEvents;
+
     /**
      * How long the in-flight refund lock (see refund()) is held before it
      * expires on its own - a safety net so a crashed/killed process that
@@ -122,16 +128,39 @@ final class Refund
         }
 
         $request = RefundRequestDTO::fromArray($this->data);
+        $provider = $this->getProviderName();
+
+        // A refund is recorded on the timeline of the payment it refunds: it
+        // moves money outward, settles asynchronously on most providers, and
+        // is what a dispute is argued over, so it belongs next to the charge.
+        $reference = $request->transactionReference;
+
+        $this->trace($reference, TraceEvent::REFUND_REQUESTED, payload: [
+            'amount' => $request->amount,
+            'currency' => $request->currency,
+            'idempotency_key' => $request->idempotencyKey,
+        ], provider: $provider);
 
         $config = app('payments.config') ?? config('payments', []);
         if ($config['refunds']['validation']['enabled'] ?? true) {
-            app(RefundValidator::class)->validateRefund($request);
+            try {
+                app(RefundValidator::class)->validateRefund($request);
+            } catch (Throwable $e) {
+                $this->trace($reference, TraceEvent::REFUND_FAILED,
+                    payload: ['stage' => 'validation', 'error' => $e->getMessage(), 'error_class' => $e::class],
+                    provider: $provider,
+                );
+
+                throw $e;
+            }
         }
 
         $preventDuplicates = $config['refunds']['prevent_duplicates'] ?? true;
         $lockKey = $this->inFlightLockKey($request->transactionReference);
 
         if ($preventDuplicates && ! Cache::add($lockKey, true, self::LOCK_TTL_SECONDS)) {
+            $this->trace($reference, TraceEvent::REFUND_DUPLICATE_REJECTED, provider: $provider);
+
             throw new RefundException(
                 "A refund is already in progress for transaction $request->transactionReference. ".
                 'Wait for it to resolve before submitting another.'
@@ -139,8 +168,20 @@ final class Refund
         }
 
         try {
-            $response = $driver->refund($request);
+            $response = $this->withTraceContext($driver, $reference, fn () => $driver->refund($request));
         } catch (Throwable $e) {
+            $this->trace($reference, TraceEvent::REFUND_FAILED, TraceDirection::INBOUND,
+                payload: [
+                    'stage' => 'provider',
+                    'error' => $e->getMessage(),
+                    'error_class' => $e::class,
+                    // The provider may have refunded despite the error; see the
+                    // message below. A timeline must not read as "it failed".
+                    'ambiguous' => $e instanceof RefundException && $e->isAmbiguousProviderOutcome(),
+                ],
+                provider: $provider,
+            );
+
             if ($preventDuplicates && $e instanceof RefundException && $e->isAmbiguousProviderOutcome()) {
                 throw new RefundException(
                     "The refund for transaction $request->transactionReference timed out or lost its response before ".
@@ -161,6 +202,23 @@ final class Refund
 
         if ($preventDuplicates) {
             Cache::forget($lockKey);
+        }
+
+        $this->trace($reference, TraceEvent::REFUND_ACCEPTED, TraceDirection::INBOUND, payload: [
+            'refund_reference' => $response->refundReference,
+            'status' => $response->getStatus()->value,
+            'amount' => $response->amount,
+            'currency' => $response->currency,
+        ], provider: $provider);
+
+        // Most providers settle later and report it by webhook, which records
+        // this then; an instant refund is already done.
+        if ($response->getStatus() === RefundStatus::COMPLETED) {
+            $this->trace($reference, TraceEvent::PAYMENT_REFUNDED, payload: [
+                'refund_reference' => $response->refundReference,
+                'amount' => $response->amount,
+                'currency' => $response->currency,
+            ], provider: $provider);
         }
 
         return $response;

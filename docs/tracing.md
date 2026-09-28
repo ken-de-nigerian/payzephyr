@@ -10,12 +10,12 @@ Consider a payment PayZephyr recovered for you. Paystack was down, so the fallba
 
 Tracing fills that in. Where logging keeps a payment's current **state**, tracing keeps the **sequence** that produced it: one append-only row per step, keyed by the same reference you already have.
 
-**What it covers today:** charges, verifications and inbound webhooks - every decision the
-fallback chain makes, every HTTP round trip to a provider, and every webhook that arrives.
-**Refunds and subscriptions are not instrumented yet.** A refund writes no trace rows at all,
-not a shortened timeline. That is planned work, and it is said here rather than in a footnote
-because a reader deciding whether to depend on this deserves to know its edges before they
-depend on it, not after.
+**What it covers:** charges, verifications, refunds, subscriptions and inbound webhooks -
+every decision the fallback chain makes, every HTTP round trip to a provider, and every webhook
+that arrives, including the ones rejected for a bad signature. A refund is recorded on the
+timeline of the payment it refunds; a subscription has a timeline of its own, keyed by its
+subscription code. The few edges that remain are listed under
+[What isn't traced](#what-isnt-traced).
 
 ```
 14:22:07.104 • payment.initiated
@@ -68,6 +68,10 @@ Every step PayZephyr takes on the charge, verification and webhook paths.
 | `provider.exception` | Anything else went wrong on the wire |
 
 **Verification and webhooks:** `verification.started`, `verification.completed`, `verification.failed`, `verification.not_persisted`, `webhook.received`, `webhook.duplicate`, `webhook.validation_failed`, `webhook.queue_failed`, `webhook.processing_failed`, `retry.scheduled`, `retry.abandoned`.
+
+**Refunds**, on the refunded payment's timeline: `refund.requested`, `refund.accepted` (with the provider's refund reference and status), `refund.failed` (with the stage - `validation`, `provider` or `settlement` - and, for a provider failure, whether the outcome is `ambiguous`), `refund.duplicate_rejected`, and `payment.refunded` once the refund completes, whether the provider says so at once or by webhook. None of these is terminal: a refunded payment still completed.
+
+**Subscriptions**, on the subscription code's timeline: `subscription.created`, `subscription.cancelled`, `subscription.enabled`, `subscription.renewed`, `subscription.payment_failed` and `subscription.operation_failed`, with the provider round trips of a cancel or re-enable in between.
 
 Two of those are worth calling out because nothing else in PayZephyr records them:
 
@@ -239,12 +243,13 @@ Timestamps are millisecond-precision, unlike PayZephyr's other tables. Several s
 | `PAYZEPHYR_TRACE_SLOW_RESPONSE_MS` | `5000` | The threshold, in milliseconds, above which a provider response is marked slow on its timeline |
 | `PAYZEPHYR_TRACE_RETENTION_DAYS` | `90` | How much history `payzephyr:trace:prune` keeps |
 
-## What isn't traced yet
+## What isn't traced
 
 Worth knowing so an empty stretch doesn't read as a bug:
 
-- **Refunds and subscriptions.** Neither is instrumented yet, and the gap is total rather than partial: a refund produces no trace rows at all. The mechanism is that `AbstractDriver::makeRequest()` only records a round trip when a trace reference is in scope, and the reference is set on the charge path alone - so a refund's HTTP calls fall outside it. `TraceEvent::PAYMENT_REFUNDED` exists in the vocabulary for that future work and is currently never emitted. This is the next thing worth instrumenting: a refund is the operation most likely to need a forensic record, because it moves money outward, settles asynchronously on most providers, and is what a dispute is argued over.
-- **Synchronous signature failures.** For most providers a bad webhook signature is rejected with a 403 in `WebhookRequest::authorize()`, before the controller or the queued job runs - so it leaves no trace row. `webhook.validation_failed` only fires for providers that defer verification into the job (Mollie and PayPal).
+- **Reads.** `Refund::fetch()` and `Subscription::fetch()` change nothing and record nothing; their result is written to the refund and subscription tables as before.
+- **The HTTP steps of a subscription creation.** Its timeline is keyed by the subscription code, which only exists once the provider has answered, so a creation records `subscription.created` and not the round trip before it - and a creation that fails has nothing to key a row on.
+- **A webhook rejected for its signature whose body is not JSON**, or names no reference: there is no payment to record it against.
 - **Custom drivers that don't extend `AbstractDriver`.** Implementing `DriverInterface` directly is fully supported and always will be; such a driver simply records no HTTP-level steps. Everything the manager decides around it is still recorded.
 
 ## Next steps

@@ -309,49 +309,6 @@ final class PaymentManager
     }
 
     /**
-     * Run one provider attempt with a fresh correlation group around it.
-     *
-     * One reference spans the whole payment; one correlation id spans a single
-     * provider attempt within it. That is what makes a fallback chain readable
-     * rather than a flat pile of events: three attempts against three
-     * providers produce three correlation groups under one reference.
-     *
-     * Cleared in a finally, always. DriverFactory hands back a new instance
-     * per create() today, but PaymentManager caches drivers by name in
-     * $this->drivers, so a second operation in the same process reuses the
-     * same object. Leaked context would file one customer's provider
-     * round-trip under another customer's attempt - the only way this feature
-     * could leak data between payments, and the reason this is not simply set
-     * inside the drivers.
-     *
-     * Guarded by instanceof for the same reason driverIsHealthy() is: a driver
-     * implementing only DriverInterface is legitimate and documented, and must
-     * not blow up on a method the contract never promised. Such a driver
-     * simply records no HTTP-level steps.
-     *
-     * @template TResult
-     *
-     * @param  callable(): TResult  $operation
-     * @return TResult
-     *
-     * @throws Throwable Whatever $operation throws, untouched.
-     */
-    private function withTraceContext(DriverInterface $driver, string $reference, callable $operation): mixed
-    {
-        if (! $driver instanceof AbstractDriver) {
-            return $operation();
-        }
-
-        $driver->setTraceContext($reference, $this->startTraceCorrelation());
-
-        try {
-            return $operation();
-        } finally {
-            $driver->setTraceContext();
-        }
-    }
-
-    /**
      * Health check for any driver, including one that implements only
      * DriverInterface.
      *

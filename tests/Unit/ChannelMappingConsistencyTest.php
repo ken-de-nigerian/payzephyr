@@ -181,9 +181,9 @@ class ChannelMappingConsistencyTest extends TestCase
         $this->app->forgetInstance('payments.config');
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
 
-        if (! $this->isProviderEnabled($provider)) {
-            $this->markTestSkipped("Provider {$provider} is not enabled");
-        }
+        // A hard failure, not a skip: a provider that is not configured would
+        // otherwise drop out of this consistency check without anyone noticing.
+        $this->assertTrue($this->isProviderEnabled($provider), "Provider {$provider} is not enabled in the test configuration");
 
         // Use proper setup method with provider-specific response
         $mockResponse = match ($provider) {
@@ -292,9 +292,9 @@ class ChannelMappingConsistencyTest extends TestCase
         $this->app->forgetInstance('payments.config');
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
 
-        if (! $this->isProviderEnabled($provider)) {
-            $this->markTestSkipped("Provider {$provider} is not enabled");
-        }
+        // A hard failure, not a skip: a provider that is not configured would
+        // otherwise drop out of this consistency check without anyone noticing.
+        $this->assertTrue($this->isProviderEnabled($provider), "Provider {$provider} is not enabled in the test configuration");
 
         $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
 

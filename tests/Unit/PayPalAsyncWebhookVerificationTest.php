@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Events\WebhookReceived;
-use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
@@ -26,43 +24,6 @@ beforeEach(function () {
     app()->forgetInstance('payments.config');
     Event::fake();
 });
-
-function makeWebhookRequestFor(string $provider, string $body, array $headers = []): WebhookRequest
-{
-    $base = Request::create("/payments/webhook/$provider", 'POST', [], [], [], [], $body);
-    foreach ($headers as $key => $value) {
-        $base->headers->set($key, $value);
-    }
-
-    $request = new class($base, $body, $provider) extends WebhookRequest
-    {
-        public function __construct(private readonly Request $base, private readonly string $body, private readonly string $provider)
-        {
-            parent::__construct(
-                $base->query->all(),
-                [],
-                $base->attributes->all(),
-                $base->cookies->all(),
-                $base->files->all(),
-                $base->server->all(),
-                $body
-            );
-            $this->headers = $base->headers;
-        }
-
-        public function getContent(bool $asResource = false): false|string
-        {
-            return $this->body;
-        }
-
-        public function route($param = null, $default = null)
-        {
-            return $param === 'provider' ? $this->provider : $default;
-        }
-    };
-
-    return $request;
-}
 
 test('paypal webhook request authorizes without a valid signature - verification is deferred (ADR-0007)', function () {
     $body = json_encode(['id' => 'WH-1', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED']);

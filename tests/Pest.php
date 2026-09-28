@@ -5,6 +5,7 @@ use KenDeNigerian\PayZephyr\Tests\TestCase;
 uses(TestCase::class)->in('Feature', 'Unit', 'Integration');
 
 require_once __DIR__.'/Helpers/fake_drivers.php';
+require_once __DIR__.'/Helpers/webhook_requests.php';
 
 /**
  * Mock the authenticated user behind the Auth facade.

@@ -142,9 +142,9 @@ class StatusNormalizationConsistencyTest extends TestCase
     #[DataProvider('successStatusVariations')]
     public function test_verification_response_is_successful_works_consistently(string $provider, array $statuses): void
     {
-        if (! $this->isProviderEnabled($provider)) {
-            $this->markTestSkipped("Provider {$provider} is not enabled");
-        }
+        // A hard failure, not a skip: a provider that is not configured would
+        // otherwise drop out of this consistency check without anyone noticing.
+        $this->assertTrue($this->isProviderEnabled($provider), "Provider {$provider} is not enabled in the test configuration");
 
         foreach ($statuses as $status) {
             $dto = new \KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO(

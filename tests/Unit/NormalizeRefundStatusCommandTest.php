@@ -77,3 +77,16 @@ test('reports nothing to do when the refund_transactions table has no rows', fun
     expect($exitCode)->toBe(NormalizeRefundStatusCommand::SUCCESS)
         ->and(Artisan::output())->toContain('nothing to do');
 });
+
+test('succeeds without touching anything when the refunds table was never installed', function () {
+    // Refunds are an optional feature. An app that never installed them still
+    // runs this command from a generic upgrade script, and it must not fail
+    // there with "no such table".
+    config(['payments.refunds.logging.table' => 'refunds_never_installed']);
+
+    $this->artisan('payzephyr:refunds:normalize-status')
+        ->expectsOutput('No "refunds_never_installed" table found - nothing to do.')
+        ->assertExitCode(NormalizeRefundStatusCommand::SUCCESS);
+
+    expect(Illuminate\Support\Facades\Schema::hasTable('refunds_never_installed'))->toBeFalse();
+});

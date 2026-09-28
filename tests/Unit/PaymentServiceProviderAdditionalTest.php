@@ -34,3 +34,18 @@ test('health route catches and reports a driver resolution failure for a misconf
         ->and($data['providers']['broken']['healthy'])->toBeFalse()
         ->and($data['providers']['broken'])->toHaveKey('error');
 });
+
+test('routes are not registered again when the application has cached its routes', function () {
+    // With `php artisan route:cache`, Laravel loads every route - including
+    // this package's - from the cache file. Registering them again on boot
+    // would duplicate them and defeat the cache.
+    $app = Mockery::mock(Illuminate\Foundation\Application::class);
+    $app->shouldReceive('routesAreCached')->once()->andReturn(true);
+
+    Illuminate\Support\Facades\Route::shouldReceive('group')->never();
+    Illuminate\Support\Facades\Route::shouldReceive('get')->never();
+
+    $provider = new KenDeNigerian\PayZephyr\PaymentServiceProvider($app);
+    $method = new ReflectionMethod($provider, 'registerRoutes');
+    $method->invoke($provider);
+});

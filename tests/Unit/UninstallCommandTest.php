@@ -302,3 +302,51 @@ test('uninstall succeeds when no .env file exists', function () {
         }
     }
 });
+
+test('a resource that fails to drop is reported, the rest are still removed, and the command fails', function () {
+    // One failure must not abort the others half-way, and must not be
+    // reported as a clean uninstall either: the caller needs a non-zero
+    // exit code to know the database was left partly in place.
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds,trace']);
+    $this->artisan('migrate', ['--force' => true])->run();
+
+    // A real failure, not a mock: DROP TABLE refuses to drop a view.
+    DB::statement('CREATE VIEW refunds_as_view AS SELECT 1 AS id');
+    config(['payments.refunds.logging.table' => 'refunds_as_view']);
+
+    try {
+        $exitCode = Artisan::call('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'refunds,trace']);
+        $output = Artisan::output();
+    } finally {
+        DB::statement('DROP VIEW IF EXISTS refunds_as_view');
+    }
+
+    expect($exitCode)->toBe(UninstallCommand::FAILURE)
+        ->and($output)->toContain('Failed to remove Refunds:')
+        ->and($output)->toContain('Uninstall finished with errors removing: Refunds. See the messages above')
+        ->and($output)->not->toContain('Failed to remove Trace')
+        ->and(Schema::hasTable('payment_trace_events'))->toBeFalse();
+
+    $files = uninstallTestMigrationFiles();
+    expect($files['trace'])->toBeEmpty()
+        ->and($files['refunds'])->not->toBeEmpty();
+});
+
+test('uninstall removes published migrations even when migrate was never run', function () {
+    // Without a migrations table there is no tracking row to forget, and
+    // that must not stop the migration file itself from being removed.
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
+    Schema::drop('migrations');
+
+    expect(uninstallTestMigrationFiles()['refunds'])->not->toBeEmpty();
+
+    $this->artisan('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'refunds'])
+        ->assertExitCode(UninstallCommand::SUCCESS);
+
+    expect(uninstallTestMigrationFiles()['refunds'])->toBeEmpty()
+        ->and(Schema::hasTable('migrations'))->toBeFalse();
+
+    // Testbench rolls the suite's own migrations back on teardown, which
+    // needs the table this test removed.
+    app('migrator')->getRepository()->createRepository();
+});

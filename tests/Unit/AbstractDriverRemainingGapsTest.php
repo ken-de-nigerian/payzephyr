@@ -158,3 +158,30 @@ test('abstract driver default extractWebhookChannel reads the channel key', func
         ->and($driver->extractWebhookChannel(['paymentMethod' => 'bank_transfer']))->toBe('bank_transfer')
         ->and($driver->extractWebhookChannel([]))->toBeNull();
 });
+
+test('a charge still succeeds when both the payments channel and the default logger throw', function () {
+    // A full disk or a broken log handler must never turn a payment the
+    // provider accepted into an exception the caller sees as a failure.
+    config(['payments.logging.enabled' => true, 'payments.logging.channel' => 'payments']);
+    app()->forgetInstance('payments.config');
+
+    Log::shouldReceive('channel')->andThrow(new InvalidArgumentException('Log channel [payments] is not defined.'));
+    Log::shouldReceive('info')->andThrow(new RuntimeException('disk full'));
+
+    $driver = new \KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
+    $driver->setClient(new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create(new \GuzzleHttp\Handler\MockHandler([
+        new \GuzzleHttp\Psr7\Response(200, [], (string) json_encode([
+            'status' => true,
+            'data' => ['authorization_url' => 'https://checkout.paystack.com/abc', 'access_code' => 'abc', 'reference' => 'REF_LOGFAIL'],
+        ])),
+    ]))]));
+
+    $response = $driver->charge(ChargeRequestDTO::fromArray([
+        'amount' => 100,
+        'currency' => 'NGN',
+        'email' => 'customer@example.com',
+        'reference' => 'REF_LOGFAIL',
+    ]));
+
+    expect($response->authorizationUrl)->toBe('https://checkout.paystack.com/abc');
+});

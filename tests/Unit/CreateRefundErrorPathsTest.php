@@ -190,3 +190,19 @@ test('paypal refund rejects a response carrying no refund id', function () {
 
     expect(fn () => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
 });
+
+test('paystack refund rejects a success response that carries no refund id', function () {
+    // Without an id the refund cannot be fetched or reconciled later, so a
+    // "successful" body missing it must not be reported as a created refund.
+    $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
+    $body = ['status' => true, 'data' => ['status' => 'pending', 'amount' => 1000, 'currency' => 'NGN']];
+    $driver->setClient(refundClient([new Response(200, [], (string) json_encode($body))]));
+
+    try {
+        $driver->refund(refundRequest());
+        $this->fail('Expected a RefundException');
+    } catch (RefundException $e) {
+        expect($e->getMessage())->toBe('Refund reference not found in response. Response: '.json_encode($body))
+            ->and($e->getPrevious())->toBeNull();
+    }
+});

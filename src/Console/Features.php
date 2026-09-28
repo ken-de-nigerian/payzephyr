@@ -164,17 +164,25 @@ final class Features
      * returning the full set (selected + transitively required). Detects
      * cycles defensively even though none exist in the registry today.
      *
+     * $dependencies maps each feature to the features it requires, and
+     * defaults to the registry's own. No feature declares one today, so the
+     * graph walk is only ever exercised through that parameter - which is
+     * why it exists: the first feature to declare a dependency should rely
+     * on cycle detection that is already proven, not find out it is broken.
+     *
      * @param  array<int, string>  $selected
+     * @param  array<string, array<int, string>>|null  $dependencies
      * @return array<int, string>
      *
      * @throws InvalidArgumentException
      */
-    public static function resolveDependencies(array $selected): array
+    public static function resolveDependencies(array $selected, ?array $dependencies = null): array
     {
+        $dependencies ??= array_map(fn (array $feature) => $feature['dependencies'], self::optional());
         $resolved = [];
         $visiting = [];
 
-        $visit = function (string $key) use (&$visit, &$resolved, &$visiting): void {
+        $visit = function (string $key) use (&$visit, &$resolved, &$visiting, $dependencies): void {
             if (isset($resolved[$key])) {
                 return;
             }
@@ -185,7 +193,11 @@ final class Features
 
             $visiting[$key] = true;
 
-            foreach (self::get($key)['dependencies'] as $dependency) {
+            if (! array_key_exists($key, $dependencies)) {
+                throw new InvalidArgumentException("Unknown PayZephyr feature [$key]. Known features: ".implode(', ', array_keys($dependencies)));
+            }
+
+            foreach ($dependencies[$key] as $dependency) {
                 $visit($dependency);
             }
 

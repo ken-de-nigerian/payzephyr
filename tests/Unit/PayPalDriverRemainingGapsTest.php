@@ -197,3 +197,25 @@ test('paypal driver healthCheck returns false for a non-HTTP connection failure'
 
     expect($driver->healthCheck())->toBeFalse();
 });
+
+test('paypal refuses to charge when the token endpoint answers 200 without an access token', function () {
+    // A 200 that carries no token is still a failed authentication; sending
+    // the charge with "Bearer " and nothing after it would only move the
+    // failure somewhere harder to diagnose.
+    $driver = paypalRemainingGapsDriver([
+        new Response(200, [], (string) json_encode(['error' => 'invalid_client', 'error_description' => 'Client Authentication failed'])),
+    ]);
+
+    try {
+        $driver->charge(ChargeRequestDTO::fromArray([
+            'amount' => 10,
+            'currency' => 'USD',
+            'email' => 'customer@example.com',
+            'reference' => 'PAYPAL_NO_TOKEN',
+            'callback_url' => 'https://shop.example.com/checkout/callback',
+        ]));
+        $this->fail('Expected a ChargeException');
+    } catch (ChargeException $e) {
+        expect($e->getMessage())->toContain('PayPal authentication failed: Failed to authenticate with PayPal');
+    }
+});

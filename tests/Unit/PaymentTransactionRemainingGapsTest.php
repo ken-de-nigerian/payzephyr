@@ -44,3 +44,19 @@ test('isSuccessful returns false for an unrecognized status even when the contai
 
     expect($model->isSuccessful())->toBeFalse();
 });
+
+test('the status scopes fall back to the built-in vocabulary when container resolution throws', function () {
+    // The scopes and the is*() predicates must agree about the same row even
+    // when the container cannot hand back a normalizer.
+    PaymentTransaction::create(['reference' => 'SCOPE_OK', 'provider' => 'paystack', 'status' => 'succeeded', 'amount' => 10, 'currency' => 'NGN', 'email' => 'a@b.test']);
+    PaymentTransaction::create(['reference' => 'SCOPE_BAD', 'provider' => 'paystack', 'status' => 'declined', 'amount' => 10, 'currency' => 'NGN', 'email' => 'a@b.test']);
+    PaymentTransaction::create(['reference' => 'SCOPE_WAIT', 'provider' => 'paystack', 'status' => 'processing', 'amount' => 10, 'currency' => 'NGN', 'email' => 'a@b.test']);
+
+    app()->bind(StatusNormalizerInterface::class, function () {
+        throw new RuntimeException('container blew up');
+    });
+
+    expect(PaymentTransaction::successful()->pluck('reference')->all())->toBe(['SCOPE_OK'])
+        ->and(PaymentTransaction::failed()->pluck('reference')->all())->toBe(['SCOPE_BAD'])
+        ->and(PaymentTransaction::pending()->pluck('reference')->all())->toBe(['SCOPE_WAIT']);
+});

@@ -167,3 +167,37 @@ test('square driver validateWebhook rejects a valid signature with an unrecogniz
 
     expect($result)->toBeFalse();
 });
+
+test('square verify reports payment not found when the order search itself is not found', function () {
+    // Neither a payment id nor a payment link: the reference falls through
+    // to the order search, and a 404 there is a clean "not found" rather
+    // than a generic verification failure.
+    $driver = createSquareDriverForRemainingGaps([
+        new Response(404, [], (string) json_encode(['errors' => [['code' => 'NOT_FOUND']]])),
+        new Response(404, [], (string) json_encode(['errors' => [['code' => 'NOT_FOUND', 'detail' => 'Location not found']]])),
+    ]);
+
+    try {
+        $driver->verify('SQUARE_REF_1');
+        $this->fail('Expected a VerificationException');
+    } catch (VerificationException $e) {
+        expect($e->getMessage())->toBe('Payment not found')
+            ->and($e->getPrevious())->toBeNull();
+    }
+});
+
+test('square verify reports a server error from the order search as a verification failure', function () {
+    $driver = createSquareDriverForRemainingGaps([
+        new Response(404, [], (string) json_encode(['errors' => [['code' => 'NOT_FOUND']]])),
+        new Response(503, [], '{}'),
+    ]);
+
+    try {
+        $driver->verify('SQUARE_REF_1');
+        $this->fail('Expected a VerificationException');
+    } catch (VerificationException $e) {
+        expect($e->getMessage())->toStartWith('Payment verification failed: ')
+            ->and($e->getMessage())->not->toBe('Payment not found')
+            ->and($e->getPrevious())->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+    }
+});

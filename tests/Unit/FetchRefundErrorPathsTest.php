@@ -177,3 +177,129 @@ test('mollie fetchRefund rejects a malformed composite reference', function () {
 
     expect(fn () => $driver->fetchRefund('re_no_payment_id'))->toThrow(RefundException::class);
 });
+
+/*
+ * A body-level failure must reach the caller as the provider's own message,
+ * not re-wrapped as "Failed to fetch refund: ..." by the generic Throwable
+ * catch. Asserting the exact message proves the RefundException passed
+ * through the dedicated rethrow rather than being swallowed and rewrapped.
+ */
+
+function monnifyDriverForFetch(): MonnifyDriver
+{
+    return new MonnifyDriver([
+        'api_key' => 'MK_TEST_xxx',
+        'secret_key' => 'SK_TEST_xxx',
+        'contract_code' => 'CONTRACT123',
+        'base_url' => 'https://sandbox.monnify.com',
+        'currencies' => ['NGN'],
+    ]);
+}
+
+function monnifyTokenResponse(): Response
+{
+    return new Response(200, [], (string) json_encode([
+        'requestSuccessful' => true,
+        'responseBody' => ['accessToken' => 'bearer_token_xyz', 'expiresIn' => 3600],
+    ]));
+}
+
+function opayDriverForFetch(array $overrides = []): OPayDriver
+{
+    return new OPayDriver(array_merge([
+        'merchant_id' => 'MERCHANT123',
+        'public_key' => 'PUBLIC_KEY_123',
+        'secret_key' => 'SECRET_KEY_123',
+        'base_url' => 'https://liveapi.opaycheckout.com',
+        'currencies' => ['NGN'],
+    ], $overrides));
+}
+
+test('monnify fetchRefund surfaces the provider message when requestSuccessful is false', function () {
+    $driver = monnifyDriverForFetch();
+    $driver->setClient(clientReturning([
+        monnifyTokenResponse(),
+        new Response(200, [], (string) json_encode([
+            'requestSuccessful' => false,
+            'responseMessage' => 'Refund reference does not exist',
+        ])),
+    ]));
+
+    expect(fn () => $driver->fetchRefund('rf_missing'))
+        ->toThrow(RefundException::class, 'Refund reference does not exist');
+});
+
+test('monnify fetchRefund falls back to a default message when the body carries none', function () {
+    $driver = monnifyDriverForFetch();
+    $driver->setClient(clientReturning([
+        monnifyTokenResponse(),
+        new Response(200, [], (string) json_encode(['requestSuccessful' => false])),
+    ]));
+
+    try {
+        $driver->fetchRefund('rf_missing');
+        $this->fail('Expected a RefundException');
+    } catch (RefundException $e) {
+        expect($e->getMessage())->toBe('Failed to fetch Monnify refund')
+            ->and($e->getPrevious())->toBeNull();
+    }
+});
+
+test('opay fetchRefund refuses to sign a request without a secret key', function () {
+    // Status lookups are HMAC-signed with the secret key; without one there is
+    // nothing to sign with, and no request may be sent.
+    $driver = opayDriverForFetch(['secret_key' => '']);
+    $mock = new MockHandler([]);
+    $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
+
+    expect(fn () => $driver->fetchRefund('rf_1'))
+        ->toThrow(RefundException::class, 'OPay secret key (private key) is required for refund API authentication');
+    expect($mock->count())->toBe(0);
+});
+
+test('opay fetchRefund surfaces the provider message when the code is not 00000', function () {
+    $driver = opayDriverForFetch();
+    $driver->setClient(clientReturning([
+        new Response(200, [], (string) json_encode(['code' => '02001', 'message' => 'refund not found'])),
+    ]));
+
+    try {
+        $driver->fetchRefund('rf_missing');
+        $this->fail('Expected a RefundException');
+    } catch (RefundException $e) {
+        expect($e->getMessage())->toBe('refund not found')
+            ->and($e->getPrevious())->toBeNull();
+    }
+});
+
+test('opay fetchRefund reads the legacy msg field, then a default', function () {
+    $driver = opayDriverForFetch();
+    $driver->setClient(clientReturning([
+        new Response(200, [], (string) json_encode(['code' => '02001', 'msg' => 'legacy message'])),
+        new Response(200, [], (string) json_encode(['code' => '02001'])),
+    ]));
+
+    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'legacy message');
+    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'Failed to fetch OPay refund');
+});
+
+test('paypal fetchRefund reports a missing refund by reference', function () {
+    $driver = new PayPalDriver([
+        'client_id' => 'test_client',
+        'client_secret' => 'test_secret',
+        'mode' => 'sandbox',
+        'currencies' => ['USD'],
+    ]);
+    $driver->setClient(clientReturning([
+        new Response(200, [], (string) json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
+        new Response(200, [], (string) json_encode(['status' => 'COMPLETED'])),
+    ]));
+
+    try {
+        $driver->fetchRefund('rf_ghost');
+        $this->fail('Expected a RefundException');
+    } catch (RefundException $e) {
+        expect($e->getMessage())->toBe('PayPal refund not found: rf_ghost')
+            ->and($e->getPrevious())->toBeNull();
+    }
+});

@@ -236,3 +236,37 @@ test('finding no drivers is refused rather than publishing an empty provider lis
         ->and($output)->toContain('No drivers found')
         ->and(file_get_contents($root.'/README.md'))->toContain('stale');
 });
+
+test('discovery skips files in src/Drivers that are not concrete, named drivers', function () {
+    // Whatever else lands in src/Drivers - a stray file, an intermediate
+    // abstract base, a driver still missing its name - must not produce a
+    // row in the published provider matrix.
+    eval('namespace KenDeNigerian\PayZephyr\Drivers; abstract class DocsFixtureBaseDriver extends AbstractDriver {}');
+    eval('namespace KenDeNigerian\PayZephyr\Drivers; final class DocsFixtureUnnamedDriver extends DocsFixtureBaseDriver {
+        protected function validateConfig(): void {}
+        protected function getDefaultHeaders(): array { return []; }
+        public function charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO $r): \KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO { throw new \LogicException; }
+        public function verify(string $r): \KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO { throw new \LogicException; }
+        public function validateWebhook(array $h, string $b): bool { return false; }
+        public function healthCheck(): bool { return false; }
+    }');
+
+    $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'payzephyr-docs-'.bin2hex(random_bytes(4));
+    mkdir($root.'/src/Drivers', 0777, true);
+
+    try {
+        foreach (['PaystackDriver', 'NoSuchClassDriver', 'DocsFixtureBaseDriver', 'DocsFixtureUnnamedDriver', 'AbstractDriver'] as $short) {
+            touch($root."/src/Drivers/$short.php");
+        }
+
+        $command = new GenerateDocsCommand($root);
+        $discover = new ReflectionMethod($command, 'discoverProviders');
+
+        expect(array_column($discover->invoke($command), 'name'))->toBe(['paystack']);
+    } finally {
+        array_map('unlink', glob($root.'/src/Drivers/*.php') ?: []);
+        rmdir($root.'/src/Drivers');
+        rmdir($root.'/src');
+        rmdir($root);
+    }
+});

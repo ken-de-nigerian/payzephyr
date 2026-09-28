@@ -71,3 +71,30 @@ test('charge request accepts a valid explicit idempotency key', function () {
 
     expect($request)->toBeInstanceOf(ChargeRequestDTO::class);
 });
+
+/*
+ * The explicit 64-character local-part check: FILTER_VALIDATE_EMAIL counts a
+ * quoted local part's length without its quotes, so "<63 or 64 chars>"@domain
+ * passes it while the local part as written is 65-66 characters - over the
+ * RFC 5321 limit. Only the explicit strlen() check catches that.
+ */
+test('charge request rejects a quoted local part longer than 64 characters including its quotes', function () {
+    $email = '"'.str_repeat('a', 63).'"@example.com';
+
+    expect(filter_var($email, FILTER_VALIDATE_EMAIL))->not->toBeFalse()
+        ->and(fn () => ChargeRequestDTO::fromArray([
+            'amount' => 100,
+            'currency' => 'NGN',
+            'email' => $email,
+        ]))->toThrow(InvalidArgumentException::class, 'Invalid email address');
+});
+
+test('charge request accepts a quoted local part of exactly 64 characters including its quotes', function () {
+    $email = '"'.str_repeat('a', 62).'"@example.com';
+
+    expect(ChargeRequestDTO::fromArray([
+        'amount' => 100,
+        'currency' => 'NGN',
+        'email' => $email,
+    ])->email)->toBe($email);
+});

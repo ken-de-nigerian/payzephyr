@@ -204,3 +204,29 @@ test('a plain array cast on a StripeObject really does produce mangled keys', fu
     expect(array_keys((array) $stripeMetadata))->toContain("\0*\0_values")
         ->and((array) $stripeMetadata)->not->toHaveKey('order_id');
 });
+
+test('a DTO factory reads a JsonSerializable object through jsonSerialize', function () {
+    $metadata = new class implements JsonSerializable
+    {
+        public function jsonSerialize(): array
+        {
+            return ['order_id' => 991];
+        }
+    };
+
+    expect(VerificationResponseDTO::fromArray(['metadata' => $metadata])->metadata)->toBe(['order_id' => 991]);
+});
+
+test('a JsonSerializable object that serializes to a scalar normalizes to an empty array', function () {
+    // jsonSerialize() may return any JSON value; only an array can become
+    // metadata, and anything else must not reach a typed array parameter.
+    $metadata = new class implements JsonSerializable
+    {
+        public function jsonSerialize(): string
+        {
+            return 'not-an-array';
+        }
+    };
+
+    expect(VerificationResponseDTO::fromArray(['metadata' => $metadata])->metadata)->toBe([]);
+});

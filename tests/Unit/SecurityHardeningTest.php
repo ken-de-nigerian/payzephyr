@@ -150,3 +150,35 @@ test('the warning stays quiet in local and testing', function () {
 
     expect($request->authorize())->toBeTrue();
 });
+
+test('the disabled-verification warning is still logged when the cache cannot answer', function () {
+    // The rate limit lives in the cache. A cache that is down must not be
+    // read as "already warned recently" - that would silence the one alert
+    // that says forged webhooks are being accepted.
+    app()['env'] = 'production';
+    config(['payments.webhook.verify_signature' => false]);
+    app()->forgetInstance('payments.config');
+
+    Cache::shouldReceive('add')->andThrow(new RuntimeException('Connection refused [tcp://redis:6379]'));
+
+    $logged = [];
+    Log::shouldReceive('channel')->andReturnSelf();
+    Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$logged) {
+        $logged[] = $message;
+
+        return true;
+    });
+
+    $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
+    $request->setContainer(app());
+    $request->setRouteResolver(fn () => new class
+    {
+        public function parameter(string $name): string
+        {
+            return 'paystack';
+        }
+    });
+
+    expect($request->authorize())->toBeTrue()
+        ->and(implode(' ', $logged))->toContain('DISABLED');
+});

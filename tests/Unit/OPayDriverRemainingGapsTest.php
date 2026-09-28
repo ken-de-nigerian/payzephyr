@@ -95,3 +95,27 @@ test('opay driver healthCheck returns true when a ClientException carries a 400/
 
     expect($driver->healthCheck())->toBeTrue();
 });
+
+test('opay charge reports a success body with no checkout url as a ChargeException, not a TypeError', function () {
+    // OPay answered 00000 but gave nothing to redirect the customer to. The
+    // DTO cannot be built, and that must surface as the driver's own
+    // exception type - a raw TypeError would bypass the manager's
+    // ChargeException handling entirely.
+    $driver = opayRemainingGapsDriver([
+        new Response(200, [], (string) json_encode(['code' => '00000', 'data' => ['orderNo' => 'ORD1']])),
+    ]);
+
+    try {
+        $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+            'amount' => 100,
+            'currency' => 'NGN',
+            'email' => 'customer@example.com',
+            'reference' => 'OPAY_NO_URL_1',
+        ]));
+        $this->fail('Expected a ChargeException');
+    } catch (\KenDeNigerian\PayZephyr\Exceptions\ChargeException $e) {
+        expect($e->getMessage())->toStartWith('Payment initialization failed: ')
+            ->and($e->getPrevious())->toBeInstanceOf(Throwable::class)
+            ->and($e->getPrevious())->not->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+    }
+});

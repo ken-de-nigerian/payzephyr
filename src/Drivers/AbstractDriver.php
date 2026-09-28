@@ -790,16 +790,24 @@ abstract class AbstractDriver implements DriverInterface
      * to define it; callers check method_exists() and fall back to a
      * content-hash key when absent, so this stays fully backward compatible.
      *
-     * Checks common top-level field names (works as-is for Stripe, PayPal,
-     * Square, Mollie). Providers that nest their event data under a
-     * sub-object (Paystack, Flutterwave, Monnify, OPay) override this, the
-     * same way they override extractWebhookTimestamp().
+     * It must identify the event, not the object the event is about: two
+     * events about one payment sharing a key means the second is dropped as a
+     * duplicate. Return null when the provider sends no event id; the caller
+     * then keys on a hash of the body, which still catches retries and
+     * replays because those are byte-identical.
+     *
+     * Checks the common top-level names, which are event ids for Stripe
+     * (evt_), PayPal (WH-) and Square (event_id). Providers that send no event
+     * id (Paystack, Flutterwave, Monnify, OPay) override this to return null.
+     * Mollie's classic webhook is handled by SendsStatelessWebhooks instead.
      *
      * @param  array<string, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $value = $payload['id'] ?? $payload['event_id'] ?? $payload['payment_id'] ?? null;
+        // Not payment_id: that names the payment an event is about, which every
+        // later event about the same payment shares.
+        $value = $payload['id'] ?? $payload['event_id'] ?? null;
 
         return $value !== null ? (string) $value : null;
     }

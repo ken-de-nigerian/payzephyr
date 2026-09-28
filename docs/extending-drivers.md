@@ -481,6 +481,15 @@ PayZephyr then dispatches `SubscriptionRenewed`, `SubscriptionPaymentFailed`, an
 `SubscriptionCancelled` for you, and you listen for those. See [Subscriptions](subscriptions.md)
 and [Webhooks](webhooks.md).
 
+One more extraction method decides whether those events arrive at all.
+`extractWebhookEventId()` is the key PayZephyr uses to recognise a delivery it has already
+handled, so it must identify the **event**, not the subscription or payment the event is about.
+Return the subscription id and the renewal is dropped as a duplicate of the creation. If your
+provider sends no event id, return `null`: PayZephyr then keys the delivery on a hash of its
+body, which still recognises retries and replays, because those are byte-identical. If a
+webhook body carries no state at all - only "something changed, go and look" - implement
+`SendsStatelessWebhooks` instead, and every delivery is processed.
+
 ## Optional: lifecycle hooks
 
 If you need to run your own code at specific moments, implement `SubscriptionLifecycleHooks`:

@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SendsStatelessWebhooks;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
@@ -29,7 +30,7 @@ use Throwable;
  * outbound API call (validateWebhookViaAPI()) and must be deferred to the
  * queued webhook job.
  */
-final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
+final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SendsStatelessWebhooks, SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
     use MollieRefundMethods;
     use MollieSubscriptionMethods;
@@ -43,6 +44,20 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
     public function requiresAsyncVerification(): bool
     {
         return empty($this->config['webhook_secret']);
+    }
+
+    /**
+     * A classic Mollie webhook is a payment id and nothing else - the same
+     * body for paid, refunded, charged back and expired - so it cannot be
+     * deduplicated without dropping every status change after the first.
+     * A typed event (anything with a `type`, such as `hook.ping`) carries its
+     * own event id and is deduplicated normally.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    public function isStatelessWebhook(array $payload): bool
+    {
+        return ! isset($payload['type']);
     }
 
     /**

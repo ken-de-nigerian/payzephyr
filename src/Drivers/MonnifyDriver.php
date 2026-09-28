@@ -256,17 +256,22 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
     }
 
     /**
-     * Monnify nests the transaction/disbursement reference (used for
-     * event-level idempotency) under `eventData`.
+     * Monnify sends no event identifier, so there is none to return, and
+     * ProcessWebhook keys the delivery on a hash of its body instead.
+     *
+     * The id this used to return was eventData.transactionReference - the
+     * transaction an event is about, not the event. A payment and every refund
+     * against it shared a key, so the refund's outcome was dropped as a
+     * duplicate delivery.
+     *
+     * A retry or a replay is byte-identical to the original, so the body
+     * hash still catches both.
      *
      * @param  array<string, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $eventData = $payload['eventData'] ?? [];
-        $id = $eventData['transactionReference'] ?? $eventData['reference'] ?? null;
-
-        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+        return null;
     }
 
     /**

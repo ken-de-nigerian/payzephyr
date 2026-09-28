@@ -121,6 +121,10 @@ Providers routinely deliver the same webhook more than once: if your server resp
 
 PayZephyr handles this for you: every webhook delivery is checked against a table of previously-processed deliveries (`webhook_events`, created by the migration you ran during [installation](installation.md)) before any side effect runs. A duplicate delivery is recognized and skipped: your `WebhookReceived` listener only fires once per actual event, even if the provider sent the underlying webhook three times. You don't need to write your own deduplication logic for this.
 
+A delivery is recognised by the provider's own event id where it sends one (Stripe, PayPal, Square, Paddle), and otherwise by a hash of the webhook body (Paystack, Flutterwave, Monnify, OPay), since a retry is byte-identical to the original. Two different events about the same payment - a charge and its later refund, a subscription's creation and its cancellation - are never mistaken for each other.
+
+**Mollie is the exception.** Its classic webhook is just a payment id, identical whether the payment was paid, refunded or charged back, so there is nothing to tell one event from the next. PayZephyr processes every one of those deliveries rather than risk dropping a status change, so a Mollie retry reaches your `WebhookReceived` listener again. That is harmless if your listener does what [the example above](#reacting-to-a-webhook) does - re-verify and act on the provider's current state - which is the only thing a Mollie webhook can mean.
+
 ## Local development without signature verification
 
 If you're testing against a provider's sandbox that doesn't send correctly-signed webhooks (rare, but it happens with some sandboxes), you can disable signature verification for local development only:

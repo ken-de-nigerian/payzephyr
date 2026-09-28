@@ -10,6 +10,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Webhook deduplication dropped real events as duplicates.** A delivery is recorded under a
+  key and a later delivery with the same key is skipped. For Paystack, Flutterwave, Monnify and
+  OPay the key was the id of the *object* an event is about - the transaction, subscription or
+  invoice - not of the event. Every later event about the same object was skipped without an
+  error:
+
+  - Paystack: `subscription.disable` after `subscription.create`, so a cancelled subscription
+    stayed active; `invoice.payment_failed` after `invoice.create`.
+  - Flutterwave: a subscription's cancellation after its activation.
+  - Monnify: a refund's outcome, which carries the refunded payment's `transactionReference`.
+  - OPay: any status change after the first.
+
+  None of these providers sends an event id, so their deliveries are now keyed on a hash of the
+  body. A retry or a replay is byte-identical to the original and is still skipped; two
+  different events are not.
+
+  Mollie's classic webhook is only a payment id, the same body for paid, refunded, charged back
+  and expired, so every status change after the first was dropped. Those deliveries are now
+  always processed. A Mollie retry therefore reaches your `WebhookReceived` listener again,
+  which is harmless if the listener re-verifies, as the [webhooks guide](webhooks.md) shows.
+
+  `AbstractDriver::extractWebhookEventId()` no longer treats a top-level `payment_id` as an
+  event id. A custom driver must return an event id, or null. See
+  [ADR-0016](architecture/adr/0016-webhook-event-identity.md).
+
 - **A PayPal or Mollie webhook could be lost to a network blip.** Both verify a delivery by
   calling the provider, and that happens in the queued job, after the provider has been told
   202 and will not send it again. A timeout or a 5xx from the verification endpoint was caught

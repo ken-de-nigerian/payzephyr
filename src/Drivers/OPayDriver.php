@@ -292,17 +292,21 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
     }
 
     /**
-     * OPay nests the transaction id (used for event-level idempotency) under
-     * `payload`.
+     * OPay sends no event identifier, so there is none to return, and
+     * ProcessWebhook keys the delivery on a hash of its body instead.
+     *
+     * The id this used to return was payload.transactionId - the transaction
+     * an event is about, not the event. Every status change after the first
+     * shared its key and was dropped as a duplicate delivery.
+     *
+     * A retry or a replay is byte-identical to the original, so the body
+     * hash still catches both.
      *
      * @param  array<string, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $inner = $payload['payload'] ?? [];
-        $id = $inner['transactionId'] ?? $inner['reference'] ?? null;
-
-        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+        return null;
     }
 
     /**

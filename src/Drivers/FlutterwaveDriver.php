@@ -275,16 +275,22 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
     }
 
     /**
-     * Flutterwave nests the transaction id (used for event-level
-     * idempotency) under `data`, not at the top level.
+     * Flutterwave sends no event identifier, so there is none to return, and
+     * ProcessWebhook keys the delivery on a hash of its body instead.
+     *
+     * The id this used to return was data.id - the transaction or
+     * subscription an event is about, not the event. A subscription's
+     * activation and its cancellation shared a key, so the cancellation was
+     * dropped as a duplicate delivery.
+     *
+     * A retry or a replay is byte-identical to the original, so the body
+     * hash still catches both.
      *
      * @param  array<string, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $id = $payload['data']['id'] ?? null;
-
-        return $id !== null ? (string) $id : parent::extractWebhookEventId($payload);
+        return null;
     }
 
     /**

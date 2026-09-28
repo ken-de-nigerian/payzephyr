@@ -11,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SendsStatelessWebhooks;
 use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
@@ -96,34 +97,40 @@ final class ProcessWebhook implements ShouldQueue
                 return;
             }
 
-            $eventKey = $this->resolveEventKey($manager);
+            // A stateless delivery is never claimed: its body cannot tell one
+            // event from the next, so a claim would drop every event after the
+            // first. $eventKey stays null, which also leaves nothing to release
+            // if processing fails.
+            if (! $this->isStatelessDelivery($manager)) {
+                $eventKey = $this->resolveEventKey($manager);
 
-            $claimed = $webhookEventRepository->recordIfNew($this->provider, $eventKey);
+                $claimed = $webhookEventRepository->recordIfNew($this->provider, $eventKey);
 
-            if (! $claimed && ! $this->isRetryOfThisDelivery()) {
-                $this->log('info', 'Duplicate webhook delivery skipped', [
-                    'provider' => $this->provider,
-                    'event_key' => $eventKey,
-                ]);
+                if (! $claimed && ! $this->isRetryOfThisDelivery()) {
+                    $this->log('info', 'Duplicate webhook delivery skipped', [
+                        'provider' => $this->provider,
+                        'event_key' => $eventKey,
+                    ]);
 
-                $this->trace($reference, TraceEvent::WEBHOOK_DUPLICATE, TraceDirection::INBOUND,
-                    payload: $this->tracePayload(),
-                    provider: $this->provider,
-                    metadata: ['event_key' => $eventKey],
-                );
+                    $this->trace($reference, TraceEvent::WEBHOOK_DUPLICATE, TraceDirection::INBOUND,
+                        payload: $this->tracePayload(),
+                        provider: $this->provider,
+                        metadata: ['event_key' => $eventKey],
+                    );
 
-                return;
-            }
+                    return;
+                }
 
-            if (! $claimed) {
-                // The marker is this job's own, left behind by an attempt that
-                // died before its catch block could release it. Reclaim it
-                // rather than mistaking our own footprint for a duplicate.
-                $this->log('warning', 'Reclaiming an idempotency marker left by a previous attempt', [
-                    'provider' => $this->provider,
-                    'event_key' => $eventKey,
-                    'attempt' => $this->attempts(),
-                ]);
+                if (! $claimed) {
+                    // The marker is this job's own, left behind by an attempt that
+                    // died before its catch block could release it. Reclaim it
+                    // rather than mistaking our own footprint for a duplicate.
+                    $this->log('warning', 'Reclaiming an idempotency marker left by a previous attempt', [
+                        'provider' => $this->provider,
+                        'event_key' => $eventKey,
+                        'attempt' => $this->attempts(),
+                    ]);
+                }
             }
 
             $this->trace($reference, TraceEvent::WEBHOOK_RECEIVED, TraceDirection::INBOUND,
@@ -264,6 +271,21 @@ final class ProcessWebhook implements ShouldQueue
                 $driver->setWebhookReceivedAt(null);
             }
         }
+    }
+
+    /**
+     * Whether the driver reports this delivery as one whose body carries no
+     * event identity (see SendsStatelessWebhooks).
+     */
+    protected function isStatelessDelivery(PaymentManager $manager): bool
+    {
+        try {
+            $driver = $manager->driver($this->provider);
+        } catch (DriverNotFoundException) {
+            return false;
+        }
+
+        return $driver instanceof SendsStatelessWebhooks && $driver->isStatelessWebhook($this->payload);
     }
 
     /**

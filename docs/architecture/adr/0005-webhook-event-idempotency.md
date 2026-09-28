@@ -1,6 +1,6 @@
 # ADR-0005: Event-level webhook idempotency (`webhook_events` table)
 
-- **Status**: Accepted
+- **Status**: Accepted; event-key selection refined by ADR-0016
 - **Date**: 2026-07-31
 
 ## Problem

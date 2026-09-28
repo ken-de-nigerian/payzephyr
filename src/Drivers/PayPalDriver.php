@@ -367,7 +367,9 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         }
 
         $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
+        // create_time, when PayPal created the event. Every retry repeats it, so the window is the replay window
+        // sized to outlast retries, not the five-minute delivery tolerance.
+        if (! $this->validateWebhookTimestamp($payload, $this->webhookReplayWindow())) {
             $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 
             return false;
@@ -440,6 +442,15 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     /**
      * Check API connectivity by attempting to generate an access token.
      */
+    /**
+     * validateWebhook() rejects an event created longer ago than the replay
+     * window, so records older than that can be pruned.
+     */
+    public function webhookReplayHorizon(): int
+    {
+        return $this->webhookReplayWindow();
+    }
+
     public function healthCheck(): bool
     {
         try {

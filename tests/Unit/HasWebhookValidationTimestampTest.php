@@ -105,18 +105,23 @@ test('a tolerance that is not a positive number falls back to five minutes', fun
     'null' => [null],
 ]);
 
-test('paystack honours the configured tolerance end to end', function () {
-    $secret = 'sk_test_tolerance';
-    $body = (string) json_encode([
-        'event' => 'charge.success',
-        'data' => ['reference' => 'REF_TOL', 'paid_at' => date('c', time() - 600)],
-    ]);
-    $headers = ['x-paystack-signature' => [hash_hmac('sha512', $body, $secret)]];
-    $driver = new \KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => $secret, 'currencies' => ['NGN']]);
+test('a replay window that is not a positive number falls back to 72 hours', function (mixed $value) {
+    config(['payments.webhook.events.replay_window' => $value]);
+    app()->forgetInstance('payments.config');
 
-    setWebhookTolerance(300);
-    expect($driver->validateWebhook($headers, $body))->toBeFalse();
+    $driver = new \KenDeNigerian\PayZephyr\Drivers\SquareDriver(['access_token' => 'x', 'location_id' => 'l', 'currencies' => ['USD']]);
 
-    setWebhookTolerance(900);
-    expect($driver->validateWebhook($headers, $body))->toBeTrue();
-});
+    expect($driver->webhookReplayHorizon())->toBe(259200);
+})->with([
+    'zero' => [0],
+    'negative' => [-1],
+    'not a number' => ['three days'],
+    'null' => [null],
+]);
+
+test('drivers that enforce no replay window declare no horizon', function (string $provider) {
+    // payzephyr:webhooks:prune reads this; a driver claiming a horizon it
+    // does not enforce would let its deduplication records be deleted while
+    // a replay could still get through.
+    expect(app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider)->webhookReplayHorizon())->toBeNull();
+})->with(['paystack', 'flutterwave', 'monnify', 'opay', 'mollie', 'razorpay']);

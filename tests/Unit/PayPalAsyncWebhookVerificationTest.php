@@ -174,8 +174,10 @@ test('ProcessWebhook records when the delivery was received', function () {
 
 test('ProcessWebhook measures the paypal replay window from receipt, not from when a worker ran it', function () {
     // Received ten minutes ago and only now picked up - a backed-up queue.
-    // Measured from now, create_time is outside the five-minute window and
-    // the delivery would be thrown away.
+    // Measured from now, create_time is outside a five-minute window and the
+    // delivery would be thrown away.
+    config(['payments.webhook.events.replay_window' => 300]);
+    app()->forgetInstance('payments.config');
     $driver = paypalDriverInManagerAnswering([
         new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
         new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'),

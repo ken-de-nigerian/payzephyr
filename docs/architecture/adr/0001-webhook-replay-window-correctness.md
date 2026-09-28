@@ -1,6 +1,6 @@
 # ADR-0001: Fail-closed webhook replay window with provider-accurate timestamp extraction
 
-- **Status**: Accepted; the Mollie API-path timestamp check superseded by ADR-0015
+- **Status**: Superseded by ADR-0017 (the Mollie API-path check earlier by ADR-0015)
 - **Date**: 2026-07-31
 
 ## Problem

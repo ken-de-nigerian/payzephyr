@@ -244,16 +244,14 @@ test('the health check treats a 400 or 404 as reachable', function (int $status)
     expect($driver->healthCheck())->toBeTrue();
 })->with([400, 404]);
 
-test('the health check reads the event envelope timestamp Paddle actually sends', function () {
-    // extractWebhookTimestamp feeds the shared replay window, and had no test
-    // of its own despite being security-relevant.
-    $driver = paddleFixDriver([]);
-    $method = (new ReflectionClass($driver))->getMethod('extractWebhookTimestamp');
+test('paddle declares its signed-timestamp tolerance as its replay horizon', function () {
+    // validateWebhook() rejects a ts= older than the tolerance, and Paddle signs
+    // a fresh one per attempt, so that is how long a deduplication record
+    // must be kept before payzephyr:webhooks:prune may delete it.
+    config(['payments.security.webhook_timestamp_tolerance' => 420]);
+    app()->forgetInstance('payments.config');
 
-    expect($method->invoke($driver, ['occurred_at' => '2026-01-01T12:00:00Z']))
-        ->toBe(strtotime('2026-01-01T12:00:00Z'))
-        ->and($method->invoke($driver, ['occurred_at' => 'not a date']))->toBeNull()
-        ->and($method->invoke($driver, []))->toBeNull();
+    expect(paddleFixDriver([])->webhookReplayHorizon())->toBe(420);
 });
 
 test('every Paddle adjustment status maps to a refund status PayZephyr knows', function (string $paddle, string $expected) {

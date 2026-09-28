@@ -354,20 +354,13 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * Paddle timestamps the envelope with `occurred_at`, which the shared
-     * field list doesn't know about.
-     *
-     * @param  array<string, mixed>  $payload
+     * validateWebhook() rejects a delivery whose signed ts= is older than the
+     * tolerance, and Paddle signs a fresh one for every attempt, so records
+     * older than that can be pruned.
      */
-    protected function extractWebhookTimestamp(array $payload): ?int
+    public function webhookReplayHorizon(): int
     {
-        $occurredAt = $payload['occurred_at'] ?? null;
-
-        if (is_string($occurredAt) && strtotime($occurredAt) !== false) {
-            return strtotime($occurredAt);
-        }
-
-        return parent::extractWebhookTimestamp($payload);
+        return $this->webhookTimestampTolerance();
     }
 
     /**

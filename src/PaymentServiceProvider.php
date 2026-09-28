@@ -11,6 +11,7 @@ use KenDeNigerian\PayZephyr\Console\GenerateDocsCommand;
 use KenDeNigerian\PayZephyr\Console\InstallCommand;
 use KenDeNigerian\PayZephyr\Console\NormalizeRefundStatusCommand;
 use KenDeNigerian\PayZephyr\Console\PruneTraceEventsCommand;
+use KenDeNigerian\PayZephyr\Console\PruneWebhookEventsCommand;
 use KenDeNigerian\PayZephyr\Console\TraceCommand;
 use KenDeNigerian\PayZephyr\Console\UninstallCommand;
 use KenDeNigerian\PayZephyr\Contracts\ChannelMapperInterface;
@@ -100,6 +101,7 @@ final class PaymentServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../database/migrations/2024_01_01_000000_create_payment_transactions_table.php' => database_path('migrations/2024_01_01_000000_create_payment_transactions_table.php'),
                 __DIR__.'/../database/migrations/2024_01_01_000002_create_webhook_events_table.php' => database_path('migrations/2024_01_01_000002_create_webhook_events_table.php'),
+                __DIR__.'/../database/migrations/2024_01_04_000000_index_webhook_events_table.php' => database_path('migrations/2024_01_04_000000_index_webhook_events_table.php'),
             ], 'payzephyr-migrations-core');
 
             $this->publishes([
@@ -121,6 +123,7 @@ final class PaymentServiceProvider extends ServiceProvider
                 TraceCommand::class,
                 GenerateDocsCommand::class,
                 PruneTraceEventsCommand::class,
+                PruneWebhookEventsCommand::class,
             ]);
         }
 

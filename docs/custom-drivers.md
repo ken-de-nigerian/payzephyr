@@ -164,11 +164,13 @@ public function validateWebhook(array $headers, string $body): bool
 
     $payload = json_decode($body, true) ?? [];
 
-    return $this->validateWebhookTimestamp($payload); // replay-attack protection, from HasWebhookValidation
+    // Replay protection, from HasWebhookValidation - only if created_at is when
+    // the event happened. See the note below.
+    return $this->validateWebhookTimestamp($payload, $this->webhookReplayWindow());
 }
 ```
 
-Always use `hash_equals()` for the comparison, never `===`; see [Security](security.md#webhook-signature-verification) for why. `validateWebhookTimestamp()` is inherited from a shared trait and handles replay protection automatically, provided your payload has a recognizable timestamp field. Check `AbstractDriver`'s existing drivers in PayZephyr's source for the exact field names it checks by default, and override `extractWebhookTimestamp()` if Acmepay nests its timestamp somewhere non-standard.
+Always use `hash_equals()` for the comparison, never `===`; see [Security](security.md#webhook-signature-verification) for why. `validateWebhookTimestamp()` is inherited from a shared trait and rejects a payload whose timestamp is outside the replay window. Use it only if Acmepay's timestamp is the time the **event** was created, and pass `$this->webhookReplayWindow()` so a retry, which repeats that timestamp, is not rejected; if the timestamp is when the payment or subscription was created, a window on it rejects real events. If Acmepay signs a fresh timestamp into each delivery instead, check that against `$this->webhookTimestampTolerance()`. Whichever you enforce, return it from `webhookReplayHorizon()` so `payzephyr:webhooks:prune` knows how long your deduplication records must be kept. If Acmepay signs no meaningful time at all, skip the window: duplicate-delivery deduplication stops replays, and your records are kept. See [Security](security.md#replay-attack-protection).
 
 ### 5. Registering the driver
 

@@ -35,6 +35,17 @@ final class PaymentConstants
     public const WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS = 300;
 
     /**
+     * Default window for an event-creation timestamp (72 hours): long enough
+     * to outlast provider retry schedules, since every retry repeats it.
+     */
+    public const WEBHOOK_REPLAY_WINDOW_SECONDS = 259200;
+
+    /**
+     * Default days of webhook deduplication records payzephyr:webhooks:prune keeps.
+     */
+    public const WEBHOOK_EVENTS_RETENTION_DAYS = 30;
+
+    /**
      * Default health check cache TTL in seconds (5 minutes).
      */
     public const HEALTH_CHECK_CACHE_TTL_SECONDS = 300;

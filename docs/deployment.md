@@ -38,13 +38,16 @@ This signals workers to finish their current job and then exit gracefully; your 
 
 ## Scheduled tasks
 
-Only if you've enabled [Tracing](tracing.md). It's the one PayZephyr table that grows per *step* rather than per payment - roughly six to ten rows where the rest of the package writes one - and nothing prunes it on its own:
+Two PayZephyr tables grow without bound unless something prunes them, and nothing does on its own:
 
 ```php
 use Illuminate\Support\Facades\Schedule;
 
-Schedule::command('payzephyr:trace:prune')->daily();
+Schedule::command('payzephyr:webhooks:prune --force')->daily();
+Schedule::command('payzephyr:trace:prune')->daily(); // only if you enabled Tracing
 ```
+
+`webhook_events` gets a row per webhook delivery. Those rows are what stop a replayed webhook being processed twice, so `payzephyr:webhooks:prune` only deletes them for providers whose own replay window already rejects anything that old, and keeps the rest; see [Security](security.md#pruning-deduplication-records-safely). The trace table grows per *step* rather than per payment - roughly six to ten rows where the rest of the package writes one - once [Tracing](tracing.md) is on.
 
 That needs Laravel's scheduler actually running (a single `* * * * * php artisan schedule:run` cron entry, or your platform's equivalent), which is easy to forget on a box that didn't previously need one. Check it with `php artisan schedule:list`.
 

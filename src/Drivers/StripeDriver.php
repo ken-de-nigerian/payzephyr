@@ -289,18 +289,17 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         try {
+            // The replay window is the SDK's, on the t= timestamp inside the
+            // signature header. Stripe signs a fresh one for every attempt, so
+            // it never rejects a genuine retry. The payload's Event.created is
+            // repeated by every retry and is not checked: doing so rejected
+            // every Stripe retry more than five minutes after the event.
             Webhook::constructEvent(
                 $body,
                 $signature,
-                $this->config['webhook_secret']
+                $this->config['webhook_secret'],
+                $this->webhookTimestampTolerance()
             );
-
-            $payload = json_decode($body, true) ?? [];
-            if (! $this->validateWebhookTimestamp($payload)) {
-                $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-                return false;
-            }
 
             $this->log('info', 'Webhook validated successfully');
 
@@ -325,6 +324,15 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Check API connectivity by retrieving the account balance.
      */
+    /**
+     * The SDK rejects a delivery whose signed t= timestamp is older than the
+     * tolerance, so records older than that can be pruned.
+     */
+    public function webhookReplayHorizon(): int
+    {
+        return $this->webhookTimestampTolerance();
+    }
+
     public function healthCheck(): bool
     {
         try {

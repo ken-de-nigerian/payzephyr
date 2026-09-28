@@ -1,6 +1,6 @@
 # ADR-0014: Razorpay driver
 
-- **Status**: Accepted
+- **Status**: Accepted; its pruning concern resolved by ADR-0017
 - **Date**: 2026-09-15
 
 ## Problem

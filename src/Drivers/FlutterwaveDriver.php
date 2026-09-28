@@ -251,27 +251,13 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
-            $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-            return false;
-        }
+        // No payload replay window: data.created_at is when the transaction was
+        // created, not when this event happened, and a retry repeats it. A
+        // replay is stopped by deduplication instead (ADR-0016, ADR-0017).
 
         $this->log('info', 'Webhook validated successfully');
 
         return true;
-    }
-
-    /**
-     * Flutterwave nests event data (including `created_at`) under `data`,
-     * not at the top level of the webhook body.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    protected function extractWebhookTimestamp(array $payload): ?int
-    {
-        return $this->extractWebhookTimestampFrom($payload, 'data');
     }
 
     /**

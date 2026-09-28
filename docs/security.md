@@ -31,21 +31,25 @@ URL. The switch still works; it just refuses to be silent.
 
 ## Replay-attack protection
 
-Even a *correctly signed* webhook can be a problem if it's a genuine, previously-valid request being resent later by someone who intercepted it, a "replay attack." PayZephyr guards against this by checking the timestamp embedded in each webhook payload and rejecting anything older than a configurable tolerance window:
+Even a *correctly signed* webhook can be a problem if it's a genuine, previously-valid request being resent later by someone who intercepted it, a "replay attack." PayZephyr stops replays two ways, and which one carries the weight depends on what the provider signs.
 
-```env
-PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE=300
-```
+**Deduplication, for every provider.** Every delivery is recorded in `webhook_events` before anything else happens, and a delivery that matches one already recorded is skipped (see [duplicate deliveries](webhooks.md#duplicate-deliveries)). A replay is byte-identical to the original, so it always matches - for as long as the record is kept.
 
-(Default: 300 seconds, five minutes.) A webhook whose own timestamp is older than that gets rejected, even if its signature is otherwise valid: the assumption being that a legitimate webhook delivery from a provider arrives within seconds of the event happening, not minutes later.
+**A time window, where the provider signs a time that means something.**
 
-This is separate from (and in addition to) the [duplicate-delivery deduplication](webhooks.md#duplicate-deliveries) covered in the Webhooks chapter. That mechanism stops the *same* webhook a provider sends twice from being processed twice (normal provider behavior); this one stops an *old* webhook from being resent by someone else and treated as new.
+| Provider | What the window checks | Default |
+| --- | --- | --- |
+| Stripe, Paddle | The timestamp inside the signature header, which the provider signs fresh for every delivery attempt | `PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE=300` (5 minutes) |
+| PayPal, Square | The event's own creation time in the signed body. Every retry repeats it, so this window has to outlast the provider's retries | `PAYMENTS_WEBHOOK_REPLAY_WINDOW=259200` (72 hours) |
+| Paystack, Flutterwave, Monnify, OPay, Razorpay, Mollie | Nothing: none of these signs a time at which the event happened | no window; deduplication alone |
 
-**Razorpay is the exception.** Its webhook `created_at` is when the Payment Link or refund was created, not when the event happened, so a link paid ten minutes after it was created would fail the window. Razorpay webhooks are therefore checked by signature only, and a replayed one is stopped by duplicate-delivery deduplication: a replay is byte-identical to the original, so it is recognised and skipped. See [ADR-0014](architecture/adr/0014-razorpay-driver.md).
-
-**Mollie without a webhook secret has no window either.** On that path the webhook body is only a payment id, and PayZephyr fetches the payment's actual state from Mollie's API rather than trusting anything in the request, so a replayed ping can do no more than re-read the payment's current state. The fetched payment's `createdAt` is when it was created, not when the event happened, and checking it rejected customers who took more than five minutes to pay. See [ADR-0015](architecture/adr/0015-deferred-verification-failure-semantics.md).
+Why not a window on everything? Because checking the wrong timestamp rejects real payments. Paystack's `charge.success` carries `created_at`, which is when the transaction was initialised, so a window on it rejected any customer who took more than five minutes to pay - and every Paystack retry after that, since a retry repeats the body. A subscription cancellation carries only the subscription's own creation date, so a window on it rejected every cancellation. Where no field means "when this happened", deduplication is the exact defence and a window is a guess. See [ADR-0017](architecture/adr/0017-webhook-replay-model.md).
 
 For providers verified in the queued job (PayPal, and Mollie without a secret), the window is measured from when the webhook reached your application, not from when a worker processed it.
+
+### Pruning deduplication records safely
+
+`webhook_events` grows with every webhook. `php artisan payzephyr:webhooks:prune` deletes records older than `PAYMENTS_WEBHOOK_EVENTS_RETENTION_DAYS` (default 30), but only for providers whose window already rejects anything that old - otherwise deleting a record would let a replay of it through. It refuses a retention shorter than a provider's window, and keeps every record for providers with no window unless you pass `--include-unbounded`, which tells you what that gives up. Schedule it alongside your other maintenance; see [Deployment](deployment.md).
 
 ## Metadata sanitization
 

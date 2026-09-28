@@ -154,7 +154,8 @@ your-app/
 ├── database/
 │   └── migrations/
 │       ├── ..._create_payment_transactions_table.php
-│       └── ..._create_webhook_events_table.php
+│       ├── ..._create_webhook_events_table.php
+│       └── ..._index_webhook_events_table.php
 └── .env                       ← your provider credentials
 ```
 

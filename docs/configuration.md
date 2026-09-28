@@ -98,6 +98,8 @@ The currency used when you don't specify one on a charge (`->currency('USD')`). 
     'retry_backoff' => env('PAYMENTS_WEBHOOK_RETRY_BACKOFF', 60),
     'events' => [
         'table' => env('PAYMENTS_WEBHOOK_EVENTS_TABLE', 'webhook_events'),
+        'replay_window' => env('PAYMENTS_WEBHOOK_REPLAY_WINDOW', 259200),
+        'retention_days' => env('PAYMENTS_WEBHOOK_EVENTS_RETENTION_DAYS', 30),
     ],
 ],
 ```
@@ -109,6 +111,8 @@ These control the endpoint PayZephyr registers to receive webhook deliveries fro
 - **`max_payload_size`**: webhooks larger than this (in bytes) are rejected before PayZephyr even tries to parse them, as a defense against oversized payloads.
 - **`max_retries` / `retry_backoff`**: if processing a webhook fails (a transient database error, for instance), PayZephyr retries it this many times, waiting `retry_backoff` seconds between attempts, using Laravel's queue retry mechanism.
 - **`events.table`**: the database table PayZephyr uses to remember which webhook deliveries it's already processed, so a provider re-sending the same webhook (which every provider does as normal behavior, not a bug) doesn't get handled twice. See [Webhooks](webhooks.md#duplicate-deliveries) for why this matters.
+- **`events.replay_window`**: how old, in seconds, an event's own creation time may be for providers that sign one (PayPal, Square). Every retry repeats that time, so this has to outlast the provider's retries; the default is 72 hours. See [Security](security.md#replay-attack-protection).
+- **`events.retention_days`**: how many days of deduplication records `payzephyr:webhooks:prune` keeps. The command refuses a value shorter than any pruned provider's replay window. See [Security](security.md#pruning-deduplication-records-safely).
 
 ## Health check
 
@@ -229,7 +233,7 @@ A few providers take options beyond credentials:
 ],
 ```
 
-Explained fully, with the reasoning behind each default, in [Security](security.md). The short version: `webhook_timestamp_tolerance` (seconds) is how old a webhook's timestamp can be before PayZephyr rejects it as a possible replay attack; `sanitize_logs` strips things that look like API keys or tokens out of log output before they're written, so a stray `Log::debug()` somewhere can't leak a secret into your logs.
+Explained fully, with the reasoning behind each default, in [Security](security.md). The short version: `webhook_timestamp_tolerance` (seconds) is how old the timestamp Stripe and Paddle sign into each delivery can be before PayZephyr rejects it as a possible replay (event creation times for PayPal and Square use `webhook.events.replay_window` instead); `sanitize_logs` strips things that look like API keys or tokens out of log output before they're written, so a stray `Log::debug()` somewhere can't leak a secret into your logs.
 
 ## Next steps
 

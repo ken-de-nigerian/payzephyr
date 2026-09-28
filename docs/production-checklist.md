@@ -14,6 +14,8 @@ A concrete list to work through before you point PayZephyr at real payment provi
 - [ ] Each provider's dashboard has the correct live webhook URL configured: see the table in [Webhooks](webhooks.md#setting-it-up-in-your-providers-dashboard).
 - [ ] A queue worker is actually running in production, supervised so it restarts if it crashes (Supervisor, systemd, or your platform's equivalent). This is the single most common thing people forget; see [Queues](queues.md) for exactly what breaks if you skip it.
 - [ ] Migrations have been run in production, so `payment_transactions` and `webhook_events` exist (core), plus `subscription_transactions`/`refund_transactions` if you use those features - see [Installation: core vs. optional features](installation.md#core-vs-optional-features).
+- [ ] **`payzephyr:webhooks:prune` is scheduled** and the scheduler is running (`php artisan schedule:list`). `webhook_events` gets a row per webhook delivery and nothing else removes them; the command deletes only what can no longer stop a replay. See [Deployment](deployment.md#scheduled-tasks).
+- [ ] If you use Square, `SQUARE_WEBHOOK_URL` is exactly the notification URL registered in the Square dashboard - Square signs it along with the body. See [Providers](providers.md#square).
 
 ## Health endpoint
 

@@ -534,7 +534,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
+        // the envelope's created_at, when Square created the event. Every retry repeats it, so the window is the replay window
+        // sized to outlast retries, not the five-minute delivery tolerance.
+        if (! $this->validateWebhookTimestamp($payload, $this->webhookReplayWindow())) {
             $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
 
             return false;
@@ -563,6 +565,15 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         return route('payments.webhook', ['provider' => $this->getName()]);
+    }
+
+    /**
+     * validateWebhook() rejects an event created longer ago than the replay
+     * window, so records older than that can be pruned.
+     */
+    public function webhookReplayHorizon(): int
+    {
+        return $this->webhookReplayWindow();
     }
 
     public function healthCheck(): bool

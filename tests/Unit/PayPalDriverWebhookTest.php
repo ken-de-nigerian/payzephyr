@@ -453,7 +453,10 @@ test('paypal throws rather than rejecting when the OAuth token cannot be obtaine
 test('paypal measures the replay window from the receipt time it is given, then from now once cleared', function () {
     // The queued job hands the driver the moment the delivery arrived. A
     // create_time ten minutes before "now" but moments before receipt is a
-    // delivery that waited in the queue, not a replay.
+    // delivery that waited in the queue, not a replay. A five-minute window
+    // makes the difference between the two measurements decisive.
+    config(['payments.webhook.events.replay_window' => 300]);
+    app()->forgetInstance('payments.config');
     $receivedAt = time() - 600;
 
     $history = [];

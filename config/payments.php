@@ -202,6 +202,12 @@ return [
         'retry_backoff' => env('PAYMENTS_WEBHOOK_RETRY_BACKOFF', 60), // seconds
         'events' => [
             'table' => env('PAYMENTS_WEBHOOK_EVENTS_TABLE', 'webhook_events'),
+            // How old an event-creation timestamp may be (PayPal, Square). Every retry repeats it,
+            // so this must outlast the providers' retry schedules. Seconds; default 72 hours.
+            'replay_window' => env('PAYMENTS_WEBHOOK_REPLAY_WINDOW', 259200),
+            // Days of deduplication records payzephyr:webhooks:prune keeps. Must exceed each
+            // pruned provider's replay window; the command refuses otherwise.
+            'retention_days' => env('PAYMENTS_WEBHOOK_EVENTS_RETENTION_DAYS', 30),
         ],
     ],
 
@@ -348,6 +354,8 @@ return [
     |
     */
     'security' => [
+        // Window for a signed per-delivery timestamp (Stripe's t=, Paddle's ts=), which is fresh on
+        // every retry, so it can stay tight. Seconds. Event-creation timestamps use webhook.events.replay_window.
         'webhook_timestamp_tolerance' => env('PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE', 300),
         'rate_limit' => [
             'enabled' => env('PAYMENTS_RATE_LIMIT_ENABLED', true),

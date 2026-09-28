@@ -71,11 +71,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PayPal's sandbox. They are replaced by tests that queue each HTTP response in order and
   assert the verification request was actually sent.
 
-- **`PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE` did nothing for nine of the ten providers.** It was
-  documented as the replay window for every webhook, but only Paddle read it; every other
-  driver used a hard-coded 300 seconds, so widening or narrowing it had no effect. All drivers
-  now read it. A value that is not a positive number (zero, negative, or not numeric) falls
-  back to 300 rather than rejecting every webhook.
+- **Genuine webhooks were rejected as replays, and retries could never succeed.** Every provider
+  had a mandatory five-minute window on a timestamp found in the webhook body, and for most of
+  them that timestamp did not mean what the window assumed:
+
+  - Paystack's `charge.success` carries `created_at`, when the transaction was *initialised*,
+    and it was read before `paid_at`. A customer who took more than five minutes to pay had their
+    payment notification rejected with a 403. A `subscription.disable` carries only the
+    subscription's own creation date, so no subscription older than five minutes could be
+    cancelled by webhook. Flutterwave's `data.created_at` has the same meaning.
+  - A retry repeats the original body, so its timestamp only gets older. Paystack retries for
+    72 hours; an outage on your side of more than five minutes lost every event in it. Stripe
+    signs a fresh `t=` for every attempt and its SDK already checks it, but PayZephyr also
+    checked the body's `Event.created`, which rejected every Stripe retry after five minutes.
+  - `PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE` was documented as the window for every provider but
+    only Paddle read it.
+
+  A window now applies only to a timestamp the provider signs and that means what the window
+  assumes. Stripe and Paddle: their signed per-delivery timestamp, with
+  `PAYMENTS_WEBHOOK_TIMESTAMP_TOLERANCE` (still 300 seconds), which now actually applies.
+  PayPal and Square: the event's own creation time, with the new `PAYMENTS_WEBHOOK_REPLAY_WINDOW`
+  (72 hours, to outlast retries). Paystack, Flutterwave, Monnify, OPay, Razorpay and Mollie have
+  no window; their replay defence is deduplication, which is exact because a replay is
+  byte-identical to a delivery already recorded. Nothing that was accepted before is now
+  rejected. See [ADR-0017](architecture/adr/0017-webhook-replay-model.md).
+
+### Added
+
+- **`php artisan payzephyr:webhooks:prune`**, for `webhook_events`, which grew by a row per
+  webhook with nothing to remove them. A row is what stops a replay, so the command deletes a
+  provider's rows only once they are older than both the retention period
+  (`PAYMENTS_WEBHOOK_EVENTS_RETENTION_DAYS`, default 30) and that provider's replay window, and
+  refuses a retention shorter than the window. Providers with no window keep their rows unless
+  you pass `--include-unbounded`. Supports `--days`, `--dry-run`, `--chunk` and `--force`, like
+  `payzephyr:trace:prune`. Schedule it daily; see [Deployment](deployment.md#scheduled-tasks).
+
+- **A `(provider, created_at)` index on `webhook_events`**, in a new core migration, for the
+  query pruning runs. ADR-0005 described this index as part of the original table; it never
+  was. Run `php artisan payzephyr:install` to publish the migration, then `php artisan migrate`.
+
+- **`webhookReplayHorizon()` on `AbstractDriver`**, declaring how old a delivery can be before
+  the driver's own checks reject it (`null` when nothing does). A custom driver that enforces a
+  window should return it, or its deduplication records are never pruned.
+
+- **`SQUARE_WEBHOOK_URL`**, the notification URL Square signs with each webhook.
 
 ---
 ## [4.0.0] - 2026-09-23

@@ -234,25 +234,11 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
-            $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-            return false;
-        }
+        // No payload replay window: no field in Monnify's payloads is confirmed
+        // to be the time of the event rather than of the payment or refund it
+        // concerns. A replay is stopped by deduplication instead (ADR-0017).
 
         return true;
-    }
-
-    /**
-     * Monnify nests event data (including `paidOn` / `completedOn`) under
-     * `eventData`, not at the top level of the webhook body.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    protected function extractWebhookTimestamp(array $payload): ?int
-    {
-        return $this->extractWebhookTimestampFrom($payload, 'eventData');
     }
 
     /**

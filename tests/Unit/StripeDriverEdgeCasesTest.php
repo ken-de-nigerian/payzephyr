@@ -41,33 +41,34 @@ test('stripe driver accepts webhook with created timestamp within tolerance (ADR
     expect($driver->validateWebhook($headers, $payload))->toBeTrue();
 });
 
-test('stripe driver rejects a validly-signed webhook with no `created` field (ADR-0001)', function () {
+test('stripe accepts a retry of an old event, because its window is on the freshly signed t=', function () {
+    // Stripe signs a new t= for every delivery attempt; Event.created is the
+    // event's and is repeated by every retry. The old check on Event.created
+    // rejected every Stripe retry more than five minutes after the event.
     $secret = 'whsec_test_secret';
-    config([
-        'payments.providers.stripe' => [
-            'driver' => 'stripe',
-            'secret_key' => 'sk_test_xxx',
-            'webhook_secret' => $secret,
-            'enabled' => true,
-        ],
-    ]);
+    $driver = new StripeDriver(['driver' => 'stripe', 'secret_key' => 'sk_test_xxx', 'webhook_secret' => $secret]);
 
-    $driver = new StripeDriver(config('payments.providers.stripe'));
-
-    // Stripe's SDK-level t= tolerance check passes (the header timestamp is
-    // fresh) but our app-level check must independently reject this because
-    // the JSON body itself carries no recognizable timestamp field.
     $payload = json_encode([
         'id' => 'evt_123',
         'type' => 'payment_intent.succeeded',
+        'created' => time() - 86400,
         'data' => ['object' => ['metadata' => ['reference' => 'stripe_ref_123']]],
     ]);
 
-    $headers = [
-        'stripe-signature' => [makeStripeSignatureHeader($payload, $secret, time())],
-    ];
+    expect($driver->validateWebhook(['stripe-signature' => [makeStripeSignatureHeader($payload, $secret, time())]], $payload))->toBeTrue()
+        ->and($driver->validateWebhook(['stripe-signature' => [makeStripeSignatureHeader($payload, $secret, time() - 600)]], $payload))->toBeFalse();
+});
 
-    expect($driver->validateWebhook($headers, $payload))->toBeFalse();
+test('stripe applies the configured tolerance to the signed t= and declares it as its replay horizon', function () {
+    config(['payments.security.webhook_timestamp_tolerance' => 900]);
+    app()->forgetInstance('payments.config');
+
+    $secret = 'whsec_test_secret';
+    $driver = new StripeDriver(['driver' => 'stripe', 'secret_key' => 'sk_test_xxx', 'webhook_secret' => $secret]);
+    $payload = json_encode(['id' => 'evt_124', 'type' => 'charge.succeeded']);
+
+    expect($driver->validateWebhook(['stripe-signature' => [makeStripeSignatureHeader($payload, $secret, time() - 600)]], $payload))->toBeTrue()
+        ->and($driver->webhookReplayHorizon())->toBe(900);
 });
 
 test('stripe driver handles webhook with metadata reference', function () {

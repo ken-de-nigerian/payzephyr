@@ -268,27 +268,13 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
-            $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-            return false;
-        }
+        // No payload replay window: no field in OPay's payloads is confirmed to
+        // be the time of the event. A replay is stopped by deduplication
+        // instead (ADR-0017).
 
         $this->log('info', 'Webhook validated successfully');
 
         return true;
-    }
-
-    /**
-     * OPay nests transaction data (including `timestamp`) under `payload`,
-     * not at the top level of the webhook body.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    protected function extractWebhookTimestamp(array $payload): ?int
-    {
-        return $this->extractWebhookTimestampFrom($payload, 'payload');
     }
 
     /**

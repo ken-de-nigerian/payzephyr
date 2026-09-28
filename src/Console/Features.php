@@ -93,7 +93,9 @@ final class Features
             ],
             'webhooks' => [
                 'label' => 'Webhooks',
-                'migrationPattern' => '*_create_webhook_events_table.php',
+                // Matches both the create migration and the later index one, so
+                // install detection and uninstall cover every file this owns.
+                'migrationPattern' => '*_webhook_events_table.php',
                 'tableConfigKey' => 'webhook.events.table',
                 'defaultTable' => 'webhook_events',
             ],

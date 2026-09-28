@@ -62,26 +62,39 @@ test('it rejects table names with special characters', function () {
     expect($transaction->getTable())->toBe('payment_transactions');
 });
 
-test('it rejects webhooks with old timestamps', function () {
-    $driver = app(PaymentManager::class)->driver('paystack');
-
-    // Real Paystack payloads carry the timestamp under data.paid_at, not a
-    // top-level 'timestamp' field - see ADR-0001.
-    $oldPayload = [
+test('a replayed paystack webhook is stopped by deduplication, however long ago it was paid', function () {
+    // Paystack's payload carries no time at which the event happened -
+    // data.created_at is when the transaction was initialised - so it has no
+    // replay window (ADR-0017). A replay is byte-identical to the original,
+    // so it collides with the delivery already recorded.
+    \Illuminate\Support\Facades\Event::fake();
+    $payload = [
         'event' => 'charge.success',
-        'data' => ['reference' => 'TEST_123', 'paid_at' => date(DATE_ATOM, time() - 360)],
+        'data' => ['reference' => 'TEST_REPLAY', 'status' => 'success', 'paid_at' => date(DATE_ATOM, time() - 86400 * 30)],
     ];
+    $body = (string) json_encode($payload);
+    $signature = hash_hmac('sha512', $body, config('payments.providers.paystack.secret_key'));
 
-    $signature = hash_hmac('sha512', json_encode($oldPayload), config('payments.providers.paystack.secret_key'));
+    $driver = app(PaymentManager::class)->driver('paystack');
+    expect($driver->validateWebhook(['x-paystack-signature' => [$signature]], $body))->toBeTrue();
 
-    $isValid = $driver->validateWebhook(
-        ['x-paystack-signature' => [$signature]],
-        json_encode($oldPayload)
-    );
+    app()->call([new \KenDeNigerian\PayZephyr\Jobs\ProcessWebhook('paystack', $payload), 'handle']);
+    app()->call([new \KenDeNigerian\PayZephyr\Jobs\ProcessWebhook('paystack', $payload), 'handle']);
 
-    expect($isValid)->toBeFalse();
+    \Illuminate\Support\Facades\Event::assertDispatchedTimes(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class, 1);
 });
 
+test('a stripe webhook whose signed delivery timestamp is stale is rejected', function () {
+    // Stripe's replay window is on the t= it signs for every delivery attempt,
+    // so a captured request cannot be replayed once t is outside it.
+    $secret = 'whsec_security_test';
+    $driver = new \KenDeNigerian\PayZephyr\Drivers\StripeDriver(['secret_key' => 'sk_test', 'webhook_secret' => $secret, 'currencies' => ['USD']]);
+    $body = (string) json_encode(['id' => 'evt_1', 'type' => 'charge.succeeded', 'created' => time()]);
+    $signed = fn (int $t) => ['stripe-signature' => ["t=$t,v1=".hash_hmac('sha256', "$t.$body", $secret)]];
+
+    expect($driver->validateWebhook($signed(time()), $body))->toBeTrue()
+        ->and($driver->validateWebhook($signed(time() - 600), $body))->toBeFalse();
+});
 test('it accepts webhooks with recent timestamps', function () {
     $driver = app(PaymentManager::class)->driver('paystack');
 
@@ -98,27 +111,6 @@ test('it accepts webhooks with recent timestamps', function () {
     );
 
     expect($isValid)->toBeTrue();
-});
-
-test('it rejects validly-signed webhooks with no recognizable timestamp (ADR-0001)', function () {
-    // Prior to ADR-0001 this was treated as valid ("missing timestamp =
-    // backward compatible"), which was the replay-window bypass the ADR
-    // fixes. It must now be rejected even with a genuinely valid signature.
-    $driver = app(PaymentManager::class)->driver('paystack');
-
-    $payload = [
-        'event' => 'charge.success',
-        'data' => ['reference' => 'TEST_123'],
-    ];
-
-    $signature = hash_hmac('sha512', json_encode($payload), config('payments.providers.paystack.secret_key'));
-
-    $isValid = $driver->validateWebhook(
-        ['x-paystack-signature' => [$signature]],
-        json_encode($payload)
-    );
-
-    expect($isValid)->toBeFalse();
 });
 
 test('it isolates cache keys per user', function () {

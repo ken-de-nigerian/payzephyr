@@ -214,27 +214,16 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
-        if (! $this->validateWebhookTimestamp($payload)) {
-            $this->log('warning', 'Webhook timestamp validation failed - potential replay attack');
-
-            return false;
-        }
+        // No payload replay window: nothing in a Paystack webhook says when the
+        // event happened. data.created_at is when the transaction was
+        // initialized, and a subscription event carries only the subscription's
+        // own createdAt, so a window on either rejected real events. A replay is
+        // byte-identical to a delivery already recorded and is stopped by
+        // deduplication instead (ADR-0016, ADR-0017).
 
         $this->log('info', 'Webhook validated successfully');
 
         return true;
-    }
-
-    /**
-     * Paystack nests event data (including `paid_at` / `created_at`) under
-     * `data`, not at the top level of the webhook body.
-     *
-     * @param  array<string, mixed>  $payload
-     */
-    protected function extractWebhookTimestamp(array $payload): ?int
-    {
-        return $this->extractWebhookTimestampFrom($payload, 'data');
     }
 
     /**

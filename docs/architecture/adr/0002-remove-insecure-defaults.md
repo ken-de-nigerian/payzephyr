@@ -1,6 +1,6 @@
 # ADR-0002: Remove insecure defaults (TLS bypass, unbounded log recursion)
 
-- **Status**: Accepted
+- **Status**: Accepted; its deferred health-check decision made by ADR-0018
 - **Date**: 2026-07-31
 
 ## Problem

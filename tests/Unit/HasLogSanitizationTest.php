@@ -17,7 +17,8 @@ function sanitizeViaDriver(mixed $data): mixed
 
 test('a short bearer token is still redacted despite being under the old 20-char gate', function () {
     // Regression: sanitizeLogContext() used to only pattern-match strings
-    // longer than PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK (20),
+    // longer than 20 characters (the since-removed
+    // PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK),
     // so a short real token like this ("Bearer test123" = 15 chars) slipped
     // through un-redacted.
     $result = sanitizeViaDriver(['auth' => 'Bearer test123']);

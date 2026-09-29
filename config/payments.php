@@ -228,7 +228,10 @@ return [
         // provider without asking whether it is reachable first.
         'enabled' => env('PAYMENTS_HEALTH_CHECK_ENABLED', true),
         'cache_ttl' => env('PAYMENTS_HEALTH_CHECK_CACHE_TTL', 300), // 5 minutes
-        'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', false),
+        // On by default outside local development: the endpoint names your providers and whether
+        // they are reachable. With it on, set allowed_tokens or allowed_ips, or every request is
+        // refused (and the reason logged).
+        'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)),
         'allowed_ips' => $paymentsHealthCheckAllowedIps ? explode(',', $paymentsHealthCheckAllowedIps) : [],
         'allowed_tokens' => $paymentsHealthCheckAllowedTokens ? explode(',', $paymentsHealthCheckAllowedTokens) : [],
     ],

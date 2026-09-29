@@ -120,7 +120,7 @@ These control the endpoint PayZephyr registers to receive webhook deliveries fro
 'health_check' => [
     'enabled' => env('PAYMENTS_HEALTH_CHECK_ENABLED', true),
     'cache_ttl' => env('PAYMENTS_HEALTH_CHECK_CACHE_TTL', 300),
-    'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', false),
+    'require_auth' => env('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH', ! in_array(env('APP_ENV', 'production'), ['local', 'testing'], true)),
     'allowed_ips' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_IPS')) : [],
     'allowed_tokens' => env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS') ? explode(',', env('PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS')) : [],
 ],
@@ -130,7 +130,7 @@ These control the endpoint PayZephyr registers to receive webhook deliveries fro
 
 PayZephyr exposes `/payments/health`, which reports whether it can currently reach each enabled provider, useful for uptime monitoring. Checking a provider's health means making a real HTTP request to it, which is slow to do on every hit, so results are cached for `cache_ttl` seconds.
 
-`require_auth` is `false` by default so the endpoint works immediately in local development with zero setup. **You should turn this on before deploying**, along with either `allowed_ips` (a comma-separated allowlist) or `allowed_tokens` (bearer tokens callers must present); otherwise anyone on the internet can hit this endpoint. See the [Production Checklist](production-checklist.md) and [Security](security.md#health-endpoint).
+`require_auth` is on by default except when `APP_ENV` is `local` or `testing`, so the endpoint works immediately in local development and is closed everywhere else. With it on, set `allowed_ips` (a comma-separated allowlist) or `allowed_tokens` (bearer tokens callers must present) - either is enough, and both are enforced if you set both. With neither, every request is refused and the reason is logged. See the [Production Checklist](production-checklist.md) and [Security](security.md#health-endpoint).
 
 ## Transaction logging
 

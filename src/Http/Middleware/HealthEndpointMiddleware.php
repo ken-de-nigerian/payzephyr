@@ -21,6 +21,8 @@ final class HealthEndpointMiddleware
      */
     private const UNAUTHENTICATED_WARNING_INTERVAL_SECONDS = 3600;
 
+    private const MISCONFIGURED_WARNING_INTERVAL_SECONDS = 3600;
+
     public function handle(Request $request, Closure $next): Response
     {
         $config = app('payments.config') ?? config('payments', []);
@@ -50,7 +52,20 @@ final class HealthEndpointMiddleware
             }
         }
 
-        if ($requiresAuth || ! empty($allowedTokens)) {
+        // With require_auth on and nothing to authenticate against, every
+        // request is refused - failing closed - and the reason is logged, so
+        // the endpoint does not just go dark with nobody knowing why.
+        if ($requiresAuth && empty($allowedIps) && empty($allowedTokens)) {
+            $this->warnOnceIfMisconfigured();
+
+            return response()->json(['error' => 'Unauthorized'], HttpStatusCodes::UNAUTHORIZED);
+        }
+
+        // A token is demanded whenever tokens are configured. With require_auth
+        // on and only an IP allowlist, the allowlist - already enforced above -
+        // is the authentication: demanding a token nobody could configure
+        // refused every request, although the docs say either is enough.
+        if (! empty($allowedTokens)) {
             $token = $request->bearerToken()
                 ?? $request->header('X-Health-Token')
                 ?? $request->query('token');
@@ -119,7 +134,18 @@ final class HealthEndpointMiddleware
 
         if (Cache::add($cacheKey, true, self::UNAUTHENTICATED_WARNING_INTERVAL_SECONDS)) {
             $this->log('warning', 'The /payments/health endpoint is exposed without authentication', [
-                'hint' => 'Set PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true and PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS (or ALLOWED_IPS) in production. See docs/SECURITY.md#3-health-endpoint-security.',
+                'hint' => 'Set PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true and PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS (or ALLOWED_IPS) in production. See docs/security.md#health-endpoint.',
+            ]);
+        }
+    }
+
+    private function warnOnceIfMisconfigured(): void
+    {
+        $cacheKey = 'payzephyr:health_check:misconfigured_warning';
+
+        if (Cache::add($cacheKey, true, self::MISCONFIGURED_WARNING_INTERVAL_SECONDS)) {
+            $this->log('error', 'The /payments/health endpoint requires authentication but has nothing to authenticate against, so every request is refused', [
+                'hint' => 'Set PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS or PAYMENTS_HEALTH_CHECK_ALLOWED_IPS, or set PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=false to leave it open. See docs/security.md#health-endpoint.',
             ]);
         }
     }

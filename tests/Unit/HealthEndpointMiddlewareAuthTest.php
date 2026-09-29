@@ -119,3 +119,75 @@ test('health endpoint rejects a missing token when auth is required', function (
 
     expect($response->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED);
 });
+
+function healthConfig(bool $requireAuth, array $ips = [], array $tokens = []): void
+{
+    config([
+        'payments.health_check.require_auth' => $requireAuth,
+        'payments.health_check.allowed_ips' => $ips,
+        'payments.health_check.allowed_tokens' => $tokens,
+    ]);
+    app()->forgetInstance('payments.config');
+}
+
+test('with auth required, an allowed IP is enough when only an allowlist is configured', function () {
+    // The docs say to set tokens or IPs. With IPs alone, the middleware used
+    // to demand a token nobody could have configured, and refused everyone.
+    healthConfig(true, ips: ['10.0.0.5']);
+
+    expect(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.5'])->getStatusCode())->toBe(200)
+        ->and(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.6'])->getStatusCode())->toBe(403);
+});
+
+test('with auth required and both configured, both are enforced', function () {
+    healthConfig(true, ips: ['10.0.0.5'], tokens: ['health-secret']);
+
+    expect(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.5'])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED)
+        ->and(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.5', 'HTTP_AUTHORIZATION' => 'Bearer health-secret'])->getStatusCode())->toBe(200)
+        ->and(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.9', 'HTTP_AUTHORIZATION' => 'Bearer health-secret'])->getStatusCode())->toBe(403);
+});
+
+test('with auth required and nothing to authenticate against, every request is refused and the reason logged once', function () {
+    healthConfig(true);
+    Illuminate\Support\Facades\Cache::flush();
+
+    $errors = [];
+    Illuminate\Support\Facades\Log::shouldReceive('channel')->andReturnSelf();
+    Illuminate\Support\Facades\Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$errors) {
+        $errors[] = $message;
+
+        return true;
+    });
+
+    expect(makeHealthRequest(['HTTP_AUTHORIZATION' => 'Bearer anything'])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED)
+        ->and(makeHealthRequest()->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED)
+        ->and($errors)->toHaveCount(1)
+        ->and($errors[0])->toContain('requires authentication but has nothing to authenticate against');
+});
+
+test('the shipped default requires auth everywhere except local and testing', function (string $appEnv, bool $expected) {
+    // An install that publishes config gets an explicit value it can see; one
+    // that does not gets a closed endpoint in production, open only on a
+    // developer's machine and in the test suite.
+    $originalEnv = $_ENV['APP_ENV'] ?? null;
+    $originalServer = $_SERVER['APP_ENV'] ?? null;
+    unset($_ENV['PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH'], $_SERVER['PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH']);
+    putenv('PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH');
+    $_ENV['APP_ENV'] = $_SERVER['APP_ENV'] = $appEnv;
+    putenv("APP_ENV=$appEnv");
+
+    try {
+        $config = require __DIR__.'/../../config/payments.php';
+
+        expect($config['health_check']['require_auth'])->toBe($expected);
+    } finally {
+        $originalEnv === null ? $_ENV = array_diff_key($_ENV, ['APP_ENV' => 1]) : $_ENV['APP_ENV'] = $originalEnv;
+        $originalServer === null ? $_SERVER = array_diff_key($_SERVER, ['APP_ENV' => 1]) : $_SERVER['APP_ENV'] = $originalServer;
+        putenv($originalEnv === null ? 'APP_ENV' : "APP_ENV=$originalEnv");
+    }
+})->with([
+    'production' => ['production', true],
+    'staging' => ['staging', true],
+    'local' => ['local', false],
+    'testing' => ['testing', false],
+]);

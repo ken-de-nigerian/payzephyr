@@ -90,9 +90,9 @@ Two other things worth knowing:
 
 ## Health endpoint
 
-`/payments/health` (see [Configuration](configuration.md#health-check)) is registered **without authentication by default**, which is a deliberate trade-off, not an oversight: it means the endpoint works immediately for local development and for uptime monitors that don't support custom headers, with zero setup. But an unauthenticated endpoint that reports which payment providers you have configured and whether they're currently reachable is information you probably don't want handed to anyone who requests it in production.
+`/payments/health` (see [Configuration](configuration.md#health-check)) reports which payment providers you have configured and whether they are currently reachable - information you do not want handed to anyone who asks. It therefore **requires authentication by default everywhere except `APP_ENV=local` and `APP_ENV=testing`**, where it stays open so it works on a developer's machine with no setup. If you published `config/payments.php` before this default changed, your copy still says `false`; see the [upgrade guide](upgrade-guide.md).
 
-Before deploying, turn on authentication for it:
+With authentication required, give it something to authenticate against:
 
 ```env
 PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true
@@ -106,7 +106,7 @@ PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true
 PAYMENTS_HEALTH_CHECK_ALLOWED_IPS=203.0.113.10,203.0.113.11
 ```
 
-PayZephyr will log a warning (rate-limited, so it won't flood your logs) if it detects the health endpoint is enabled without authentication, as a nudge before you deploy. See the [Production Checklist](production-checklist.md) for the full pre-launch review.
+Either is enough on its own; configure both and both are enforced. With authentication required and neither set, every request is refused and an error is logged once an hour saying why, rather than the endpoint going quietly dark. If you turn authentication off outside local development, PayZephyr logs a warning (also rate-limited) as a nudge. See the [Production Checklist](production-checklist.md) for the full pre-launch review.
 
 ## Rate limiting
 

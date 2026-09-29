@@ -2,6 +2,90 @@
 
 This chapter walks through what changes when you move between PayZephyr's major versions. For the complete, exhaustive list of every change (not just breaking ones), see [CHANGELOG.md](CHANGELOG.md): this chapter is the narrative, tutorial version of the same information, focused on *what you need to actually do*.
 
+## Upgrading to the next major version
+
+Not yet released; this is what the current `main` needs. Most of it fixes webhooks that were being
+rejected or dropped, so the steps are short and the payoff is events you were silently losing.
+
+### Required: publish and run the new migrations
+
+```bash
+php artisan payzephyr:install --no-interaction
+php artisan migrate
+```
+
+This adds an index `payzephyr:webhooks:prune` needs, and - if you use subscriptions - the
+`state_as_of` column that stops a slow response overwriting newer subscription state.
+Re-running the installer never overwrites or removes a migration you already have; it now adds
+new ones for features you already installed, which it previously did not. Until the
+subscriptions migration runs, subscriptions are logged as before, without that protection.
+
+### Required if you do not publish `config/payments.php`: the health endpoint
+
+`/payments/health` now requires authentication by default outside `APP_ENV=local` and
+`APP_ENV=testing`. If you published the config, your copy still says `false` and nothing
+changes. Otherwise, set one of these, or the endpoint answers 401:
+
+```env
+PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS=your-monitoring-token
+# or
+PAYMENTS_HEALTH_CHECK_ALLOWED_IPS=203.0.113.10
+# or, to keep it open deliberately
+PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=false
+```
+
+An IP allowlist on its own now works with `REQUIRE_AUTH=true`; it used to refuse everyone.
+
+### Required if you use Square: the notification URL
+
+Square signs the URL it delivers to, together with the body. Set it to exactly the notification
+URL registered in the Square dashboard:
+
+```env
+SQUARE_WEBHOOK_URL=https://yourdomain.com/payments/webhook/square
+```
+
+Left unset, PayZephyr uses its own webhook route as your app sees it. Before this release, no
+genuine Square webhook could pass verification, so if you had Square webhooks "working", check
+that `PAYMENTS_WEBHOOK_VERIFY_SIGNATURE` was not turned off.
+
+### Recommended: schedule the new prune command
+
+```php
+Schedule::command('payzephyr:webhooks:prune --force')->daily();
+```
+
+It only deletes deduplication records that can no longer stop a replayed webhook. See
+[Security](security.md#pruning-deduplication-records-safely).
+
+### If you referenced `PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK`
+
+It is removed. Nothing in PayZephyr had read it since log sanitization stopped skipping short
+strings; if your code used the value, inline `20`.
+
+### If you wrote a custom driver
+
+- `extractWebhookEventId()` must return an id for the **event**, or `null` - never the id of the
+  payment or subscription it is about, or later events for that object are dropped as
+  duplicates. The default no longer reads a top-level `payment_id`.
+- If your `validateWebhook()` enforces a replay window, return it from `webhookReplayHorizon()`,
+  or its deduplication records are never pruned. See
+  [Building a custom driver](custom-drivers.md).
+- `PayPalDriver::validateWebhook()` and Mollie's API-verified `validateWebhook()` may now throw
+  `WebhookException` when the provider could not be asked, instead of returning `false`. Only
+  relevant if you call them directly.
+
+### What you will notice
+
+- Webhooks that used to be rejected are now accepted: Paystack payments that took more than five
+  minutes, Paystack subscription cancellations, and Stripe and Paystack retries after an outage.
+- Events that used to be dropped as duplicates now arrive: a Paystack cancellation after its
+  creation, a Monnify refund result, a Mollie refund or chargeback. A Mollie retry now reaches
+  your `WebhookReceived` listener again, which is harmless if the listener re-verifies.
+- `RefundCompleted` fires once per refund even when the provider reports it twice.
+- With tracing on, refunds appear on the payment's timeline, subscriptions get timelines of their
+  own, and bad-signature webhooks are recorded for every provider.
+
 ## Upgrading to v4.0.0
 
 This release contains breaking changes, all of them in service of one rule: **PayZephyr no

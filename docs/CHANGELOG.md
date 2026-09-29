@@ -8,7 +8,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+> **Contains breaking changes** - see [Changed](#changed) and [Removed](#removed), and the
+> [upgrade guide](upgrade-guide.md#upgrading-to-the-next-major-version). This release needs a
+> major version.
+
+### Changed
+
+- **Breaking: `/payments/health` requires authentication by default outside local
+  development.** It reports which providers you use and whether each is reachable, and was open
+  to anyone unless you turned authentication on. `health_check.require_auth` now defaults to on
+  unless `APP_ENV` is `local` or `testing`. If you published `config/payments.php`, your copy
+  keeps its explicit `false` and nothing changes until you edit it. If you did not, and you run
+  outside local/testing without `PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS` or
+  `PAYMENTS_HEALTH_CHECK_ALLOWED_IPS`, the endpoint now answers 401 - failing closed - and logs
+  once an hour why. Set one of them, or `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=false` to keep it
+  open. Closes the decision [ADR-0002](architecture/adr/0002-remove-insecure-defaults.md)
+  deferred; see [ADR-0018](architecture/adr/0018-health-endpoint-auth-by-default.md).
+
+### Removed
+
+- **Breaking: `PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK`.** Nothing has read it since
+  the log sanitizer stopped skipping short strings - the gate that let `"Bearer test123"` through
+  un-redacted. It was kept as public API pending a decision; this is that decision.
+
 ### Fixed
+
+- **Requiring health-endpoint authentication with only an IP allowlist refused everyone.** The
+  production checklist said to set `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true` with tokens *or*
+  IPs. With IPs alone, the middleware checked the address and then demanded a token nobody could
+  have configured. An allowed address is now enough; with both configured, both are still
+  enforced.
 
 - **A slow response could overwrite newer subscription or refund state.** Rows are written
   from provider responses, and a response can finish after a later request's did. A

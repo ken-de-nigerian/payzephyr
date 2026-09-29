@@ -19,7 +19,7 @@ A concrete list to work through before you point PayZephyr at real payment provi
 
 ## Health endpoint
 
-- [ ] `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true`, with either `PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS` or `PAYMENTS_HEALTH_CHECK_ALLOWED_IPS` set. The default (`false`) is fine for local development but leaves `/payments/health` open to anyone in production. See [Security](security.md#health-endpoint).
+- [ ] `PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS` or `PAYMENTS_HEALTH_CHECK_ALLOWED_IPS` is set. Authentication is required by default outside local development, so without one of them `/payments/health` refuses every request. If your published `config/payments.php` predates that default, check it does not still say `false`. See [Security](security.md#health-endpoint).
 
 ## Database
 

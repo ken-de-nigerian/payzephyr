@@ -25,6 +25,12 @@ use Throwable;
  */
 final class SquareDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
+    /** Orders per page of the verify-by-reference search; Square allows up to 1000. */
+    private const ORDER_SEARCH_PAGE_SIZE = 500;
+
+    /** Default pages the verify-by-reference search reads before giving up. */
+    private const ORDER_SEARCH_MAX_PAGES = 10;
+
     use SquareRefundMethods;
     use SquareSubscriptionMethods;
 
@@ -318,23 +324,25 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Verify payment by searching orders using reference_id.
      *
+     * The last resort: a charge stores its payment link id, and verify() goes
+     * straight to that whenever the transaction log or the session cache has
+     * it. This path serves a verify with nothing but the reference - logging
+     * off and the cache expired, or a reference Square did not get from a
+     * PayZephyr charge.
+     *
+     * Square's order search cannot filter on reference_id, so orders are read
+     * newest-first, a page at a time, until one matches. It used to read one
+     * page, so on a busy account any order that had dropped off it could
+     * never be found. The number of pages is bounded
+     * (`verify_search_pages`, default 10 of 500) so a reference that matches
+     * nothing costs a known number of requests, and the error says how far
+     * back it looked.
+     *
      * @throws VerificationException|ChargeException
      */
     private function verifyByReferenceId(string $reference): VerificationResponseDTO
     {
-        $orders = $this->searchOrders();
-
-        $foundOrder = null;
-        foreach ($orders as $order) {
-            if (($order['reference_id'] ?? null) === $reference) {
-                $foundOrder = $order;
-                break;
-            }
-        }
-
-        if (! $foundOrder) {
-            throw new VerificationException("Payment not found for reference [$reference]");
-        }
+        $foundOrder = $this->findOrderByReference($reference);
 
         $orderId = $foundOrder['id'];
         $order = $this->getOrderById($orderId);
@@ -345,31 +353,71 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * Search orders using Square's order search API.
-     *
-     * @return array<int, array<string, mixed>>
+     * @return array<string, mixed>
      *
      * @throws VerificationException|ChargeException
      */
-    private function searchOrders(): array
+    private function findOrderByReference(string $reference): array
+    {
+        $maxPages = max(1, (int) ($this->config['verify_search_pages'] ?? self::ORDER_SEARCH_MAX_PAGES));
+        $cursor = null;
+        $searched = 0;
+
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $data = $this->searchOrdersPage($cursor);
+            $orders = $data['orders'] ?? [];
+            $searched += count($orders);
+
+            foreach ($orders as $order) {
+                if (($order['reference_id'] ?? null) === $reference) {
+                    return $order;
+                }
+            }
+
+            $cursor = $data['cursor'] ?? null;
+
+            if (! is_string($cursor) || $cursor === '') {
+                throw new VerificationException("Payment not found for reference [$reference]");
+            }
+        }
+
+        throw new VerificationException(
+            "Payment not found for reference [$reference] in the $searched most recent Square orders. ".
+            'Square cannot search orders by reference, so older orders are not read. Verify with the '.
+            'payment link id instead, or raise verify_search_pages.'
+        );
+    }
+
+    /**
+     * One page of the location's orders, newest first.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws VerificationException|ChargeException
+     */
+    private function searchOrdersPage(?string $cursor): array
     {
         try {
             $response = $this->makeRequest('POST', '/v2/orders/search', [
-                'json' => [
+                'json' => array_filter([
                     'location_ids' => [$this->config['location_id']],
+                    'limit' => self::ORDER_SEARCH_PAGE_SIZE,
+                    'cursor' => $cursor,
                     'query' => [
                         'filter' => [
                             'state_filter' => [
                                 'states' => ['OPEN', 'COMPLETED', 'CANCELED'],
                             ],
                         ],
+                        'sort' => [
+                            'sort_field' => 'CREATED_AT',
+                            'sort_order' => 'DESC',
+                        ],
                     ],
-                ],
+                ], fn ($value) => $value !== null),
             ]);
 
-            $data = $this->parseResponse($response);
-
-            return $data['orders'] ?? [];
+            return $this->parseResponse($response);
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
             if ($previous instanceof ClientException) {

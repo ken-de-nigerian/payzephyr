@@ -119,6 +119,8 @@ return [
             // The notification URL exactly as registered in the Square dashboard. Square signs it
             // along with the body, so it must match byte for byte. Defaults to this app's webhook route.
             'webhook_url' => env('SQUARE_WEBHOOK_URL'),
+            // Pages of 500 orders verify() reads, newest first, when it has only your reference to go on.
+            'verify_search_pages' => env('SQUARE_VERIFY_SEARCH_PAGES', 10),
             'base_url' => env('SQUARE_BASE_URL', 'https://connect.squareupsandbox.com'), // Sandbox: https://connect.squareupsandbox.com | Live: https://connect.squareup.com,
             'currencies' => ['USD', 'CAD', 'GBP', 'AUD'],
             'enabled' => env('SQUARE_ENABLED', false),

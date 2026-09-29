@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have configured. An allowed address is now enough; with both configured, both are still
   enforced.
 
+- **Square could not verify an older payment by reference.** When verify() has only the
+  reference - logging off and the cache expired - Square offers no lookup by it, so PayZephyr
+  searches the location's orders. It read one page, in whatever order Square returned, so on a
+  busy account any payment that had fallen off that page was reported as not found. It now reads
+  newest-first and follows Square's cursor until the reference matches, up to
+  `SQUARE_VERIFY_SEARCH_PAGES` pages of 500 (default 10), and when it gives up it says how many
+  orders it searched.
+
 - **A slow response could overwrite newer subscription or refund state.** Rows are written
   from provider responses, and a response can finish after a later request's did. A
   `fetchSubscription()` sent before a `cancelSubscription()` committed, and answered after it,

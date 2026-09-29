@@ -269,3 +269,105 @@ test('square signs against the package webhook route when no notification url is
     expect(squareSignatureDriver(['webhook_url' => null])->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue()
         ->and(squareSignatureDriver(['webhook_url' => ''])->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue();
 });
+
+/*
+ * Verify-by-reference is the last resort: the charge's payment link id is
+ * normally used instead. Square cannot search orders by reference, so orders
+ * are read newest-first until one matches. It used to read a single page.
+ */
+
+function squareSearchDriver(array $responses, array &$history, array $config = []): SquareDriver
+{
+    $stack = HandlerStack::create(new MockHandler($responses));
+    $stack->push(GuzzleHttp\Middleware::history($history));
+
+    $driver = new SquareDriver(array_merge([
+        'access_token' => 'test_token',
+        'location_id' => 'test_location',
+        'currencies' => ['USD'],
+    ], $config));
+    $driver->setClient(new Client(['handler' => $stack]));
+
+    return $driver;
+}
+
+function squareNotFound(): Response
+{
+    return new Response(404, [], (string) json_encode(['errors' => [['code' => 'NOT_FOUND']]]));
+}
+
+function squareOrdersPage(array $referenceIds, ?string $cursor): Response
+{
+    return new Response(200, [], (string) json_encode(array_filter([
+        'orders' => array_map(fn (string $ref) => ['id' => 'order_'.$ref, 'reference_id' => $ref], $referenceIds),
+        'cursor' => $cursor,
+    ], fn ($value) => $value !== null)));
+}
+
+function squareSearchBodies(array $history): array
+{
+    return array_values(array_map(
+        fn (array $entry) => json_decode((string) $entry['request']->getBody(), true),
+        array_filter($history, fn (array $entry) => str_ends_with($entry['request']->getUri()->getPath(), '/v2/orders/search'))
+    ));
+}
+
+test('square finds an order on a later page of the search by following the cursor', function () {
+    $history = [];
+    $driver = squareSearchDriver([
+        squareNotFound(), // payment link lookup
+        squareOrdersPage(['SQ_NEWER_1', 'SQ_NEWER_2'], 'cursor_page_2'),
+        squareOrdersPage(['SQ_TARGET'], null),
+        new Response(200, [], (string) json_encode(['order' => ['id' => 'order_SQ_TARGET', 'reference_id' => 'SQ_TARGET', 'tenders' => [['payment_id' => 'pay_1']]]])),
+        new Response(200, [], (string) json_encode(['payment' => [
+            'id' => 'pay_1', 'reference_id' => 'SQ_TARGET', 'status' => 'COMPLETED',
+            'amount_money' => ['amount' => 1500, 'currency' => 'USD'], 'source_type' => 'CARD',
+        ]])),
+    ], $history);
+
+    expect($driver->verify('SQ_TARGET')->status)->toBe('success');
+
+    $searches = squareSearchBodies($history);
+    expect($searches)->toHaveCount(2)
+        ->and($searches[0])->not->toHaveKey('cursor')
+        ->and($searches[0]['query']['sort'])->toBe(['sort_field' => 'CREATED_AT', 'sort_order' => 'DESC'])
+        ->and($searches[1]['cursor'])->toBe('cursor_page_2');
+});
+
+test('square reports not found once the search runs out of orders', function () {
+    $history = [];
+    $driver = squareSearchDriver([
+        squareNotFound(),
+        squareOrdersPage(['SQ_OTHER'], 'cursor_page_2'),
+        squareOrdersPage([], null),
+    ], $history);
+
+    expect(fn () => $driver->verify('SQ_MISSING'))
+        ->toThrow(VerificationException::class, 'Payment not found for reference [SQ_MISSING]');
+});
+
+test('square stops after the configured number of pages and says how far back it looked', function () {
+    $history = [];
+    $driver = squareSearchDriver([
+        squareNotFound(),
+        squareOrdersPage(['A', 'B'], 'c2'),
+        squareOrdersPage(['C', 'D'], 'c3'),
+        squareOrdersPage(['E'], 'c4'), // never requested
+    ], $history, ['verify_search_pages' => 2]);
+
+    expect(fn () => $driver->verify('SQ_OLD'))
+        ->toThrow(VerificationException::class, 'in the 4 most recent Square orders');
+
+    expect(squareSearchBodies($history))->toHaveCount(2);
+});
+
+test('a page limit that is not a positive number still searches one page', function () {
+    $history = [];
+    $driver = squareSearchDriver([
+        squareNotFound(),
+        squareOrdersPage(['A'], 'c2'),
+    ], $history, ['verify_search_pages' => 0]);
+
+    expect(fn () => $driver->verify('SQ_X'))->toThrow(VerificationException::class, 'in the 1 most recent Square orders');
+    expect(squareSearchBodies($history))->toHaveCount(1);
+});

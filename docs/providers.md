@@ -125,6 +125,7 @@ SQUARE_ENABLED=true
 - **Subscriptions:** ✅ supported; requires a Square card-on-file ID via `->authorization(...)`; cancelling pauses rather than permanently ending the subscription (see [Subscriptions](subscriptions.md#cancelling-and-re-enabling))
 - **Refunds:** ✅ full support, starts `PENDING` and confirms via webhook
 - Needs a `location_id` in addition to the usual access token: Square's API is organized around physical/logical business locations, and every charge and subscription needs to know which one it belongs to
+- **Verifying by your own reference is a search.** A charge stores its payment link id, and `Payment::verify()` uses that whenever the transaction log or the session cache has it. Without it - logging off and the cache expired - Square offers no way to look an order up by reference, so PayZephyr reads orders newest-first until one matches, up to `SQUARE_VERIFY_SEARCH_PAGES` pages of 500 (default 10). An older order is reported as not found, with how far back the search went.
 - **`SQUARE_WEBHOOK_URL` must be exactly the notification URL you registered in the Square dashboard.** Square signs that URL together with the webhook body, so any difference - `http` instead of `https`, another hostname, a trailing slash - makes every signature fail. Left unset, PayZephyr uses its own webhook route as your app sees it, which is right unless a proxy or a different public hostname sits in front of the app.
 
 ### Monnify

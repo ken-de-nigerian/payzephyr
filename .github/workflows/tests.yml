@@ -121,8 +121,11 @@ jobs:
           mkdir -p build/coverage
           mkdir -p build/logs
 
+      # Parallel on purpose: a test that writes to shared state - the
+      # Testbench skeleton, a fixed temp path - fails here instead of flaking
+      # later. The coverage job below stays serial.
       - name: Execute tests
-        run: vendor/bin/pest
+        run: vendor/bin/pest --parallel
 
   coverage:
     runs-on: ubuntu-latest

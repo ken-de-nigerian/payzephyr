@@ -28,7 +28,7 @@ function uninstallTestCleanState(): void
         }
     }
 
-    $envPath = base_path('.env');
+    $envPath = app()->environmentFilePath();
     if (File::exists($envPath)) {
         $contents = preg_replace('/^PAYZEPHYR_FEATURE_\w+=.*$/m', '', File::get($envPath));
         File::put($envPath, trim((string) $contents)."\n");
@@ -186,14 +186,14 @@ test('uninstall never touches config/payments.php', function () {
 });
 
 test('uninstall clears the .env feature flag for a removed feature', function () {
-    File::put(base_path('.env'), "APP_NAME=Test\n");
+    File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
-    expect(File::get(base_path('.env')))->toContain('PAYZEPHYR_FEATURE_REFUNDS=true');
+    expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_REFUNDS=true');
 
     Artisan::call('payzephyr:uninstall', ['--force' => true, '--features' => 'refunds']);
 
-    expect(File::get(base_path('.env')))->toContain('PAYZEPHYR_FEATURE_REFUNDS=false');
+    expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_REFUNDS=false');
 });
 
 test('cancelling the interactive confirmation removes nothing', function () {
@@ -287,7 +287,7 @@ test('the non-interactive warning still states what will be removed', function (
 test('uninstall succeeds when no .env file exists', function () {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
-    $envPath = base_path('.env');
+    $envPath = app()->environmentFilePath();
     $original = File::exists($envPath) ? File::get($envPath) : null;
     if ($original !== null) {
         File::delete($envPath);

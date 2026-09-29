@@ -28,7 +28,7 @@ function cleanPublishedInstallerState(): void
         }
     }
 
-    $envPath = base_path('.env');
+    $envPath = app()->environmentFilePath();
     if (File::exists($envPath)) {
         $contents = preg_replace('/^PAYZEPHYR_FEATURE_\w+=.*$/m', '', File::get($envPath));
         File::put($envPath, trim((string) $contents)."\n");
@@ -262,29 +262,29 @@ test('interactive prompts pre-select features that are already installed', funct
 });
 
 test('newly selected features are recorded in .env as PAYZEPHYR_FEATURE_* flags', function () {
-    File::put(base_path('.env'), "APP_NAME=Test\n");
+    File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
-    $env = File::get(base_path('.env'));
+    $env = File::get(app()->environmentFilePath());
 
     expect($env)->toContain('PAYZEPHYR_FEATURE_REFUNDS=true')
         ->and($env)->not->toContain('PAYZEPHYR_FEATURE_SUBSCRIPTIONS=true');
 });
 
 test('re-running install does not duplicate an already-written .env flag', function () {
-    File::put(base_path('.env'), "APP_NAME=Test\n");
+    File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
-    $env = File::get(base_path('.env'));
+    $env = File::get(app()->environmentFilePath());
 
     expect(substr_count($env, 'PAYZEPHYR_FEATURE_REFUNDS='))->toBe(1);
 });
 
 test('install command gracefully handles a missing .env file instead of erroring', function () {
-    $envPath = base_path('.env');
+    $envPath = app()->environmentFilePath();
     $hadEnv = File::exists($envPath);
     if ($hadEnv) {
         File::move($envPath, $envPath.'.bak');
@@ -355,4 +355,25 @@ test('re-running install never overwrites a migration the application has edited
 
     expect(file_get_contents($file))->toBe("<?php\n// edited by the application\n")
         ->and(Artisan::output())->toContain('only migrations added since were published; existing files are never overwritten or removed.');
+});
+
+test('feature flags go to the .env file Laravel actually loads', function () {
+    // Tests run with a per-process environment path, so this is also the
+    // case of an app that moved its .env with useEnvironmentPath().
+    File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
+
+    Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
+
+    expect(app()->environmentFilePath())->not->toBe(base_path('.env'))
+        ->and(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_REFUNDS=true');
+});
+
+test('outside a full Laravel application the .env file is taken from the project root', function () {
+    $container = Mockery::mock(Illuminate\Contracts\Foundation\Application::class);
+    $container->shouldReceive('basePath')->with('.env')->andReturn('/srv/app/.env');
+
+    $command = new KenDeNigerian\PayZephyr\Console\InstallCommand;
+    $command->setLaravel($container);
+
+    expect((new ReflectionMethod($command, 'environmentFilePath'))->invoke($command))->toBe('/srv/app/.env');
 });

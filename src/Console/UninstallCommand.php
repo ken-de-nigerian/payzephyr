@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Traits\ResolvesEnvironmentFile;
 use Throwable;
 
 use function Laravel\Prompts\confirm;
@@ -35,6 +36,8 @@ use function Laravel\Prompts\warning;
  */
 final class UninstallCommand extends Command
 {
+    use ResolvesEnvironmentFile;
+
     protected $signature = 'payzephyr:uninstall
         {--force : Skip the confirmation prompt (required to run in a non-interactive environment)}
         {--features= : Comma-separated list of optional features to remove, e.g. --features=refunds. Omit to remove everything PayZephyr owns, including core.}';
@@ -263,7 +266,7 @@ final class UninstallCommand extends Command
      */
     private function clearEnvironmentFlag(string $envVar): void
     {
-        $envPath = base_path('.env');
+        $envPath = $this->environmentFilePath();
 
         if (! File::exists($envPath)) {
             return;

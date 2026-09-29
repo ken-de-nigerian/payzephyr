@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Support\Facades\File;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Traits\ResolvesEnvironmentFile;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\intro;
@@ -17,6 +18,8 @@ use function Laravel\Prompts\outro;
 
 final class InstallCommand extends Command
 {
+    use ResolvesEnvironmentFile;
+
     protected $signature = 'payzephyr:install
         {--force : Overwrite existing published files}
         {--all : Install every optional feature without prompting}
@@ -206,7 +209,7 @@ final class InstallCommand extends Command
      */
     private function updateEnvironmentFlags(array $newlySelected): void
     {
-        $envPath = base_path('.env');
+        $envPath = $this->environmentFilePath();
 
         if (! File::exists($envPath)) {
             $this->comment('No .env file found - set these manually: '.

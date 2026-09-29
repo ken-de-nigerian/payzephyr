@@ -14,8 +14,41 @@ abstract class TestCase extends Orchestra
         ];
     }
 
+    /**
+     * A database directory and .env of this process's own.
+     *
+     * The install and uninstall tests publish migrations into database_path()
+     * and write feature flags to the .env file. Left pointing at Testbench's
+     * skeleton, which every parallel worker shares, one worker deleted files
+     * another worker's `migrate` was halfway through reading. Set here, before
+     * the service provider boots and computes its publish targets.
+     */
+    private static function isolatedApplicationPath(): string
+    {
+        static $path = null;
+
+        if ($path === null) {
+            $path = sys_get_temp_dir().DIRECTORY_SEPARATOR.'payzephyr-tests-'.getmypid().'-'.(getenv('TEST_TOKEN') ?: '0');
+
+            if (! is_dir($path.'/database/migrations')) {
+                mkdir($path.'/database/migrations', 0777, true);
+            }
+
+            // Start from the skeleton's .env, as the tests always have.
+            $skeletonEnv = dirname(__DIR__).'/vendor/orchestra/testbench-core/laravel/.env';
+            if (! file_exists($path.'/.env') && file_exists($skeletonEnv)) {
+                copy($skeletonEnv, $path.'/.env');
+            }
+        }
+
+        return $path;
+    }
+
     protected function getEnvironmentSetUp($app): void
     {
+        $app->useDatabasePath(self::isolatedApplicationPath().DIRECTORY_SEPARATOR.'database');
+        $app->useEnvironmentPath(self::isolatedApplicationPath());
+
         $app['config']->set('database.default', 'testing');
         $app['config']->set('database.connections.testing', [
             'driver' => 'sqlite',

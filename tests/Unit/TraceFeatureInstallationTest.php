@@ -26,7 +26,7 @@ function traceInstallCleanState(): void
         @unlink($file);
     }
 
-    $envPath = base_path('.env');
+    $envPath = app()->environmentFilePath();
     if (File::exists($envPath)) {
         $contents = preg_replace('/^PAYZEPHYR_FEATURE_\w+=.*$/m', '', File::get($envPath));
         File::put($envPath, trim((string) $contents)."\n");
@@ -110,11 +110,11 @@ test('--all includes trace', function () {
 });
 
 test('installing trace records the flag the runtime actually reads', function () {
-    File::put(base_path('.env'), "APP_ENV=testing\n");
+    File::put(app()->environmentFilePath(), "APP_ENV=testing\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
 
-    expect(File::get(base_path('.env')))->toContain('PAYZEPHYR_FEATURE_TRACE=true');
+    expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_TRACE=true');
 });
 
 test('installing trace twice does not publish the migration twice', function () {
@@ -146,11 +146,11 @@ test('uninstalling trace clears the flag, so the app stops trying to write', fun
     // flag, so a live app briefly sees tracing on with no table behind it.
     // TraceRecorder::record() is guaranteed not to throw, which is what makes
     // that survivable rather than lucky.
-    File::put(base_path('.env'), "APP_ENV=testing\nPAYZEPHYR_FEATURE_TRACE=true\n");
+    File::put(app()->environmentFilePath(), "APP_ENV=testing\nPAYZEPHYR_FEATURE_TRACE=true\n");
 
     Artisan::call('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'trace']);
 
-    expect(File::get(base_path('.env')))->toContain('PAYZEPHYR_FEATURE_TRACE=false');
+    expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_TRACE=false');
 });
 
 test('uninstalling another feature leaves the trace table standing', function () {

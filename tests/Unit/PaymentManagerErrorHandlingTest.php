@@ -70,15 +70,11 @@ test('payment manager getDefaultDriver returns first provider when default not s
 test('payment manager getDefaultDriver handles empty providers config', function () {
     config()->set('payments.providers', []);
     config()->set('payments.default');
+    app()->forgetInstance('payments.config');
 
     $manager = new PaymentManager;
 
-    try {
-        $default = $manager->getDefaultDriver();
-        expect($default)->toBeString();
-    } catch (TypeError $e) {
-        expect($e)->toBeInstanceOf(TypeError::class);
-    }
+    expect(fn () => $manager->getDefaultDriver())->toThrow(DriverNotFoundException::class);
 });
 
 test('payment manager getFallbackChain handles empty fallback string', function () {

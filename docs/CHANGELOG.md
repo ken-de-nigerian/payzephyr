@@ -53,6 +53,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reference, status and channel were read from the top level, so the reference came back
   null. They are now read from `payload`, with the top level kept as a fallback.
 
+- **A provider switched off with `"false"` or `"off"` stayed on.** `PaymentManager` read
+  `providers.<name>.enabled` by truthiness, and both strings are truthy. `env()` converts the
+  bare words, but a quoted value, or one set through `config()` from another source, arrives
+  as a string - and the provider kept taking charges and appearing in the verify chain. The
+  switch is read the way every other one in the package is: `false`, `"false"`, `"off"`,
+  `"no"`, `"0"` and `0` are off.
+
+- **Verifying a payment whose stored provider id is a number raised a `TypeError`.** The id kept
+  in a transaction's metadata (`_provider_id`, `session_id`, `order_id`) was handed to the driver
+  as it came out of JSON. A numeric id came back an integer and failed the driver's `string`
+  parameter, so the payment could not be verified through the manager at all. It is passed as
+  the string it is. A session-cache entry of the wrong shape is likewise ignored rather than
+  fatal.
+
+- **With no provider configured, the manager failed with a `TypeError`.** `getDefaultDriver()`
+  returned `null` from a `string` method. It now throws `DriverNotFoundException` naming the two
+  settings that would fix it.
+
 - **Monnify refund webhooks were dropped.** A refund webhook was read from `data` or
   `resource`; Monnify sends it under `eventData` and names its state `refundStatus`. The job
   logged "missing refund reference" and did nothing, so the refund stayed pending and

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
@@ -25,6 +25,8 @@ use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
@@ -59,7 +61,7 @@ final class PaymentManager
         ?MetadataSanitizer $metadataSanitizer = null,
         ?TransactionRepositoryInterface $transactionRepository = null
     ) {
-        $this->config = app('payments.config') ?? Config::get('payments', []);
+        $this->config = PackageConfig::read()->all();
         $this->providerDetector = $providerDetector ?? app(ProviderDetectorInterface::class);
         $this->driverFactory = $driverFactory ?? app(DriverFactory::class);
         $this->metadataSanitizer = $metadataSanitizer ?? app(MetadataSanitizer::class);
@@ -77,16 +79,24 @@ final class PaymentManager
             return $this->drivers[$name];
         }
 
-        $config = $this->config['providers'][$name] ?? null;
+        $config = $this->settings()->array('providers', $name);
 
-        if (! $config || ! ($config['enabled'] ?? true)) {
+        if ($config === [] || ! (new Payload($config))->flag(true, 'enabled')) {
             throw new DriverNotFoundException("Payment driver [$name] not found or disabled");
         }
 
-        $driverName = $config['driver'] ?? $name;
+        $driverName = (new Payload($config))->string('driver') ?? $name;
         $this->drivers[$name] = $this->driverFactory->create($driverName, $config);
 
         return $this->drivers[$name];
+    }
+
+    /**
+     * The package configuration this manager was built with, as a typed reader.
+     */
+    private function settings(): Payload
+    {
+        return new Payload($this->config);
     }
 
     /**
@@ -195,7 +205,7 @@ final class PaymentManager
                     continue;
                 }
 
-                if ($this->config['health_check']['enabled'] ?? true) {
+                if ($this->settings()->flag(true, 'health_check', 'enabled')) {
                     if (! $this->driverIsHealthy($driver)) {
                         $this->log('warning', "Provider [$providerName] failed health check, skipping");
                         $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
@@ -245,7 +255,7 @@ final class PaymentManager
                     ],
                     'provider_config' => [
                         'name' => $providerName,
-                        'enabled' => ($this->config['providers'][$providerName]['enabled'] ?? true),
+                        'enabled' => $this->settings()->flag(true, 'providers', $providerName, 'enabled'),
                     ],
                 ]);
 
@@ -512,7 +522,7 @@ final class PaymentManager
 
     protected function logTransaction(ChargeRequestDTO $request, ChargeResponseDTO $response, string $provider): void
     {
-        if (! ($this->config['logging']['enabled'] ?? true)) {
+        if (! $this->settings()->flag(true, 'logging', 'enabled')) {
             return;
         }
 
@@ -618,8 +628,7 @@ final class PaymentManager
 
     protected function cacheSessionData(string $reference, string $provider, string $providerId): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $cacheTtl = $config['cache']['session_ttl'] ?? 3600;
+        $cacheTtl = PackageConfig::read()->int('cache', 'session_ttl') ?? 3600;
 
         Cache::put(
             $this->cacheKey('session', $reference),
@@ -656,20 +665,13 @@ final class PaymentManager
                 return $this->cachedContext;
             }
 
-            if (app()->bound('request')) {
-                $request = app('request');
+            $request = app()->bound('request') ? app('request') : null;
 
-                if ($request->user()) {
-                    $this->cachedContext = 'user_'.$request->user()->id;
+            if ($request instanceof Request) {
+                $this->cachedContext = $this->userContext(data_get($request->user(), 'id'))
+                    ?? $this->userContext($request->session()->get('user_id'));
 
-                    return $this->cachedContext;
-                }
-
-                if ($request->session() && $request->session()->has('user_id')) {
-                    $this->cachedContext = 'user_'.$request->session()->get('user_id');
-
-                    return $this->cachedContext;
-                }
+                return $this->cachedContext;
             }
         } catch (Throwable $e) {
             $this->log('debug', 'Could not resolve cache context', [
@@ -683,57 +685,51 @@ final class PaymentManager
     }
 
     /**
-     * @return array<string, mixed>
+     * The cache namespace for a user id, or null when there is no usable one.
+     */
+    private function userContext(mixed $id): ?string
+    {
+        return is_int($id) || (is_string($id) && $id !== '') ? 'user_'.$id : null;
+    }
+
+    /**
+     * @return array{provider: string|null, id: string}
      *
      * @throws DriverNotFoundException
      */
     protected function resolveVerificationContext(string $reference, ?string $explicitProvider): array
     {
-        $cached = Cache::get($this->cacheKey('session', $reference));
-        if ($cached) {
-            $driver = $this->driver($cached['provider']);
-            $verificationId = $driver->resolveVerificationId($reference, $cached['id']);
+        $cached = Payload::of(Cache::get($this->cacheKey('session', $reference)));
+        $cachedProvider = $cached->string('provider');
+        $cachedId = $cached->string('id');
 
+        if ($cachedProvider !== null && $cachedId !== null) {
             return [
-                'provider' => $cached['provider'],
-                'id' => $verificationId,
+                'provider' => $cachedProvider,
+                'id' => $this->driver($cachedProvider)->resolveVerificationId($reference, $cachedId),
             ];
         }
 
-        if ($this->config['logging']['enabled'] ?? true) {
+        if ($this->settings()->flag(true, 'logging', 'enabled')) {
             $transaction = $this->transactionRepository->findByReference($reference);
             if ($transaction instanceof PaymentTransaction) {
+                /** @var string $provider */
+                $provider = $transaction->getAttribute('provider');
+                $metadata = new Payload(self::normalizeMetadata($transaction->getAttribute('metadata')));
+
+                $providerId = $metadata->string('_provider_id')
+                    ?? $metadata->string('session_id')
+                    ?? $metadata->string('order_id')
+                    ?? $reference;
+
                 try {
-                    /** @var string $provider */
-                    $provider = $transaction->getAttribute('provider');
-                    $driver = $this->driver($provider);
-
-                    $metadata = self::normalizeMetadata($transaction->getAttribute('metadata'));
-
-                    $providerId = $metadata['_provider_id']
-                        ?? $metadata['session_id']
-                        ?? $metadata['order_id']
-                        ?? $reference;
-
-                    $verificationId = $driver->resolveVerificationId($reference, $providerId);
-
                     return [
                         'provider' => $provider,
-                        'id' => $verificationId,
+                        'id' => $this->driver($provider)->resolveVerificationId($reference, $providerId),
                     ];
                 } catch (DriverNotFoundException) {
-                    $metadata = self::normalizeMetadata($transaction->getAttribute('metadata'));
-
-                    $providerId = $metadata['_provider_id']
-                        ?? $metadata['session_id']
-                        ?? $metadata['order_id']
-                        ?? $reference;
-
-                    /** @var string $transactionProvider */
-                    $transactionProvider = $transaction->getAttribute('provider');
-
                     return [
-                        'provider' => $transactionProvider,
+                        'provider' => $provider,
                         'id' => $providerId,
                     ];
                 }
@@ -755,7 +751,7 @@ final class PaymentManager
 
     protected function updateTransactionFromVerification(string $reference, VerificationResponseDTO $response): void
     {
-        if (! ($this->config['logging']['enabled'] ?? true)) {
+        if (! $this->settings()->flag(true, 'logging', 'enabled')) {
             return;
         }
 
@@ -781,9 +777,21 @@ final class PaymentManager
         }
     }
 
+    /**
+     * @throws DriverNotFoundException When no default is set and no provider is configured.
+     */
     public function getDefaultDriver(): string
     {
-        return $this->config['default'] ?? array_key_first($this->config['providers'] ?? []);
+        $settings = $this->settings();
+        $default = $settings->string('default') ?? array_key_first($settings->array('providers'));
+
+        if ($default === null) {
+            throw new DriverNotFoundException(
+                'No payment provider is configured: set payments.default, or add a provider under payments.providers'
+            );
+        }
+
+        return (string) $default;
     }
 
     /**
@@ -793,8 +801,8 @@ final class PaymentManager
     {
         $chain = [$this->getDefaultDriver()];
 
-        $fallback = $this->config['fallback'] ?? null;
-        if ($fallback && $fallback !== $chain[0]) {
+        $fallback = $this->settings()->string('fallback');
+        if ($fallback !== null && $fallback !== '' && $fallback !== $chain[0]) {
             $chain[] = $fallback;
         }
 
@@ -802,13 +810,20 @@ final class PaymentManager
     }
 
     /**
-     * @return array<int, string>
+     * Every provider that is configured and not switched off, by name.
+     *
+     * @return array<string, array<array-key, mixed>>
      */
     public function getEnabledProviders(): array
     {
-        return array_filter(
-            $this->config['providers'] ?? [],
-            fn ($config) => $config['enabled'] ?? true
-        );
+        $enabled = [];
+
+        foreach ($this->settings()->array('providers') as $name => $config) {
+            if (is_array($config) && (new Payload($config))->flag(true, 'enabled')) {
+                $enabled[(string) $name] = $config;
+            }
+        }
+
+        return $enabled;
     }
 }

@@ -70,7 +70,7 @@ final readonly class SubscriptionPlanDTO
      * Only the keys actually present are checked - an update is partial by
      * nature.
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -106,7 +106,7 @@ final readonly class SubscriptionPlanDTO
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     public static function fromArray(array $data): self
     {

@@ -14,7 +14,7 @@ final class DriverFactory
     protected array $drivers = [];
 
     /**
-     * @param  array<string, mixed>  $config
+     * @param  array<array-key, mixed>  $config
      *
      * @throws DriverNotFoundException
      */

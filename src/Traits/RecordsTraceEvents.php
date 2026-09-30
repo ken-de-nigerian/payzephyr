@@ -36,8 +36,8 @@ trait RecordsTraceEvents
      * not parse, for instance - and that is a normal outcome, not a fault
      * worth a log line every time it happens.
      *
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>  $metadata
+     * @param  array<array-key, mixed>  $payload
+     * @param  array<array-key, mixed>  $metadata
      */
     protected function trace(
         ?string $reference,

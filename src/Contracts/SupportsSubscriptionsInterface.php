@@ -26,7 +26,7 @@ interface SupportsSubscriptionsInterface
     /**
      * Update a subscription plan
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO;
 
@@ -38,7 +38,7 @@ interface SupportsSubscriptionsInterface
     /**
      * List all subscription plans
      *
-     * @return array<string, mixed> Array with 'data' key containing array of PlanResponseDTO or arrays
+     * @return array<array-key, mixed> Array with 'data' key containing array of PlanResponseDTO or arrays
      */
     public function listPlans(?int $perPage = 50, ?int $page = 1): array;
 
@@ -70,7 +70,7 @@ interface SupportsSubscriptionsInterface
     /**
      * List customer subscriptions
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public function listSubscriptions(?int $perPage = 50, ?int $page = 1, ?string $customer = null): array;
 }

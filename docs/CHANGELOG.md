@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Tracing switched off with `"false"` stayed on.** The service provider chose the trace
+  recorder by the truthiness of `features.trace`, and `"false"` and `"off"` are truthy strings,
+  so every payment payload went on being written to the trace table. It reads the switch as the
+  rest of the package does.
+
 - **A Paystack subscription created without a `status` in the response was reported as a
   failure.** The mapper read `status` directly; a response without it raised a `TypeError`, which
   surfaced as "Failed to create subscription" for a subscription that existed - inviting a retry

@@ -53,10 +53,10 @@ final readonly class TraceEventDTO
 
     private const MAX_HTTP_STATUS_CODE = 599;
 
-    /** @var array<string, mixed> */
+    /** @var array<array-key, mixed> */
     public array $payload;
 
-    /** @var array<string, mixed> */
+    /** @var array<array-key, mixed> */
     public array $metadata;
 
     public ?string $provider;
@@ -68,8 +68,8 @@ final readonly class TraceEventDTO
     public ?int $httpStatusCode;
 
     /**
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>  $metadata
+     * @param  array<array-key, mixed>  $payload
+     * @param  array<array-key, mixed>  $metadata
      *
      * @throws InvalidTraceDataException If the reference cannot key a timeline.
      */
@@ -107,8 +107,8 @@ final readonly class TraceEventDTO
      * valid nor readable. Losing the body while keeping the event is the
      * honest version of truncation.
      *
-     * @param  array<string, mixed>  $value
-     * @return array<string, mixed>
+     * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
      */
     private static function normalizeJsonColumn(array $value): array
     {
@@ -174,8 +174,8 @@ final readonly class TraceEventDTO
      * two free-form columns, they are redacted by the same pass, and doing
      * them separately would build and re-validate the DTO twice.
      *
-     * @param  array<string, mixed>  $payload
-     * @param  array<string, mixed>  $metadata
+     * @param  array<array-key, mixed>  $payload
+     * @param  array<array-key, mixed>  $metadata
      *
      * @throws InvalidTraceDataException
      */

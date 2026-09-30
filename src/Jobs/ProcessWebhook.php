@@ -313,7 +313,7 @@ final class ProcessWebhook implements ShouldQueue
         } catch (DriverNotFoundException) {
         }
 
-        return $eventId ?? hash('sha256', $this->provider.'|'.json_encode($this->payload));
+        return is_string($eventId) ? $eventId : hash('sha256', $this->provider.'|'.json_encode($this->payload));
     }
 
     protected function extractReference(PaymentManager $manager): ?string

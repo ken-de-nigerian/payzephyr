@@ -76,7 +76,7 @@ trait MollieSubscriptionMethods
      * Stripe's immutable-Price update behavior for the same underlying
      * reason (nothing to mutate in place).
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -127,7 +127,7 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException
      */
@@ -273,7 +273,7 @@ trait MollieSubscriptionMethods
      * Mollie's list endpoint is customer-scoped, not global - $customer is
      * required, unlike every other driver's optional filter.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws SubscriptionException
      */
@@ -386,7 +386,7 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws ChargeException
      */
@@ -401,7 +401,7 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws ChargeException
      */
@@ -476,9 +476,13 @@ trait MollieSubscriptionMethods
     private function decodeMolliePlanData(string $planCode): array
     {
         $decoded = base64_decode($planCode, true);
-        $data = $decoded !== false ? json_decode($decoded, true) : null;
+        $plan = Payload::of($decoded !== false ? json_decode($decoded, true) : null);
+        $name = $plan->string('name');
+        $amount = $plan->float('amount');
+        $interval = $plan->string('interval');
+        $currency = $plan->string('currency');
 
-        if (! is_array($data) || ! isset($data['name'], $data['amount'], $data['interval'], $data['currency'])) {
+        if ($name === null || $amount === null || $interval === null || $currency === null) {
             throw new PlanException(
                 "Invalid Mollie plan code [$planCode] - expected a value returned by ".
                 'createPlan()/fetchPlan()/updatePlan().'
@@ -486,15 +490,15 @@ trait MollieSubscriptionMethods
         }
 
         return [
-            'name' => (string) $data['name'],
-            'amount' => (float) $data['amount'],
-            'interval' => (string) $data['interval'],
-            'currency' => (string) $data['currency'],
+            'name' => $name,
+            'amount' => $amount,
+            'interval' => $interval,
+            'currency' => $currency,
         ];
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function molliePlanCodeFromSubscriptionData(array $data): string
     {
@@ -509,7 +513,7 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function mapMollieSubscriptionToResponse(array $data, string $customerId, ?string $customerEmail = null): SubscriptionResponseDTO
     {

@@ -122,10 +122,10 @@ trait PaddleRefundMethods
             $described = implode(', ', array_map(
                 fn (array $r): string => sprintf(
                     '%s (%s %s, %s)',
-                    $r['id'] ?? 'unknown id',
-                    $r['totals']['total'] ?? '?',
-                    $r['currency_code'] ?? '?',
-                    $r['status'] ?? 'unknown status',
+                    Payload::of($r)->string('id') ?? 'unknown id',
+                    Payload::of($r)->string('totals', 'total') ?? '?',
+                    Payload::of($r)->string('currency_code') ?? '?',
+                    Payload::of($r)->string('status') ?? 'unknown status',
                 ),
                 $refunds
             ));
@@ -210,7 +210,7 @@ trait PaddleRefundMethods
     }
 
     /**
-     * @param  array<string, mixed>  $adjustment
+     * @param  array<array-key, mixed>  $adjustment
      *
      * @throws ChargeException
      */

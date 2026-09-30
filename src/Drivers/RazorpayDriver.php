@@ -321,7 +321,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      * payment events sent to the same endpoint must not be read as a
      * transaction status update.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookReference(array $payload): ?string
     {
@@ -333,7 +333,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookStatus(array $payload): string
     {
@@ -345,7 +345,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookChannel(array $payload): ?string
     {
@@ -359,7 +359,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      * validateWebhook()), so it leaves out the envelope's `created_at`, which
      * is the entity's creation time rather than the event's.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
@@ -385,7 +385,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      * eventually consistent: in test mode it did not yet return a link created
      * two seconds earlier, while fetching by plink_ id always did.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws VerificationException|ChargeException
      */
@@ -509,7 +509,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     }
 
     /**
-     * @param  array<int, string>  $methods
+     * @param  array<array-key, string>  $methods
      * @return array<string, bool>
      */
     private function buildCheckoutMethods(array $methods): array
@@ -525,8 +525,8 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     /**
      * The payment that settled a link: captured, or since refunded.
      *
-     * @param  array<string, mixed>  $link
-     * @return array<string, mixed>|null
+     * @param  array<array-key, mixed>  $link
+     * @return array<array-key, mixed>|null
      */
     private function findSettledPayment(array $link): ?array
     {
@@ -540,7 +540,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function isPaymentLinkEvent(array $payload): bool
     {

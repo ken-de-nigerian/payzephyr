@@ -40,7 +40,7 @@ trait HasWebhookValidation
     /**
      * Validate webhook timestamp to prevent replay attacks.
      *
-     * @param  array<string, mixed>  $payload  Webhook payload
+     * @param  array<array-key, mixed>  $payload  Webhook payload
      * @param  int|null  $toleranceSeconds  Allowed time difference; null reads
      *                                      payments.security.webhook_timestamp_tolerance
      */
@@ -83,7 +83,7 @@ trait HasWebhookValidation
      * created" (ADR-0017). A window on any other kind of timestamp - when the
      * transaction or subscription was created - rejects real events.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      * @return int|null Unix timestamp
      */
     protected function extractWebhookTimestamp(array $payload): ?int
@@ -96,7 +96,7 @@ trait HasWebhookValidation
      * override point - drivers needing different field names override
      * extractWebhookTimestamp() instead.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function matchTimestampField(array $payload): ?int
     {

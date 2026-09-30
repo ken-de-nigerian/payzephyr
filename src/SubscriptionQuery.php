@@ -151,8 +151,8 @@ final class SubscriptionQuery
     /**
      * Execute the query and return all matching subscriptions.
      *
-     * @return array<string, mixed>|list<mixed> The provider's paginated envelope, or a plain list when
-     *                                          the provider returned one
+     * @return array<array-key, mixed> The provider's paginated envelope, or a plain list when
+     *                                 the provider returned one
      *
      * @throws PaymentException
      */
@@ -229,8 +229,8 @@ final class SubscriptionQuery
      * => ...] envelope when $results had a 'data' key, otherwise the plain
      * filtered list.
      *
-     * @param  array<string, mixed>  $results
-     * @return array<string, mixed>|list<mixed>
+     * @param  array<array-key, mixed>  $results
+     * @return array<array-key, mixed>
      */
     protected function applyFilters(array $results): array
     {
@@ -268,7 +268,6 @@ final class SubscriptionQuery
             $results['data'] = $filtered;
             $results['meta'] = array_merge((new Payload($results))->array('meta'), ['filtered_count' => count($filtered)]);
 
-            /** @var array<string, mixed> $results */
             return $results;
         }
 

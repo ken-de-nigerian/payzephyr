@@ -42,7 +42,7 @@ final class PaymentManager
     /** @var array<string, DriverInterface> */
     protected array $drivers = [];
 
-    /** @var array<string, mixed> */
+    /** @var array<array-key, mixed> */
     protected array $config;
 
     protected ProviderDetectorInterface $providerDetector;
@@ -340,7 +340,7 @@ final class PaymentManager
     public function driverIsHealthy(DriverInterface $driver): bool
     {
         if (method_exists($driver, 'getCachedHealthCheck')) {
-            return $driver->getCachedHealthCheck();
+            return $driver->getCachedHealthCheck() === true;
         }
 
         return $driver->healthCheck();
@@ -359,7 +359,7 @@ final class PaymentManager
     private function driverSupportsCurrency(DriverInterface $driver, string $currency): bool
     {
         if (method_exists($driver, 'isCurrencySupported')) {
-            return $driver->isCurrencySupported($currency);
+            return $driver->isCurrencySupported($currency) === true;
         }
 
         return in_array(

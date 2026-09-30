@@ -261,7 +261,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      * A retry or a replay is byte-identical to the original, so the body
      * hash still catches both.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
@@ -302,7 +302,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      * back null and the status "unknown", and the transaction was never
      * updated.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function webhookEventData(array $payload): Payload
     {

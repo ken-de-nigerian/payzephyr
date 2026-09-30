@@ -274,7 +274,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
      * A retry or a replay is byte-identical to the original, so the body
      * hash still catches both.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {

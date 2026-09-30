@@ -16,9 +16,9 @@ final readonly class ChargeRequestDTO
 
     /**
      * @param  array<string, mixed>  $metadata
-     * @param  array<string, mixed>|null  $customer
-     * @param  array<string, mixed>|null  $customFields
-     * @param  array<string, mixed>|null  $split
+     * @param  array<array-key, mixed>|null  $customer
+     * @param  array<array-key, mixed>|null  $customFields
+     * @param  array<array-key, mixed>|null  $split
      * @param  array<int, string>|null  $channels
      */
     public function __construct(
@@ -162,7 +162,7 @@ final readonly class ChargeRequestDTO
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     public static function fromArray(array $data): ChargeRequestDTO
     {

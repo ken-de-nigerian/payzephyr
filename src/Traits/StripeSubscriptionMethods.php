@@ -67,7 +67,7 @@ trait StripeSubscriptionMethods
      * nickname, and active-state changes update the existing Price in
      * place. Name/description changes update the underlying Product.
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -189,7 +189,7 @@ trait StripeSubscriptionMethods
      * request logs a warning and still returns page 1 rather than silently
      * returning wrong data.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException
      */
@@ -380,7 +380,7 @@ trait StripeSubscriptionMethods
      *
      * Same cursor-pagination caveat as listPlans().
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws SubscriptionException
      */
@@ -474,7 +474,7 @@ trait StripeSubscriptionMethods
             interval: $this->mapIntervalFromStripe($data->string('recurring', 'interval') ?? 'month'),
             currency: strtoupper($this->requireString($data->all(), 'currency', 'plan')),
             description: $product->string('description'),
-            metadata: $data->array('metadata'),
+            metadata: self::normalizeMetadata($data->get('metadata')),
             provider: $this->getName(),
         );
     }
@@ -502,7 +502,7 @@ trait StripeSubscriptionMethods
             amount: $unitAmount === null ? null : $unitAmount / 100,
             currency: strtoupper($price->string('currency') ?? 'USD'),
             nextPaymentDate: $periodEnd === null ? null : date('Y-m-d H:i:s', $periodEnd),
-            metadata: $data->array('metadata'),
+            metadata: self::normalizeMetadata($data->get('metadata')),
             provider: $this->getName(),
         );
     }

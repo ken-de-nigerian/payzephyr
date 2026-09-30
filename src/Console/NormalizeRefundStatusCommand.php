@@ -50,23 +50,29 @@ final class NormalizeRefundStatusCommand extends Command
         $unmappable = [];
 
         foreach ($rows as $row) {
-            $canonical = RefundStatus::tryFromString((string) $row->status);
+            $record = Payload::of((array) $row);
+            $change = [
+                'id' => $record->string('id') ?? '',
+                'reference' => $record->string('refund_reference') ?? '',
+                'from' => $record->string('status') ?? '',
+            ];
+            $canonical = RefundStatus::tryFromString($change['from']);
 
             if ($canonical === null) {
-                $unmappable[] = $row;
+                $unmappable[] = $change;
 
                 continue;
             }
 
-            if ($canonical->value !== $row->status) {
-                $toUpdate[] = ['id' => $row->id, 'reference' => $row->refund_reference, 'from' => $row->status, 'to' => $canonical->value];
+            if ($canonical->value !== $change['from']) {
+                $toUpdate[] = $change + ['to' => $canonical->value];
             }
         }
 
         if ($unmappable !== []) {
             $this->warn(count($unmappable).' row(s) have a status that cannot be mapped to any known RefundStatus and were left untouched:');
             foreach ($unmappable as $row) {
-                $this->line("  - #$row->id ($row->refund_reference): \"$row->status\"");
+                $this->line("  - #{$row['id']} ({$row['reference']}): \"{$row['from']}\"");
             }
         }
 

@@ -95,7 +95,7 @@ trait SquareSubscriptionMethods
      * and re-upserted individually (rather than via batch-upsert, since
      * there are no new objects being created here).
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -175,7 +175,7 @@ trait SquareSubscriptionMethods
      * Square's catalog list API is cursor-based, not page-numbered - same
      * caveat as Stripe's listPlans().
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException
      */
@@ -386,7 +386,7 @@ trait SquareSubscriptionMethods
      *
      * Same cursor-pagination caveat as listPlans().
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws SubscriptionException
      */
@@ -527,7 +527,7 @@ trait SquareSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws ChargeException
      */

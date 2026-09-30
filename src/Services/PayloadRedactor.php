@@ -22,8 +22,8 @@ final readonly class PayloadRedactor
     /**
      * Redact sensitive fields from a payload.
      *
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
+     * @param  array<array-key, mixed>  $payload
+     * @return array<array-key, mixed>
      */
     public function redact(array $payload, ?int $maxDepth = null): array
     {

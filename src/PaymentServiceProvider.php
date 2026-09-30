@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Application as FoundationApplication;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -63,8 +64,8 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(PayloadRedactor::class);
         $this->app->singleton(TraceTimelineBuilder::class);
 
-        $this->app->singleton(TraceRecorderInterface::class, function ($app) {
-            return data_get($app->make('payments.config'), 'features.trace') ?? false
+        $this->app->singleton(TraceRecorderInterface::class, function (Application $app) {
+            return PackageConfig::read()->flag(false, 'features', 'trace')
                 ? $app->make(TraceRecorder::class)
                 : $app->make(NullTraceRecorder::class);
         });
@@ -74,7 +75,7 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(RefundRepositoryInterface::class, EloquentRefundRepository::class);
         $this->app->singleton(WebhookEventRepositoryInterface::class, EloquentWebhookEventRepository::class);
 
-        $this->app->singleton(PaymentManager::class, function ($app) {
+        $this->app->singleton(PaymentManager::class, function (Application $app) {
             return new PaymentManager(
                 $app->make(ProviderDetectorInterface::class),
                 $app->make(DriverFactory::class),
@@ -83,7 +84,7 @@ final class PaymentServiceProvider extends ServiceProvider
             );
         });
 
-        $this->app->bind(Payment::class, function ($app) {
+        $this->app->bind(Payment::class, function (Application $app) {
             return new Payment($app->make(PaymentManager::class));
         });
     }

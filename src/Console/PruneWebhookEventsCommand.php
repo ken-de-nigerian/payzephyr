@@ -160,7 +160,9 @@ final class PruneWebhookEventsCommand extends Command
             return null;
         }
 
-        return method_exists($driver, 'webhookReplayHorizon') ? $driver->webhookReplayHorizon() : null;
+        $horizon = method_exists($driver, 'webhookReplayHorizon') ? $driver->webhookReplayHorizon() : null;
+
+        return is_int($horizon) ? $horizon : null;
     }
 
     private function retentionDays(): ?int

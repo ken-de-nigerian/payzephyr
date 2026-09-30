@@ -240,7 +240,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      * A retry or a replay is byte-identical to the original, so the body
      * hash still catches both.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {

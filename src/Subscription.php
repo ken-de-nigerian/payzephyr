@@ -404,7 +404,7 @@ final class Subscription
     /**
      * List subscriptions
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PaymentException
      */
@@ -527,7 +527,7 @@ final class Subscription
     /**
      * List subscription plans
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PaymentException
      */

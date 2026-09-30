@@ -503,7 +503,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     /**
      * The href of the first link in a response with the given rel.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function linkHref(array $data, string $rel): ?string
     {

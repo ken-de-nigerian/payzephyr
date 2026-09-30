@@ -25,7 +25,7 @@ trait LogsToPaymentChannel
      * method. That is the right side of the trade: a lost log line is
      * recoverable, a payment reported as failed after the money moved is not.
      *
-     * @param  array<string, mixed>  $context
+     * @param  array<array-key, mixed>  $context
      */
     protected function log(string $level, string $message, array $context = []): void
     {

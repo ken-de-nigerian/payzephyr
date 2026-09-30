@@ -108,7 +108,7 @@ trait StripeRefundMethods
             amount: $this->requireAmountValue($data->get('amount'), 'amount', 'refund') / 100,
             currency: strtoupper($this->requireString($data->all(), 'currency', 'refund')),
             reason: $reason,
-            metadata: $data->array('metadata'),
+            metadata: self::normalizeMetadata($data->get('metadata')),
             provider: $this->getName(),
         );
     }

@@ -90,7 +90,7 @@ trait PayPalSubscriptionMethods
      * ignored rather than guessed at, since PayPal's documented set of
      * PATCH-able plan fields is narrow.
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -162,7 +162,7 @@ trait PayPalSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException
      */
@@ -368,7 +368,7 @@ trait PayPalSubscriptionMethods
      * rather than returning an empty result that could be mistaken for "no
      * subscriptions exist".
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws SubscriptionException
      */
@@ -409,7 +409,7 @@ trait PayPalSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws ChargeException
      */
@@ -457,7 +457,7 @@ trait PayPalSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function mapPayPalPlanToResponse(array $data): PlanResponseDTO
     {
@@ -478,7 +478,7 @@ trait PayPalSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function mapPayPalSubscriptionToResponse(
         array $data,

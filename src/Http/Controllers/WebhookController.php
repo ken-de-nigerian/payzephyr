@@ -62,7 +62,7 @@ final class WebhookController extends Controller
      * A webhook that was accepted and never queued is the one failure the job
      * itself can never record, because the job never runs.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function referenceFor(string $provider, array $payload): ?string
     {

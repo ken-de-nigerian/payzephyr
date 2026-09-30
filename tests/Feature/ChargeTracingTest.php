@@ -645,3 +645,15 @@ test('a body that explodes while being read costs the timeline its payload and n
     expect($received->payload)->toBe([])
         ->and($received->http_status_code)->toBe(200);
 });
+
+test('tracing switched off with the string an env file produces is off', function (mixed $off) {
+    // The binding read the switch by truthiness, and "false" is truthy: tracing
+    // was on, writing every payload to the trace table, for a merchant who had
+    // turned it off.
+    config(['payments.features.trace' => $off]);
+    app()->forgetInstance('payments.config');
+    app()->forgetInstance(\KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface::class);
+
+    expect(app(\KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface::class))
+        ->toBeInstanceOf(\KenDeNigerian\PayZephyr\Services\NullTraceRecorder::class);
+})->with(['false', 'off', '0']);

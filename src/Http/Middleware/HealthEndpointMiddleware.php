@@ -24,6 +24,9 @@ final class HealthEndpointMiddleware
 
     private const MISCONFIGURED_WARNING_INTERVAL_SECONDS = 3600;
 
+    /**
+     * @param  Closure(Request): Response  $next
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $healthConfig = PackageConfig::read()->at('health_check');

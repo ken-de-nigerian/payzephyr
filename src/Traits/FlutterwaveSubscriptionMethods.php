@@ -65,7 +65,7 @@ trait FlutterwaveSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
      */
@@ -115,7 +115,7 @@ trait FlutterwaveSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException
      */
@@ -275,7 +275,7 @@ trait FlutterwaveSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws SubscriptionException
      */
@@ -375,7 +375,7 @@ trait FlutterwaveSubscriptionMethods
      * Flutterwave's own statuses ('active', 'canceled') already match the
      * enum's recognized vocabulary directly.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function mapFlutterwavePlanToResponse(array $data): PlanResponseDTO
     {
@@ -393,7 +393,7 @@ trait FlutterwaveSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      */
     private function mapFlutterwaveSubscriptionToResponse(array $data): SubscriptionResponseDTO
     {

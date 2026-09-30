@@ -293,7 +293,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      * A retry or a replay is byte-identical to the original, so the body
      * hash still catches both.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {
@@ -345,7 +345,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      * and the transaction was never updated. A body without `payload` is read
      * as it is.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     private function webhookTransaction(array $payload): Payload
     {

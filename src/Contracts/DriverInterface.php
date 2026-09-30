@@ -36,17 +36,17 @@ interface DriverInterface
     public function getSupportedCurrencies(): array;
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookReference(array $payload): ?string;
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookStatus(array $payload): string;
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookChannel(array $payload): ?string;
 

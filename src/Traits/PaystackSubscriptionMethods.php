@@ -82,7 +82,7 @@ trait PaystackSubscriptionMethods
     /**
      * Update a subscription plan
      *
-     * @param  array<string, mixed>  $updates
+     * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException If the plan update fails
      */
@@ -161,7 +161,7 @@ trait PaystackSubscriptionMethods
     /**
      * List all subscription plans
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws PlanException If listing plans fails
      */

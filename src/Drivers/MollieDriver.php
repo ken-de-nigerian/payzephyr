@@ -54,7 +54,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      * A typed event (anything with a `type`, such as `hook.ping`) carries its
      * own event id and is deduplicated normally.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function isStatelessWebhook(array $payload): bool
     {
@@ -428,7 +428,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
     /**
      * Extract the transaction reference from Mollie's webhook payload.
      *
-     * @param  array<string, mixed>  $payload  Webhook payload
+     * @param  array<array-key, mixed>  $payload  Webhook payload
      * @return string|null Transaction reference or null if not found
      */
     public function extractWebhookReference(array $payload): ?string
@@ -442,7 +442,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      * Mollie webhook doesn't contain full payment details, just the ID.
      * The actual status should be fetched from the API.
      *
-     * @param  array<string, mixed>  $payload  Webhook payload
+     * @param  array<array-key, mixed>  $payload  Webhook payload
      * @return string Payment status
      */
     public function extractWebhookStatus(array $payload): string
@@ -453,7 +453,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
     /**
      * Extract the payment channel from Mollie's webhook payload.
      *
-     * @param  array<string, mixed>  $payload  Webhook payload
+     * @param  array<array-key, mixed>  $payload  Webhook payload
      * @return string|null Payment channel or null if not found
      */
     public function extractWebhookChannel(array $payload): ?string

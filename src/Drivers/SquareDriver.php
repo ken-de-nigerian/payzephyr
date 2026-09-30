@@ -398,7 +398,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * One page of the location's orders, newest first.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws VerificationException|ChargeException
      */
@@ -440,7 +440,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Square's own explanation of a rejected request, when it gave one.
      *
-     * @param  array<string, mixed>  $response
+     * @param  array<array-key, mixed>  $response
      */
     private function errorDetail(array $response): ?string
     {
@@ -495,7 +495,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Retrieve payment details by payment ID.
      *
-     * @return array<string, mixed> Payment data
+     * @return array<array-key, mixed> Payment data
      *
      * @throws ChargeException
      */

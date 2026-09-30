@@ -51,7 +51,7 @@ abstract class AbstractDriver implements DriverInterface
 
     protected Client $client;
 
-    /** @var array<string, mixed> */
+    /** @var array<array-key, mixed> */
     protected array $config;
 
     protected string $name;
@@ -116,7 +116,7 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Create a new payment driver instance.
      *
-     * @param  array<string, mixed>  $config
+     * @param  array<array-key, mixed>  $config
      *
      * @throws InvalidConfigurationException If required, config is missing.
      */
@@ -165,7 +165,7 @@ abstract class AbstractDriver implements DriverInterface
      * Network errors are caught and wrapped with more user-friendly messages
      * to prevent crashes and provide better error context.
      *
-     * @param  array<string, mixed>  $options  Additional Guzzle options (json, query, etc.)
+     * @param  array<array-key, mixed>  $options  Additional Guzzle options (json, query, etc.)
      *
      * @throws ChargeException If the HTTP request fails.
      */
@@ -290,7 +290,7 @@ abstract class AbstractDriver implements DriverInterface
      * misbehaves is worth strictly less than the payment. An unreadable body
      * costs the timeline its payload, nothing more.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function peekResponseBody(ResponseInterface $response): array
     {
@@ -311,7 +311,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function arrayBody(mixed $body): array
     {
@@ -391,7 +391,7 @@ abstract class AbstractDriver implements DriverInterface
      * the conservative outcome; being told which field the provider omitted is
      * what makes it diagnosable.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      *
      * @throws ChargeException
      */
@@ -409,7 +409,7 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      *
      * @throws ChargeException
      */
@@ -430,7 +430,7 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * A monetary amount, which must never be allowed to default.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      *
      * @throws ChargeException
      */
@@ -470,8 +470,8 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Narrow a decoded response to the array PayZephyr expects to map from.
      *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
      *
      * @throws ChargeException
      */
@@ -486,14 +486,13 @@ abstract class AbstractDriver implements DriverInterface
             );
         }
 
-        /** @var array<string, mixed> */
         return $value;
     }
 
     /**
      * Convert the HTTP response body from JSON to a PHP array.
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     protected function parseResponse(ResponseInterface $response): array
     {
@@ -569,7 +568,7 @@ abstract class AbstractDriver implements DriverInterface
      *
      * @param  string  $level  Log level: 'info', 'warning', 'error', etc.
      * @param  string  $message  The log message
-     * @param  array<string, mixed>  $context
+     * @param  array<array-key, mixed>  $context
      */
     protected function log(string $level, string $message, array $context = []): void
     {
@@ -800,7 +799,7 @@ abstract class AbstractDriver implements DriverInterface
      * Default implementation that can be overridden by specific drivers.
      */
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookReference(array $payload): ?string
     {
@@ -813,7 +812,7 @@ abstract class AbstractDriver implements DriverInterface
      * Default implementation that can be overridden by specific drivers.
      */
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookStatus(array $payload): string
     {
@@ -825,7 +824,7 @@ abstract class AbstractDriver implements DriverInterface
      * Default implementation that can be overridden by specific drivers.
      */
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookChannel(array $payload): ?string
     {
@@ -852,7 +851,7 @@ abstract class AbstractDriver implements DriverInterface
      * id (Paystack, Flutterwave, Monnify, OPay) override this to return null.
      * Mollie's classic webhook is handled by SendsStatelessWebhooks instead.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {

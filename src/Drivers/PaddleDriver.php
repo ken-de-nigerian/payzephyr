@@ -302,7 +302,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      * Paddle wraps the changed entity in `data`; the package reference lives in
      * that entity's `custom_data`, with the transaction id as the fallback.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookReference(array $payload): ?string
     {
@@ -324,7 +324,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      * and reach this method. Scoping to `transaction.*` keeps a subscription's
      * lifecycle status from being written over a payment's.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookStatus(array $payload): string
     {
@@ -338,7 +338,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookChannel(array $payload): ?string
     {
@@ -346,7 +346,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function extractWebhookEventId(array $payload): ?string
     {

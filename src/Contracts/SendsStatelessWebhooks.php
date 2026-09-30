@@ -22,7 +22,7 @@ interface SendsStatelessWebhooks
     /**
      * Whether this particular payload is one of the stateless kind.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $payload
      */
     public function isStatelessWebhook(array $payload): bool;
 }

@@ -224,7 +224,9 @@ final class InstallCommand extends Command
             $envVar = Features::get($key)['envVar'];
 
             if (preg_match('/^'.preg_quote($envVar, '/').'=/m', $contents)) {
-                $contents = preg_replace('/^'.preg_quote($envVar, '/').'=.*$/m', "$envVar=true", $contents);
+                // preg_replace() answers null on a PCRE failure; writing that
+                // back would empty the .env, so the contents are kept as they were.
+                $contents = preg_replace('/^'.preg_quote($envVar, '/').'=.*$/m', "$envVar=true", $contents) ?? $contents;
             } else {
                 $contents = rtrim($contents, "\n")."\n$envVar=true\n";
             }

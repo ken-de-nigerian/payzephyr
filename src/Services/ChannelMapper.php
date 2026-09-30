@@ -185,12 +185,17 @@ final class ChannelMapper implements ChannelMapperInterface
 
         $validOptions = ['CARD', 'BANK_ACCOUNT', 'OPAY_ACCOUNT', 'OPAY_QRCODE', 'BALANCE', 'OTHERS'];
 
-        $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? (in_array(strtoupper($channel), $validOptions) ? strtoupper($channel) : null),
-            $channels
-        );
+        $mapped = [];
 
-        return array_filter($mapped, fn ($option) => in_array($option, $validOptions));
+        foreach ($channels as $index => $channel) {
+            $option = $mapping[strtolower($channel)] ?? strtoupper($channel);
+
+            if (in_array($option, $validOptions, true)) {
+                $mapped[$index] = $option;
+            }
+        }
+
+        return $mapped;
     }
 
     /**

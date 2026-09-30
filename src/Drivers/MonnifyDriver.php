@@ -89,10 +89,16 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 throw new ChargeException('Failed to authenticate with Monnify');
             }
 
-            $this->accessToken = $data['responseBody']['accessToken'];
+            $token = $data['responseBody']['accessToken'] ?? null;
+
+            if (! is_string($token) || $token === '') {
+                throw new ChargeException('Monnify reported a successful login but returned no access token');
+            }
+
+            $this->accessToken = $token;
             $this->tokenExpiry = time() + ($data['responseBody']['expiresIn'] ?? 3600) - 60;
 
-            return $this->accessToken;
+            return $token;
         } catch (Throwable $e) {
             $this->log('error', 'Monnify authentication failed', [
                 'error' => $e->getMessage(),

@@ -79,7 +79,9 @@ final class MetadataSanitizer
         ];
 
         foreach ($dangerousPatterns as $pattern) {
-            $value = preg_replace($pattern, '', $value);
+            // Null means PCRE gave up on the value. Nothing about it can be
+            // vouched for then, so it is dropped rather than stored unsanitized.
+            $value = preg_replace($pattern, '', $value) ?? '';
         }
 
         return $value;

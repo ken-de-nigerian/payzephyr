@@ -594,6 +594,8 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Helper to append a query parameter to a URL.
      * Handles cases where the URL already has query params.
+     *
+     * @return ($url is non-empty-string ? non-empty-string : null)
      */
     protected function appendQueryParam(?string $url, string $key, string $value): ?string
     {

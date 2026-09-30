@@ -159,6 +159,11 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
             $session = $this->stripe->checkout->sessions->create($params, $options);
 
+            // Only a hosted session has a URL to send the customer to.
+            if ($session->url === null) {
+                throw new ChargeException("Stripe created checkout session [$session->id] without a URL to redirect the customer to");
+            }
+
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
                 'session_id' => $session->id,

@@ -41,7 +41,7 @@ final class HealthEndpointMiddleware
             $allowed = false;
 
             foreach ($allowedIps as $allowedIp) {
-                if ($this->ipMatches($clientIp, $allowedIp)) {
+                if ($clientIp !== null && $this->ipMatches($clientIp, $allowedIp)) {
                     $allowed = true;
                     break;
                 }

@@ -75,10 +75,14 @@ class WebhookRequest extends FormRequest
                 return true;
             }
 
-            $valid = $driver->validateWebhook(
-                $this->headers->all(),
-                $this->getContent()
+            // A header can be present with no value; a signature is never one
+            // of those, so they are dropped rather than passed as null.
+            $headers = array_map(
+                fn (array $values): array => array_values(array_filter($values, 'is_string')),
+                $this->headers->all()
             );
+
+            $valid = $driver->validateWebhook($headers, $this->getContent());
 
             if (! $valid) {
                 $this->traceRejectedSignature($driver, $provider);

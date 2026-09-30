@@ -199,3 +199,15 @@ test('a token sent as an array is refused, not cast', function () {
 
     expect(makeHealthRequest(query: ['token' => ['health-secret']])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED);
 });
+
+test('a request with no resolvable address is refused by the allowlist, not crashed by it', function () {
+    healthConfig(false, ips: ['10.0.0.5']);
+
+    $request = Request::create('/payments/health', 'GET');
+    $request->server->remove('REMOTE_ADDR');
+
+    $response = (new HealthEndpointMiddleware)->handle($request, fn () => response()->json(['status' => 'operational']));
+
+    expect($request->ip())->toBeNull()
+        ->and($response->getStatusCode())->toBe(403);
+});

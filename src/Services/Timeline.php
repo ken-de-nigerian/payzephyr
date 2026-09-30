@@ -193,7 +193,7 @@ final readonly class Timeline
         $findings = [];
 
         foreach ($this->events->groupBy('correlation_id') as $correlationId => $group) {
-            if ($correlationId === '' || $group->first()->correlation_id === null) {
+            if ($correlationId === '' || $group->first()?->correlation_id === null) {
                 continue;
             }
 

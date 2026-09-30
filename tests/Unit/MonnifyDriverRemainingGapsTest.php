@@ -167,3 +167,13 @@ test('monnify resolveVerificationId returns the provider id as-is', function () 
 
     expect($driver->resolveVerificationId('MON_REF_123', 'provider_tx_456'))->toBe('provider_tx_456');
 });
+
+test('monnify refuses a login that reports success but carries no access token', function () {
+    // Without this the null was stored as the token and returned from a
+    // method declared to return a string.
+    $driver = createMonnifyRemainingGapsDriver([
+        new Response(200, [], json_encode(['requestSuccessful' => true, 'responseBody' => ['expiresIn' => 3600]])),
+    ]);
+
+    $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
+})->throws(ChargeException::class, 'returned no access token');

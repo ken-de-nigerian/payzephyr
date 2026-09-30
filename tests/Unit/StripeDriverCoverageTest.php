@@ -233,3 +233,20 @@ test('stripe driver healthCheck returns false for 5xx errors', function () {
 
     expect($driver->healthCheck())->toBeFalse();
 });
+
+test('stripe refuses a checkout session that came back without a url', function () {
+    // Only a hosted session has somewhere to send the customer. Passing a
+    // null on as the authorization url surfaced as a TypeError from the DTO.
+    $driver = new StripeDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['USD']]);
+
+    $sessions = Mockery::mock();
+    $sessions->shouldReceive('create')->once()->andReturn((object) ['id' => 'cs_test_no_url', 'url' => null]);
+    $stripe = Mockery::mock();
+    $stripe->checkout = (object) ['sessions' => $sessions];
+    $driver->setStripeClient($stripe);
+
+    expect(fn () => $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+        'amount' => 10, 'currency' => 'USD', 'email' => 'a@b.test',
+        'reference' => 'STRIPE_NO_URL', 'callback_url' => 'https://shop.example.com/cb',
+    ])))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'without a URL to redirect the customer to');
+});

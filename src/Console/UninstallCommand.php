@@ -277,8 +277,8 @@ final class UninstallCommand extends Command
         $contents = File::get($envPath);
 
         if (preg_match('/^'.preg_quote($envVar, '/').'=/m', $contents)) {
-            $contents = preg_replace('/^'.preg_quote($envVar, '/').'=.*$/m', "$envVar=false", $contents);
-            File::put($envPath, $contents);
+            // Null on a PCRE failure; never write that over the .env.
+            File::put($envPath, preg_replace('/^'.preg_quote($envVar, '/').'=.*$/m', "$envVar=false", $contents) ?? $contents);
         }
     }
 }

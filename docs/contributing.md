@@ -60,6 +60,15 @@ composer test && composer analyse && composer rector && composer format
 
 Run them before opening a pull request: CI runs the same checks, and catching a formatting or static-analysis issue locally is faster than waiting for CI to tell you. CI also requires 100% line coverage (`vendor/bin/pest --coverage --min=100`).
 
+The suite runs on in-memory SQLite. CI runs it again on MySQL and PostgreSQL, since row locks, unique-violation detection and decimal sums are where those differ; to do the same locally, point it at an empty database:
+
+```bash
+DB_CONNECTION=mysql DB_HOST=127.0.0.1 DB_PORT=3306 DB_DATABASE=payzephyr_test DB_USERNAME=root DB_PASSWORD= vendor/bin/pest
+DB_CONNECTION=pgsql DB_HOST=127.0.0.1 DB_PORT=5432 DB_DATABASE=payzephyr_test DB_USERNAME=postgres DB_PASSWORD=postgres vendor/bin/pest
+```
+
+Run those without `--parallel`: every process would share the one database. `tests/Integration/RedisQueueAndCacheTest.php` skips unless `REDIS_HOST` is set; with it, a webhook job goes through a real Redis queue and worker, and the charge claims through a Redis cache.
+
 `composer mutation` changes each line of the webhook verification path, the webhook job and every driver in small ways - a `>` to `>=`, a removed array entry - and runs the tests that cover that line. Every change must make a test fail; one that does not is a behaviour no test pins, and CI fails until one does. It takes a couple of minutes, and needs the pcov extension. Pest's mutation plugin does not run reliably on Windows (it builds paths and a test filter Windows rejects); run it on Linux, macOS or WSL, or leave it to CI.
 
 ## Coding standards

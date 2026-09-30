@@ -2,6 +2,7 @@
 
 namespace KenDeNigerian\PayZephyr\Tests;
 
+use Illuminate\Support\Facades\DB;
 use KenDeNigerian\PayZephyr\PaymentServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
 
@@ -15,13 +16,18 @@ abstract class TestCase extends Orchestra
     }
 
     /**
-     * A database directory and .env of this process's own.
+     * A database directory, config directory and .env of this process's own.
      *
      * The install and uninstall tests publish migrations into database_path()
-     * and write feature flags to the .env file. Left pointing at Testbench's
-     * skeleton, which every parallel worker shares, one worker deleted files
-     * another worker's `migrate` was halfway through reading. Set here, before
-     * the service provider boots and computes its publish targets.
+     * and config/payments.php into config_path(), and write feature flags to
+     * the .env file. Left pointing at Testbench's skeleton, which every
+     * parallel worker shares, one worker deleted files another worker's
+     * `migrate` was halfway through reading - and a worker booting while
+     * another was publishing the config read a half-written payments.php,
+     * which `require`s to 1, and failed in mergeConfigFrom(). A published
+     * config left in the skeleton was also merged into every later test's
+     * configuration. Set here, before the service provider boots and computes
+     * its publish targets.
      */
     private static function isolatedApplicationPath(): string
     {
@@ -32,6 +38,10 @@ abstract class TestCase extends Orchestra
 
             if (! is_dir($path.'/database/migrations')) {
                 mkdir($path.'/database/migrations', 0777, true);
+            }
+
+            if (! is_dir($path.'/config')) {
+                mkdir($path.'/config', 0777, true);
             }
 
             // Start from the skeleton's .env, as the tests always have.
@@ -48,13 +58,10 @@ abstract class TestCase extends Orchestra
     {
         $app->useDatabasePath(self::isolatedApplicationPath().DIRECTORY_SEPARATOR.'database');
         $app->useEnvironmentPath(self::isolatedApplicationPath());
+        $app->useConfigPath(self::isolatedApplicationPath().DIRECTORY_SEPARATOR.'config');
 
         $app['config']->set('database.default', 'testing');
-        $app['config']->set('database.connections.testing', [
-            'driver' => 'sqlite',
-            'database' => ':memory:',
-            'prefix' => '',
-        ]);
+        $app['config']->set('database.connections.testing', self::databaseConnection());
 
         $app['config']->set('payments.default', 'paystack');
 
@@ -171,13 +178,129 @@ abstract class TestCase extends Orchestra
         }
     }
 
+    /**
+     * The database the suite runs against: in-memory SQLite by default, or the
+     * server DB_CONNECTION names. CI runs the suite once more on each of MySQL
+     * and PostgreSQL, because locking, unique-violation detection and decimal
+     * sums are exactly where those differ from SQLite.
+     *
+     * @return array<string, string|int>
+     */
+    private static function databaseConnection(): array
+    {
+        $env = fn (string $key, string $default): string => is_string($value = getenv($key)) && $value !== '' ? $value : $default;
+
+        return match ($env('DB_CONNECTION', 'sqlite')) {
+            'mysql' => [
+                'driver' => 'mysql',
+                'host' => $env('DB_HOST', '127.0.0.1'),
+                'port' => $env('DB_PORT', '3306'),
+                'database' => $env('DB_DATABASE', 'payzephyr_test'),
+                'username' => $env('DB_USERNAME', 'root'),
+                'password' => $env('DB_PASSWORD', ''),
+                'charset' => 'utf8mb4',
+                'collation' => 'utf8mb4_unicode_ci',
+                'prefix' => '',
+            ],
+            'pgsql' => [
+                'driver' => 'pgsql',
+                'host' => $env('DB_HOST', '127.0.0.1'),
+                'port' => $env('DB_PORT', '5432'),
+                'database' => $env('DB_DATABASE', 'payzephyr_test'),
+                'username' => $env('DB_USERNAME', 'postgres'),
+                'password' => $env('DB_PASSWORD', ''),
+                'charset' => 'utf8',
+                'prefix' => '',
+                'search_path' => 'public',
+            ],
+            default => [
+                'driver' => 'sqlite',
+                'database' => ':memory:',
+                'prefix' => '',
+            ],
+        };
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        if (config('database.connections.testing.driver') === 'sqlite') {
+            $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+            $this->artisan('migrate', ['--database' => 'testing'])->run();
 
-        $this->artisan('migrate', ['--database' => 'testing'])->run();
+            return;
+        }
+
+        // Not loadMigrationsFrom(): Testbench rolls those migrations back
+        // after every test, which would rebuild a server database each time.
+        $this->app->make('migrator')->path(__DIR__.'/../database/migrations');
+        $this->resetServerDatabase();
+    }
+
+    /**
+     * The schema after the last fresh migration on a server database - each
+     * table with its columns, and the migrations recorded - or null until the
+     * first test of the process builds it.
+     *
+     * @var array{tables: array<string, list<string>>, migrations: int}|null
+     */
+    private static ?array $migratedSchema = null;
+
+    /**
+     * Give this test an empty database with the package's schema.
+     *
+     * In-memory SQLite starts that way; a server database keeps whatever the
+     * last test left. Rebuilding it for every test takes most of a second on
+     * MySQL, so the schema is built once and the tables emptied between tests.
+     * A test that changed the schema - the install and uninstall tests drop
+     * tables, and the stale-column tests drop a column - leaves one that no
+     * longer matches, and the next test rebuilds.
+     */
+    private function resetServerDatabase(): void
+    {
+        if (self::$migratedSchema === null || $this->currentSchema() !== self::$migratedSchema) {
+            $this->artisan('migrate:fresh', ['--database' => 'testing'])->run();
+            self::$migratedSchema = $this->currentSchema();
+
+            return;
+        }
+
+        $data = array_values(array_filter(array_keys(self::$migratedSchema['tables']), fn (string $table): bool => $table !== 'migrations'));
+
+        if (config('database.connections.testing.driver') === 'pgsql') {
+            DB::connection('testing')->statement('TRUNCATE TABLE '.implode(', ', array_map(fn (string $t): string => '"'.$t.'"', $data)).' RESTART IDENTITY CASCADE');
+
+            return;
+        }
+
+        foreach ($data as $table) {
+            DB::connection('testing')->table($table)->delete();
+        }
+    }
+
+    /**
+     * @return array{tables: array<string, list<string>>, migrations: int}
+     */
+    private function currentSchema(): array
+    {
+        $schema = DB::connection('testing')->getSchemaBuilder();
+        $tables = [];
+
+        foreach ($schema->getTableListing() as $qualified) {
+            $parts = explode('.', $qualified);
+            $table = end($parts);
+            $columns = $schema->getColumnListing($table);
+            sort($columns);
+            $tables[$table] = $columns;
+        }
+
+        ksort($tables);
+
+        return [
+            'tables' => $tables,
+            'migrations' => isset($tables['migrations']) ? DB::connection('testing')->table('migrations')->count() : 0,
+        ];
     }
 
     /**

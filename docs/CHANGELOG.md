@@ -300,6 +300,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CI runs the suite on MySQL and PostgreSQL, and the queue and cache paths on Redis.** The
+  suite ran only on in-memory SQLite, with a synchronous queue and an array cache - none of which
+  a production install uses. `DB_CONNECTION` now selects the test database; the Redis tests send
+  a webhook through a real queue and worker and take charge claims through a Redis cache.
+
 - **Rector and mutation testing gate CI.** `composer rector` runs Rector as a dry run over
   `src`; `composer mutation` runs Pest's mutation testing over the webhook verification path,
   the webhook job and all ten drivers, and fails unless every one of its 2,754 mutations is

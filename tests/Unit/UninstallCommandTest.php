@@ -310,16 +310,20 @@ test('a resource that fails to drop is reported, the rest are still removed, and
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds,trace']);
     $this->artisan('migrate', ['--force' => true])->run();
 
-    // A real failure, not a mock: DROP TABLE refuses to drop a view.
-    DB::statement('CREATE VIEW refunds_as_view AS SELECT 1 AS id');
-    config(['payments.refunds.logging.table' => 'refunds_as_view']);
+    // A failure raised by the connection itself, not a mocked Schema: the
+    // DROP for the refunds table is refused before it reaches the database.
+    // It works on every database the suite runs on; making DROP TABLE fail
+    // for real (a view in the table's place) only fails on SQLite.
+    $refuse = true;
+    DB::connection()->beforeExecuting(function (string $query) use (&$refuse): void {
+        if ($refuse && preg_match('/^drop table if exists [`"]?refund_transactions[`"]?$/i', $query) === 1) {
+            throw new RuntimeException('Refusing to drop refund_transactions');
+        }
+    });
 
-    try {
-        $exitCode = Artisan::call('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'refunds,trace']);
-        $output = Artisan::output();
-    } finally {
-        DB::statement('DROP VIEW IF EXISTS refunds_as_view');
-    }
+    $exitCode = Artisan::call('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'refunds,trace']);
+    $output = Artisan::output();
+    $refuse = false;
 
     expect($exitCode)->toBe(UninstallCommand::FAILURE)
         ->and($output)->toContain('Failed to remove Refunds:')

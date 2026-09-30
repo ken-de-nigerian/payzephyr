@@ -132,6 +132,134 @@ jobs:
       - name: Execute tests
         run: vendor/bin/pest --parallel
 
+  # The suite once more on each server database. SQLite differs from both
+  # exactly where this package leans on the database: row locks
+  # (lockForUpdate), unique-violation detection, decimal sums and datetime
+  # precision. tests/TestCase.php reads DB_CONNECTION. Serial, because every
+  # process would share the one database.
+  databases:
+    runs-on: ubuntu-latest
+    name: Tests on ${{ matrix.database }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - database: mysql
+            port: 3306
+            username: root
+            password: ''
+          - database: pgsql
+            port: 5432
+            username: postgres
+            password: postgres
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: payzephyr_test
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: payzephyr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd=pg_isready
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_mysql, pdo_pgsql, redis, bcmath, intl, soap, gd, exif, iconv
+          coverage: none
+
+      - name: Configure dependencies for Laravel 12
+        run: |
+          composer require "laravel/framework:12.*" --no-interaction --no-update
+          composer require --dev "orchestra/testbench:10.*" --no-interaction --no-update
+          composer require --dev "pestphp/pest:^3.0" --no-interaction --no-update
+          composer require --dev "pestphp/pest-plugin-laravel:^3.0" --no-interaction --no-update
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare test environment
+        run: mkdir -p .phpunit.cache
+
+      - name: Execute tests
+        run: vendor/bin/pest
+        env:
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ matrix.port }}
+          DB_DATABASE: payzephyr_test
+          DB_USERNAME: ${{ matrix.username }}
+          DB_PASSWORD: ${{ matrix.password }}
+
+  # A webhook job serialized onto a Redis queue and run by a worker, and the
+  # in-flight claims Cache::add takes, on the store production uses. The
+  # tests skip without REDIS_HOST, so the step also checks they ran.
+  redis:
+    runs-on: ubuntu-latest
+    name: Queue and cache on Redis
+
+    services:
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_mysql, pdo_pgsql, redis, bcmath, intl, soap, gd, exif, iconv
+          coverage: none
+
+      - name: Configure dependencies for Laravel 12
+        run: |
+          composer require "laravel/framework:12.*" --no-interaction --no-update
+          composer require --dev "orchestra/testbench:10.*" --no-interaction --no-update
+          composer require --dev "pestphp/pest:^3.0" --no-interaction --no-update
+          composer require --dev "pestphp/pest-plugin-laravel:^3.0" --no-interaction --no-update
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare test environment
+        run: mkdir -p .phpunit.cache
+
+      - name: Execute Redis tests
+        run: |
+          vendor/bin/pest tests/Integration/RedisQueueAndCacheTest.php --colors=never | tee redis-tests.log
+          grep -q "3 passed" redis-tests.log
+        env:
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
   # Every mutation of the webhook trust boundary and the drivers must be
   # caught by a test: the code that decides whether a delivery is genuine,
   # fresh and new, and the code that turns a provider's answer into money.

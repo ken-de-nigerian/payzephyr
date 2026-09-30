@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -25,7 +26,7 @@ trait SquareRefundMethods
             $amountMoney = $request->amount !== null
                 ? [
                     'amount' => $request->getAmountInMinorUnits(),
-                    'currency' => $request->currency ?? $this->config['currencies'][0] ?? 'USD',
+                    'currency' => $request->currency ?? $this->settings()->string('currencies', 0) ?? 'USD',
                 ] : $this->fetchOriginalPaymentAmountMoney($request->transactionReference);
 
             $payload = array_filter([
@@ -38,25 +39,27 @@ trait SquareRefundMethods
             $response = $this->makeRequest('POST', '/v2/refunds', ['json' => $payload]);
             $data = $this->parseResponse($response);
 
-            if (! isset($data['refund'])) {
-                $errorMessage = $data['errors'][0]['detail'] ?? $data['errors'][0]['code'] ?? 'Failed to create Square refund';
-                throw new RefundException($errorMessage);
+            $result = Payload::of($data)->arrayOrNull('refund');
+
+            if ($result === null) {
+                throw new RefundException($this->errorDetail($data) ?? 'Failed to create Square refund');
             }
 
-            $result = $data['refund'];
+            $refund = new Payload($result);
+            $refundId = $this->requireString($result, 'id', 'refund');
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => $result['id'],
+                'refund_reference' => $refundId,
                 'transaction_reference' => $request->transactionReference,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['id'],
-                transactionReference: $result['payment_id'] ?? $request->transactionReference,
-                status: $result['status'] ?? 'pending',
+                refundReference: $refundId,
+                transactionReference: $refund->string('payment_id') ?? $request->transactionReference,
+                status: $refund->string('status') ?? 'pending',
                 amount: $this->requireAmount($this->requireArray($result, 'amount_money', 'refund'), 'amount', 'refund') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount_money', 'refund'), 'currency', 'refund'),
-                reason: $result['reason'] ?? $request->reason,
+                reason: $refund->string('reason') ?? $request->reason,
                 metadata: $request->metadata,
                 provider: $this->getName(),
             );
@@ -93,17 +96,19 @@ trait SquareRefundMethods
             );
         }
 
-        $amountMoney = $data['payment']['amount_money'] ?? null;
+        $amountMoney = Payload::of($data)->at('payment', 'amount_money');
+        $amount = $amountMoney->int('amount');
+        $currency = $amountMoney->string('currency');
 
-        if (! is_array($amountMoney) || ! isset($amountMoney['amount'], $amountMoney['currency'])) {
+        if ($amount === null || $currency === null) {
             throw new RefundException(
                 "Cannot issue a full refund for Square payment [$paymentId]: the original payment's amount could not be determined. Pass an explicit amount() instead."
             );
         }
 
         return [
-            'amount' => (int) $amountMoney['amount'],
-            'currency' => (string) $amountMoney['currency'],
+            'amount' => $amount,
+            'currency' => $currency,
         ];
     }
 
@@ -113,20 +118,21 @@ trait SquareRefundMethods
             $response = $this->makeRequest('GET', '/v2/refunds/'.rawurlencode($refundReference));
             $data = $this->parseResponse($response);
 
-            if (! isset($data['refund'])) {
-                $errorMessage = $data['errors'][0]['detail'] ?? $data['errors'][0]['code'] ?? 'Failed to fetch Square refund';
-                throw new RefundException($errorMessage);
+            $result = Payload::of($data)->arrayOrNull('refund');
+
+            if ($result === null) {
+                throw new RefundException($this->errorDetail($data) ?? 'Failed to fetch Square refund');
             }
 
-            $result = $data['refund'];
+            $refund = new Payload($result);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['id'] ?? $refundReference,
-                transactionReference: $result['payment_id'] ?? '',
-                status: $result['status'] ?? 'unknown',
+                refundReference: $refund->string('id') ?? $refundReference,
+                transactionReference: $refund->string('payment_id') ?? '',
+                status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($this->requireArray($result, 'amount_money', 'refund'), 'amount', 'refund') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount_money', 'refund'), 'currency', 'refund'),
-                reason: $result['reason'] ?? null,
+                reason: $refund->string('reason'),
                 metadata: [],
                 provider: $this->getName(),
             );

@@ -8,6 +8,7 @@ use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -53,10 +54,10 @@ trait PaddleRefundMethods
             }
 
             $response = $this->makeRequest('POST', '/adjustments', ['json' => $payload]);
-            $data = $this->parseResponse($response)['data'] ?? [];
+            $data = Payload::of($this->parseResponse($response))->array('data');
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => $data['id'] ?? null,
+                'refund_reference' => Payload::of($data)->string('id'),
                 'transaction_reference' => $request->transactionReference,
             ]);
 
@@ -154,10 +155,9 @@ trait PaddleRefundMethods
             $response = $this->makeRequest('GET', '/adjustments', [
                 'query' => ['id' => $refundReference],
             ]);
-            $data = $this->parseResponse($response)['data'] ?? [];
-            $adjustment = $data[0] ?? null;
+            $adjustment = Payload::of($this->parseResponse($response))->arrayOrNull('data', 0);
 
-            if (! is_array($adjustment)) {
+            if ($adjustment === null) {
                 throw new RefundException("Paddle adjustment [$refundReference] not found");
             }
 
@@ -188,24 +188,25 @@ trait PaddleRefundMethods
     {
         try {
             $response = $this->makeRequest('GET', '/transactions/'.rawurlencode($transactionId));
-            $transaction = $this->parseResponse($response)['data'] ?? [];
+            $transaction = Payload::of($this->parseResponse($response))->at('data');
         } catch (Throwable $e) {
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: failed to look up its line items. (".$e->getMessage().')', 0, $e);
         }
 
-        $lineItems = $transaction['details']['line_items'] ?? [];
+        $lineItems = $transaction->array('details', 'line_items');
+        $itemId = count($lineItems) === 1 ? $transaction->string('details', 'line_items', 0, 'id') : null;
 
-        if (count($lineItems) !== 1 || empty($lineItems[0]['id'])) {
+        if ($itemId === null || $itemId === '') {
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: expected exactly one line item, found ".count($lineItems).'. Issue a full refund instead, or create the adjustment directly through Paddle.');
         }
 
-        $currency = strtoupper((string) ($transaction['currency_code'] ?? ''));
+        $currency = strtoupper($transaction->string('currency_code') ?? '');
 
         if ($currency === '') {
             throw new RefundException("Cannot issue a partial refund for Paddle transaction [$transactionId]: the transaction did not report a currency_code, so the refund amount cannot be converted safely.");
         }
 
-        return [(string) $lineItems[0]['id'], $currency];
+        return [$itemId, $currency];
     }
 
     /**
@@ -221,10 +222,10 @@ trait PaddleRefundMethods
         return new RefundResponseDTO(
             refundReference: $this->requireString($adjustment, 'id', 'refund'),
             transactionReference: $this->requireString($adjustment, 'transaction_id', 'refund'),
-            status: $this->mapAdjustmentStatus((string) ($adjustment['status'] ?? '')),
+            status: $this->mapAdjustmentStatus(Payload::of($adjustment)->string('status') ?? ''),
             amount: $this->fromMinorUnits($this->requireAmount($totals, 'total', 'refund'), $currency),
             currency: $currency,
-            reason: $adjustment['reason'] ?? $reason,
+            reason: Payload::of($adjustment)->string('reason') ?? $reason,
             metadata: [
                 'paddle_adjustment_status' => $adjustment['status'] ?? null,
                 'paddle_customer_id' => $adjustment['customer_id'] ?? null,

@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -24,7 +25,7 @@ trait PayPalRefundMethods
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
-            $refundCurrency = $request->currency ?? $this->config['currencies'][0] ?? 'USD';
+            $refundCurrency = $request->currency ?? $this->settings()->string('currencies', 0) ?? 'USD';
 
             $payload = array_filter([
                 'amount' => $request->amount !== null ? [
@@ -44,23 +45,25 @@ trait PayPalRefundMethods
 
             $response = $this->makeRequest('POST', '/v2/payments/captures/'.rawurlencode($request->transactionReference).'/refund', $requestOptions);
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
+            $refundId = $body->string('id');
 
-            if (! isset($data['id'])) {
+            if ($refundId === null) {
                 throw new RefundException('Failed to create PayPal refund');
             }
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => $data['id'],
+                'refund_reference' => $refundId,
                 'transaction_reference' => $request->transactionReference,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $data['id'],
+                refundReference: $refundId,
                 transactionReference: $request->transactionReference,
-                status: $data['status'] ?? 'pending',
-                amount: $this->requireAmountValue($data['amount']['value'] ?? $request->amount, 'amount.value', 'refund'),
+                status: $body->string('status') ?? 'pending',
+                amount: $this->requireAmountValue($body->get('amount', 'value') ?? $request->amount, 'amount.value', 'refund'),
                 currency: $this->requireString($this->requireArray($data, 'amount', 'refund'), 'currency_code', 'refund'),
-                reason: $data['note_to_payer'] ?? $request->reason,
+                reason: $body->string('note_to_payer') ?? $request->reason,
                 metadata: $request->metadata,
                 provider: $this->getName(),
             );
@@ -83,23 +86,24 @@ trait PayPalRefundMethods
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
+            $refundId = $body->string('id');
 
-            if (! isset($data['id'])) {
+            if ($refundId === null) {
                 throw new RefundException("PayPal refund not found: $refundReference");
             }
 
-            /** @var array<int, array<string, mixed>> $links */
-            $links = $data['links'] ?? [];
-            $captureLink = collect($links)->firstWhere('rel', 'up');
-            $captureId = $captureLink ? basename((string) $captureLink['href']) : '';
+            // The refunded capture is the refund's `up` link.
+            $captureLink = $this->linkHref($data, 'up');
+            $captureId = $captureLink === null ? '' : basename($captureLink);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $data['id'],
+                refundReference: $refundId,
                 transactionReference: $captureId,
-                status: $data['status'] ?? 'unknown',
+                status: $body->string('status') ?? 'unknown',
                 amount: $this->requireAmount($this->requireArray($data, 'amount', 'fetch refund'), 'value', 'fetch refund'),
                 currency: $this->requireString($this->requireArray($data, 'amount', 'fetch refund'), 'currency_code', 'fetch refund'),
-                reason: $data['note_to_payer'] ?? null,
+                reason: $body->string('note_to_payer'),
                 metadata: [],
                 provider: $this->getName(),
             );

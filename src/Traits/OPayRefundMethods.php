@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -28,8 +29,8 @@ trait OPayRefundMethods
         $refundReference = $request->idempotencyKey ?? Str::uuid()->toString();
 
         try {
-            $privateKey = $this->config['secret_key'] ?? null;
-            if (empty($privateKey)) {
+            $privateKey = $this->settings()->string('secret_key');
+            if ($privateKey === null || $privateKey === '') {
                 throw new InvalidConfigurationException('OPay secret key (private key) is required for refund API authentication');
             }
 
@@ -39,7 +40,7 @@ trait OPayRefundMethods
                 'orderNo' => $request->transactionReference,
                 'amount' => $request->amount !== null ? [
                     'total' => (string) $request->getAmountInMinorUnits(),
-                    'currency' => $request->currency ?? $this->config['currencies'][0] ?? 'NGN',
+                    'currency' => $request->currency ?? $this->settings()->string('currencies', 0) ?? 'NGN',
                 ] : null,
                 'refundReason' => $request->reason,
             ], fn ($value) => $value !== null);
@@ -51,17 +52,19 @@ trait OPayRefundMethods
                 'json' => $payload,
                 'headers' => [
                     'Authorization' => 'Bearer '.$signature,
-                    'MerchantId' => $this->config['merchant_id'],
+                    'MerchantId' => $this->settings()->string('merchant_id') ?? '',
                 ],
             ]);
 
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
 
-            if (($data['code'] ?? '') !== '00000') {
-                throw new RefundException($data['message'] ?? $data['msg'] ?? 'Failed to create OPay refund');
+            if ($body->string('code') !== '00000') {
+                throw new RefundException($body->string('message') ?? $body->string('msg') ?? 'Failed to create OPay refund');
             }
 
-            $result = $data['data'] ?? $data;
+            $result = $body->arrayOrNull('data') ?? $data;
+            $refund = new Payload($result);
 
             $this->log('info', 'Refund created', [
                 'refund_reference' => $refundReference,
@@ -69,9 +72,9 @@ trait OPayRefundMethods
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['refundNo'] ?? $refundReference,
-                transactionReference: $result['orderNo'] ?? $request->transactionReference,
-                status: $result['status'] ?? 'pending',
+                refundReference: $refund->string('refundNo') ?? $refundReference,
+                transactionReference: $refund->string('orderNo') ?? $request->transactionReference,
+                status: $refund->string('status') ?? 'pending',
                 amount: $this->requireAmount($this->requireArray($result, 'amount', 'refund'), 'total', 'refund') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount', 'refund'), 'currency', 'refund'),
                 reason: $request->reason,
@@ -93,8 +96,8 @@ trait OPayRefundMethods
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {
-            $privateKey = $this->config['secret_key'] ?? null;
-            if (empty($privateKey)) {
+            $privateKey = $this->settings()->string('secret_key');
+            if ($privateKey === null || $privateKey === '') {
                 throw new InvalidConfigurationException('OPay secret key (private key) is required for refund API authentication');
             }
 
@@ -106,22 +109,24 @@ trait OPayRefundMethods
                 'json' => $payload,
                 'headers' => [
                     'Authorization' => 'Bearer '.$signature,
-                    'MerchantId' => $this->config['merchant_id'],
+                    'MerchantId' => $this->settings()->string('merchant_id') ?? '',
                 ],
             ]);
 
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
 
-            if (($data['code'] ?? '') !== '00000') {
-                throw new RefundException($data['message'] ?? $data['msg'] ?? 'Failed to fetch OPay refund');
+            if ($body->string('code') !== '00000') {
+                throw new RefundException($body->string('message') ?? $body->string('msg') ?? 'Failed to fetch OPay refund');
             }
 
-            $result = $data['data'] ?? $data;
+            $result = $body->arrayOrNull('data') ?? $data;
+            $refund = new Payload($result);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['refundNo'] ?? $refundReference,
-                transactionReference: $result['orderNo'] ?? '',
-                status: $result['status'] ?? 'unknown',
+                refundReference: $refund->string('refundNo') ?? $refundReference,
+                transactionReference: $refund->string('orderNo') ?? '',
+                status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($this->requireArray($result, 'amount', 'refund'), 'total', 'refund') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount', 'refund'), 'currency', 'refund'),
                 reason: null,

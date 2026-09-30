@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -39,27 +40,29 @@ trait PaystackRefundMethods
 
             $response = $this->makeRequest('POST', '/refund', $requestOptions);
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
 
-            if (! ($data['status'] ?? false)) {
-                throw new RefundException($data['message'] ?? 'Failed to create Paystack refund');
+            if (! $body->flag(false, 'status')) {
+                throw new RefundException($body->string('message') ?? 'Failed to create Paystack refund');
             }
 
-            $result = $data['data'] ?? [];
-            $refundReference = $result['id'] ?? null;
+            $result = $body->array('data');
+            $refund = new Payload($result);
+            $refundReference = $refund->string('id');
 
             if ($refundReference === null) {
                 throw new RefundException('Refund reference not found in response. Response: '.json_encode($data));
             }
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => (string) $refundReference,
+                'refund_reference' => $refundReference,
                 'transaction_reference' => $request->transactionReference,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) $refundReference,
+                refundReference: $refundReference,
                 transactionReference: $request->transactionReference,
-                status: $result['status'] ?? 'pending',
+                status: $refund->string('status') ?? 'pending',
                 amount: $this->requireAmount($result, 'amount', 'refund') / 100,
                 currency: $this->requireString($result, 'currency', 'refund'),
                 reason: $request->reason,
@@ -82,21 +85,22 @@ trait PaystackRefundMethods
     {
         try {
             $response = $this->makeRequest('GET', '/refund/'.rawurlencode($refundReference));
-            $data = $this->parseResponse($response);
+            $body = new Payload($this->parseResponse($response));
 
-            if (! ($data['status'] ?? false)) {
-                throw new RefundException($data['message'] ?? 'Failed to fetch Paystack refund');
+            if (! $body->flag(false, 'status')) {
+                throw new RefundException($body->string('message') ?? 'Failed to fetch Paystack refund');
             }
 
-            $result = $data['data'] ?? [];
+            $result = $body->array('data');
+            $refund = new Payload($result);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) ($result['id'] ?? $refundReference),
-                transactionReference: (string) ($result['transaction']['reference'] ?? $result['transaction_reference'] ?? ''),
-                status: $result['status'] ?? 'unknown',
+                refundReference: $refund->string('id') ?? $refundReference,
+                transactionReference: $refund->string('transaction', 'reference') ?? $refund->string('transaction_reference') ?? '',
+                status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($result, 'amount', 'refund') / 100,
                 currency: $this->requireString($result, 'currency', 'refund'),
-                reason: $result['customer_note'] ?? null,
+                reason: $refund->string('customer_note'),
                 metadata: [],
                 provider: $this->getName(),
             );

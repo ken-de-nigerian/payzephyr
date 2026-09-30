@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -30,7 +31,7 @@ trait MollieRefundMethods
 
             $payload = array_filter([
                 'amount' => $request->amount !== null ? [
-                    'currency' => $request->currency ?? $this->config['currencies'][0] ?? 'EUR',
+                    'currency' => $request->currency ?? $this->settings()->string('currencies', 0) ?? 'EUR',
                     'value' => number_format($request->amount, 2, '.', ''),
                 ] : null,
                 'description' => $request->reason,
@@ -43,23 +44,25 @@ trait MollieRefundMethods
 
             $response = $this->makeRequest('POST', '/v2/payments/'.rawurlencode($paymentId).'/refunds', $requestOptions);
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
+            $refundId = $body->string('id');
 
-            if (! isset($data['id'])) {
+            if ($refundId === null) {
                 throw new RefundException('Refund id not found in response. Response: '.json_encode($data));
             }
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => "$paymentId:{$data['id']}",
+                'refund_reference' => "$paymentId:$refundId",
                 'transaction_reference' => $paymentId,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: "$paymentId:{$data['id']}",
+                refundReference: "$paymentId:$refundId",
                 transactionReference: $paymentId,
-                status: $data['status'] ?? 'pending',
-                amount: $this->requireAmountValue($data['amount']['value'] ?? $request->amount, 'amount.value', 'refund'),
+                status: $body->string('status') ?? 'pending',
+                amount: $this->requireAmountValue($body->get('amount', 'value') ?? $request->amount, 'amount.value', 'refund'),
                 currency: $this->requireString($this->requireArray($data, 'amount', 'refund'), 'currency', 'refund'),
-                reason: $data['description'] ?? $request->reason,
+                reason: $body->string('description') ?? $request->reason,
                 metadata: $request->metadata,
                 provider: $this->getName(),
             );
@@ -90,10 +93,10 @@ trait MollieRefundMethods
             $refundResponse = new RefundResponseDTO(
                 refundReference: "$paymentId:$refundId",
                 transactionReference: $paymentId,
-                status: $data['status'] ?? 'unknown',
+                status: Payload::of($data)->string('status') ?? 'unknown',
                 amount: $this->requireAmount($this->requireArray($data, 'amount', 'fetch refund'), 'value', 'fetch refund'),
                 currency: $this->requireString($this->requireArray($data, 'amount', 'fetch refund'), 'currency', 'fetch refund'),
-                reason: $data['description'] ?? null,
+                reason: Payload::of($data)->string('description'),
                 metadata: [],
                 provider: $this->getName(),
             );

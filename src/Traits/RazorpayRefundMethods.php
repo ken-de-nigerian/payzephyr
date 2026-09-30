@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -59,25 +60,26 @@ trait RazorpayRefundMethods
             }
 
             $response = $this->makeRequest('POST', '/v1/payments/'.rawurlencode($paymentId).'/refund', $requestOptions);
-            $data = $this->parseResponse($response);
+            $body = new Payload($this->parseResponse($response));
+            $refundId = $body->string('id');
 
-            if (empty($data['id'])) {
+            if ($refundId === null || $refundId === '') {
                 throw new RefundException('Razorpay did not return a refund id');
             }
 
-            $responseCurrency = strtoupper((string) ($data['currency'] ?? $currency));
-            $refundedMinorUnits = $data['amount'] ?? $payload['amount'];
+            $responseCurrency = strtoupper($body->string('currency') ?? $currency);
+            $refundedMinorUnits = $body->float('amount') ?? $payload['amount'];
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => (string) $data['id'],
+                'refund_reference' => $refundId,
                 'transaction_reference' => $request->transactionReference,
                 'razorpay_payment_id' => $paymentId,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) $data['id'],
+                refundReference: $refundId,
                 transactionReference: $request->transactionReference,
-                status: (string) ($data['status'] ?? 'pending'),
+                status: $body->string('status') ?? 'pending',
                 amount: $this->fromMinorUnits($refundedMinorUnits, $responseCurrency),
                 currency: $responseCurrency,
                 reason: $request->reason,
@@ -101,22 +103,24 @@ trait RazorpayRefundMethods
         try {
             $response = $this->makeRequest('GET', '/v1/refunds/'.rawurlencode($refundReference));
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
+            $refundId = $body->string('id');
 
-            if (empty($data['id'])) {
+            if ($refundId === null || $refundId === '') {
                 throw new RefundException("Razorpay refund [$refundReference] not found");
             }
 
             $currency = strtoupper($this->requireString($data, 'currency', 'refund'));
             $amount = $this->requireAmount($data, 'amount', 'refund');
-            $notes = is_array($data['notes'] ?? null) ? $data['notes'] : [];
+            $notes = $body->at('notes');
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) $data['id'],
-                transactionReference: (string) ($notes['payzephyr_reference'] ?? $data['payment_id'] ?? ''),
-                status: (string) ($data['status'] ?? 'pending'),
+                refundReference: $refundId,
+                transactionReference: $notes->string('payzephyr_reference') ?? $body->string('payment_id') ?? '',
+                status: $body->string('status') ?? 'pending',
                 amount: $this->fromMinorUnits($amount, $currency),
                 currency: $currency,
-                reason: isset($notes['reason']) ? (string) $notes['reason'] : null,
+                reason: $notes->string('reason'),
                 metadata: [],
                 provider: $this->getName(),
             );
@@ -155,17 +159,18 @@ trait RazorpayRefundMethods
             );
 
             $settled = array_values(array_filter(
-                is_array($link['payments'] ?? null) ? $link['payments'] : [],
-                fn ($payment) => is_array($payment) && in_array($payment['status'] ?? null, ['captured', 'refunded'], true)
+                Payload::of($link)->array('payments'),
+                fn ($payment) => in_array(Payload::of($payment)->string('status'), ['captured', 'refunded'], true)
             ));
+            $settledId = count($settled) === 1 ? Payload::of($settled[0])->string('payment_id') : null;
 
-            if (count($settled) !== 1 || empty($settled[0]['payment_id'])) {
+            if ($settledId === null || $settledId === '') {
                 throw new RefundException(
                     "Cannot refund [$transactionReference]: expected exactly one captured Razorpay payment, found ".count($settled).'.'
                 );
             }
 
-            $paymentId = (string) $settled[0]['payment_id'];
+            $paymentId = $settledId;
         }
 
         $payment = $this->lookUpBeforeRefunding(
@@ -173,12 +178,14 @@ trait RazorpayRefundMethods
             fn () => $this->parseResponse($this->makeRequest('GET', '/v1/payments/'.rawurlencode($paymentId)))
         );
 
-        $amount = (int) ($payment['amount'] ?? 0);
-        $refundable = $amount - (int) ($payment['amount_refunded'] ?? 0);
+        $paymentData = new Payload($payment);
+        $amount = $paymentData->int('amount') ?? 0;
+        $refundable = $amount - ($paymentData->int('amount_refunded') ?? 0);
+        $status = $paymentData->string('status');
 
-        if (($payment['status'] ?? null) !== 'captured' || $refundable <= 0) {
+        if ($status !== 'captured' || $refundable <= 0) {
             throw new RefundException(
-                "Cannot refund Razorpay payment [$paymentId]: it is ".($payment['status'] ?? 'unknown')
+                "Cannot refund Razorpay payment [$paymentId]: it is ".($status ?? 'unknown')
                 ." with $refundable of $amount minor units left to refund."
             );
         }

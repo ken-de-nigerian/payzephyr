@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -41,13 +42,14 @@ trait MonnifyRefundMethods
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => $payload,
             ]);
-            $data = $this->parseResponse($response);
+            $body = new Payload($this->parseResponse($response));
 
-            if (! ($data['requestSuccessful'] ?? false)) {
-                throw new RefundException($data['responseMessage'] ?? 'Failed to create Monnify refund');
+            if (! $body->flag(false, 'requestSuccessful')) {
+                throw new RefundException($body->string('responseMessage') ?? 'Failed to create Monnify refund');
             }
 
-            $result = $data['responseBody'] ?? [];
+            $result = $body->array('responseBody');
+            $refund = new Payload($result);
 
             $this->log('info', 'Refund created', [
                 'refund_reference' => $refundReference,
@@ -55,16 +57,16 @@ trait MonnifyRefundMethods
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['refundReference'] ?? $refundReference,
-                transactionReference: $result['transactionReference'] ?? $request->transactionReference,
-                status: $result['refundStatus'] ?? 'pending',
+                refundReference: $refund->string('refundReference') ?? $refundReference,
+                transactionReference: $refund->string('transactionReference') ?? $request->transactionReference,
+                status: $refund->string('refundStatus') ?? 'pending',
                 // Falling back to the requested amount is a defensible
                 // inference for a refund the provider just accepted. Falling
                 // back to zero is not - it records a refund that did happen as
                 // one worth nothing.
-                amount: $this->requireAmountValue($result['refundAmount'] ?? $request->amount, 'refundAmount', 'refund'),
+                amount: $this->requireAmountValue($refund->get('refundAmount') ?? $request->amount, 'refundAmount', 'refund'),
                 currency: $this->requireString($result, 'currencyCode', 'refund'),
-                reason: $result['refundReason'] ?? $request->reason,
+                reason: $refund->string('refundReason') ?? $request->reason,
                 metadata: $request->metadata,
                 provider: $this->getName(),
             );
@@ -108,21 +110,22 @@ trait MonnifyRefundMethods
             $response = $this->makeRequest('GET', '/api/v1/refunds/'.rawurlencode($refundReference), [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
             ]);
-            $data = $this->parseResponse($response);
+            $body = new Payload($this->parseResponse($response));
 
-            if (! ($data['requestSuccessful'] ?? false)) {
-                throw new RefundException($data['responseMessage'] ?? 'Failed to fetch Monnify refund');
+            if (! $body->flag(false, 'requestSuccessful')) {
+                throw new RefundException($body->string('responseMessage') ?? 'Failed to fetch Monnify refund');
             }
 
-            $result = $data['responseBody'] ?? [];
+            $result = $body->array('responseBody');
+            $refund = new Payload($result);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: $result['refundReference'] ?? $refundReference,
-                transactionReference: $result['transactionReference'] ?? '',
-                status: $result['refundStatus'] ?? 'unknown',
+                refundReference: $refund->string('refundReference') ?? $refundReference,
+                transactionReference: $refund->string('transactionReference') ?? '',
+                status: $refund->string('refundStatus') ?? 'unknown',
                 amount: $this->requireAmount($result, 'refundAmount', 'fetch refund'),
                 currency: $this->requireString($result, 'currencyCode', 'fetch refund'),
-                reason: $result['refundReason'] ?? null,
+                reason: $refund->string('refundReason'),
                 metadata: [],
                 provider: $this->getName(),
             );

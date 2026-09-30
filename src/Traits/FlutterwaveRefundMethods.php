@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -35,28 +36,30 @@ trait FlutterwaveRefundMethods
 
             $response = $this->makeRequest('POST', 'transactions/'.rawurlencode($request->transactionReference).'/refund', $requestOptions);
             $data = $this->parseResponse($response);
+            $body = new Payload($data);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new RefundException($data['message'] ?? 'Failed to create Flutterwave refund');
+            if ($body->string('status') !== 'success') {
+                throw new RefundException($body->string('message') ?? 'Failed to create Flutterwave refund');
             }
 
-            $result = $data['data'] ?? [];
-            $refundReference = $result['id'] ?? null;
+            $result = $body->array('data');
+            $refund = new Payload($result);
+            $refundReference = $refund->string('id');
 
             if ($refundReference === null) {
                 throw new RefundException('Refund reference not found in response. Response: '.json_encode($data));
             }
 
             $this->log('info', 'Refund created', [
-                'refund_reference' => (string) $refundReference,
+                'refund_reference' => $refundReference,
                 'transaction_reference' => $request->transactionReference,
             ]);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) $refundReference,
+                refundReference: $refundReference,
                 transactionReference: $request->transactionReference,
-                status: $result['status'] ?? 'pending',
-                amount: $this->requireAmountValue($result['amount_refunded'] ?? $request->amount, 'amount_refunded', 'refund'),
+                status: $refund->string('status') ?? 'pending',
+                amount: $this->requireAmountValue($refund->get('amount_refunded') ?? $request->amount, 'amount_refunded', 'refund'),
                 currency: $this->requireString($result, 'currency', 'refund'),
                 reason: $request->reason,
                 metadata: $request->metadata,
@@ -78,18 +81,20 @@ trait FlutterwaveRefundMethods
     {
         try {
             $response = $this->makeRequest('GET', 'refunds/'.rawurlencode($refundReference));
-            $data = $this->parseResponse($response);
+            $body = new Payload($this->parseResponse($response));
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new RefundException($data['message'] ?? 'Failed to fetch Flutterwave refund');
+            if ($body->string('status') !== 'success') {
+                throw new RefundException($body->string('message') ?? 'Failed to fetch Flutterwave refund');
             }
 
-            $result = $data['data'][0] ?? $data['data'] ?? [];
+            // The refund, or a list holding it.
+            $result = $body->arrayOrNull('data', 0) ?? $body->array('data');
+            $refund = new Payload($result);
 
             $refundResponse = new RefundResponseDTO(
-                refundReference: (string) ($result['id'] ?? $refundReference),
-                transactionReference: (string) ($result['transaction_id'] ?? ''),
-                status: $result['status'] ?? 'unknown',
+                refundReference: $refund->string('id') ?? $refundReference,
+                transactionReference: $refund->string('transaction_id') ?? '',
+                status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($result, 'amount_refunded', 'fetch refund'),
                 currency: $this->requireString($result, 'currency', 'fetch refund'),
                 reason: null,

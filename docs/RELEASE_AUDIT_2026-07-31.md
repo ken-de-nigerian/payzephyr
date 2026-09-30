@@ -10,6 +10,11 @@
 > addressed across v3.x and v4.0.0 - M-1's `composer audit` recommendation and M-3's SQLite
 > guidance both landed, and M-2's `catch (Exception)` sites are gone.
 >
+> The environment gaps it discloses in §0 are closed as well. CI runs the suite on MySQL 8
+> and PostgreSQL 16 as well as SQLite, runs the queue and cache paths on Redis, gates on
+> PHPStan level 10 and Rector, and requires every mutation of the webhook path and the
+> drivers to be caught (LOW-3). See [ADR-0003](architecture/adr/0003-adr-process-and-quality-gates.md#outcome).
+>
 > It is still here because [ADR-0011](architecture/adr/0011-refund-driver-mapping.md) cites
 > it as the origin of refund support, and three test files reference its finding IDs to
 > record why they exist. For the current state of the package see

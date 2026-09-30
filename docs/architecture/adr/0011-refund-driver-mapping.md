@@ -1,6 +1,8 @@
 # ADR-0011: v2.1 - Refund support across all 8 providers
 
-- **Status**: Accepted
+- **Status**: Accepted. The per-provider sandbox verification named under Trade-offs has not
+  been done: every refund mapping is covered by tests against recorded response shapes, not
+  against each provider's live sandbox.
 - **Date**: 2026-08-12
 
 ## Problem

@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -31,6 +32,15 @@ use Throwable;
  */
 trait MollieSubscriptionMethods
 {
+    /**
+     * Mollie's customers endpoint cannot filter by email, so finding a
+     * customer means walking the list. 250 is the most Mollie returns per
+     * page; twenty pages is five thousand customers.
+     */
+    private const MOLLIE_CUSTOMER_PAGE_SIZE = 250;
+
+    private const MOLLIE_CUSTOMER_MAX_PAGES = 20;
+
     use LogsSubscriptionTransactions;
 
     /**
@@ -76,10 +86,11 @@ trait MollieSubscriptionMethods
 
         $existing = $this->decodeMolliePlanData($planCode);
 
-        $name = $updates['name'] ?? $existing['name'];
-        $amount = (float) ($updates['amount'] ?? $existing['amount']);
-        $interval = $updates['interval'] ?? $existing['interval'];
-        $currency = $updates['currency'] ?? $existing['currency'];
+        $changes = new Payload($updates);
+        $name = $changes->string('name') ?? $existing['name'];
+        $amount = $changes->float('amount') ?? $existing['amount'];
+        $interval = $changes->string('interval') ?? $existing['interval'];
+        $currency = $changes->string('currency') ?? $existing['currency'];
 
         $newPlanCode = $this->encodeMolliePlanData($name, $amount, $interval, $currency);
 
@@ -150,7 +161,7 @@ trait MollieSubscriptionMethods
 
             $planData = $this->decodeMolliePlanData($request->plan);
             $customer = $this->findOrCreateMollieCustomer($request->customer);
-            $customerId = $customer['id'];
+            $customerId = $this->requireString($customer, 'id', 'customer');
 
             $payload = array_filter([
                 'amount' => [
@@ -161,7 +172,7 @@ trait MollieSubscriptionMethods
                 'description' => $planData['name'],
                 'mandateId' => $request->authorization,
                 'startDate' => $request->startDate,
-                'times' => $request->metadata['times'] ?? null,
+                'times' => Payload::of($request->metadata)->int('times'),
                 'webhookUrl' => $request->callbackUrl,
                 'metadata' => $request->metadata ?: null,
             ], fn ($value) => $value !== null);
@@ -172,7 +183,7 @@ trait MollieSubscriptionMethods
             $data = $this->parseResponse($response);
 
             $this->log('info', 'Subscription created', [
-                'subscription_code' => "$customerId:{$data['id']}",
+                'subscription_code' => $customerId.':'.(Payload::of($data)->string('id') ?? ''),
                 'customer' => $request->customer,
             ]);
 
@@ -286,21 +297,19 @@ trait MollieSubscriptionMethods
             if (! $customerObject) {
                 return ['data' => [], 'has_more' => false];
             }
-            $customerId = $customerObject['id'];
+            $customerId = $this->requireString($customerObject, 'id', 'customer');
 
             $response = $this->makeRequest('GET', '/v2/customers/'.rawurlencode($customerId).'/subscriptions', [
                 'query' => array_filter(['limit' => $perPage ?? 50]),
             ]);
-            $data = $this->parseResponse($response);
-
-            $items = $data['_embedded']['subscriptions'] ?? [];
+            $body = new Payload($this->parseResponse($response));
 
             return [
                 'data' => array_map(
-                    fn ($item) => $this->mapMollieSubscriptionToResponse($item, $customerId, $customer),
-                    $items
+                    fn ($item) => $this->mapMollieSubscriptionToResponse(Payload::of($item)->all(), $customerId, $customer),
+                    $body->array('_embedded', 'subscriptions')
                 ),
-                'has_more' => isset($data['_links']['next']),
+                'has_more' => $body->has('_links', 'next'),
             ];
         } catch (SubscriptionException $e) {
             throw $e;
@@ -330,28 +339,61 @@ trait MollieSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>|null
+     * The customer with this email, walking Mollie's customer list a page at
+     * a time.
      *
-     * @throws ChargeException
+     * Only the first page used to be read, so past 250 customers an existing
+     * one was not found: subscribing created a second customer for the same
+     * email, and listing that customer's subscriptions returned none. Past
+     * the last page it looks at, it refuses rather than answering "not
+     * found" - which would create that duplicate.
+     *
+     * @return array<array-key, mixed>|null
+     *
+     * @throws ChargeException|SubscriptionException
      */
     private function findMollieCustomerByEmail(string $email): ?array
     {
-        $response = $this->makeRequest('GET', '/v2/customers', ['query' => ['limit' => 250]]);
-        $data = $this->parseResponse($response);
+        $query = ['limit' => self::MOLLIE_CUSTOMER_PAGE_SIZE];
 
-        foreach ($data['_embedded']['customers'] ?? [] as $customer) {
-            if (($customer['email'] ?? null) === $email) {
-                return $customer;
+        for ($page = 1; $page <= self::MOLLIE_CUSTOMER_MAX_PAGES; $page++) {
+            $body = new Payload($this->parseResponse($this->makeRequest('GET', '/v2/customers', ['query' => $query])));
+
+            foreach ($body->array('_embedded', 'customers') as $customer) {
+                $candidate = Payload::of($customer);
+
+                if ($candidate->string('email') === $email) {
+                    return $candidate->all();
+                }
             }
+
+            // The next page is named by the customer id it starts from.
+            parse_str(parse_url($body->string('_links', 'next', 'href') ?? '', PHP_URL_QUERY) ?: '', $next);
+            $from = Payload::of($next)->string('from');
+
+            if ($from === null) {
+                return null;
+            }
+
+            $query['from'] = $from;
         }
 
-        return null;
+        throw new SubscriptionException(
+            "Could not tell whether a Mollie customer exists for [$email]: it is not among the first ".
+            (self::MOLLIE_CUSTOMER_PAGE_SIZE * self::MOLLIE_CUSTOMER_MAX_PAGES).' customers, which is as far as PayZephyr '.
+            'searches. Nothing was created, so no duplicate customer exists.'
+        );
     }
 
     /**
      * @return array<string, mixed>
      *
      * @throws ChargeException
+     */
+    /**
+     * @return array<array-key, mixed>
+     *
+     * @throws ChargeException|SubscriptionException
      */
     private function findOrCreateMollieCustomer(string $email): array
     {
@@ -456,13 +498,13 @@ trait MollieSubscriptionMethods
      */
     private function molliePlanCodeFromSubscriptionData(array $data): string
     {
-        $amount = $data['amount'] ?? [];
+        $subscription = new Payload($data);
 
         return $this->encodeMolliePlanData(
-            $data['description'] ?? '',
-            (float) ($amount['value'] ?? 0),
-            $this->mapIntervalFromMollie($data['interval'] ?? '1 month'),
-            $amount['currency'] ?? 'EUR'
+            $subscription->string('description') ?? '',
+            $subscription->float('amount', 'value') ?? 0.0,
+            $this->mapIntervalFromMollie($subscription->string('interval') ?? '1 month'),
+            $subscription->string('amount', 'currency') ?? 'EUR'
         );
     }
 
@@ -471,17 +513,17 @@ trait MollieSubscriptionMethods
      */
     private function mapMollieSubscriptionToResponse(array $data, string $customerId, ?string $customerEmail = null): SubscriptionResponseDTO
     {
-        $amount = $data['amount'] ?? [];
+        $subscription = new Payload($data);
 
         return new SubscriptionResponseDTO(
-            subscriptionCode: $customerId.':'.($data['id'] ?? ''),
-            status: $this->mapMollieSubscriptionStatus($data['status'] ?? 'pending'),
+            subscriptionCode: $customerId.':'.$this->requireString($data, 'id', 'subscription'),
+            status: $this->mapMollieSubscriptionStatus($subscription->string('status') ?? 'pending'),
             customer: $customerEmail ?? '',
             plan: $this->molliePlanCodeFromSubscriptionData($data),
-            amount: isset($amount['value']) ? (float) $amount['value'] : null,
-            currency: $amount['currency'] ?? 'EUR',
-            nextPaymentDate: $data['nextPaymentDate'] ?? null,
-            metadata: array_filter(['mandate_id' => $data['mandateId'] ?? null]),
+            amount: $subscription->float('amount', 'value'),
+            currency: $subscription->string('amount', 'currency') ?? 'EUR',
+            nextPaymentDate: $subscription->string('nextPaymentDate'),
+            metadata: array_filter(['mandate_id' => $subscription->string('mandateId')]),
             provider: $this->getName(),
         );
     }

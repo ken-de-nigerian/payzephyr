@@ -64,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Mollie found a customer only among its first 250.** Mollie cannot filter customers by email,
+  so the driver lists them - and read one page. Past 250 customers, an existing customer was not
+  found: `subscribe()` created a second Mollie customer for the same email, and
+  `listSubscriptions()` for that customer returned nothing. The driver follows Mollie's pages
+  now, up to 5,000 customers; beyond that it throws a `SubscriptionException` instead of
+  answering "not found", since that answer is what creates the duplicate.
+
 - **Stripe refunds, plans and subscriptions carried the SDK's internals as their metadata.**
   The mappers read `(array) $object->metadata`. On a real `StripeObject` that cast yields the
   SDK's own properties (`_values`, `_opts`, `_lastResponse`, ...), not the metadata, and that is

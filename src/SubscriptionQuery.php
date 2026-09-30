@@ -150,7 +150,8 @@ final class SubscriptionQuery
     /**
      * Execute the query and return all matching subscriptions.
      *
-     * @return array<string, mixed> Array of subscription data
+     * @return array<string, mixed>|list<mixed> The provider's paginated envelope, or a plain list when
+     *                                          the provider returned one
      *
      * @throws PaymentException
      */

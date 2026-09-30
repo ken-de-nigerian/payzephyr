@@ -65,6 +65,7 @@ class WebhookRequest extends FormRequest
         }
 
         $provider = $this->route('provider');
+        $provider = is_string($provider) ? $provider : '';
 
         try {
             $manager = app(PaymentManager::class);
@@ -80,7 +81,7 @@ class WebhookRequest extends FormRequest
             );
 
             if (! $valid) {
-                $this->traceRejectedSignature($driver, (string) $provider);
+                $this->traceRejectedSignature($driver, $provider);
             }
 
             return $valid;

@@ -66,31 +66,22 @@ final class GenerateDocsCommand extends Command
         }
 
         $targets = [
-            $this->packagePath('docs/providers.md') => [
-                self::MATRIX_START => $this->renderMatrix($providers),
-                self::MATRIX_END => null,
-            ],
-            $this->packagePath('README.md') => [
-                self::LIST_START => $this->renderList($providers),
-                self::LIST_END => null,
-            ],
+            [$this->packagePath('docs/providers.md'), self::MATRIX_START, self::MATRIX_END, $this->renderMatrix($providers)],
+            [$this->packagePath('README.md'), self::LIST_START, self::LIST_END, $this->renderList($providers)],
         ];
 
         $drifted = [];
         $written = [];
 
-        foreach ($targets as $path => $blocks) {
-            $markers = array_keys($blocks);
-            $replacement = $blocks[$markers[0]];
-
+        foreach ($targets as [$path, $startMarker, $endMarker, $replacement]) {
             $original = (string) file_get_contents($path);
-            $updated = $this->replaceBlock($original, $markers[0], $markers[1], $replacement);
+            $updated = $this->replaceBlock($original, $startMarker, $endMarker, $replacement);
 
             if ($updated === null) {
                 $this->components->error(sprintf(
                     'Missing %s / %s markers in %s.',
-                    $markers[0],
-                    $markers[1],
+                    $startMarker,
+                    $endMarker,
                     basename($path),
                 ));
 

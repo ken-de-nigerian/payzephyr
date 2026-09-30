@@ -70,7 +70,9 @@ final class HealthEndpointMiddleware
                 ?? $request->header('X-Health-Token')
                 ?? $request->query('token');
 
-            if (empty($token) || ! $this->tokenIsAllowed((string) $token, $allowedTokens)) {
+            // Only a string can be a token. ?token[]=x arrives as an array, and
+            // casting that to a string raised a warning Laravel turns into a 500.
+            if (! is_string($token) || $token === '' || ! $this->tokenIsAllowed($token, $allowedTokens)) {
                 return response()->json(['error' => 'Unauthorized'], HttpStatusCodes::UNAUTHORIZED);
             }
         }

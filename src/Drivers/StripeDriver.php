@@ -36,7 +36,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * The native Stripe SDK client wrapper.
      *
-     * @var StripeClient|object
+     * @var StripeClient
      */
     protected $stripe;
 
@@ -60,7 +60,10 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * Inject a mock object for testing purposes.
+     * Inject a mock object for testing purposes. Natively typed `object` so a
+     * test double need not extend the SDK's client; it has to behave like one.
+     *
+     * @param  StripeClient  $stripe
      */
     public function setStripeClient(object $stripe): void
     {
@@ -357,12 +360,12 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  object{payment_intent?: object{amount?: int}, payment_status: string, client_reference_id?: string, id: string, amount_total?: int, currency: string, created: int, metadata?: array<string, mixed>, payment_method_types?: array<int, string>, customer_email?: string}  $session
+     * @param  \Stripe\Checkout\Session  $session
      */
     private function mapFromCheckoutSession(object $session): VerificationResponseDTO
     {
         $pi = $session->payment_intent ?? null;
-        $piAmount = $pi?->amount;
+        $piAmount = $pi->amount ?? null;
 
         $status = match ($session->payment_status) {
             'paid' => 'success',
@@ -392,7 +395,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  object{metadata: array<string, mixed>, id: string, status: string, amount: int, currency: string, created: int, payment_method_types: array<int, string>, receipt_email?: string}  $intent
+     * @param  \Stripe\PaymentIntent  $intent
      */
     private function mapFromPaymentIntent(object $intent): VerificationResponseDTO
     {

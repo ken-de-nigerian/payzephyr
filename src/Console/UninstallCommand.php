@@ -129,8 +129,10 @@ final class UninstallCommand extends Command
      */
     private function resolveTargetResources(): array
     {
-        if ($this->option('features') !== null) {
-            $keys = Features::parseList((string) $this->option('features'));
+        $features = $this->option('features');
+
+        if (is_string($features)) {
+            $keys = Features::parseList($features);
 
             $resources = [];
             foreach ($keys as $key) {
@@ -249,7 +251,7 @@ final class UninstallCommand extends Command
      */
     private function forgetMigration(string $file): void
     {
-        $repository = $this->laravel['migrator']->getRepository();
+        $repository = $this->laravel->make('migrator')->getRepository();
 
         if (! $repository->repositoryExists()) {
             return;

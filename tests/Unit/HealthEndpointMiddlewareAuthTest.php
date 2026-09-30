@@ -191,3 +191,11 @@ test('the shipped default requires auth everywhere except local and testing', fu
     'local' => ['local', false],
     'testing' => ['testing', false],
 ]);
+
+test('a token sent as an array is refused, not cast', function () {
+    // ?token[]=x arrives as an array. Casting it to a string raised an
+    // "Array to string conversion" warning, which Laravel turns into a 500.
+    healthConfig(false, tokens: ['health-secret']);
+
+    expect(makeHealthRequest(query: ['token' => ['health-secret']])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED);
+});

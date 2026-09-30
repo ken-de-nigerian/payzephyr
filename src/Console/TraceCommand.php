@@ -29,7 +29,8 @@ final class TraceCommand extends Command
 
     public function handle(TraceTimelineBuilder $builder): int
     {
-        $reference = (string) $this->argument('reference');
+        $reference = $this->argument('reference');
+        $reference = is_string($reference) ? $reference : '';
 
         try {
             $timeline = $builder->build($reference);

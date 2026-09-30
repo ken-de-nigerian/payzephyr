@@ -144,10 +144,10 @@ final class InstallCommand extends Command
      */
     private function determineOptionalFeatures(): array
     {
-        if ($this->option('features') !== null) {
-            $selected = Features::parseList((string) $this->option('features'));
+        $features = $this->option('features');
 
-            return Features::resolveDependencies($selected);
+        if (is_string($features)) {
+            return Features::resolveDependencies(Features::parseList($features));
         }
 
         if ($this->option('all')) {
@@ -171,7 +171,7 @@ final class InstallCommand extends Command
             hint: 'Space to select, Enter to continue. Deselecting an already-installed feature does not remove it.',
         );
 
-        return Features::resolveDependencies($selected);
+        return Features::resolveDependencies(array_map('strval', array_values($selected)));
     }
 
     /**

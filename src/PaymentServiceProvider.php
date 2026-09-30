@@ -38,6 +38,7 @@ use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 use KenDeNigerian\PayZephyr\Services\TraceRecorder;
 use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 final class PaymentServiceProvider extends ServiceProvider
@@ -141,9 +142,9 @@ final class PaymentServiceProvider extends ServiceProvider
             return;
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $webhookPath = $config['webhook']['path'] ?? '/payments/webhook';
-        $rateLimit = $config['webhook']['rate_limit'] ?? '120,1';
+        $config = PackageConfig::read();
+        $webhookPath = $config->string('webhook', 'path') ?? '/payments/webhook';
+        $rateLimit = $config->string('webhook', 'rate_limit') ?? '120,1';
 
         Route::group([
             'prefix' => $webhookPath,
@@ -154,20 +155,16 @@ final class PaymentServiceProvider extends ServiceProvider
                 ->name('payments.webhook');
         });
 
-        $healthConfig = $config['health_check'] ?? [];
-        $healthMiddleware = $healthConfig['middleware'] ?? [];
+        $healthMiddleware = $config->array('health_check', 'middleware');
         $healthMiddleware[] = HealthEndpointMiddleware::class;
 
         Route::get('/payments/health', function (PaymentManager $manager) {
             $providers = [];
-            $healthConfig = app('payments.config') ?? config('payments', []);
 
-            $enabledProviders = array_filter(
-                $healthConfig['providers'] ?? [],
-                fn ($config) => $config['enabled'] ?? false
-            );
-
-            foreach ($enabledProviders as $name => $providerConfig) {
+            // The manager's own list, so the endpoint reports exactly the
+            // providers that can take a charge - including one configured
+            // without an `enabled` key, which the manager treats as on.
+            foreach (array_keys($manager->getEnabledProviders()) as $name) {
                 try {
                     $driver = $manager->driver($name);
                     $providers[$name] = [
@@ -191,9 +188,7 @@ final class PaymentServiceProvider extends ServiceProvider
 
     protected function configureModel(): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $tableName = $config['logging']['table'] ?? 'payment_transactions';
-        PaymentTransaction::setTableName($tableName);
+        PaymentTransaction::setTableName(PackageConfig::read()->string('logging', 'table') ?? 'payment_transactions');
     }
 
     protected function registerWebhookStatusMappings(): void

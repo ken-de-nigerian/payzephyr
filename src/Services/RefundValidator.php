@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 final readonly class RefundValidator
@@ -39,8 +40,7 @@ final readonly class RefundValidator
      */
     public function validateRefund(RefundRequestDTO $request): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $preventDuplicates = $config['refunds']['prevent_duplicates'] ?? true;
+        $preventDuplicates = PackageConfig::read()->flag(true, 'refunds', 'prevent_duplicates');
 
         if ($preventDuplicates && $this->refundRepository->hasInFlightRefund($request->transactionReference)) {
             throw new RefundException(

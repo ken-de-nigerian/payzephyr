@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Services\RefundValidator;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
 
@@ -141,8 +142,8 @@ final class Refund
             'idempotency_key' => $request->idempotencyKey,
         ], provider: $provider);
 
-        $config = app('payments.config') ?? config('payments', []);
-        if ($config['refunds']['validation']['enabled'] ?? true) {
+        $config = PackageConfig::read();
+        if ($config->flag(true, 'refunds', 'validation', 'enabled')) {
             try {
                 app(RefundValidator::class)->validateRefund($request);
             } catch (Throwable $e) {
@@ -155,7 +156,7 @@ final class Refund
             }
         }
 
-        $preventDuplicates = $config['refunds']['prevent_duplicates'] ?? true;
+        $preventDuplicates = $config->flag(true, 'refunds', 'prevent_duplicates');
         $lockKey = $this->inFlightLockKey($request->transactionReference);
 
         if ($preventDuplicates && ! Cache::add($lockKey, true, self::LOCK_TTL_SECONDS)) {

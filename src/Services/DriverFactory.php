@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Services;
 
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 final class DriverFactory
 {
@@ -38,9 +39,8 @@ final class DriverFactory
             return $this->drivers[$name];
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $configDriver = $config['providers'][$name]['driver_class'] ?? null;
-        if ($configDriver && class_exists($configDriver)) {
+        $configDriver = PackageConfig::read()->string('providers', $name, 'driver_class');
+        if ($configDriver !== null && class_exists($configDriver)) {
             return $configDriver;
         }
 

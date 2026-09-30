@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Services;
 
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 
 final class ProviderDetector implements ProviderDetectorInterface
 {
@@ -21,12 +23,12 @@ final class ProviderDetector implements ProviderDetectorInterface
      */
     protected function loadPrefixesFromConfig(): array
     {
-        $config = app('payments.config') ?? config('payments', []);
         $prefixes = [];
 
-        foreach ($config['providers'] ?? [] as $providerName => $providerConfig) {
-            $driverName = $providerConfig['driver'] ?? $providerName;
-            $prefix = $providerConfig['reference_prefix'] ?? strtoupper($driverName);
+        foreach (PackageConfig::read()->array('providers') as $providerName => $providerConfig) {
+            $provider = Payload::of($providerConfig);
+            $providerName = (string) $providerName;
+            $prefix = $provider->string('reference_prefix') ?? $provider->string('driver') ?? $providerName;
             $prefixes[strtoupper($prefix)] = $providerName;
         }
 

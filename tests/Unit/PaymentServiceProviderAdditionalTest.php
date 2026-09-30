@@ -49,3 +49,20 @@ test('routes are not registered again when the application has cached its routes
     $method = new ReflectionMethod($provider, 'registerRoutes');
     $method->invoke($provider);
 });
+
+test('the health route reports a provider configured without an enabled key, as the manager charges it', function () {
+    // The manager reads a missing `enabled` as on; the route read it as off,
+    // so a provider that was taking payments was absent from the health report.
+    config([
+        'payments.providers.implicit' => ['driver' => 'totally_nonexistent_driver'],
+        'payments.providers.switched_off' => ['driver' => 'totally_nonexistent_driver', 'enabled' => false],
+    ]);
+
+    app()->forgetInstance('payments.config');
+    app()->forgetInstance(PaymentManager::class);
+
+    $providers = $this->getJson('/payments/health')->assertStatus(200)->json('providers');
+
+    expect($providers)->toHaveKey('implicit')
+        ->and($providers)->not->toHaveKey('switched_off');
+});

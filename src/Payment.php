@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -12,6 +13,8 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 final class Payment
@@ -150,8 +153,7 @@ final class Payment
             );
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $defaultCurrency = $config['currency']['default'] ?? 'NGN';
+        $defaultCurrency = PackageConfig::read()->string('currency', 'default') ?? 'NGN';
 
         $request = ChargeRequestDTO::fromArray(array_merge([
             'currency' => $defaultCurrency,
@@ -167,12 +169,16 @@ final class Payment
             return 'payment_charge:user_'.auth()->guard()->id();
         }
 
-        if (! empty($this->data['email'])) {
-            return 'payment_charge:email_'.hash('sha256', $this->data['email']);
+        $email = (new Payload($this->data))->string('email');
+
+        if ($email !== null && $email !== '') {
+            return 'payment_charge:email_'.hash('sha256', $email);
         }
 
-        if (app()->bound('request')) {
-            return 'payment_charge:ip_'.app('request')->ip();
+        $request = app()->bound('request') ? app('request') : null;
+
+        if ($request instanceof Request) {
+            return 'payment_charge:ip_'.$request->ip();
         }
 
         return 'payment_charge:global';

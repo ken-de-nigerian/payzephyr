@@ -250,3 +250,35 @@ test('stripe refuses a checkout session that came back without a url', function 
         'reference' => 'STRIPE_NO_URL', 'callback_url' => 'https://shop.example.com/cb',
     ])))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'without a URL to redirect the customer to');
 });
+
+test('stripe sends metadata as strings, with nested values as json', function () {
+    // Stripe metadata is string to string. A nested value sent as it is
+    // becomes nested form fields, and Stripe rejects the whole charge.
+    $driver = new StripeDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['USD']]);
+
+    $sent = null;
+    $sessions = Mockery::mock();
+    $sessions->shouldReceive('create')->once()->andReturnUsing(function (array $params) use (&$sent) {
+        $sent = $params['metadata'];
+
+        return (object) ['id' => 'cs_test_meta', 'url' => 'https://checkout.stripe.com/pay/cs_test_meta'];
+    });
+    $stripe = Mockery::mock();
+    $stripe->checkout = (object) ['sessions' => $sessions];
+    $driver->setStripeClient($stripe);
+
+    $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+        'amount' => 10, 'currency' => 'USD', 'email' => 'a@b.test',
+        'reference' => 'STRIPE_META', 'callback_url' => 'https://shop.example.com/cb',
+        'metadata' => ['order_id' => 991, 'gift' => true, 'note' => null, 'cart' => ['sku' => 'A1', 'qty' => 2], 'ratio' => 1.5],
+    ]));
+
+    expect($sent)->toBe([
+        'order_id' => '991',
+        'gift' => 'true',
+        'note' => '',
+        'cart' => '{"sku":"A1","qty":2}',
+        'ratio' => '1.5',
+        'reference' => 'STRIPE_META',
+    ]);
+});

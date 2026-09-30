@@ -13,6 +13,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\StripeRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\StripeSubscriptionMethods;
 use Random\RandomException;
@@ -56,7 +57,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function initializeClient(): void
     {
         parent::initializeClient();
-        $this->stripe = new StripeClient($this->config['secret_key']);
+        $this->stripe = new StripeClient((string) $this->settings()->string('secret_key'));
     }
 
     /**
@@ -81,7 +82,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['secret_key'],
+            'Authorization' => 'Bearer '.$this->settings()->string('secret_key'),
             'Content-Type' => 'application/json',
         ];
     }
@@ -147,9 +148,9 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
                 'cancel_url' => $cancelUrl,
                 'client_reference_id' => $reference,
                 'customer_email' => $request->email,
-                'metadata' => array_merge($request->metadata, [
+                'metadata' => $this->chargeMetadata(array_merge($request->metadata, [
                     'reference' => $reference,
-                ]),
+                ])),
             ];
 
             $options = [];
@@ -305,7 +306,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             Webhook::constructEvent(
                 $body,
                 $signature,
-                $this->config['webhook_secret'],
+                (string) $this->settings()->string('webhook_secret'),
                 $this->webhookTimestampTolerance()
             );
 
@@ -405,7 +406,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     private function mapFromPaymentIntent(object $intent): VerificationResponseDTO
     {
         return new VerificationResponseDTO(
-            reference: $intent->metadata['reference'] ?? $intent->id,
+            reference: Payload::of(self::normalizeMetadata($intent->metadata))->string('reference') ?? $intent->id,
             status: $this->normalizeStatus($intent->status),
             amount: $intent->amount / 100,
             currency: strtoupper($intent->currency),
@@ -422,13 +423,42 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
+     * Metadata in the shape Stripe accepts: string keys to string values.
+     *
+     * PayZephyr's metadata is a general-purpose bag, and callers put nested
+     * values in it - a cart, an address. Sent as it is, a nested value becomes
+     * nested form fields and Stripe rejects the whole charge. A scalar is sent
+     * as its string, null as an empty string, and anything else as JSON, so
+     * it survives the round trip readable.
+     *
+     * @param  array<array-key, mixed>  $metadata
+     * @return array<string, string>
+     */
+    private function chargeMetadata(array $metadata): array
+    {
+        $flat = [];
+
+        foreach ($metadata as $key => $value) {
+            $flat[(string) $key] = match (true) {
+                is_string($value) => $value,
+                is_int($value), is_float($value) => (string) $value,
+                is_bool($value) => $value ? 'true' : 'false',
+                $value === null => '',
+                default => (string) json_encode($value),
+            };
+        }
+
+        return $flat;
+    }
+
+    /**
      * Get the transaction reference from a raw webhook payload.
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['data']['object']['metadata']['reference']
-            ?? $payload['data']['object']['client_reference_id']
-            ?? null;
+        $object = Payload::of($payload)->at('data', 'object');
+
+        return $object->string('metadata', 'reference') ?? $object->string('client_reference_id');
     }
 
     /**
@@ -436,7 +466,9 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['data']['object']['status'] ?? $payload['type'] ?? 'unknown';
+        $body = new Payload($payload);
+
+        return $body->string('data', 'object', 'status') ?? $body->string('type') ?? 'unknown';
     }
 
     /**
@@ -444,6 +476,6 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['object']['payment_method'] ?? null;
+        return Payload::of($payload)->string('data', 'object', 'payment_method');
     }
 }

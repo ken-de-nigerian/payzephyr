@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have configured. An allowed address is now enough; with both configured, both are still
   enforced.
 
+- **A Stripe charge with nested metadata was rejected.** Stripe's metadata is string to string,
+  and `->metadata([...])` was passed to it as given, so a nested value - a cart, an address -
+  went out as nested form fields and Stripe refused the whole charge. Scalars are now sent as
+  their string, `null` as an empty string, and anything else as JSON.
+
 - **An OPay webhook could be forged with the public key.** With no `OPAY_SECRET_KEY`
   configured, webhook validation fell back to the public key, which is not a secret: anyone who
   knew it could sign a webhook that passed. Only the secret key is used now, and without one an

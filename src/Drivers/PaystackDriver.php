@@ -14,6 +14,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\PaystackRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\PaystackSubscriptionMethods;
 use Throwable;
@@ -47,7 +48,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['secret_key'],
+            'Authorization' => 'Bearer '.$this->settings()->string('secret_key'),
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
@@ -97,7 +98,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
             if (! ($data['status'] ?? false)) {
                 throw new ChargeException(
-                    $data['message'] ?? 'Failed to initialize Paystack transaction'
+                    Payload::of($data)->string('message') ?? 'Failed to initialize Paystack transaction'
                 );
             }
 
@@ -143,11 +144,12 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
             if (! ($data['status'] ?? false)) {
                 throw new VerificationException(
-                    $data['message'] ?? 'Failed to verify Paystack transaction'
+                    Payload::of($data)->string('message') ?? 'Failed to verify Paystack transaction'
                 );
             }
 
             $result = is_array($data['data'] ?? null) ? $data['data'] : [];
+            $details = new Payload($result);
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
@@ -159,17 +161,17 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 status: $this->requireString($result, 'status', 'verify'),
                 amount: $this->requireAmount($result, 'amount', 'verify') / 100,
                 currency: $this->requireString($result, 'currency', 'verify'),
-                paidAt: $result['paid_at'] ?? null,
+                paidAt: $details->string('paid_at'),
                 metadata: self::normalizeMetadata($result['metadata'] ?? null),
                 provider: $this->getName(),
-                channel: $result['channel'] ?? null,
-                cardType: $result['authorization']['card_type'] ?? null,
-                bank: $result['authorization']['bank'] ?? null,
+                channel: $details->string('channel'),
+                cardType: $details->string('authorization', 'card_type'),
+                bank: $details->string('authorization', 'bank'),
                 customer: [
-                    'email' => $result['customer']['email'] ?? null,
-                    'code' => $result['customer']['customer_code'] ?? null,
+                    'email' => $details->string('customer', 'email'),
+                    'code' => $details->string('customer', 'customer_code'),
                 ],
-                authorizationCode: $result['authorization']['authorization_code'] ?? null,
+                authorizationCode: $details->string('authorization', 'authorization_code'),
             );
         } catch (VerificationException $e) {
             throw $e;
@@ -205,7 +207,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             return false;
         }
 
-        $hash = hash_hmac('sha512', $body, $this->config['secret_key']);
+        $hash = hash_hmac('sha512', $body, (string) $this->settings()->string('secret_key'));
         $signatureValid = hash_equals($signature, $hash);
 
         if (! $signatureValid) {
@@ -298,7 +300,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['data']['reference'] ?? null;
+        return Payload::of($payload)->string('data', 'reference');
     }
 
     /**
@@ -306,7 +308,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['data']['status'] ?? 'unknown';
+        return Payload::of($payload)->string('data', 'status') ?? 'unknown';
     }
 
     /**
@@ -314,7 +316,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['channel'] ?? null;
+        return Payload::of($payload)->string('data', 'channel');
     }
 
     /**

@@ -18,6 +18,7 @@ use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\MollieRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\MollieSubscriptionMethods;
 use Throwable;
@@ -82,7 +83,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['api_key'],
+            'Authorization' => 'Bearer '.$this->settings()->string('api_key'),
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
@@ -143,7 +144,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $data = $this->parseResponse($response);
 
-            $checkoutUrl = $data['_links']['checkout']['href'] ?? null;
+            $checkoutUrl = Payload::of($data)->string('_links', 'checkout', 'href');
             if (! $checkoutUrl) {
                 throw new ChargeException('No checkout URL returned by Mollie');
             }
@@ -157,8 +158,8 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $checkoutUrl,
-                accessCode: $data['id'],
-                status: $this->normalizeStatus($data['status']),
+                accessCode: $this->requireString($data, 'id', 'charge'),
+                status: $this->normalizeStatus($this->requireString($data, 'status', 'charge')),
                 metadata: array_merge($request->metadata, [
                     'mollie_id' => $data['id'],
                     'reference' => $reference,
@@ -193,6 +194,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
             $data = $this->parseResponse($response);
+            $details = new Payload($data);
             $status = $this->requireString($data, 'status', 'verify');
             $amount = $this->requireArray($data, 'amount', 'verify');
 
@@ -201,22 +203,22 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 'status' => $status,
             ]);
 
-            $actualReference = $data['metadata']['reference'] ?? $reference;
+            $actualReference = $details->string('metadata', 'reference') ?? $reference;
 
             return new VerificationResponseDTO(
                 reference: $actualReference,
                 status: $this->normalizeStatus($status),
                 amount: $this->requireAmount($amount, 'value', 'verify'),
                 currency: $this->requireString($amount, 'currency', 'verify'),
-                paidAt: $data['paidAt'] ?? null,
+                paidAt: $details->string('paidAt'),
                 metadata: self::normalizeMetadata($data['metadata'] ?? null),
                 provider: $this->getName(),
-                channel: $data['method'] ?? null,
-                cardType: $data['details']['cardLabel'] ?? null,
-                bank: $data['details']['consumerName'] ?? null,
+                channel: $details->string('method'),
+                cardType: $details->string('details', 'cardLabel'),
+                bank: $details->string('details', 'consumerName'),
                 customer: [
-                    'email' => $data['billingAddress']['email'] ?? null,
-                    'name' => $data['billingAddress']['givenName'] ?? null,
+                    'email' => $details->string('billingAddress', 'email'),
+                    'name' => $details->string('billingAddress', 'givenName'),
                 ],
             );
         } catch (Throwable $e) {
@@ -270,7 +272,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
         }
 
         $signature = str_replace('sha256=', '', $signature);
-        $expectedSignature = hash_hmac('sha256', $body, $this->config['webhook_secret']);
+        $expectedSignature = hash_hmac('sha256', $body, (string) $this->settings()->string('webhook_secret'));
         $isValid = hash_equals($signature, $expectedSignature);
 
         if (! $isValid) {
@@ -281,12 +283,12 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
+        $event = Payload::of(json_decode($body, true));
 
-        $eventType = $payload['type'] ?? null;
+        $eventType = $event->string('type');
         if ($eventType === 'hook.ping') {
             $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
-                'event_id' => $payload['id'] ?? null,
+                'event_id' => $event->string('id'),
             ]);
 
             return true;
@@ -323,31 +325,31 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
     protected function validateWebhookViaAPI(string $body): bool
     {
         try {
-            $payload = json_decode($body, true);
+            $event = Payload::of(json_decode($body, true));
 
-            if (! $payload) {
+            if ($event->all() === []) {
                 $this->log('warning', 'Webhook payload is invalid JSON');
 
                 return false;
             }
 
-            $eventType = $payload['type'] ?? null;
+            $eventType = $event->string('type');
             if ($eventType === 'hook.ping') {
                 $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
-                    'event_id' => $payload['id'] ?? null,
+                    'event_id' => $event->string('id'),
                     'hint' => 'Consider configuring MOLLIE_WEBHOOK_SECRET for more secure signature-based validation',
                 ]);
 
                 return true;
             }
 
-            if (! isset($payload['id'])) {
+            $paymentId = $event->string('id');
+
+            if ($paymentId === null) {
                 $this->log('warning', 'Webhook missing payment ID');
 
                 return false;
             }
-
-            $paymentId = $payload['id'];
 
             $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($paymentId));
             $paymentData = $this->parseResponse($response);
@@ -431,7 +433,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['id'] ?? null;
+        return Payload::of($payload)->string('id');
     }
 
     /**
@@ -445,7 +447,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['status'] ?? 'unknown';
+        return Payload::of($payload)->string('status') ?? 'unknown';
     }
 
     /**
@@ -456,7 +458,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['method'] ?? null;
+        return Payload::of($payload)->string('method');
     }
 
     /**

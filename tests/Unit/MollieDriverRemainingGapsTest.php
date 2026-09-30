@@ -33,14 +33,10 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
  * instead, with an identical observable result (false). This was left
  * untouched per instructions: src/ is not to be modified for this task.
  */
-test('mollie driver charge wraps unexpected non-charge errors in a charge exception', function () {
-    // The response has a checkout URL (so the explicit "No checkout URL"
-    // ChargeException is not triggered) but is missing 'status'.
-    // normalizeStatus() has a `string $status` parameter and this file
-    // declares strict_types=1, so passing the resulting null triggers a
-    // TypeError - a Throwable that isn't already a ChargeException - which
-    // must be caught by the generic catch (Throwable $e) block in charge()
-    // rather than the earlier catch (ChargeException $e) rethrow.
+test('mollie charge names the field when a response carries no status', function () {
+    // The response has a checkout URL but no status. That used to reach
+    // normalizeStatus() as a null and come back as a TypeError wrapped in
+    // "Payment initialization failed"; it now says which field is missing.
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_no_status',
@@ -66,4 +62,4 @@ test('mollie driver charge wraps unexpected non-charge errors in a charge except
     );
 
     $driver->charge($request);
-})->throws(ChargeException::class, 'Payment initialization failed');
+})->throws(ChargeException::class, '[mollie] omitted the required field [status] from its charge response');

@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\FlutterwaveRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\FlutterwaveSubscriptionMethods;
 use Throwable;
@@ -47,7 +48,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['secret_key'],
+            'Authorization' => 'Bearer '.$this->settings()->string('secret_key'),
             'Content-Type' => 'application/json',
         ];
     }
@@ -114,11 +115,11 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
             if (($data['status'] ?? '') !== 'success') {
                 throw new ChargeException(
-                    $data['message'] ?? 'Failed to initialize Flutterwave transaction'
+                    Payload::of($data)->string('message') ?? 'Failed to initialize Flutterwave transaction'
                 );
             }
 
-            $result = $data['data'];
+            $result = $this->requireArray($data, 'data', 'charge');
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
@@ -127,7 +128,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: $result['link'],
+                authorizationUrl: $this->requireString($result, 'link', 'charge'),
                 accessCode: $reference,
                 status: 'pending',
                 metadata: $request->metadata,
@@ -165,12 +166,13 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
             if (($data['status'] ?? '') !== 'success') {
                 throw new VerificationException(
-                    $data['message'] ?? 'Failed to verify Flutterwave transaction'
+                    Payload::of($data)->string('message') ?? 'Failed to verify Flutterwave transaction'
                 );
             }
 
             $result = $this->requireArray($data, 'data', 'verify');
             $status = $this->requireString($result, 'status', 'verify');
+            $details = new Payload($result);
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
@@ -182,15 +184,15 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
                 status: $this->normalizeStatus($status),
                 amount: $this->requireAmount($result, 'amount', 'verify'),
                 currency: $this->requireString($result, 'currency', 'verify'),
-                paidAt: $result['created_at'] ?? null,
+                paidAt: $details->string('created_at'),
                 metadata: self::normalizeMetadata($result['meta'] ?? null),
                 provider: $this->getName(),
-                channel: $result['payment_type'] ?? null,
-                cardType: $result['card']['type'] ?? null,
-                bank: $result['card']['issuer'] ?? null,
+                channel: $details->string('payment_type'),
+                cardType: $details->string('card', 'type'),
+                bank: $details->string('card', 'issuer'),
                 customer: [
-                    'email' => $result['customer']['email'] ?? null,
-                    'name' => $result['customer']['name'] ?? null,
+                    'email' => $details->string('customer', 'email'),
+                    'name' => $details->string('customer', 'name'),
                 ],
             );
         } catch (VerificationException $e) {
@@ -228,7 +230,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
             return false;
         }
 
-        $secretHash = $this->config['webhook_secret'] ?? $this->config['secret_key'] ?? null;
+        $secretHash = $this->settings()->string('webhook_secret') ?? $this->settings()->string('secret_key');
 
         if (empty($secretHash)) {
             $this->log('warning', 'Webhook secret hash not configured', [
@@ -314,7 +316,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['data']['tx_ref'] ?? null;
+        return Payload::of($payload)->string('data', 'tx_ref');
     }
 
     /**
@@ -322,7 +324,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['data']['status'] ?? 'unknown';
+        return Payload::of($payload)->string('data', 'status') ?? 'unknown';
     }
 
     /**
@@ -330,7 +332,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['payment_type'] ?? null;
+        return Payload::of($payload)->string('data', 'payment_type');
     }
 
     /**

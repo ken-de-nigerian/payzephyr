@@ -64,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Flutterwave subscription lookups read one page.** `listSubscriptions(customer: ...)` fetched
+  a page of every merchant subscription and filtered it locally, and the lookup that finds the
+  subscription a new charge created fetched the first page with no filter at all. A customer's
+  subscription on any other page was not listed, and `subscribe()` could report a charge that
+  succeeded as "could not be located". Both now send Flutterwave's `email` (and `plan`) filters,
+  and still check each result, so a filter the API ignored cannot match another customer.
+
 - **Mollie found a customer only among its first 250.** Mollie cannot filter customers by email,
   so the driver lists them - and read one page. Past 250 customers, an existing customer was not
   found: `subscribe()` created a second Mollie customer for the same email, and

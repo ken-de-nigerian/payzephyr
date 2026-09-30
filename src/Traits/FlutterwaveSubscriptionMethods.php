@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -45,16 +46,16 @@ trait FlutterwaveSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new PlanException($data['message'] ?? 'Failed to create subscription plan');
+            if (Payload::of($data)->string('status') !== 'success') {
+                throw new PlanException(Payload::of($data)->string('message') ?? 'Failed to create subscription plan');
             }
 
             $this->log('info', 'Subscription plan created', [
-                'plan_code' => $data['data']['id'] ?? null,
+                'plan_code' => Payload::of($data)->string('data', 'id'),
                 'name' => $plan->name,
             ]);
 
-            return $this->mapFlutterwavePlanToResponse($data['data']);
+            return $this->mapFlutterwavePlanToResponse(Payload::of($data)->array('data'));
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -100,11 +101,11 @@ trait FlutterwaveSubscriptionMethods
             $response = $this->makeRequest('GET', 'payment-plans/'.rawurlencode($planCode));
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new PlanException($data['message'] ?? 'Failed to fetch subscription plan');
+            if (Payload::of($data)->string('status') !== 'success') {
+                throw new PlanException(Payload::of($data)->string('message') ?? 'Failed to fetch subscription plan');
             }
 
-            return $this->mapFlutterwavePlanToResponse($data['data']);
+            return $this->mapFlutterwavePlanToResponse(Payload::of($data)->array('data'));
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -126,12 +127,15 @@ trait FlutterwaveSubscriptionMethods
             ]);
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new PlanException($data['message'] ?? 'Failed to list subscription plans');
+            if (Payload::of($data)->string('status') !== 'success') {
+                throw new PlanException(Payload::of($data)->string('message') ?? 'Failed to list subscription plans');
             }
 
             return [
-                'data' => array_map(fn ($item) => $this->mapFlutterwavePlanToResponse($item), $data['data'] ?? []),
+                'data' => array_map(
+                    fn ($item) => $this->mapFlutterwavePlanToResponse(Payload::of($item)->all()),
+                    Payload::of($data)->array('data')
+                ),
                 'meta' => $data['meta'] ?? null,
             ];
         } catch (PlanException $e) {
@@ -208,11 +212,11 @@ trait FlutterwaveSubscriptionMethods
             $response = $this->makeRequest('GET', 'subscriptions/'.rawurlencode($subscriptionCode));
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new SubscriptionException($data['message'] ?? 'Failed to fetch subscription');
+            if (Payload::of($data)->string('status') !== 'success') {
+                throw new SubscriptionException(Payload::of($data)->string('message') ?? 'Failed to fetch subscription');
             }
 
-            return $this->mapFlutterwaveSubscriptionToResponse($data['data']);
+            return $this->mapFlutterwaveSubscriptionToResponse(Payload::of($data)->array('data'));
         } catch (SubscriptionException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -278,25 +282,27 @@ trait FlutterwaveSubscriptionMethods
     public function listSubscriptions(?int $perPage = 50, ?int $page = 1, ?string $customer = null): array
     {
         try {
-            $query = ['page' => $page ?? 1];
+            // The email filter is Flutterwave's; the one below is kept so a
+            // page that ignored it still answers only for this customer.
+            $query = array_filter(['page' => $page ?? 1, 'email' => $customer], fn ($value) => $value !== null);
 
             $response = $this->makeRequest('GET', 'subscriptions', ['query' => $query]);
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
-                throw new SubscriptionException($data['message'] ?? 'Failed to list subscriptions');
+            if (Payload::of($data)->string('status') !== 'success') {
+                throw new SubscriptionException(Payload::of($data)->string('message') ?? 'Failed to list subscriptions');
             }
 
-            $items = $data['data'] ?? [];
+            $items = Payload::of($data)->array('data');
             if ($customer) {
                 $items = array_values(array_filter(
                     $items,
-                    fn ($item) => ($item['customer']['email'] ?? null) === $customer
+                    fn ($item) => Payload::of($item)->string('customer', 'email') === $customer
                 ));
             }
 
             return [
-                'data' => array_map(fn ($item) => $this->mapFlutterwaveSubscriptionToResponse($item), $items),
+                'data' => array_map(fn ($item) => $this->mapFlutterwaveSubscriptionToResponse(Payload::of($item)->all()), $items),
                 'meta' => $data['meta'] ?? null,
             ];
         } catch (SubscriptionException $e) {
@@ -308,26 +314,41 @@ trait FlutterwaveSubscriptionMethods
     }
 
     /**
-     * @return array<string, mixed>|null
+     * Asks Flutterwave for this customer's subscriptions to this plan, and
+     * still checks each one returned, so a filter the API ignored cannot
+     * match someone else's.
+     *
+     * @return array<array-key, mixed>|null
      *
      * @throws ChargeException
      */
     private function findFlutterwaveSubscription(string $customerEmail, string $planCode): ?array
     {
-        $response = $this->makeRequest('GET', 'subscriptions');
-        $data = $this->parseResponse($response);
+        $response = $this->makeRequest('GET', 'subscriptions', [
+            'query' => ['email' => $customerEmail, 'plan' => $planCode],
+        ]);
 
-        foreach ($data['data'] ?? [] as $item) {
-            $itemPlan = is_array($item['plan'] ?? null) ? ($item['plan']['id'] ?? null) : ($item['plan'] ?? null);
+        foreach (Payload::of($this->parseResponse($response))->array('data') as $item) {
+            $subscription = Payload::of($item);
+
             if (
-                ($item['customer']['email'] ?? null) === $customerEmail
-                && (string) $itemPlan === $planCode
+                $subscription->string('customer', 'email') === $customerEmail
+                && $this->flutterwavePlanId($subscription) === $planCode
             ) {
-                return $item;
+                return $subscription->all();
             }
         }
 
         return null;
+    }
+
+    /**
+     * A subscription's plan id: the plan object's id, or the plan itself
+     * when Flutterwave sends only the id.
+     */
+    private function flutterwavePlanId(Payload $subscription): ?string
+    {
+        return $subscription->string('plan', 'id') ?? $subscription->string('plan');
     }
 
     private function mapIntervalToFlutterwave(string $interval): string
@@ -358,13 +379,15 @@ trait FlutterwaveSubscriptionMethods
      */
     private function mapFlutterwavePlanToResponse(array $data): PlanResponseDTO
     {
+        $plan = new Payload($data);
+
         return new PlanResponseDTO(
-            planCode: (string) $data['id'],
-            name: $data['name'] ?? '',
-            amount: isset($data['amount']) ? (float) $data['amount'] : null,
-            interval: $this->mapIntervalFromFlutterwave($data['interval'] ?? 'monthly'),
-            currency: $data['currency'] ?? 'NGN',
-            metadata: array_filter(['duration' => $data['duration'] ?? null]),
+            planCode: $this->requireString($data, 'id', 'plan'),
+            name: $plan->string('name') ?? '',
+            amount: $plan->float('amount'),
+            interval: $this->mapIntervalFromFlutterwave($plan->string('interval') ?? 'monthly'),
+            currency: $plan->string('currency') ?? 'NGN',
+            metadata: array_filter(['duration' => $plan->int('duration')]),
             provider: $this->getName(),
         );
     }
@@ -374,15 +397,15 @@ trait FlutterwaveSubscriptionMethods
      */
     private function mapFlutterwaveSubscriptionToResponse(array $data): SubscriptionResponseDTO
     {
-        $plan = $data['plan'] ?? null;
+        $subscription = new Payload($data);
 
         return new SubscriptionResponseDTO(
-            subscriptionCode: (string) $data['id'],
-            status: strtolower((string) ($data['status'] ?? 'active')),
-            customer: $data['customer']['email'] ?? '',
-            plan: is_array($plan) ? (string) ($plan['id'] ?? '') : (string) $plan,
-            amount: isset($data['amount']) ? (float) $data['amount'] : null,
-            currency: $data['customer']['currency'] ?? 'NGN',
+            subscriptionCode: $this->requireString($data, 'id', 'subscription'),
+            status: strtolower($subscription->string('status') ?? 'active'),
+            customer: $subscription->string('customer', 'email') ?? '',
+            plan: $this->flutterwavePlanId($subscription) ?? '',
+            amount: $subscription->float('amount'),
+            currency: $subscription->string('customer', 'currency') ?? 'NGN',
             nextPaymentDate: null,
             metadata: [],
             provider: $this->getName(),

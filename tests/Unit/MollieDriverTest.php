@@ -226,22 +226,22 @@ test('mollie driver accepts hook.ping test events with valid signature', functio
     expect($isValid)->toBeTrue();
 });
 
-test('mollie driver accepts hook.ping test events without webhook secret (API fallback)', function () {
+test('mollie driver rejects a typed event it cannot verify without a webhook secret', function (string $type) {
+    // Typed events are always signed. Without a secret there is nothing to
+    // check one with and no payment to look up, so accepting it accepted
+    // whatever anyone posted - which reached WebhookReceived listeners.
     $driver = new MollieDriver($this->config);
 
     $payload = json_encode([
         'resource' => 'event',
         'id' => 'event_HXpCDZRutNP923WZH2KJJ',
-        'type' => 'hook.ping',
+        'type' => $type,
         'entityId' => 'hook_maMfxMEpntWV5J6V92KJJ',
         'createdAt' => '2025-12-14T00:36:23.0Z',
     ]);
 
-    // hook.ping events should be accepted even without payment ID
-    $isValid = $driver->validateWebhook([], $payload);
-
-    expect($isValid)->toBeTrue();
-});
+    expect($driver->validateWebhook([], $payload))->toBeFalse();
+})->with(['hook.ping', 'payment-link.paid']);
 
 test('mollie driver rejects webhook without payment id', function () {
     $driver = new MollieDriver($this->config);

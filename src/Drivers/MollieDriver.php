@@ -333,14 +333,20 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 return false;
             }
 
+            // A typed event - hook.ping, or any of Mollie's next-gen webhooks -
+            // is always signed, and there is no secret here to check it with.
+            // The API path verifies a classic webhook by looking its payment
+            // up; a typed event has no payment to look up, so accepting it
+            // meant accepting whatever anyone posted, and handing it to the
+            // application's WebhookReceived listeners.
             $eventType = $event->string('type');
-            if ($eventType === 'hook.ping') {
-                $this->log('info', 'Webhook validated successfully (hook.ping test event)', [
-                    'event_id' => $event->string('id'),
-                    'hint' => 'Consider configuring MOLLIE_WEBHOOK_SECRET for more secure signature-based validation',
+            if ($eventType !== null) {
+                $this->log('warning', 'Rejected a typed Mollie webhook that cannot be verified without a webhook secret', [
+                    'event_type' => $eventType,
+                    'hint' => 'Mollie signs typed webhooks. Set MOLLIE_WEBHOOK_SECRET to the secret shown when the webhook was created.',
                 ]);
 
-                return true;
+                return false;
             }
 
             $paymentId = $event->string('id');

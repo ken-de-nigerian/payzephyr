@@ -64,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Security: an unsigned Mollie `hook.ping` was accepted.** Without `MOLLIE_WEBHOOK_SECRET`,
+  Mollie webhooks are verified by looking the posted payment id up through the API. A typed
+  event names no payment, and `hook.ping` was accepted without any check at all - so anyone could
+  post one, it reached your `WebhookReceived` listeners, and each distinct body wrote a
+  deduplication row. Typed events are always signed by Mollie; without the secret they are now
+  rejected, with a log line naming the setting.
+
 - **Tracing switched off with `"false"` stayed on.** The service provider chose the trace
   recorder by the truthiness of `features.trace`, and `"false"` and `"off"` are truthy strings,
   so every payment payload went on being written to the trace table. It reads the switch as the

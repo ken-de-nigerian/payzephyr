@@ -187,7 +187,7 @@ MOLLIE_ENABLED=true
 - **Currencies:** EUR, USD, GBP, CHF, SEK, NOK, DKK, PLN, CZK, HUF (the widest currency list of any supported provider)
 - **Subscriptions:** ✅ supported, with two structural quirks worth reading about before you use them: composite subscription codes, and no server-side plan storage; both covered in [Subscriptions](subscriptions.md#mollies-subscription-codes-look-different-heres-why)
 - **Refunds:** ✅ full support; refund references are also composite (`"{paymentId}:{refundId}"`), the same reasoning as Mollie's subscription codes
-- If `MOLLIE_WEBHOOK_SECRET` isn't set, PayZephyr falls back to verifying webhooks by calling Mollie's API directly instead of checking a local signature; functionally fine, but slower per webhook, and specifically why Mollie is one of the providers whose webhook handling depends on a correctly running [queue worker](queues.md)
+- If `MOLLIE_WEBHOOK_SECRET` isn't set, PayZephyr falls back to verifying webhooks by calling Mollie's API directly instead of checking a local signature; functionally fine, but slower per webhook, and specifically why Mollie is one of the providers whose webhook handling depends on a correctly running [queue worker](queues.md). That fallback covers Mollie's classic webhook, a bare payment id it can look up. A typed event - `hook.ping`, and Mollie's next-gen webhooks - is always signed and names no payment, so without the secret it is rejected; set `MOLLIE_WEBHOOK_SECRET` to receive them
 
 ### Razorpay
 

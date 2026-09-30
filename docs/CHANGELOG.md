@@ -39,6 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have configured. An allowed address is now enough; with both configured, both are still
   enforced.
 
+- **An OPay webhook could be forged with the public key.** With no `OPAY_SECRET_KEY`
+  configured, webhook validation fell back to the public key, which is not a secret: anyone who
+  knew it could sign a webhook that passed. Only the secret key is used now, and without one an
+  OPay webhook is rejected. If your OPay webhooks worked without `OPAY_SECRET_KEY`, set it.
+
+- **OPay webhooks never updated the transaction.** OPay sends the transaction under `payload`;
+  the reference, status and channel were read from the top level, so the reference came back
+  null. They are now read from `payload`, with the top level kept as a fallback.
+
 - **Monnify webhooks never updated the transaction.** Monnify wraps a webhook's fields in
   `eventData`, and the driver's event-id code already read them there, but the reference,
   status and channel were read from the top level, where the current format has nothing. The

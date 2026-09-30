@@ -13,6 +13,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\OPayRefundMethods;
 use Throwable;
 
@@ -52,8 +53,8 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
         return [
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
-            'Authorization' => 'Bearer '.$this->config['public_key'],
-            'MerchantId' => $this->config['merchant_id'],
+            'Authorization' => 'Bearer '.$this->settings()->string('public_key'),
+            'MerchantId' => (string) $this->settings()->string('merchant_id'),
         ];
     }
 
@@ -120,11 +121,11 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
             if (($data['code'] ?? '') !== '00000') {
                 throw new ChargeException(
-                    $data['message'] ?? $data['msg'] ?? 'Failed to initialize OPay payment'
+                    Payload::of($data)->string('message') ?? Payload::of($data)->string('msg') ?? 'Failed to initialize OPay payment'
                 );
             }
 
-            $result = $data['data'] ?? $data;
+            $result = new Payload(is_array($data['data'] ?? null) ? $data['data'] : $data);
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
@@ -132,8 +133,9 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: $result['cashierUrl'] ?? $result['paymentUrl'] ?? $result['checkoutUrl'],
-                accessCode: $result['orderNo'] ?? $result['orderNumber'] ?? $reference,
+                authorizationUrl: $result->string('cashierUrl') ?? $result->string('paymentUrl') ?? $result->string('checkoutUrl')
+                    ?? throw new ChargeException('OPay accepted the payment but returned no checkout URL to send the customer to'),
+                accessCode: $result->string('orderNo') ?? $result->string('orderNumber') ?? $reference,
                 status: 'pending',
                 metadata: $request->metadata,
                 provider: $this->getName(),
@@ -167,8 +169,8 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             ];
             $payloadJson = (string) json_encode($payload, JSON_UNESCAPED_SLASHES);
 
-            $privateKey = $this->config['secret_key'] ?? null;
-            if (empty($privateKey)) {
+            $privateKey = $this->settings()->string('secret_key');
+            if ($privateKey === null || $privateKey === '') {
                 throw new InvalidConfigurationException('OPay secret key (private key) is required for status API authentication');
             }
 
@@ -177,25 +179,26 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 'json' => $payload,
                 'headers' => [
                     'Authorization' => 'Bearer '.$signature,
-                    'MerchantId' => $this->config['merchant_id'],
+                    'MerchantId' => (string) $this->settings()->string('merchant_id'),
                 ],
             ]);
 
             $data = $this->parseResponse($response);
             if (($data['code'] ?? '') !== '00000') {
                 throw new VerificationException(
-                    $data['message'] ?? $data['msg'] ?? 'Failed to verify OPay transaction'
+                    Payload::of($data)->string('message') ?? Payload::of($data)->string('msg') ?? 'Failed to verify OPay transaction'
                 );
             }
 
-            $result = $data['data'] ?? $data;
+            $result = is_array($data['data'] ?? null) ? $data['data'] : $data;
+            $details = new Payload($result);
+            $opayStatus = $details->string('status') ?? $details->string('orderStatus') ?? 'unknown';
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
-                'status' => $result['status'] ?? $result['orderStatus'] ?? 'unknown',
+                'status' => $opayStatus,
             ]);
 
-            $opayStatus = $result['status'] ?? $result['orderStatus'] ?? 'unknown';
             $status = match (strtoupper($opayStatus)) {
                 'SUCCESS', 'SUCCEEDED', 'PAID' => 'success',
                 'PENDING', 'PROCESSING' => 'pending',
@@ -203,18 +206,18 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             };
 
             return new VerificationResponseDTO(
-                reference: $result['reference'] ?? $result['orderNo'] ?? $reference,
+                reference: $details->string('reference') ?? $details->string('orderNo') ?? $reference,
                 status: $status,
                 amount: $this->requireAmount($this->requireArray($result, 'amount', 'verify'), 'total', 'verify') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount', 'verify'), 'currency', 'verify'),
-                paidAt: isset($result['createTime']) ? date('Y-m-d H:i:s', $result['createTime']) : null,
-                metadata: self::normalizeMetadata($result['metadata'] ?? null),
+                paidAt: ($createTime = $details->int('createTime')) !== null ? date('Y-m-d H:i:s', $createTime) : null,
+                metadata: self::normalizeMetadata($details->get('metadata')),
                 provider: $this->getName(),
-                channel: $result['instrumentType'] ?? null,
-                cardType: $result['opayCardToken'] ?? null,
+                channel: $details->string('instrumentType'),
+                cardType: $details->string('opayCardToken'),
                 customer: [
-                    'email' => $result['customerEmail'] ?? $result['email'] ?? null,
-                    'name' => $result['customerName'] ?? $result['name'] ?? null,
+                    'email' => $details->string('customerEmail') ?? $details->string('email'),
+                    'name' => $details->string('customerName') ?? $details->string('name'),
                 ],
             );
         } catch (VerificationException $e) {
@@ -249,7 +252,9 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             return false;
         }
 
-        $secretKey = $this->config['secret_key'] ?? $this->config['public_key'] ?? null;
+        // The secret key only. This used to fall back to the public key, which
+        // is not a secret: a webhook signed with it proves nothing.
+        $secretKey = $this->settings()->string('secret_key');
 
         if (! $secretKey) {
             $this->log('warning', 'OPay secret key not configured for webhook validation');
@@ -332,11 +337,31 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
     }
 
     /**
+     * The part of a webhook body that describes the transaction.
+     *
+     * OPay sends `{"payload": {...}, "sha512": ..., "type": ...}`, with the
+     * transaction under `payload`. The extractors below used to read the top
+     * level, where none of those fields are, so the reference came back null
+     * and the transaction was never updated. A body without `payload` is read
+     * as it is.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function webhookTransaction(array $payload): Payload
+    {
+        $body = new Payload($payload);
+
+        return $body->has('payload') ? $body->at('payload') : $body;
+    }
+
+    /**
      * Get the transaction reference from a raw webhook payload.
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['reference'] ?? $payload['orderNo'] ?? null;
+        $event = $this->webhookTransaction($payload);
+
+        return $event->string('reference') ?? $event->string('orderNo');
     }
 
     /**
@@ -344,7 +369,9 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['status'] ?? $payload['orderStatus'] ?? 'unknown';
+        $event = $this->webhookTransaction($payload);
+
+        return $event->string('status') ?? $event->string('orderStatus') ?? 'unknown';
     }
 
     /**
@@ -352,7 +379,9 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['instrumentType'] ?? $payload['paymentChannel'] ?? null;
+        $event = $this->webhookTransaction($payload);
+
+        return $event->string('instrumentType') ?? $event->string('paymentChannel');
     }
 
     /**

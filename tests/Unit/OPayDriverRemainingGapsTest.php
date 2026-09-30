@@ -96,26 +96,63 @@ test('opay driver healthCheck returns true when a ClientException carries a 400/
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('opay charge reports a success body with no checkout url as a ChargeException, not a TypeError', function () {
-    // OPay answered 00000 but gave nothing to redirect the customer to. The
-    // DTO cannot be built, and that must surface as the driver's own
-    // exception type - a raw TypeError would bypass the manager's
-    // ChargeException handling entirely.
+test('opay charge says so when a success body carries no checkout url', function () {
+    // OPay answered 00000 but gave nothing to redirect the customer to.
     $driver = opayRemainingGapsDriver([
         new Response(200, [], (string) json_encode(['code' => '00000', 'data' => ['orderNo' => 'ORD1']])),
     ]);
 
-    try {
-        $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
-            'amount' => 100,
-            'currency' => 'NGN',
-            'email' => 'customer@example.com',
-            'reference' => 'OPAY_NO_URL_1',
-        ]));
-        $this->fail('Expected a ChargeException');
-    } catch (\KenDeNigerian\PayZephyr\Exceptions\ChargeException $e) {
-        expect($e->getMessage())->toStartWith('Payment initialization failed: ')
-            ->and($e->getPrevious())->toBeInstanceOf(Throwable::class)
-            ->and($e->getPrevious())->not->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
-    }
+    expect(fn () => $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+        'amount' => 100,
+        'currency' => 'NGN',
+        'email' => 'customer@example.com',
+        'reference' => 'OPAY_NO_URL_1',
+    ])))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'returned no checkout URL');
+});
+
+test('opay reads the reference, status and channel from the webhook payload branch', function () {
+    // OPay sends {"payload": {...}, "sha512": ..., "type": ...}. The
+    // extractors read the top level, so the reference was null and the
+    // transaction was never updated from a webhook.
+    $driver = new OPayDriver(opayRemainingGapsConfig());
+    $body = ['type' => 'transaction-status', 'sha512' => 'x', 'payload' => [
+        'reference' => 'ORDER_77', 'status' => 'SUCCESS', 'instrumentType' => 'BankCard',
+    ]];
+
+    expect($driver->extractWebhookReference($body))->toBe('ORDER_77')
+        ->and($driver->extractWebhookStatus($body))->toBe('SUCCESS')
+        ->and($driver->extractWebhookChannel($body))->toBe('BankCard');
+});
+
+test('opay still reads a flat webhook body, with its fallback field names', function () {
+    $driver = new OPayDriver(opayRemainingGapsConfig());
+
+    expect($driver->extractWebhookReference(['orderNo' => 'ORD_9']))->toBe('ORD_9')
+        ->and($driver->extractWebhookStatus(['orderStatus' => 'PENDING']))->toBe('PENDING')
+        ->and($driver->extractWebhookStatus(['payload' => []]))->toBe('unknown')
+        ->and($driver->extractWebhookChannel(['payload' => ['paymentChannel' => 'USSD']]))->toBe('USSD')
+        ->and($driver->extractWebhookReference([]))->toBeNull();
+});
+
+test('an opay webhook updates the transaction it names', function () {
+    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+        'reference' => 'ORDER_88', 'provider' => 'opay', 'status' => 'pending',
+        'amount' => 5000, 'currency' => 'NGN', 'email' => 'a@b.test',
+    ]);
+
+    app()->call([new \KenDeNigerian\PayZephyr\Jobs\ProcessWebhook('opay', ['type' => 'transaction-status', 'payload' => [
+        'reference' => 'ORDER_88', 'status' => 'SUCCESS',
+    ]]), 'handle']);
+
+    expect(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'ORDER_88')->value('status'))->toBe('success');
+});
+
+test('opay does not verify a webhook against the public key', function () {
+    // With no secret key configured, validation used to fall back to the
+    // public key. Anyone can know that, so anyone could sign a webhook with it.
+    $driver = new OPayDriver(opayRemainingGapsConfig(['secret_key' => null]));
+    $body = (string) json_encode(['payload' => ['reference' => 'FORGED', 'status' => 'SUCCESS'], 'type' => 'transaction-status']);
+    $signedWithPublicKey = hash_hmac('sha256', $body, 'PUBLIC_KEY_123');
+
+    expect($driver->validateWebhook(['x-opay-signature' => [$signedWithPublicKey]], $body))->toBeFalse();
 });

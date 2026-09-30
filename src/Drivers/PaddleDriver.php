@@ -14,6 +14,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\PaddleRefundMethods;
 use Throwable;
 
@@ -58,7 +59,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['api_key'],
+            'Authorization' => 'Bearer '.$this->settings()->string('api_key'),
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
@@ -118,14 +119,14 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             }
 
             $response = $this->makeRequest('POST', '/transactions', ['json' => $payload]);
-            $data = $this->parseResponse($response)['data'] ?? [];
+            $details = Payload::of($this->parseResponse($response))->at('data');
 
-            $checkoutUrl = $data['checkout']['url'] ?? null;
+            $checkoutUrl = $details->string('checkout', 'url');
             if (! $checkoutUrl) {
                 throw new ChargeException('No checkout URL returned by Paddle. Set an approved default payment link under Paddle > Checkout > Checkout settings.');
             }
 
-            $transactionId = $data['id'] ?? null;
+            $transactionId = $details->string('id');
             if (! $transactionId) {
                 throw new ChargeException('Paddle returned a transaction without an id; the payment cannot be verified later.');
             }
@@ -138,8 +139,8 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $checkoutUrl,
-                accessCode: (string) $transactionId,
-                status: $this->normalizeStatus((string) ($data['status'] ?? 'draft')),
+                accessCode: $transactionId,
+                status: $this->normalizeStatus($details->string('status') ?? 'draft'),
                 metadata: array_merge($request->metadata, [
                     'paddle_transaction_id' => $transactionId,
                     'reference' => $reference,
@@ -169,31 +170,32 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     {
         try {
             $response = $this->makeRequest('GET', '/transactions/'.rawurlencode($reference));
-            $data = $this->parseResponse($response)['data'] ?? [];
+            $details = Payload::of($this->parseResponse($response))->at('data');
+            $data = $details->all();
             $currency = strtoupper($this->requireString($data, 'currency_code', 'verify'));
             $totals = $this->requireArray($this->requireArray($data, 'details', 'verify'), 'totals', 'verify');
             $grandTotal = $this->requireAmount($totals, 'grand_total', 'verify');
-            $customData = self::normalizeMetadata($data['custom_data'] ?? null);
-            $payment = $data['payments'][0] ?? [];
+            $customData = self::normalizeMetadata($details->get('custom_data'));
+            $payment = $details->at('payments', 0);
 
             $this->log('info', 'Payment verified', [
                 'reference' => $reference,
-                'status' => $data['status'] ?? null,
+                'status' => $details->string('status'),
             ]);
 
             return new VerificationResponseDTO(
-                reference: (string) ($customData['reference'] ?? $data['id'] ?? $reference),
-                status: $this->normalizeStatus((string) ($data['status'] ?? 'unknown')),
+                reference: Payload::of($customData)->string('reference') ?? $details->string('id') ?? $reference,
+                status: $this->normalizeStatus($details->string('status') ?? 'unknown'),
                 amount: $this->fromMinorUnits($grandTotal, $currency),
                 currency: $currency,
-                paidAt: $data['billed_at'] ?? null,
+                paidAt: $details->string('billed_at'),
                 metadata: $customData,
                 provider: $this->getName(),
-                channel: $payment['method_details']['type'] ?? null,
-                cardType: $payment['method_details']['card']['type'] ?? null,
+                channel: $payment->string('method_details', 'type'),
+                cardType: $payment->string('method_details', 'card', 'type'),
                 customer: [
                     'email' => $customData['email'] ?? null,
-                    'name' => $payment['method_details']['card']['cardholder_name'] ?? null,
+                    'name' => $payment->string('method_details', 'card', 'cardholder_name'),
                 ],
             );
         } catch (Throwable $e) {
@@ -215,7 +217,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        $secret = $this->config['webhook_secret'] ?? null;
+        $secret = $this->settings()->string('webhook_secret');
         if (empty($secret)) {
             $this->log('warning', 'Webhook rejected: no webhook secret configured', [
                 'hint' => 'Set PADDLE_WEBHOOK_SECRET to the endpoint secret key from Paddle > Developer tools > Notifications.',
@@ -250,7 +252,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $expected = hash_hmac('sha256', $timestamp.':'.$body, (string) $secret);
+        $expected = hash_hmac('sha256', $timestamp.':'.$body, $secret);
         if (! hash_equals($expected, $signature)) {
             $this->log('warning', 'Webhook signature validation failed', [
                 'hint' => 'PADDLE_WEBHOOK_SECRET must match the secret key of the notification destination that sent this event.',
@@ -304,9 +306,9 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        $data = $payload['data'] ?? [];
+        $data = Payload::of($payload)->at('data');
 
-        return $data['custom_data']['reference'] ?? $data['id'] ?? null;
+        return $data->string('custom_data', 'reference') ?? $data->string('id');
     }
 
     /**
@@ -326,13 +328,13 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookStatus(array $payload): string
     {
-        $eventType = (string) ($payload['event_type'] ?? '');
+        $eventType = Payload::of($payload)->string('event_type') ?? '';
 
         if (! str_starts_with($eventType, 'transaction.')) {
             return 'unknown';
         }
 
-        return $payload['data']['status'] ?? 'unknown';
+        return Payload::of($payload)->string('data', 'status') ?? 'unknown';
     }
 
     /**
@@ -340,7 +342,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['data']['payments'][0]['method_details']['type'] ?? null;
+        return Payload::of($payload)->string('data', 'payments', 0, 'method_details', 'type');
     }
 
     /**
@@ -348,9 +350,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $id = $payload['event_id'] ?? $payload['notification_id'] ?? null;
-
-        return $id !== null ? (string) $id : null;
+        return Payload::of($payload)->string('event_id') ?? Payload::of($payload)->string('notification_id');
     }
 
     /**

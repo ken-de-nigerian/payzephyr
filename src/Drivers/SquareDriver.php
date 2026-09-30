@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\SquareRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\SquareSubscriptionMethods;
 use Random\RandomException;
@@ -57,7 +58,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->config['access_token'],
+            'Authorization' => 'Bearer '.$this->settings()->string('access_token'),
             'Content-Type' => 'application/json',
             'Square-Version' => '2024-10-18',
         ];
@@ -116,8 +117,10 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
 
             $data = $this->parseResponse($response);
 
-            if (! isset($data['payment_link'])) {
-                $errorMessage = $data['errors'][0]['detail'] ?? $data['errors'][0]['code'] ?? 'Failed to create Square payment link';
+            $link = Payload::of($data)->array('payment_link');
+
+            if ($link === []) {
+                $errorMessage = $this->errorDetail($data) ?? 'Failed to create Square payment link';
                 $this->log('error', 'Failed to create payment link', [
                     'reference' => $reference,
                     'errors' => $data['errors'] ?? [],
@@ -125,7 +128,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                 throw new ChargeException($errorMessage);
             }
 
-            $paymentLinkUrl = $data['payment_link']['url'];
+            $paymentLinkUrl = $this->requireString($link, 'url', 'charge');
 
             $this->log('info', 'Charge initialized successfully', [
                 'reference' => $reference,
@@ -135,11 +138,11 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             return new ChargeResponseDTO(
                 reference: $reference,
                 authorizationUrl: $paymentLinkUrl,
-                accessCode: $data['payment_link']['id'],
+                accessCode: $this->requireString($link, 'id', 'charge'),
                 status: 'pending',
                 metadata: [
-                    'payment_link_id' => $data['payment_link']['id'],
-                    'order_id' => $data['payment_link']['order_id'] ?? null,
+                    'payment_link_id' => Payload::of($link)->string('id'),
+                    'order_id' => Payload::of($link)->string('order_id'),
                 ],
                 provider: $this->getName(),
             );
@@ -154,9 +157,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
 
             $statusCode = $response->getStatusCode();
             $responseData = $this->parseResponse($response);
-            $errorMessage = $responseData['errors'][0]['detail'] ?? $responseData['errors'][0]['code'] ?? $previous->getMessage();
+            $errorMessage = $this->errorDetail($responseData) ?? $previous->getMessage();
 
-            $baseUrl = $this->config['base_url'] ?? '';
+            $baseUrl = $this->settings()->string('base_url') ?? '';
             $isSandboxUrl = str_contains($baseUrl, 'squareupsandbox.com');
             $isProductionUrl = str_contains($baseUrl, 'squareup.com') && ! $isSandboxUrl;
 
@@ -223,7 +226,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                 $statusCode = $response->getStatusCode();
                 $responseData = $this->parseResponse($response);
 
-                $errorMessage = $responseData['errors'][0]['detail'] ?? $responseData['errors'][0]['code'] ?? $previous->getMessage();
+                $errorMessage = $this->errorDetail($responseData) ?? $previous->getMessage();
 
                 $this->log('error', 'Verification failed', [
                     'reference' => $reference,
@@ -264,8 +267,10 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $response = $this->makeRequest('GET', '/v2/payments/'.rawurlencode($reference));
             $data = $this->parseResponse($response);
 
-            if (isset($data['payment'])) {
-                return $this->mapFromPayment($data['payment'], $reference);
+            $payment = Payload::of($data)->array('payment');
+
+            if ($payment !== []) {
+                return $this->mapFromPayment($payment, $reference);
             }
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
@@ -297,7 +302,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $paymentLinkResponse = $this->makeRequest('GET', '/v2/online-checkout/payment-links/'.rawurlencode($reference));
             $paymentLinkData = $this->parseResponse($paymentLinkResponse);
 
-            $orderId = $paymentLinkData['payment_link']['order_id'] ?? null;
+            $orderId = Payload::of($paymentLinkData)->string('payment_link', 'order_id');
             if (! $orderId) {
                 return null;
             }
@@ -306,9 +311,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $payment = $this->getPaymentFromOrder($order, $orderId);
             $paymentDetails = $this->getPaymentDetails($payment);
 
-            $actualReference = $order['reference_id'] ?? $reference;
+            $actualReference = Payload::of($order)->string('reference_id') ?? $reference;
 
-            return $this->mapFromPayment($paymentDetails['payment'], $actualReference);
+            return $this->mapFromPayment(Payload::of($paymentDetails)->array('payment'), $actualReference);
         } catch (ChargeException $e) {
             $previous = $e->getPrevious();
             if ($previous instanceof ClientException) {
@@ -344,39 +349,41 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     {
         $foundOrder = $this->findOrderByReference($reference);
 
-        $orderId = $foundOrder['id'];
+        $orderId = $this->requireString($foundOrder, 'id', 'verify');
         $order = $this->getOrderById($orderId);
         $payment = $this->getPaymentFromOrder($order, $orderId);
         $paymentDetails = $this->getPaymentDetails($payment);
 
-        return $this->mapFromPayment($paymentDetails['payment'], $reference);
+        return $this->mapFromPayment(Payload::of($paymentDetails)->array('payment'), $reference);
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      *
      * @throws VerificationException|ChargeException
      */
     private function findOrderByReference(string $reference): array
     {
-        $maxPages = max(1, (int) ($this->config['verify_search_pages'] ?? self::ORDER_SEARCH_MAX_PAGES));
+        $maxPages = max(1, $this->settings()->int('verify_search_pages') ?? self::ORDER_SEARCH_MAX_PAGES);
         $cursor = null;
         $searched = 0;
 
         for ($page = 1; $page <= $maxPages; $page++) {
             $data = $this->searchOrdersPage($cursor);
-            $orders = $data['orders'] ?? [];
+            $orders = Payload::of($data)->array('orders');
             $searched += count($orders);
 
             foreach ($orders as $order) {
-                if (($order['reference_id'] ?? null) === $reference) {
-                    return $order;
+                $order = Payload::of($order);
+
+                if ($order->string('reference_id') === $reference) {
+                    return $order->all();
                 }
             }
 
-            $cursor = $data['cursor'] ?? null;
+            $cursor = Payload::of($data)->string('cursor');
 
-            if (! is_string($cursor) || $cursor === '') {
+            if ($cursor === null || $cursor === '') {
                 throw new VerificationException("Payment not found for reference [$reference]");
             }
         }
@@ -431,9 +438,21 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
+     * Square's own explanation of a rejected request, when it gave one.
+     *
+     * @param  array<string, mixed>  $response
+     */
+    private function errorDetail(array $response): ?string
+    {
+        $error = Payload::of($response)->at('errors', 0);
+
+        return $error->string('detail') ?? $error->string('code');
+    }
+
+    /**
      * Retrieve an order by ID.
      *
-     * @return array<string, mixed> Order data
+     * @return array<array-key, mixed> Order data
      *
      * @throws VerificationException|ChargeException
      */
@@ -442,8 +461,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         $response = $this->makeRequest('GET', '/v2/orders/'.rawurlencode($orderId));
         $data = $this->parseResponse($response);
 
-        $order = $data['order'] ?? null;
-        if (! $order) {
+        $order = Payload::of($data)->array('order');
+        if ($order === []) {
             throw new VerificationException("Order not found for ID [$orderId]");
         }
 
@@ -453,19 +472,19 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Extract payment ID from an order's tenders.
      *
-     * @param  array<string, mixed>  $order
+     * @param  array<array-key, mixed>  $order
      * @return string Payment ID
      *
      * @throws VerificationException
      */
     private function getPaymentFromOrder(array $order, string $orderId): string
     {
-        $tenders = $order['tenders'] ?? [];
-        if (empty($tenders)) {
+        $tenders = Payload::of($order)->array('tenders');
+        if ($tenders === []) {
             throw new VerificationException("No payment found for order [$orderId]");
         }
 
-        $paymentId = $tenders[0]['payment_id'] ?? null;
+        $paymentId = Payload::of($tenders)->string(0, 'payment_id');
         if (! $paymentId) {
             throw new VerificationException("Payment ID not found for order [$orderId]");
         }
@@ -505,27 +524,28 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     /**
      * Map Square payment data to VerificationResponseDTO.
      *
-     * @param  array<string, mixed>  $payment
+     * @param  array<array-key, mixed>  $payment
      *
      * @throws ChargeException
      */
     private function mapFromPayment(array $payment, string $reference): VerificationResponseDTO
     {
-        $status = $this->normalizeStatus($payment['status'] ?? 'pending');
+        $details = new Payload($payment);
+        $status = $this->normalizeStatus($details->string('status') ?? 'pending');
 
         return new VerificationResponseDTO(
-            reference: $payment['reference_id'] ?? $reference,
+            reference: $details->string('reference_id') ?? $reference,
             status: $status,
             amount: $this->requireAmount($this->requireArray($payment, 'amount_money', 'verify'), 'amount', 'verify') / 100,
             currency: strtoupper($this->requireString($this->requireArray($payment, 'amount_money', 'verify'), 'currency', 'verify')),
-            paidAt: $status === 'success' ? ($payment['updated_at'] ?? $payment['created_at'] ?? null) : null,
+            paidAt: $status === 'success' ? ($details->string('updated_at') ?? $details->string('created_at')) : null,
             metadata: [
                 'payment_id' => $payment['id'] ?? null,
                 'order_id' => $payment['order_id'] ?? null,
             ],
             provider: $this->getName(),
-            channel: $payment['source_type'] ?? 'card',
-            cardType: $payment['card_details']['card']['card_brand'] ?? null,
+            channel: $details->string('source_type') ?? 'card',
+            cardType: $details->string('card_details', 'card', 'card_brand'),
             customer: [
                 'email' => $payment['buyer_email_address'] ?? null,
             ],
@@ -557,7 +577,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $webhookSignatureKey = $this->config['webhook_signature_key'] ?? null;
+        $webhookSignatureKey = $this->settings()->string('webhook_signature_key');
 
         if (! $webhookSignatureKey) {
             $this->log('warning', 'Webhook signature key not configured', [
@@ -581,7 +601,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
+        $payload = Payload::of(json_decode($body, true))->all();
         // the envelope's created_at, when Square created the event. Every retry repeats it, so the window is the replay window
         // sized to outlast retries, not the five-minute delivery tolerance.
         if (! $this->validateWebhookTimestamp($payload, $this->webhookReplayWindow())) {
@@ -657,9 +677,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['data']['object']['payment']['reference_id']
-            ?? $payload['data']['id']
-            ?? null;
+        $data = Payload::of($payload)->at('data');
+
+        return $data->string('object', 'payment', 'reference_id') ?? $data->string('id');
     }
 
     /**
@@ -668,9 +688,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['data']['object']['payment']['status']
-            ?? $payload['type']
-            ?? 'unknown';
+        $body = new Payload($payload);
+
+        return $body->string('data', 'object', 'payment', 'status') ?? $body->string('type') ?? 'unknown';
     }
 
     /**
@@ -678,9 +698,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        $sourceType = $payload['data']['object']['payment']['source_type'] ?? null;
+        $sourceType = Payload::of($payload)->string('data', 'object', 'payment', 'source_type');
 
-        return is_string($sourceType) && $sourceType !== '' ? $sourceType : null;
+        return $sourceType !== '' ? $sourceType : null;
     }
 
     /**

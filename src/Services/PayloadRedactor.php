@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Services;
 
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 /**
  * Strips sensitive values out of a trace payload before it is stored.
@@ -26,12 +27,10 @@ final readonly class PayloadRedactor
      */
     public function redact(array $payload, ?int $maxDepth = null): array
     {
-        $config = app('payments.config') ?? config('payments', []);
+        $trace = PackageConfig::read()->at('trace');
+        $fields = array_values(array_filter($trace->array('redact_fields'), 'is_string'));
 
-        /** @var array<int, string> $fields */
-        $fields = data_get($config, 'trace.redact_fields', []);
-
-        $maxDepth ??= (int) (data_get($config, 'trace.redaction_max_depth') ?? PaymentConstants::METADATA_MAX_DEPTH);
+        $maxDepth ??= $trace->int('redaction_max_depth') ?? PaymentConstants::METADATA_MAX_DEPTH;
 
         return $this->redactRecursive($payload, $fields, $maxDepth, 0);
     }
@@ -42,9 +41,9 @@ final readonly class PayloadRedactor
      * attacker-influenced input, and unbounded recursion over deeply nested
      * JSON is a memory-exhaustion vector.
      *
-     * @param  array<string, mixed>  $data
+     * @param  array<array-key, mixed>  $data
      * @param  array<int, string>  $fields
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function redactRecursive(array $data, array $fields, int $maxDepth, int $currentDepth): array
     {

@@ -8,6 +8,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -25,12 +26,13 @@ final class HealthEndpointMiddleware
 
     public function handle(Request $request, Closure $next): Response
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $healthConfig = $config['health_check'] ?? [];
+        $healthConfig = PackageConfig::read()->at('health_check');
 
-        $requiresAuth = $healthConfig['require_auth'] ?? false;
-        $allowedIps = $healthConfig['allowed_ips'] ?? [];
-        $allowedTokens = $healthConfig['allowed_tokens'] ?? [];
+        $requiresAuth = $healthConfig->flag(false, 'require_auth');
+        // Only a string can be an address or a token; anything else in the
+        // list is ignored rather than compared.
+        $allowedIps = array_values(array_filter($healthConfig->array('allowed_ips'), 'is_string'));
+        $allowedTokens = array_values(array_filter($healthConfig->array('allowed_tokens'), 'is_string'));
 
         if (! $requiresAuth && empty($allowedIps) && empty($allowedTokens) && ! app()->environment(['local', 'testing'])) {
             $this->warnOnceIfUnauthenticated();

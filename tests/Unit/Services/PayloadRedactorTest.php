@@ -123,3 +123,10 @@ test('an empty field list redacts nothing', function () {
 
     expect(redactor()->redact(['cvv' => '123']))->toBe(['cvv' => '123']);
 });
+
+test('a redact_fields entry that is not a string is skipped, and the rest still redact', function () {
+    config(['payments.trace.redact_fields' => [['cvv'], 'cvv', 7]]);
+
+    expect(redactor()->redact(['cvv' => '123', 'amount' => 5000]))
+        ->toBe(['cvv' => PayloadRedactor::REDACTED, 'amount' => 5000]);
+});

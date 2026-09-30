@@ -176,7 +176,7 @@ final class PruneTraceEventsCommand extends Command
                 break;
             }
 
-            $deleted += PaymentTraceEvent::whereIn('id', $ids)->delete();
+            $deleted += PaymentTraceEvent::query()->toBase()->whereIn('id', $ids)->delete();
         } while ($ids->count() === $chunk);
 
         return $deleted;

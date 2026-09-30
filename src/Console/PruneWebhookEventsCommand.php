@@ -58,7 +58,10 @@ final class PruneWebhookEventsCommand extends Command
         }
 
         try {
-            $providers = WebhookEvent::query()->distinct()->orderBy('provider')->pluck('provider')->all();
+            $providers = array_values(array_filter(
+                WebhookEvent::query()->distinct()->orderBy('provider')->pluck('provider')->all(),
+                'is_string'
+            ));
         } catch (QueryException) {
             $this->error('The webhook_events table does not exist, so there is nothing to prune.');
 

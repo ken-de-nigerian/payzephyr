@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Services;
 use Illuminate\Support\Collection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 /**
  * Every recorded step of one payment, in the order it happened.
@@ -227,8 +228,7 @@ final readonly class Timeline
      */
     private function slowResponses(): array
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $threshold = (int) (data_get($config, 'trace.slow_response_ms') ?? 5000);
+        $threshold = PackageConfig::read()->int('trace', 'slow_response_ms') ?? 5000;
 
         $slow = $this->events->filter(
             fn (PaymentTraceEvent $e): bool => $e->response_time_ms !== null
@@ -239,7 +239,11 @@ final readonly class Timeline
             return [];
         }
 
-        $slowest = $slow->max('response_time_ms');
+        $slowest = $threshold;
+
+        foreach ($slow as $event) {
+            $slowest = max($slowest, $event->response_time_ms ?? 0);
+        }
 
         return [[
             'severity' => 'medium',

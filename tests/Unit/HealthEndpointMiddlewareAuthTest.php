@@ -211,3 +211,16 @@ test('a request with no resolvable address is refused by the allowlist, not cras
     expect($request->ip())->toBeNull()
         ->and($response->getStatusCode())->toBe(403);
 });
+
+test('an allowlist entry that is not a string is ignored, not a 500', function () {
+    // ipMatches() takes a string. A nested array in the list reached it as
+    // one and raised a TypeError on every request.
+    config([
+        'payments.health_check.allowed_ips' => [['203.0.113.5'], '203.0.113.5'],
+        'payments.health_check.allowed_tokens' => [42, 'secret-token'],
+    ]);
+    app()->forgetInstance('payments.config');
+
+    expect(makeHealthRequest(['REMOTE_ADDR' => '203.0.113.5'], ['X-Health-Token' => 'secret-token'])->getStatusCode())->toBe(200)
+        ->and(makeHealthRequest(['REMOTE_ADDR' => '198.51.100.1'], ['X-Health-Token' => 'secret-token'])->getStatusCode())->toBe(403);
+});

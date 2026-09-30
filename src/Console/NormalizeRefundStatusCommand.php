@@ -8,6 +8,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Support\Payload;
 
 /**
  * One-time, opt-in data fix for refund_transactions rows written before the
@@ -35,7 +36,7 @@ final class NormalizeRefundStatusCommand extends Command
 
     public function handle(): int
     {
-        $table = config('payments.refunds.logging.table', 'refund_transactions');
+        $table = Payload::of(config('payments'))->string('refunds', 'logging', 'table') ?? 'refund_transactions';
 
         if (! Schema::hasTable($table)) {
             $this->info("No \"$table\" table found - nothing to do.");

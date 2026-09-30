@@ -17,7 +17,7 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
 
     public function updateOrCreateAtomic(string $refundReference, array $attributes): RefundTransaction
     {
-        return DB::transaction(function () use ($refundReference, $attributes) {
+        return DB::connection()->transaction(function () use ($refundReference, $attributes): RefundTransaction {
             /** @var RefundTransaction|null $existing */
             $existing = RefundTransaction::where('refund_reference', $refundReference)
                 ->lockForUpdate()
@@ -94,9 +94,12 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
 
     public function sumRefundedAmount(string $transactionReference): float
     {
-        return (float) RefundTransaction::where('transaction_reference', $transactionReference)
+        $sum = RefundTransaction::where('transaction_reference', $transactionReference)
             ->whereIn('status', $this->countedStatuses())
             ->sum('amount');
+
+        // A decimal column sums to a numeric string on most drivers.
+        return is_numeric($sum) ? (float) $sum : 0.0;
     }
 
     public function hasInFlightRefund(string $transactionReference): bool
@@ -108,7 +111,7 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
 
     public function updateStatusIfExists(string $refundReference, string $status): bool
     {
-        return DB::transaction(function () use ($refundReference, $status) {
+        return DB::connection()->transaction(function () use ($refundReference, $status): bool {
             /** @var RefundTransaction|null $refund */
             $refund = RefundTransaction::where('refund_reference', $refundReference)
                 ->lockForUpdate()

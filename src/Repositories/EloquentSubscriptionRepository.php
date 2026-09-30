@@ -39,7 +39,7 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
     {
         $attributes = $this->withSupportedColumns($attributes);
 
-        return DB::transaction(function () use ($subscriptionCode, $attributes) {
+        return DB::connection()->transaction(function () use ($subscriptionCode, $attributes): SubscriptionTransaction {
             /** @var SubscriptionTransaction|null $existing */
             $existing = SubscriptionTransaction::where('subscription_code', $subscriptionCode)
                 ->lockForUpdate()

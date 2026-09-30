@@ -22,7 +22,7 @@ final class EloquentTransactionRepository implements TransactionRepositoryInterf
 
     public function updateIfNotSuccessful(string $reference, array $attributes): bool
     {
-        return DB::transaction(function () use ($reference, $attributes) {
+        return DB::connection()->transaction(function () use ($reference, $attributes): bool {
             /** @var PaymentTransaction|null $transaction */
             $transaction = PaymentTransaction::where('reference', $reference)
                 ->lockForUpdate()

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\ResolvesEnvironmentFile;
 use Throwable;
 
@@ -186,10 +188,7 @@ final class UninstallCommand extends Command
      */
     private function printWarning(array $installed): void
     {
-        $tables = array_map(
-            fn (array $resource) => config('payments.'.$resource['tableConfigKey'], $resource['defaultTable']),
-            $installed
-        );
+        $tables = array_map(fn (array $resource) => $this->tableName($resource), $installed);
         $labels = array_map(fn (array $resource) => $resource['label'], $installed);
 
         $message = "This will permanently drop the following PayZephyr table(s) and all data in them:\n"
@@ -203,6 +202,17 @@ final class UninstallCommand extends Command
         }
 
         warning($message);
+    }
+
+    /**
+     * The table a resource lives in: its configured name, or its default.
+     *
+     * @param  array{tableConfigKey: string, defaultTable: string}  $resource
+     */
+    private function tableName(array $resource): string
+    {
+        return Payload::of(config('payments'))->string(...explode('.', $resource['tableConfigKey']))
+            ?? $resource['defaultTable'];
     }
 
     private function confirmDestruction(): bool
@@ -220,8 +230,7 @@ final class UninstallCommand extends Command
     private function removeResource(array $resource): bool
     {
         try {
-            $tableName = config('payments.'.$resource['tableConfigKey'], $resource['defaultTable']);
-            Schema::dropIfExists($tableName);
+            Schema::dropIfExists($this->tableName($resource));
 
             foreach (glob(database_path('migrations/'.$resource['migrationPattern'])) ?: [] as $file) {
                 $this->forgetMigration($file);
@@ -251,7 +260,7 @@ final class UninstallCommand extends Command
      */
     private function forgetMigration(string $file): void
     {
-        $repository = $this->laravel->make('migrator')->getRepository();
+        $repository = $this->laravel->make(Migrator::class)->getRepository();
 
         if (! $repository->repositoryExists()) {
             return;

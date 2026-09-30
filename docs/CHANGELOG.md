@@ -82,6 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reached Stripe as a string. `updatePlan()` now refuses an `active` that is not a switch
   before anything is sent, and sends `0`, `"0"`, `"off"` and `"false"` as `false`.
 
+- **A non-string entry in a health allowlist, or in `trace.redact_fields`, raised a
+  `TypeError`.** `health_check.allowed_ips` and `allowed_tokens` entries went straight into
+  string comparisons, so one nested array made every request to `/payments/health` a 500; a
+  non-string `redact_fields` entry did the same to every traced request. Entries that are not
+  strings are ignored now, and the rest still apply.
+
 - **`/payments/health` left out a provider configured without an `enabled` key.** The manager
   treats a missing `enabled` as on and charges through that provider; the health route treated
   it as off, so a provider that was taking payments was absent from the report. The route now

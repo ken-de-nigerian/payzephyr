@@ -12,6 +12,8 @@ use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
@@ -31,10 +33,9 @@ class WebhookRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $webhookConfig = $config['webhook'] ?? [];
+        $webhookConfig = PackageConfig::read()->at('webhook');
 
-        $maxPayloadSize = $webhookConfig['max_payload_size'] ?? 1048576;
+        $maxPayloadSize = $webhookConfig->int('max_payload_size') ?? 1048576;
         $contentLength = $this->header('Content-Length');
         $bodySize = strlen($this->getContent());
 
@@ -58,7 +59,7 @@ class WebhookRequest extends FormRequest
             return false;
         }
 
-        if (! ($webhookConfig['verify_signature'] ?? true)) {
+        if (! $webhookConfig->flag(true, 'verify_signature')) {
             $this->warnOnceIfSignatureVerificationDisabled();
 
             return true;
@@ -114,7 +115,7 @@ class WebhookRequest extends FormRequest
     {
         try {
             $payload = json_decode($this->getContent(), true);
-            $reference = is_array($payload) ? $driver->extractWebhookReference($payload) : null;
+            $reference = is_array($payload) ? $driver->extractWebhookReference(Payload::of($payload)->all()) : null;
         } catch (Throwable) {
             return;
         }

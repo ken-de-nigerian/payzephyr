@@ -63,3 +63,26 @@ test('mollie charge names the field when a response carries no status', function
 
     $driver->charge($request);
 })->throws(ChargeException::class, '[mollie] omitted the required field [status] from its charge response');
+
+test('mollie charge wraps a failure that is not an http error in a charge exception', function () {
+    // makeRequest() converts Guzzle's exceptions. Anything else thrown beneath
+    // the call - a handler, a middleware, a stream - is not one of those, and
+    // must still reach the caller as the driver's own exception type.
+    $driver = new MollieDriver(['api_key' => 'test_mollie_api_key', 'currencies' => ['EUR']]);
+    $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
+        new RuntimeException('stream wrapper failed'),
+    ]))]));
+
+    try {
+        $driver->charge(new ChargeRequestDTO(
+            amount: 10.00,
+            currency: 'EUR',
+            email: 'test@example.com',
+            callbackUrl: 'https://example.com/callback',
+        ));
+        $this->fail('Expected a ChargeException');
+    } catch (ChargeException $e) {
+        expect($e->getMessage())->toBe('Payment initialization failed: stream wrapper failed')
+            ->and($e->getPrevious())->toBeInstanceOf(RuntimeException::class);
+    }
+});

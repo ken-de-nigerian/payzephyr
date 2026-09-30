@@ -218,3 +218,23 @@ test('a monnify webhook updates the transaction it names', function () {
 
     expect(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'ORDER_2002')->value('status'))->toBe('success');
 });
+
+test('monnify charge wraps a failure that is not an http error in a charge exception', function () {
+    // The login succeeds; the charge request then fails beneath the HTTP call
+    // with something that is not a Guzzle exception.
+    $driver = createMonnifyRemainingGapsDriver([
+        new Response(200, [], json_encode([
+            'requestSuccessful' => true,
+            'responseBody' => ['accessToken' => 'token', 'expiresIn' => 3600],
+        ])),
+        new RuntimeException('stream wrapper failed'),
+    ]);
+
+    try {
+        $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
+        $this->fail('Expected a ChargeException');
+    } catch (ChargeException $e) {
+        expect($e->getMessage())->toBe('Monnify charge failed: stream wrapper failed')
+            ->and($e->getPrevious())->toBeInstanceOf(RuntimeException::class);
+    }
+});

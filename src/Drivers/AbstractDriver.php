@@ -23,6 +23,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\HasLogSanitization;
 use KenDeNigerian\PayZephyr\Traits\HasNetworkErrorHandling;
@@ -173,9 +174,11 @@ abstract class AbstractDriver implements DriverInterface
         if ($this->currentRequest?->idempotencyKey) {
             $idempotencyHeaders = $this->getIdempotencyHeader($this->currentRequest->idempotencyKey);
 
+            $headers = Payload::of($options)->array('headers');
+
             $headersAlreadySet = false;
             foreach (array_keys($idempotencyHeaders) as $headerName) {
-                if (isset($options['headers'][$headerName])) {
+                if (isset($headers[$headerName])) {
                     $headersAlreadySet = true;
                     break;
                 }
@@ -183,7 +186,7 @@ abstract class AbstractDriver implements DriverInterface
 
             if (! $headersAlreadySet) {
                 $options['headers'] = array_merge(
-                    $options['headers'] ?? [],
+                    $headers,
                     $idempotencyHeaders
                 );
             }
@@ -321,7 +324,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     private function absoluteUri(string $uri): string
     {
-        $base = (string) ($this->config['base_url'] ?? '');
+        $base = $this->settings()->string('base_url') ?? '';
 
         if ($base === '' || str_starts_with($uri, 'http://') || str_starts_with($uri, 'https://')) {
             return $uri;
@@ -496,7 +499,12 @@ abstract class AbstractDriver implements DriverInterface
     {
         $body = (string) $response->getBody();
 
-        return json_decode($body, true) ?? [];
+        $decoded = json_decode($body, true);
+
+        // A body that is not a JSON object or array - a bare string, a number,
+        // HTML from a proxy - is treated as empty rather than returned as
+        // something that is not the array this promises.
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
@@ -515,7 +523,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function getSupportedCurrencies(): array
     {
-        return $this->config['currencies'] ?? [];
+        return array_values(array_filter($this->settings()->array('currencies'), 'is_string'));
     }
 
     /**
@@ -551,12 +559,9 @@ abstract class AbstractDriver implements DriverInterface
     public function getCachedHealthCheck(): bool
     {
         $cacheKey = 'payments.health.'.$this->getName();
-        $config = app('payments.config') ?? config('payments', []);
-        $cacheTtl = $config['health_check']['cache_ttl'] ?? PaymentConstants::HEALTH_CHECK_CACHE_TTL_SECONDS;
+        $cacheTtl = PackageConfig::read()->int('health_check', 'cache_ttl') ?? PaymentConstants::HEALTH_CHECK_CACHE_TTL_SECONDS;
 
-        return Cache::remember($cacheKey, $cacheTtl, function () {
-            return $this->healthCheck();
-        });
+        return Cache::remember($cacheKey, $cacheTtl, fn (): bool => $this->healthCheck()) === true;
     }
 
     /**
@@ -569,13 +574,13 @@ abstract class AbstractDriver implements DriverInterface
     protected function log(string $level, string $message, array $context = []): void
     {
         try {
-            $config = app('payments.config') ?? config('payments', []);
-            if (! ($config['logging']['enabled'] ?? true)) {
+            $config = PackageConfig::read();
+            if (! $config->flag(true, 'logging', 'enabled')) {
                 return;
             }
 
             $sanitizedContext = $this->sanitizeLogContext($context);
-            $channelName = $config['logging']['channel'] ?? 'payments';
+            $channelName = $config->string('logging', 'channel') ?? 'payments';
             $prefixed = "[{$this->getName()}] $message";
 
             try {
@@ -799,7 +804,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['reference'] ?? $payload['transactionReference'] ?? null;
+        return Payload::of($payload)->string('reference') ?? Payload::of($payload)->string('transactionReference');
     }
 
     /**
@@ -812,7 +817,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['status'] ?? $payload['paymentStatus'] ?? 'unknown';
+        return Payload::of($payload)->string('status') ?? Payload::of($payload)->string('paymentStatus') ?? 'unknown';
     }
 
     /**
@@ -824,7 +829,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['channel'] ?? $payload['paymentMethod'] ?? null;
+        return Payload::of($payload)->string('channel') ?? Payload::of($payload)->string('paymentMethod');
     }
 
     /**
@@ -853,9 +858,7 @@ abstract class AbstractDriver implements DriverInterface
     {
         // Not payment_id: that names the payment an event is about, which every
         // later event about the same payment shares.
-        $value = $payload['id'] ?? $payload['event_id'] ?? null;
-
-        return $value !== null ? (string) $value : null;
+        return Payload::of($payload)->string('id') ?? Payload::of($payload)->string('event_id');
     }
 
     /**

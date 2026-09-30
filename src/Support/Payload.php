@@ -107,6 +107,35 @@ final readonly class Payload
     }
 
     /**
+     * An on/off setting, the way one arrives from an env file.
+     *
+     * `env()` turns "true" and "false" into booleans, but "0", "1", "off" and
+     * "yes" reach a config array as strings, and an integer 0 or 1 is common in
+     * a hand-written one. All of those are read as the switch they plainly
+     * mean. Anything else - absent, null, an array, a word that is not a
+     * switch - answers $default, since guessing at it would turn a feature on
+     * or off that nobody asked for.
+     */
+    public function flag(bool $default, string|int ...$path): bool
+    {
+        $value = $this->get(...$path);
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return $value != 0;
+        }
+
+        if (is_string($value)) {
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $default;
+        }
+
+        return $default;
+    }
+
+    /**
      * The array at a path, or an empty one.
      *
      * @return array<array-key, mixed>

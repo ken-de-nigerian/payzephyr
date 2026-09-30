@@ -126,3 +126,40 @@ test('of wraps an array and reads anything else as empty', function (mixed $valu
 test('of keeps an array as it is', function () {
     expect(Payload::of(['a' => 1])->int('a'))->toBe(1);
 });
+
+test('flag reads a switch the way it arrives from an env file', function (mixed $value, bool $expected) {
+    // env() makes "true"/"false" booleans, but "0", "1", "off" and "yes" stay
+    // strings. Reading those by strict type would turn "0" into "not set" and
+    // quietly switch the feature back on.
+    expect((new Payload(['switch' => $value]))->flag(true, 'switch'))->toBe($expected)
+        ->and((new Payload(['switch' => $value]))->flag(false, 'switch'))->toBe($expected);
+})->with([
+    'true' => [true, true],
+    'false' => [false, false],
+    'string 1' => ['1', true],
+    'string 0' => ['0', false],
+    'string true' => ['true', true],
+    'string false' => ['false', false],
+    'on' => ['on', true],
+    'off' => ['off', false],
+    'yes' => ['yes', true],
+    'no' => ['no', false],
+    'empty string' => ['', false],
+    'integer 1' => [1, true],
+    'integer 0' => [0, false],
+    'float 0.0' => [0.0, false],
+]);
+
+test('flag answers the default for anything that is not a switch', function (mixed $value) {
+    expect((new Payload(['switch' => $value]))->flag(true, 'switch'))->toBeTrue()
+        ->and((new Payload(['switch' => $value]))->flag(false, 'switch'))->toBeFalse();
+})->with([
+    'null' => [null],
+    'an array' => [['on']],
+    'a word that is not a switch' => ['sometimes'],
+]);
+
+test('flag answers the default for a missing path', function () {
+    expect((new Payload([]))->flag(true, 'a', 'b'))->toBeTrue()
+        ->and((new Payload([]))->flag(false, 'a', 'b'))->toBeFalse();
+});

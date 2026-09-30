@@ -156,3 +156,25 @@ test('opay does not verify a webhook against the public key', function () {
 
     expect($driver->validateWebhook(['x-opay-signature' => [$signedWithPublicKey]], $body))->toBeFalse();
 });
+
+test('opay charge wraps a failure that is not an http error in a charge exception', function () {
+    $driver = opayRemainingGapsDriver([new RuntimeException('stream wrapper failed')]);
+
+    try {
+        $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+            'amount' => 100, 'currency' => 'NGN', 'email' => 'customer@example.com', 'reference' => 'OPAY_BOOM',
+        ]));
+        $this->fail('Expected a ChargeException');
+    } catch (\KenDeNigerian\PayZephyr\Exceptions\ChargeException $e) {
+        expect($e->getMessage())->toBe('Payment initialization failed: stream wrapper failed')
+            ->and($e->getPrevious())->toBeInstanceOf(RuntimeException::class);
+    }
+});
+
+test('opay rejects a webhook whose signature does not match the secret key', function () {
+    $driver = new OPayDriver(opayRemainingGapsConfig());
+    $body = (string) json_encode(['payload' => ['reference' => 'R1', 'status' => 'SUCCESS'], 'type' => 'transaction-status']);
+
+    expect($driver->validateWebhook(['x-opay-signature' => [hash_hmac('sha256', $body, 'not-the-secret')]], $body))->toBeFalse()
+        ->and($driver->validateWebhook(['x-opay-signature' => [hash_hmac('sha256', $body, 'SECRET_KEY_123')]], $body))->toBeTrue();
+});

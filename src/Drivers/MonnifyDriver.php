@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\MonnifyRefundMethods;
 use Throwable;
 
@@ -79,7 +80,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
         }
 
         try {
-            $credentials = base64_encode($this->config['api_key'].':'.$this->config['secret_key']);
+            $credentials = base64_encode($this->settings()->string('api_key').':'.$this->settings()->string('secret_key'));
             $response = $this->makeRequest('POST', '/api/v1/auth/login', [
                 'headers' => ['Authorization' => 'Basic '.$credentials],
             ]);
@@ -89,14 +90,14 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
                 throw new ChargeException('Failed to authenticate with Monnify');
             }
 
-            $token = $data['responseBody']['accessToken'] ?? null;
+            $token = Payload::of($data)->string('responseBody', 'accessToken');
 
             if (! is_string($token) || $token === '') {
                 throw new ChargeException('Monnify reported a successful login but returned no access token');
             }
 
             $this->accessToken = $token;
-            $this->tokenExpiry = time() + ($data['responseBody']['expiresIn'] ?? 3600) - 60;
+            $this->tokenExpiry = time() + (Payload::of($data)->int('responseBody', 'expiresIn') ?? 3600) - 60;
 
             return $token;
         } catch (Throwable $e) {
@@ -147,16 +148,16 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             $data = $this->parseResponse($response);
 
             if (! ($data['requestSuccessful'] ?? false)) {
-                throw new ChargeException($data['responseMessage'] ?? 'Failed to initialize Monnify transaction');
+                throw new ChargeException(Payload::of($data)->string('responseMessage') ?? 'Failed to initialize Monnify transaction');
             }
 
-            $result = $data['responseBody'];
+            $result = $this->requireArray($data, 'responseBody', 'charge');
             $this->log('info', 'Charge initialized successfully', ['reference' => $reference]);
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: $result['checkoutUrl'],
-                accessCode: $result['transactionReference'],
+                authorizationUrl: $this->requireString($result, 'checkoutUrl', 'charge'),
+                accessCode: $this->requireString($result, 'transactionReference', 'charge'),
                 status: 'pending',
                 metadata: $request->metadata,
                 provider: $this->getName(),
@@ -186,27 +187,28 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             $data = $this->parseResponse($response);
 
             if (! ($data['requestSuccessful'] ?? false)) {
-                throw new VerificationException($data['responseMessage'] ?? 'Failed to verify Monnify transaction');
+                throw new VerificationException(Payload::of($data)->string('responseMessage') ?? 'Failed to verify Monnify transaction');
             }
 
-            $result = $data['responseBody'];
+            $result = $this->requireArray($data, 'responseBody', 'verify');
+            $details = new Payload($result);
 
             return new VerificationResponseDTO(
-                reference: $result['paymentReference'] ?? $reference,
+                reference: $details->string('paymentReference') ?? $reference,
                 status: $this->normalizeStatus($this->requireString($result, 'paymentStatus', 'verify')),
                 amount: $this->requireAmount($result, 'amountPaid', 'verify'),
                 currency: $this->requireString(
-                    ['currency' => $result['currency'] ?? $result['currencyCode'] ?? null],
+                    ['currency' => $details->string('currency') ?? $details->string('currencyCode')],
                     'currency',
                     'verify',
                 ),
-                paidAt: $result['paidOn'] ?? null,
-                metadata: self::normalizeMetadata($result['metaData'] ?? null),
+                paidAt: $details->string('paidOn'),
+                metadata: self::normalizeMetadata($details->get('metaData')),
                 provider: $this->getName(),
-                channel: $result['paymentMethod'] ?? null,
+                channel: $details->string('paymentMethod'),
                 customer: [
-                    'email' => $result['customer']['email'] ?? null,
-                    'name' => $result['customer']['name'] ?? null,
+                    'email' => $details->string('customer', 'email'),
+                    'name' => $details->string('customer', 'name'),
                 ],
             );
         } catch (VerificationException $e) {
@@ -233,7 +235,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
         if (! $signature) {
             return false;
         }
-        $hash = hash_hmac('sha512', $body, $this->config['secret_key']);
+        $hash = hash_hmac('sha512', $body, (string) $this->settings()->string('secret_key'));
         $signatureValid = hash_equals($signature, $hash);
 
         if (! $signatureValid) {
@@ -291,11 +293,32 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
     }
 
     /**
+     * The part of a webhook body that describes the transaction.
+     *
+     * Monnify wraps it in `eventData` alongside an `eventType`. Its older
+     * format sent the same fields at the top level, so a body without
+     * `eventData` is read as it is. The three extractors below used to read
+     * only the top level, so for a current-format webhook the reference came
+     * back null and the status "unknown", and the transaction was never
+     * updated.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function webhookEventData(array $payload): Payload
+    {
+        $body = new Payload($payload);
+
+        return $body->has('eventData') ? $body->at('eventData') : $body;
+    }
+
+    /**
      * Get the transaction reference from a raw webhook payload.
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['paymentReference'] ?? $payload['transactionReference'] ?? null;
+        $event = $this->webhookEventData($payload);
+
+        return $event->string('paymentReference') ?? $event->string('transactionReference');
     }
 
     /**
@@ -303,7 +326,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['paymentStatus'] ?? 'unknown';
+        return $this->webhookEventData($payload)->string('paymentStatus') ?? 'unknown';
     }
 
     /**
@@ -311,7 +334,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['paymentMethod'] ?? null;
+        return $this->webhookEventData($payload)->string('paymentMethod');
     }
 
     /**

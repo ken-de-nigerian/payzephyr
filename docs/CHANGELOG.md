@@ -39,6 +39,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   have configured. An allowed address is now enough; with both configured, both are still
   enforced.
 
+- **Monnify webhooks never updated the transaction.** Monnify wraps a webhook's fields in
+  `eventData`, and the driver's event-id code already read them there, but the reference,
+  status and channel were read from the top level, where the current format has nothing. The
+  reference came back null and the status `unknown`, so the local transaction stayed as it was.
+  They are now read from `eventData`, with the top level kept as a fallback for Monnify's older
+  flat format.
+
 - **Square could not verify an older payment by reference.** When verify() has only the
   reference - logging off and the cache expired - Square offers no lookup by it, so PayZephyr
   searches the location's orders. It read one page, in whatever order Square returned, so on a

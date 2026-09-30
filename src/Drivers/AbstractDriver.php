@@ -23,6 +23,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\HasLogSanitization;
 use KenDeNigerian\PayZephyr\Traits\HasNetworkErrorHandling;
 use KenDeNigerian\PayZephyr\Traits\HasWebhookValidation;
@@ -606,6 +607,16 @@ abstract class AbstractDriver implements DriverInterface
         $separator = parse_url($url, PHP_URL_QUERY) ? '&' : '?';
 
         return "$url$separator$key=$value";
+    }
+
+    /**
+     * This driver's configuration, read through types rather than as found:
+     * a config array is `mixed` all the way down, and a key set to the wrong
+     * kind of value should read as absent, not fail wherever it is used.
+     */
+    protected function settings(): Payload
+    {
+        return new Payload($this->config);
     }
 
     /**

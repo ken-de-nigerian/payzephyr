@@ -87,7 +87,9 @@ test('monnify charge throws when init-transaction reports requestSuccessful fals
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'Merchant is not permitted for this operation');
 
-test('monnify charge wraps unexpected throwables from a malformed success response', function () {
+test('monnify charge names the field when a success response carries no checkout url', function () {
+    // This used to reach the DTO as a null and come back as a TypeError wrapped
+    // in "Monnify charge failed". It now says which field Monnify left out.
     $driver = createMonnifyRemainingGapsDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -103,7 +105,7 @@ test('monnify charge wraps unexpected throwables from a malformed success respon
     ]);
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
-})->throws(ChargeException::class, 'Monnify charge failed');
+})->throws(ChargeException::class, '[monnify] omitted the required field [checkoutUrl] from its charge response');
 
 test('monnify verify throws when query reports requestSuccessful false with 200 status', function () {
     $driver = createMonnifyRemainingGapsDriver([
@@ -177,3 +179,42 @@ test('monnify refuses a login that reports success but carries no access token',
 
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'returned no access token');
+
+test('monnify reads the reference, status and channel from eventData in a current-format webhook', function () {
+    // The three extractors read the top level, where Monnify's current format
+    // has only eventType and eventData - so the reference was null, the status
+    // "unknown", and the transaction was never updated from a webhook.
+    $driver = new MonnifyDriver(['api_key' => 'k', 'secret_key' => 's', 'contract_code' => 'c', 'currencies' => ['NGN']]);
+    $payload = ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => [
+        'paymentReference' => 'ORDER_1001',
+        'transactionReference' => 'MNFY|20|1',
+        'paymentStatus' => 'PAID',
+        'paymentMethod' => 'ACCOUNT_TRANSFER',
+    ]];
+
+    expect($driver->extractWebhookReference($payload))->toBe('ORDER_1001')
+        ->and($driver->extractWebhookStatus($payload))->toBe('PAID')
+        ->and($driver->extractWebhookChannel($payload))->toBe('ACCOUNT_TRANSFER');
+});
+
+test('monnify still reads a legacy flat webhook, and falls back to the transaction reference', function () {
+    $driver = new MonnifyDriver(['api_key' => 'k', 'secret_key' => 's', 'contract_code' => 'c', 'currencies' => ['NGN']]);
+
+    expect($driver->extractWebhookReference(['paymentReference' => 'LEGACY_1', 'paymentStatus' => 'PAID']))->toBe('LEGACY_1')
+        ->and($driver->extractWebhookReference(['eventData' => ['transactionReference' => 'MNFY|20|2']]))->toBe('MNFY|20|2')
+        ->and($driver->extractWebhookStatus(['eventData' => []]))->toBe('unknown')
+        ->and($driver->extractWebhookChannel([]))->toBeNull();
+});
+
+test('a monnify webhook updates the transaction it names', function () {
+    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+        'reference' => 'ORDER_2002', 'provider' => 'monnify', 'status' => 'pending',
+        'amount' => 5000, 'currency' => 'NGN', 'email' => 'a@b.test',
+    ]);
+
+    app()->call([new \KenDeNigerian\PayZephyr\Jobs\ProcessWebhook('monnify', ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => [
+        'paymentReference' => 'ORDER_2002', 'paymentStatus' => 'PAID', 'paymentMethod' => 'CARD',
+    ]]), 'handle']);
+
+    expect(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'ORDER_2002')->value('status'))->toBe('success');
+});

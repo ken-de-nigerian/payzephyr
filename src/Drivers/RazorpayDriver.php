@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\RazorpayRefundMethods;
 use Throwable;
 
@@ -90,7 +91,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     protected function getDefaultHeaders(): array
     {
         return [
-            'Authorization' => 'Basic '.base64_encode($this->config['key_id'].':'.$this->config['key_secret']),
+            'Authorization' => 'Basic '.base64_encode($this->settings()->string('key_id').':'.$this->settings()->string('key_secret')),
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
         ];
@@ -159,9 +160,9 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: (string) $data['short_url'],
-                accessCode: (string) $data['id'],
-                status: $this->normalizeStatus((string) ($data['status'] ?? 'created')),
+                authorizationUrl: $this->requireString($data, 'short_url', 'charge'),
+                accessCode: $this->requireString($data, 'id', 'charge'),
+                status: $this->normalizeStatus(Payload::of($data)->string('status') ?? 'created'),
                 metadata: array_merge($request->metadata, [
                     'razorpay_payment_link_id' => $data['id'],
                 ]),
@@ -206,14 +207,14 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             ]);
 
             return new VerificationResponseDTO(
-                reference: (string) ($link['reference_id'] ?? $reference),
-                status: $this->normalizeStatus((string) ($link['status'] ?? 'unknown')),
+                reference: Payload::of($link)->string('reference_id') ?? $reference,
+                status: $this->normalizeStatus(Payload::of($link)->string('status') ?? 'unknown'),
                 amount: $this->fromMinorUnits($amount, $currency),
                 currency: $currency,
-                paidAt: isset($payment['created_at']) ? date('c', (int) $payment['created_at']) : null,
+                paidAt: ($settledAt = Payload::of($payment)->int('created_at')) !== null ? date('c', $settledAt) : null,
                 metadata: self::normalizeMetadata($link['notes'] ?? null),
                 provider: $this->getName(),
-                channel: $payment['method'] ?? null,
+                channel: Payload::of($payment)->string('method'),
                 customer: [
                     'email' => $customer['email'] ?? null,
                     'name' => $customer['name'] ?? null,
@@ -249,7 +250,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        $secret = $this->config['webhook_secret'] ?? null;
+        $secret = $this->settings()->string('webhook_secret');
         if (empty($secret)) {
             $this->log('warning', 'Webhook rejected: no webhook secret configured', [
                 'hint' => 'Set RAZORPAY_WEBHOOK_SECRET to the secret entered for this webhook in the Razorpay Dashboard.',
@@ -268,7 +269,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             return false;
         }
 
-        $expected = hash_hmac('sha256', $body, (string) $secret);
+        $expected = hash_hmac('sha256', $body, $secret);
         if (! hash_equals($expected, (string) $signature)) {
             $this->log('warning', 'Webhook signature invalid', [
                 'hint' => 'RAZORPAY_WEBHOOK_SECRET must match the webhook secret, not the API key secret.',
@@ -328,9 +329,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             return null;
         }
 
-        $reference = $payload['payload']['payment_link']['entity']['reference_id'] ?? null;
-
-        return $reference !== null ? (string) $reference : null;
+        return Payload::of($payload)->string('payload', 'payment_link', 'entity', 'reference_id');
     }
 
     /**
@@ -342,7 +341,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             return 'unknown';
         }
 
-        return (string) ($payload['payload']['payment_link']['entity']['status'] ?? 'unknown');
+        return Payload::of($payload)->string('payload', 'payment_link', 'entity', 'status') ?? 'unknown';
     }
 
     /**
@@ -350,7 +349,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        return $payload['payload']['payment']['entity']['method'] ?? null;
+        return Payload::of($payload)->string('payload', 'payment', 'entity', 'method');
     }
 
     /**
@@ -364,11 +363,11 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function extractWebhookEventId(array $payload): ?string
     {
-        $event = $payload['event'] ?? null;
-        $subjectId = $payload['payload']['payment_link']['entity']['id']
-            ?? $payload['payload']['refund']['entity']['id']
-            ?? null;
-        $paymentId = $payload['payload']['payment']['entity']['id'] ?? null;
+        $body = new Payload($payload);
+        $event = $body->get('event');
+        $subjectId = $body->string('payload', 'payment_link', 'entity', 'id')
+            ?? $body->string('payload', 'refund', 'entity', 'id');
+        $paymentId = $body->string('payload', 'payment', 'entity', 'id');
 
         if (! is_string($event) || ($subjectId === null && $paymentId === null)) {
             return parent::extractWebhookEventId($payload);
@@ -417,7 +416,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             );
         }
 
-        $linkId = (string) ($links[0]['id'] ?? '');
+        $linkId = Payload::of($links[0])->string('id') ?? '';
 
         if (! str_starts_with($linkId, 'plink_')) {
             throw new VerificationException("Razorpay returned a payment link without an id for reference [$identifier]");
@@ -480,7 +479,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     {
         for ($current = $e; $current !== null; $current = $current->getPrevious()) {
             if ($current instanceof RequestException && $current->getResponse() !== null) {
-                $error = json_decode((string) $current->getResponse()->getBody(), true)['error'] ?? null;
+                $error = Payload::of(json_decode((string) $current->getResponse()->getBody(), true))->get('error');
 
                 if (is_array($error) && is_string($error['description'] ?? null) && $error['description'] !== '') {
                     return $e->getMessage().' Razorpay: '.$error['description'];

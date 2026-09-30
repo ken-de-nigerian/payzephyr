@@ -88,13 +88,11 @@ test('paypal driver charge throws when no approval link is present at all', func
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class, 'No approval link found in PayPal response');
 
-test('paypal driver charge wraps unexpected non-charge errors in a charge exception', function () {
+test('paypal charge names the field when an order response carries no status', function () {
     // Order response has an 'id' and an approvable link, but is missing
-    // 'status'. normalizeStatus() has a `string $status` parameter, and this
-    // file declares strict_types=1, so passing the resulting null triggers a
-    // TypeError - a Throwable that is not already a ChargeException/
-    // VerificationException - which must be caught by the generic
-    // catch (Throwable $e) block instead of the earlier catch (ChargeException).
+    // 'status'. That used to reach normalizeStatus() as a null and come back
+    // as a TypeError wrapped in "Payment initialization failed"; it now says
+    // which field PayPal left out.
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(201, [], json_encode([
@@ -106,7 +104,7 @@ test('paypal driver charge wraps unexpected non-charge errors in a charge except
     ]);
 
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
-})->throws(ChargeException::class, 'Payment initialization failed');
+})->throws(ChargeException::class, '[paypal] omitted the required field [status] from its charge response');
 
 test('paypal driver verify throws when order id missing from lookup response', function () {
     $driver = paypalRemainingGapsDriver([

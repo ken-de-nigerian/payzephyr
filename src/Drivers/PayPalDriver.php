@@ -15,6 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\PayPalRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\PayPalSubscriptionMethods;
 use Throwable;
@@ -127,7 +128,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         }
 
         try {
-            $credentials = base64_encode($this->config['client_id'].':'.$this->config['client_secret']);
+            $credentials = base64_encode($this->settings()->string('client_id').':'.$this->settings()->string('client_secret'));
             $response = $this->makeRequest('POST', '/v1/oauth2/token', [
                 'headers' => [
                     'Authorization' => 'Basic '.$credentials,
@@ -138,14 +139,16 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $data = $this->parseResponse($response);
 
-            if (! isset($data['access_token'])) {
+            $token = Payload::of($data)->string('access_token');
+
+            if ($token === null || $token === '') {
                 throw new ChargeException('Failed to authenticate with PayPal');
             }
 
-            $this->accessToken = $data['access_token'];
-            $this->tokenExpiry = time() + ($data['expires_in'] ?? 3600) - 60;
+            $this->accessToken = $token;
+            $this->tokenExpiry = time() + (Payload::of($data)->int('expires_in') ?? 3600) - 60;
 
-            return $this->accessToken;
+            return $token;
         } catch (Throwable $e) {
             $this->log('error', 'PayPal authentication failed', [
                 'error' => $e->getMessage(),
@@ -214,12 +217,9 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
                 throw new ChargeException('Failed to create PayPal order');
             }
 
-            /** @var array<int, array<string, mixed>> $links */
-            $links = $data['links'] ?? [];
-            $approveLink = collect($links)->firstWhere('rel', 'approve')
-                ?? collect($links)->firstWhere('rel', 'payer-action');
+            $approvalUrl = $this->linkHref($data, 'approve') ?? $this->linkHref($data, 'payer-action');
 
-            if (! $approveLink) {
+            if ($approvalUrl === null) {
                 throw new ChargeException('No approval link found in PayPal response');
             }
 
@@ -230,9 +230,9 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             return new ChargeResponseDTO(
                 reference: $reference,
-                authorizationUrl: $approveLink['href'],
-                accessCode: $data['id'],
-                status: $this->normalizeStatus($data['status']),
+                authorizationUrl: $approvalUrl,
+                accessCode: $this->requireString($data, 'id', 'charge'),
+                status: $this->normalizeStatus($this->requireString($data, 'status', 'charge')),
                 metadata: [
                     'order_id' => $data['id'],
                     'links' => $data['links'] ?? [],
@@ -273,17 +273,16 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             }
 
             $status = strtoupper($this->requireString($data, 'status', 'verify'));
-            $purchaseUnit = $data['purchase_units'][0] ?? [];
-            $amount = $purchaseUnit['amount'] ?? [];
+            $order = new Payload($data);
+            $purchaseUnit = $order->at('purchase_units', 0);
+            $amount = $purchaseUnit->array('amount');
+            $capture = $purchaseUnit->at('payments', 'captures', 0);
 
-            $captures = $purchaseUnit['payments']['captures'] ?? [];
-            $capture = $captures[0] ?? null;
-
-            if ($status === 'APPROVED' && empty($capture)) {
-                $capture = $this->captureOrder($reference);
+            if ($status === 'APPROVED' && $capture->all() === []) {
+                $capture = Payload::of($this->captureOrder($reference));
                 $status = 'COMPLETED';
-            } elseif ($capture && isset($capture['status'])) {
-                $captureStatus = strtoupper($capture['status']);
+            } elseif ($capture->string('status') !== null) {
+                $captureStatus = strtoupper($capture->string('status'));
                 if ($captureStatus === 'PENDING') {
                     $status = 'APPROVED';
                 } elseif ($captureStatus === 'COMPLETED') {
@@ -292,20 +291,20 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             }
 
             return new VerificationResponseDTO(
-                reference: $purchaseUnit['custom_id'] ?? $reference,
+                reference: $purchaseUnit->string('custom_id') ?? $reference,
                 status: $this->normalizeStatus($status),
                 amount: $this->requireAmount($amount, 'value', 'verify'),
                 currency: $this->requireString($amount, 'currency_code', 'verify'),
-                paidAt: $capture['create_time'] ?? null,
+                paidAt: $capture->string('create_time'),
                 metadata: [
                     'order_id' => $data['id'],
-                    'capture_id' => $capture['id'] ?? null,
+                    'capture_id' => $capture->string('id'),
                     'raw' => $data,
                 ],
                 provider: $this->getName(),
                 customer: [
-                    'email' => $data['payer']['email_address'] ?? null,
-                    'name' => $data['payer']['name']['given_name'] ?? null,
+                    'email' => $order->string('payer', 'email_address'),
+                    'name' => $order->string('payer', 'name', 'given_name'),
                 ],
             );
 
@@ -335,7 +334,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         $certUrl = $headers['paypal-cert-url'][0] ?? null;
         $authAlgo = $headers['paypal-auth-algo'][0] ?? null;
         $transmissionSig = $headers['paypal-transmission-sig'][0] ?? null;
-        $webhookId = $this->config['webhook_id'] ?? null;
+        $webhookId = $this->settings()->string('webhook_id');
 
         if (! $transmissionId || ! $transmissionTime || ! $certUrl || ! $authAlgo || ! $transmissionSig || ! $webhookId) {
             $this->log('warning', 'PayPal webhook missing required headers', [
@@ -366,7 +365,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
             return false;
         }
 
-        $payload = json_decode($body, true) ?? [];
+        $payload = Payload::of(json_decode($body, true))->all();
         // create_time, when PayPal created the event. Every retry repeats it, so the window is the replay window
         // sized to outlast retries, not the five-minute delivery tolerance.
         if (! $this->validateWebhookTimestamp($payload, $this->webhookReplayWindow())) {
@@ -474,7 +473,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     }
 
     /**
-     * @return array<string, mixed>|null
+     * @return array<array-key, mixed>|null
      *
      * @throws VerificationException
      */
@@ -487,7 +486,9 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $data = $this->parseResponse($response);
 
-            return $data['purchase_units'][0]['payments']['captures'][0] ?? null;
+            $capture = Payload::of($data)->get('purchase_units', 0, 'payments', 'captures', 0);
+
+            return is_array($capture) ? $capture : null;
 
         } catch (Throwable $e) {
             $this->log('error', 'PayPal capture failed', [
@@ -500,13 +501,31 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
     }
 
     /**
+     * The href of the first link in a response with the given rel.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function linkHref(array $data, string $rel): ?string
+    {
+        foreach (Payload::of($data)->array('links') as $link) {
+            $link = Payload::of($link);
+
+            if ($link->string('rel') === $rel && $link->string('href') !== null) {
+                return $link->string('href');
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Get the transaction reference from a raw webhook payload.
      */
     public function extractWebhookReference(array $payload): ?string
     {
-        return $payload['resource']['custom_id']
-            ?? $payload['resource']['purchase_units'][0]['custom_id']
-            ?? null;
+        $resource = Payload::of($payload)->at('resource');
+
+        return $resource->string('custom_id') ?? $resource->string('purchase_units', 0, 'custom_id');
     }
 
     /**
@@ -514,7 +533,9 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookStatus(array $payload): string
     {
-        return $payload['resource']['status'] ?? $payload['event_type'] ?? 'unknown';
+        $body = new Payload($payload);
+
+        return $body->string('resource', 'status') ?? $body->string('event_type') ?? 'unknown';
     }
 
     /**
@@ -522,7 +543,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function extractWebhookChannel(array $payload): ?string
     {
-        $paymentSource = $payload['resource']['payment_source'] ?? null;
+        $paymentSource = Payload::of($payload)->get('resource', 'payment_source');
 
         if (! is_array($paymentSource) || $paymentSource === []) {
             return null;

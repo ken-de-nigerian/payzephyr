@@ -11,6 +11,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -52,21 +53,18 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new PlanException(
-                    $data['message'] ?? 'Failed to create subscription plan'
+                    Payload::of($data)->string('message') ?? 'Failed to create subscription plan'
                 );
             }
 
             $this->log('info', 'Subscription plan created', [
-                'plan_code' => $data['data']['plan_code'] ?? null,
+                'plan_code' => Payload::of($data)->string('data', 'plan_code'),
                 'name' => $plan->name,
             ]);
 
-            $planData = $data['data'];
-            $planData['provider'] = $this->getName();
-
-            return PlanResponseDTO::fromArray($planData);
+            return PlanResponseDTO::fromArray(array_merge(Payload::of($data)->array('data'), ['provider' => $this->getName()]));
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -99,9 +97,9 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new PlanException(
-                    $data['message'] ?? 'Failed to update subscription plan'
+                    Payload::of($data)->string('message') ?? 'Failed to update subscription plan'
                 );
             }
 
@@ -109,10 +107,7 @@ trait PaystackSubscriptionMethods
                 'plan_code' => $planCode,
             ]);
 
-            $planData = $data['data'];
-            $planData['provider'] = $this->getName();
-
-            return PlanResponseDTO::fromArray($planData);
+            return PlanResponseDTO::fromArray(array_merge(Payload::of($data)->array('data'), ['provider' => $this->getName()]));
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -141,16 +136,13 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new PlanException(
-                    $data['message'] ?? 'Failed to fetch subscription plan'
+                    Payload::of($data)->string('message') ?? 'Failed to fetch subscription plan'
                 );
             }
 
-            $planData = $data['data'];
-            $planData['provider'] = $this->getName();
-
-            return PlanResponseDTO::fromArray($planData);
+            return PlanResponseDTO::fromArray(array_merge(Payload::of($data)->array('data'), ['provider' => $this->getName()]));
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -185,13 +177,13 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new PlanException(
-                    $data['message'] ?? 'Failed to list subscription plans'
+                    Payload::of($data)->string('message') ?? 'Failed to list subscription plans'
                 );
             }
 
-            return $data['data'];
+            return Payload::of($data)->array('data');
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -230,15 +222,14 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new SubscriptionException(
-                    $data['message'] ?? 'Failed to create subscription'
+                    Payload::of($data)->string('message') ?? 'Failed to create subscription'
                 );
             }
 
-            $result = $data['data'] ?? $data;
-
-            $subscriptionCode = $result['subscription_code'] ?? $result['code'] ?? null;
+            $result = Payload::of($data)->arrayOrNull('data') ?? $data;
+            $subscriptionCode = Payload::of($result)->string('subscription_code') ?? Payload::of($result)->string('code');
             if ($subscriptionCode === null) {
                 throw new SubscriptionException('Subscription code not found in response. Response: '.json_encode($data));
             }
@@ -249,24 +240,7 @@ trait PaystackSubscriptionMethods
                 'plan' => $request->plan,
             ]);
 
-            $metadata = $result['metadata'] ?? [];
-            $planCode = $result['plan']['plan_code'] ?? $result['plan']['code'] ?? $request->plan;
-            if (! isset($metadata['plan_code'])) {
-                $metadata['plan_code'] = $planCode;
-            }
-
-            $response = new SubscriptionResponseDTO(
-                subscriptionCode: $subscriptionCode,
-                status: $result['status'],
-                customer: $result['customer']['email'] ?? $request->customer,
-                plan: $result['plan']['name'] ?? $request->plan,
-                amount: isset($result['amount']) ? (float) $result['amount'] / 100 : null,
-                currency: $result['currency'] ?? 'NGN',
-                nextPaymentDate: $result['next_payment_date'] ?? null,
-                emailToken: $result['email_token'] ?? null,
-                metadata: $metadata,
-                provider: $this->getName(),
-            );
+            $response = $this->mapPaystackSubscriptionToResponse($result, $request);
 
             $this->logSubscription($request, $response);
 
@@ -299,32 +273,13 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new SubscriptionException(
-                    $data['message'] ?? 'Failed to fetch subscription'
+                    Payload::of($data)->string('message') ?? 'Failed to fetch subscription'
                 );
             }
 
-            $result = $data['data'];
-
-            $metadata = $result['metadata'] ?? [];
-            $planCode = $result['plan']['plan_code'] ?? $result['plan']['code'] ?? null;
-            if ($planCode && ! isset($metadata['plan_code'])) {
-                $metadata['plan_code'] = $planCode;
-            }
-
-            return new SubscriptionResponseDTO(
-                subscriptionCode: $result['subscription_code'] ?? '',
-                status: $result['status'] ?? 'unknown',
-                customer: $result['customer']['email'] ?? '',
-                plan: $result['plan']['name'] ?? '',
-                amount: isset($result['amount']) ? (float) $result['amount'] / 100 : null,
-                currency: $result['currency'] ?? 'NGN',
-                nextPaymentDate: $result['next_payment_date'] ?? null,
-                emailToken: $result['email_token'] ?? null,
-                metadata: $metadata,
-                provider: $this->getName(),
-            );
+            return $this->mapPaystackSubscriptionToResponse(Payload::of($data)->array('data'));
         } catch (SubscriptionException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -362,9 +317,9 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new SubscriptionException(
-                    $data['message'] ?? 'Failed to cancel subscription'
+                    Payload::of($data)->string('message') ?? 'Failed to cancel subscription'
                 );
             }
 
@@ -414,9 +369,9 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new SubscriptionException(
-                    $data['message'] ?? 'Failed to enable subscription'
+                    Payload::of($data)->string('message') ?? 'Failed to enable subscription'
                 );
             }
 
@@ -488,13 +443,13 @@ trait PaystackSubscriptionMethods
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['status'] ?? false)) {
+            if (! Payload::of($data)->flag(false, 'status')) {
                 throw new SubscriptionException(
-                    $data['message'] ?? 'Failed to list subscriptions'
+                    Payload::of($data)->string('message') ?? 'Failed to list subscriptions'
                 );
             }
 
-            return $data['data'];
+            return Payload::of($data)->array('data');
         } catch (SubscriptionException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -507,5 +462,41 @@ trait PaystackSubscriptionMethods
                 $e
             );
         }
+    }
+
+    /**
+     * A Paystack subscription as the shared DTO.
+     *
+     * `plan` is the plan's name, as it has always been for Paystack; the plan
+     * code is kept in metadata['plan_code'], which is where the subscription
+     * log reads it from. A create response can omit what the request already
+     * said, so the request fills those gaps.
+     *
+     * @param  array<array-key, mixed>  $result
+     */
+    private function mapPaystackSubscriptionToResponse(array $result, ?SubscriptionRequestDTO $request = null): SubscriptionResponseDTO
+    {
+        $subscription = new Payload($result);
+        $metadata = self::normalizeMetadata($subscription->get('metadata'));
+        $planCode = $subscription->string('plan', 'plan_code') ?? $subscription->string('plan', 'code') ?? $request?->plan;
+
+        if ($planCode !== null && ! isset($metadata['plan_code'])) {
+            $metadata['plan_code'] = $planCode;
+        }
+
+        $amount = $subscription->float('amount');
+
+        return new SubscriptionResponseDTO(
+            subscriptionCode: $subscription->string('subscription_code') ?? $subscription->string('code') ?? '',
+            status: $subscription->string('status') ?? 'unknown',
+            customer: $subscription->string('customer', 'email') ?? $request->customer ?? '',
+            plan: $subscription->string('plan', 'name') ?? $request->plan ?? '',
+            amount: $amount === null ? null : $amount / 100,
+            currency: $subscription->string('currency') ?? 'NGN',
+            nextPaymentDate: $subscription->string('next_payment_date'),
+            emailToken: $subscription->string('email_token'),
+            metadata: $metadata,
+            provider: $this->getName(),
+        );
     }
 }

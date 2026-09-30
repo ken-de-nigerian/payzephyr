@@ -104,3 +104,44 @@ test('paystack cancelSubscription wraps a non-domain (network/HTTP) failure via 
 
     $driver->cancelSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'token_abc123']));
 })->throws(SubscriptionException::class, 'Failed to cancel subscription:');
+
+test('a created subscription whose response omits its status is reported as unknown, not as a failure', function () {
+    // The subscription exists at Paystack once this response arrives. Reading
+    // the missing status raised a TypeError, reported as "Failed to create
+    // subscription" - inviting a retry that subscribes the customer twice.
+    $driver = \Tests\Helpers\PaystackDriverTestHelper::createWithMock([
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'status' => true,
+            'data' => ['subscription_code' => 'SUB_nostatus', 'amount' => 500000],
+        ])),
+    ]);
+
+    $subscription = $driver->createSubscription(new \KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO(
+        customer: 'a@b.com',
+        plan: 'PLN_1',
+    ));
+
+    expect($subscription->subscriptionCode)->toBe('SUB_nostatus')
+        ->and($subscription->status)->toBe('unknown')
+        ->and($subscription->plan)->toBe('PLN_1')
+        ->and($subscription->amount)->toBe(5000.0);
+});
+
+test('subscription metadata Paystack returns as a JSON string is read, and keeps the plan code', function () {
+    $driver = \Tests\Helpers\PaystackDriverTestHelper::createWithMock([
+        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'status' => true,
+            'data' => [
+                'subscription_code' => 'SUB_json',
+                'status' => 'active',
+                'metadata' => json_encode(['source' => 'web']),
+                'plan' => ['plan_code' => 'PLN_9', 'name' => 'Gold'],
+            ],
+        ])),
+    ]);
+
+    $subscription = $driver->fetchSubscription('SUB_json');
+
+    expect($subscription->metadata)->toBe(['source' => 'web', 'plan_code' => 'PLN_9'])
+        ->and($subscription->plan)->toBe('Gold');
+});

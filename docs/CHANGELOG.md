@@ -64,6 +64,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **A Paystack subscription created without a `status` in the response was reported as a
+  failure.** The mapper read `status` directly; a response without it raised a `TypeError`, which
+  surfaced as "Failed to create subscription" for a subscription that existed - inviting a retry
+  that subscribes the customer twice. It is reported with status `unknown`. Subscription
+  metadata Paystack returns as a JSON string is decoded rather than dropped.
+
 - **Square plans with an introductory phase were read, and repriced, by it.** A plan variation
   lists an introductory phase (one with `periods`) before the phase it bills on indefinitely.
   The driver took `phases[0]` as the plan's price and cadence and repriced `phases[0]`, leaving

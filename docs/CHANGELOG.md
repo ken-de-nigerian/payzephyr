@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reference, status and channel were read from the top level, so the reference came back
   null. They are now read from `payload`, with the top level kept as a fallback.
 
+- **`subscriptions.prevent_duplicates` did nothing on Stripe, Square, Mollie or Flutterwave.**
+  Those drivers list subscriptions as `SubscriptionResponseDTO`s. The duplicate check indexed
+  each one as an array - an `Error` on an object - which it caught, logged as "Failed to check
+  for duplicate subscriptions", and then allowed the subscription. Only Paystack, which returns
+  raw rows, was ever checked. Both shapes are read now, as `SubscriptionQuery` already did. When
+  the provider cannot list at all (PayPal), the exception now says that
+  `payments.subscriptions.prevent_duplicates` required the listing, instead of surfacing a bare
+  "PayPal does not provide an API to list subscriptions" from a subscribe call;
+  [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
+  which the configuration page pointed to and nothing described.
+
 - **A provider switched off with `"false"` or `"off"` stayed on.** `PaymentManager` read
   `providers.<name>.enabled` by truthiness, and both strings are truthy. `env()` converts the
   bare words, but a quoted value, or one set through `config()` from another source, arrives

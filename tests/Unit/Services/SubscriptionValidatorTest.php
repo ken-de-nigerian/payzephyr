@@ -159,3 +159,86 @@ test('validateCancellation passes when the subscription is still active', functi
 
     $this->validator->validateCancellation('SUB_1', $driver);
 })->throwsNoExceptions();
+
+/*
+ * Every driver but Paystack lists subscriptions as SubscriptionResponseDTOs.
+ * The duplicate check indexed each entry as an array; on a DTO that is an
+ * Error, which it logged as "failed to check" - and then let the duplicate
+ * through. prevent_duplicates did nothing on Stripe, Square, Mollie or
+ * Flutterwave.
+ */
+
+function listedSubscription(string $plan, string $status): SubscriptionResponseDTO
+{
+    return new SubscriptionResponseDTO(
+        subscriptionCode: 'SUB_EXISTING',
+        status: $status,
+        customer: 'a@b.com',
+        plan: $plan,
+        amount: 10.0,
+        currency: 'USD',
+    );
+}
+
+function duplicateCheckingDriver(array $listing): SupportsSubscriptionsInterface
+{
+    config(['payments.subscriptions.prevent_duplicates' => true]);
+    app()->forgetInstance('payments.config');
+
+    $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
+    $driver->shouldReceive('fetchPlan')->with('PLN_1')->andReturn(activePlan());
+    $driver->shouldReceive('listSubscriptions')->andReturn($listing);
+
+    return $driver;
+}
+
+test('an active subscription listed as a DTO blocks a duplicate', function (array $listing) {
+    $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
+
+    expect(fn () => $this->validator->validateCreation($request, duplicateCheckingDriver($listing)))
+        ->toThrow(SubscriptionException::class, 'Customer already has an active subscription to plan PLN_1');
+})->with([
+    'under data, as the drivers return it' => [['data' => [listedSubscription('PLN_1', 'active')], 'has_more' => false]],
+    'as a bare list' => [[listedSubscription('PLN_2', 'active'), listedSubscription('PLN_1', 'non-renewing')]],
+    'a raw row naming its plan by code' => [['data' => [['plan' => 'PLN_1', 'status' => 'Active']]]],
+    'a raw row with a top-level plan_code' => [['data' => [['plan_code' => 'PLN_1', 'status' => 'active']]]],
+]);
+
+test('a listed DTO for another plan, or one that has ended, does not block', function () {
+    $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
+    $driver = duplicateCheckingDriver(['data' => [
+        listedSubscription('PLN_2', 'active'),
+        listedSubscription('PLN_1', 'cancelled'),
+        'not a subscription',
+        ['status' => 'active'],
+    ]]);
+
+    $this->validator->validateCreation($request, $driver);
+})->throwsNoExceptions();
+
+test('duplicate prevention switched off with the string an env file produces is off', function () {
+    config(['payments.subscriptions.prevent_duplicates' => 'false']);
+    app()->forgetInstance('payments.config');
+
+    $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
+    $driver->shouldReceive('fetchPlan')->with('PLN_1')->andReturn(activePlan());
+    $driver->shouldNotReceive('listSubscriptions');
+
+    $this->validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1'), $driver);
+});
+
+test('a provider that cannot list subscriptions stops the subscribe, and the error names the setting', function () {
+    config(['payments.subscriptions.prevent_duplicates' => true]);
+    app()->forgetInstance('payments.config');
+
+    $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
+    $driver->shouldReceive('fetchPlan')->with('PLN_1')->andReturn(activePlan());
+    $driver->shouldReceive('listSubscriptions')->andThrow(new SubscriptionException('PayPal does not provide an API to list subscriptions'));
+
+    $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
+
+    expect(fn () => $this->validator->validateCreation($request, $driver))->toThrow(
+        SubscriptionException::class,
+        'Could not check for an existing subscription to plan PLN_1, which payments.subscriptions.prevent_duplicates requires: PayPal does not provide an API to list subscriptions'
+    );
+});

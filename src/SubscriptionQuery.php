@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 
 /**
  * Fluent query builder for advanced subscription filtering and retrieval.
@@ -179,19 +180,21 @@ final class SubscriptionQuery
     public function first(): ?SubscriptionResponseDTO
     {
         $results = $this->take(1)->get();
-        $subscriptions = $results['data'] ?? $results;
+        $subscriptions = (new Payload($results))->arrayOrNull('data') ?? $results;
 
-        if (empty($subscriptions)) {
+        if ($subscriptions === []) {
             return null;
         }
 
-        $first = is_array($subscriptions) && isset($subscriptions[0]) ? $subscriptions[0] : $subscriptions;
+        // A list of subscriptions, or - from a driver that answers with one
+        // row rather than a list of them - the subscription itself.
+        $first = $subscriptions[0] ?? $subscriptions;
 
         if ($first instanceof SubscriptionResponseDTO) {
             return $first;
         }
 
-        return SubscriptionResponseDTO::fromArray($first);
+        return is_array($first) ? SubscriptionResponseDTO::fromArray(Payload::of($first)->all()) : null;
     }
 
     /**
@@ -263,7 +266,7 @@ final class SubscriptionQuery
 
         if (isset($results['data'])) {
             $results['data'] = $filtered;
-            $results['meta']['filtered_count'] = count($filtered);
+            $results['meta'] = array_merge((new Payload($results))->array('meta'), ['filtered_count' => count($filtered)]);
 
             /** @var array<string, mixed> $results */
             return $results;
@@ -278,10 +281,12 @@ final class SubscriptionQuery
      * subscription-capable driver) - into a common shape the filters above
      * can read uniformly.
      *
-     * @param  SubscriptionResponseDTO|array<string, mixed>  $subscription
+     * An entry that is neither reads as a subscription with no plan and no
+     * status, so it matches no filter rather than stopping the query.
+     *
      * @return array{plan_code: ?string, status: string, created_at: ?string}
      */
-    private function normalizeForFiltering(SubscriptionResponseDTO|array $subscription): array
+    private function normalizeForFiltering(mixed $subscription): array
     {
         if ($subscription instanceof SubscriptionResponseDTO) {
             return [
@@ -291,10 +296,12 @@ final class SubscriptionQuery
             ];
         }
 
+        $row = Payload::of($subscription);
+
         return [
-            'plan_code' => $subscription['plan']['plan_code'] ?? $subscription['plan_code'] ?? null,
-            'status' => (string) ($subscription['status'] ?? ''),
-            'created_at' => $subscription['created_at'] ?? $subscription['createdAt'] ?? null,
+            'plan_code' => $row->string('plan', 'plan_code') ?? $row->string('plan_code') ?? $row->string('plan'),
+            'status' => $row->string('status') ?? '',
+            'created_at' => $row->string('created_at') ?? $row->string('createdAt'),
         ];
     }
 

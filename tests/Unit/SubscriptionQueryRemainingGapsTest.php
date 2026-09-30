@@ -97,3 +97,40 @@ test('getProviderName falls back to the manager default driver when from() is ne
 
     expect($result)->toBe([]);
 });
+
+test('an entry that is neither a DTO nor a row does not stop the query', function () {
+    $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
+    $driver->shouldReceive('listSubscriptions')->andReturn(['data' => ['not a subscription'], 'has_more' => false]);
+
+    $query = new SubscriptionQuery(makeGapsQueryManager('stripe', $driver));
+
+    expect($query->from('stripe')->get()['data'])->toBe(['not a subscription'])
+        ->and($query->from('stripe')->first())->toBeNull()
+        ->and($query->from('stripe')->forPlan('PLN_1')->count())->toBe(0);
+});
+
+test('forPlan matches a raw row that names its plan by code', function () {
+    $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
+    $driver->shouldReceive('listSubscriptions')->andReturn(['data' => [
+        ['subscription_code' => 'SUB_1', 'plan' => 'PLN_1', 'status' => 'active'],
+        ['subscription_code' => 'SUB_2', 'plan' => 'PLN_2', 'status' => 'active'],
+    ]]);
+
+    $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
+    $result = $query->from('paystack')->forPlan('PLN_1')->get();
+
+    expect(array_column($result['data'], 'subscription_code'))->toBe(['SUB_1'])
+        ->and($result['meta'])->toBe(['filtered_count' => 1]);
+});
+
+test('filtering keeps the meta a driver already returned', function () {
+    $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
+    $driver->shouldReceive('listSubscriptions')->andReturn([
+        'data' => [['subscription_code' => 'SUB_1', 'plan_code' => 'PLN_1', 'status' => 'active']],
+        'meta' => ['total' => 40, 'filtered_count' => 99],
+    ]);
+
+    $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
+
+    expect($query->from('paystack')->forPlan('PLN_1')->get()['meta'])->toBe(['total' => 40, 'filtered_count' => 1]);
+});

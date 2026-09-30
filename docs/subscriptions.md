@@ -74,6 +74,16 @@ $subscription = Payment::subscription()
 
 Paystack and PayPal don't need this step in the same way: Paystack's own hosted checkout captures the authorization as part of subscribing, and PayPal's subscription flow sends the customer through PayPal's own approval page. If you get a `SubscriptionException` complaining about a missing authorization, that's the provider telling you a payment method needs to exist first; see [Error Handling](error-handling.md).
 
+### Preventing duplicate subscriptions
+
+Set `PAYMENTS_SUBSCRIPTIONS_PREVENT_DUPLICATES=true` and `subscribe()` first lists the customer's subscriptions with the provider, refusing with a `SubscriptionException` if one to the same plan is `active` or `non-renewing`. It is off by default, since it costs a provider call on every subscribe.
+
+Three things to know before turning it on:
+
+- **It is a check, then a create - not a lock.** Two requests arriving together can both pass the check. For a retried or double-submitted request, `->idempotency()` is the guard; this setting is for the customer who subscribes again next week.
+- **If the provider will not list, the subscribe fails.** The check was asked for and could not be made, so PayZephyr does not create the subscription; the exception says `payments.subscriptions.prevent_duplicates` required the listing, and carries the provider's reason.
+- **It cannot be used with PayPal.** PayPal has no API for listing subscriptions, so with the setting on every PayPal subscribe fails in the way just described. The setting is global, not per provider: if PayPal is one of yours, leave it off and check your own records - the `subscription_transactions` table holds `customer_email`, `plan_code` and `status` for every subscription PayZephyr created.
+
 ### What you get back
 
 ```php
@@ -148,13 +158,15 @@ $activeSubscriptions = Payment::subscriptions()
     ->forCustomer('customer@example.com')
     ->active()
     ->from('stripe')
-    ->get(); // array<SubscriptionResponseDTO>
+    ->get(); // ['data' => SubscriptionResponseDTO[], 'has_more' => bool]
 
 $count = Payment::subscriptions()->forPlan($plan->planCode)->count();
 $exists = Payment::subscriptions()->forCustomer('customer@example.com')->exists();
 ```
 
 Available filters: `forCustomer()`, `forPlan()`, `whereStatus()`, `active()`, `cancelled()`, `createdAfter()`, `createdBefore()`, plus `take()`/`page()` for pagination and `from()` to scope the query to one provider. Terminal methods: `get()`, `first()`, `count()`, `exists()`.
+
+`get()` returns what the driver's listing returns. For Stripe, Square, Mollie and Flutterwave that is an array whose `data` key holds `SubscriptionResponseDTO`s. **Paystack is the exception:** it returns Paystack's own rows as a plain list of arrays, unmapped. `first()` gives you a `SubscriptionResponseDTO` either way, and the filters and `count()` read both shapes, so reach for those rather than indexing into `get()` if your code has to work across providers.
 
 ## Managing plans
 

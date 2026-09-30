@@ -16,6 +16,8 @@ use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Services\SubscriptionValidator;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
 
@@ -191,8 +193,7 @@ final class Subscription
             $request = $driver->beforeSubscriptionCreate($request);
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        if ($config['subscriptions']['validation']['enabled'] ?? true) {
+        if (PackageConfig::read()->flag(true, 'subscriptions', 'validation', 'enabled')) {
             $validator = app(SubscriptionValidator::class);
             $validator->validateCreation($request, $driver);
         }
@@ -290,8 +291,7 @@ final class Subscription
             $driver->beforeSubscriptionCancel($this->subscriptionCode);
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        if ($config['subscriptions']['validation']['enabled'] ?? true) {
+        if (PackageConfig::read()->flag(true, 'subscriptions', 'validation', 'enabled')) {
             $validator = app(SubscriptionValidator::class);
             $validator->validateCancellation($this->subscriptionCode, $driver);
         }
@@ -418,8 +418,9 @@ final class Subscription
             );
         }
 
-        $perPage = $this->data['per_page'] ?? 50;
-        $page = $this->data['page'] ?? 1;
+        $paging = new Payload($this->data);
+        $perPage = $paging->int('per_page') ?? 50;
+        $page = $paging->int('page') ?? 1;
 
         return $driver->listSubscriptions($perPage, $page, $customer);
     }
@@ -454,7 +455,9 @@ final class Subscription
      */
     public function createPlan(): PlanResponseDTO
     {
-        if (! isset($this->data['plan_data'])) {
+        $plan = $this->data['plan_data'] ?? null;
+
+        if (! $plan instanceof SubscriptionPlanDTO) {
             throw new PaymentException('Plan data is required. Use ->planData($planDTO)');
         }
 
@@ -466,7 +469,7 @@ final class Subscription
             );
         }
 
-        return $driver->createPlan($this->data['plan_data']);
+        return $driver->createPlan($plan);
     }
 
     /**
@@ -481,7 +484,9 @@ final class Subscription
             throw new PaymentException('Plan code is required. Use ->plan($planCode)');
         }
 
-        if (! isset($this->data['plan_updates'])) {
+        $updates = (new Payload($this->data))->arrayOrNull('plan_updates');
+
+        if ($updates === null) {
             throw new PaymentException('Plan updates are required. Use ->planUpdates($updates)');
         }
 
@@ -493,7 +498,7 @@ final class Subscription
             );
         }
 
-        return $driver->updatePlan($this->planCode, $this->data['plan_updates']);
+        return $driver->updatePlan($this->planCode, $updates);
     }
 
     /**
@@ -536,8 +541,9 @@ final class Subscription
             );
         }
 
-        $perPage = $this->data['per_page'] ?? 50;
-        $page = $this->data['page'] ?? 1;
+        $paging = new Payload($this->data);
+        $perPage = $paging->int('per_page') ?? 50;
+        $page = $paging->int('page') ?? 1;
 
         return $driver->listPlans($perPage, $page);
     }

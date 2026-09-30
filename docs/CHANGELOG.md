@@ -64,6 +64,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **PayPal plans with a trial were read, and repriced, by their trial.** PayPal lists a trial
+  cycle before the regular one. `fetchPlan()`/`listPlans()` took the first cycle as the plan's
+  price and interval, so a yearly plan with a free first week reported itself as weekly and
+  free; `updatePlan(['amount' => ...])` repriced `billing_cycle_sequence` 1 - the trial - and
+  left the price customers pay unchanged. Both use the `REGULAR` cycle now.
+
+- **`'permanent' => 'false'` cancelled a PayPal subscription for good.** Cancel options were
+  read with `(bool)`, which is `true` for the string `"false"`, so a suspend request became
+  PayPal's irreversible cancel. Stripe's `at_period_end` had the same reading.
+  `SubscriptionActionDTO::flagOption()` reads a switch as the switch it names;
+  `stringOption()` reads text options.
+
 - **Flutterwave subscription lookups read one page.** `listSubscriptions(customer: ...)` fetched
   a page of every merchant subscription and filtered it locally, and the lookup that finds the
   subscription a new charge created fetched the first page with no filter at all. A customer's

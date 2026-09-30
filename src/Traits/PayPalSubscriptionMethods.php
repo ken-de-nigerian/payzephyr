@@ -9,8 +9,10 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
 
 /**
@@ -45,7 +47,7 @@ trait PayPalSubscriptionMethods
             $data = $this->parseResponse($this->makeRequest('POST', '/v1/billing/plans', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                 'json' => [
-                    'product_id' => $product['id'],
+                    'product_id' => $this->requireString($product, 'id', 'product'),
                     'name' => $plan->name,
                     'description' => $plan->description ?? $plan->name,
                     'billing_cycles' => [[
@@ -68,7 +70,7 @@ trait PayPalSubscriptionMethods
             ]));
 
             $this->log('info', 'Subscription plan created', [
-                'plan_code' => $data['id'],
+                'plan_code' => Payload::of($data)->string('id'),
                 'name' => $plan->name,
             ]);
 
@@ -96,29 +98,39 @@ trait PayPalSubscriptionMethods
     {
         SubscriptionPlanDTO::assertValidUpdates($updates);
 
+        $changes = new Payload($updates);
+        $description = $changes->string('description');
+        $amount = $changes->float('amount');
+
         try {
-            if (isset($updates['description'])) {
+            if ($description !== null) {
                 $this->makeRequest('PATCH', '/v1/billing/plans/'.rawurlencode($planCode), [
                     'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                     'json' => [[
                         'op' => 'replace',
                         'path' => '/description',
-                        'value' => $updates['description'],
+                        'value' => $description,
                     ]],
                 ]);
             }
 
-            if (isset($updates['amount'])) {
-                $currency = $updates['currency'] ?? $this->fetchPlan($planCode)->currency;
+            if ($amount !== null) {
+                // The price lives on the plan's regular cycle, which is not
+                // sequence 1 when the plan has a trial: repricing sequence 1
+                // repriced the trial and left the regular price alone.
+                $regular = $this->payPalRegularCycle(new Payload($this->payPalPlanData($planCode)));
+                $currency = $changes->string('currency')
+                    ?? $regular->string('pricing_scheme', 'fixed_price', 'currency_code')
+                    ?? 'USD';
 
                 $this->makeRequest('POST', '/v1/billing/plans/'.rawurlencode($planCode).'/update-pricing-schemes', [
                     'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
                     'json' => [
                         'pricing_schemes' => [[
-                            'billing_cycle_sequence' => 1,
+                            'billing_cycle_sequence' => $regular->int('sequence') ?? 1,
                             'pricing_scheme' => [
                                 'fixed_price' => [
-                                    'value' => number_format((float) $updates['amount'], 2, '.', ''),
+                                    'value' => number_format($amount, 2, '.', ''),
                                     'currency_code' => $currency,
                                 ],
                             ],
@@ -142,11 +154,7 @@ trait PayPalSubscriptionMethods
     public function fetchPlan(string $planCode): PlanResponseDTO
     {
         try {
-            $data = $this->parseResponse($this->makeRequest('GET', '/v1/billing/plans/'.rawurlencode($planCode), [
-                'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
-            ]));
-
-            return $this->mapPayPalPlanToResponse($data);
+            return $this->mapPayPalPlanToResponse($this->payPalPlanData($planCode));
         } catch (Throwable $e) {
             $this->log('error', 'Failed to get plan', ['plan_code' => $planCode, 'error' => $e->getMessage()]);
             throw new PlanException('Failed to get plan: '.$e->getMessage(), 0, $e);
@@ -171,8 +179,11 @@ trait PayPalSubscriptionMethods
             ]));
 
             return [
-                'data' => array_map(fn ($item) => $this->mapPayPalPlanToResponse($item), $data['plans'] ?? []),
-                'total_items' => $data['total_items'] ?? null,
+                'data' => array_map(
+                    fn ($item) => $this->mapPayPalPlanToResponse(Payload::of($item)->all()),
+                    Payload::of($data)->array('plans')
+                ),
+                'total_items' => Payload::of($data)->int('total_items'),
             ];
         } catch (Throwable $e) {
             $this->log('error', 'Failed to list plans', ['error' => $e->getMessage()]);
@@ -227,20 +238,12 @@ trait PayPalSubscriptionMethods
             ]));
 
             $this->log('info', 'Subscription created', [
-                'subscription_code' => $data['id'],
+                'subscription_code' => Payload::of($data)->string('id'),
                 'customer' => $request->customer,
                 'plan' => $request->plan,
             ]);
 
-            $approvalUrl = null;
-            foreach ($data['links'] ?? [] as $link) {
-                if (($link['rel'] ?? null) === 'approve') {
-                    $approvalUrl = $link['href'] ?? null;
-                    break;
-                }
-            }
-
-            $response = $this->mapPayPalSubscriptionToResponse($data, $request->customer, $approvalUrl);
+            $response = $this->mapPayPalSubscriptionToResponse($data, $request->customer, $this->linkHref($data, 'approve'));
             $this->logSubscription($request, $response);
 
             return $response;
@@ -286,8 +289,8 @@ trait PayPalSubscriptionMethods
     public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $permanent = (bool) $action->option('permanent', false);
-            $reason = (string) $action->option('reason', 'Cancelled by merchant');
+            $permanent = $action->flagOption('permanent', false);
+            $reason = $action->stringOption('reason', 'Cancelled by merchant');
             $endpoint = $permanent ? 'cancel' : 'suspend';
 
             $this->makeRequest('POST', '/v1/billing/subscriptions/'.rawurlencode($action->subscriptionCode).'/'.rawurlencode($endpoint), [
@@ -339,7 +342,7 @@ trait PayPalSubscriptionMethods
 
             $this->makeRequest('POST', '/v1/billing/subscriptions/'.rawurlencode($action->subscriptionCode).'/activate', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
-                'json' => ['reason' => (string) $action->option('reason', 'Reactivated by merchant')],
+                'json' => ['reason' => $action->stringOption('reason', 'Reactivated by merchant')],
             ]);
 
             $this->log('info', 'Subscription enabled', ['subscription_code' => $action->subscriptionCode]);
@@ -393,16 +396,46 @@ trait PayPalSubscriptionMethods
     }
 
     /**
-     * @param  array<string, mixed>  $frequency
+     * @param  array<array-key, mixed>  $frequency
      */
     private function mapIntervalFromPayPal(array $frequency): string
     {
-        return match ($frequency['interval_unit'] ?? 'MONTH') {
+        return match (Payload::of($frequency)->string('interval_unit') ?? 'MONTH') {
             'DAY' => 'daily',
             'WEEK' => 'weekly',
             'YEAR' => 'annually',
             default => 'monthly',
         };
+    }
+
+    /**
+     * @return array<string, mixed>
+     *
+     * @throws ChargeException
+     */
+    private function payPalPlanData(string $planCode): array
+    {
+        return $this->parseResponse($this->makeRequest('GET', '/v1/billing/plans/'.rawurlencode($planCode), [
+            'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],
+        ]));
+    }
+
+    /**
+     * The billing cycle a plan charges on: its REGULAR one. A plan with a
+     * trial lists the trial first, so the first cycle is not it. A plan with
+     * no cycle marked REGULAR answers its first.
+     */
+    private function payPalRegularCycle(Payload $plan): Payload
+    {
+        foreach ($plan->array('billing_cycles') as $cycle) {
+            $cycle = Payload::of($cycle);
+
+            if ($cycle->string('tenure_type') === 'REGULAR') {
+                return $cycle;
+            }
+        }
+
+        return $plan->at('billing_cycles', 0);
     }
 
     /**
@@ -428,17 +461,18 @@ trait PayPalSubscriptionMethods
      */
     private function mapPayPalPlanToResponse(array $data): PlanResponseDTO
     {
-        $cycle = $data['billing_cycles'][0] ?? [];
-        $price = $cycle['pricing_scheme']['fixed_price'] ?? [];
+        $plan = new Payload($data);
+        $cycle = $this->payPalRegularCycle($plan);
+        $price = $cycle->at('pricing_scheme', 'fixed_price');
 
         return new PlanResponseDTO(
-            planCode: $data['id'],
-            name: $data['name'] ?? '',
-            amount: isset($price['value']) ? (float) $price['value'] : null,
-            interval: $this->mapIntervalFromPayPal($cycle['frequency'] ?? []),
-            currency: $price['currency_code'] ?? 'USD',
-            description: $data['description'] ?? null,
-            metadata: array_filter(['product_id' => $data['product_id'] ?? null]),
+            planCode: $this->requireString($data, 'id', 'plan'),
+            name: $plan->string('name') ?? '',
+            amount: $price->float('value'),
+            interval: $this->mapIntervalFromPayPal($cycle->array('frequency')),
+            currency: $price->string('currency_code') ?? 'USD',
+            description: $plan->string('description'),
+            metadata: array_filter(['product_id' => $plan->string('product_id')]),
             provider: $this->getName(),
         );
     }
@@ -453,14 +487,17 @@ trait PayPalSubscriptionMethods
     ): SubscriptionResponseDTO {
         $metadata = $approvalUrl ? ['approval_url' => $approvalUrl] : [];
 
+        $subscription = new Payload($data);
+        $lastPayment = $subscription->at('billing_info', 'last_payment', 'amount');
+
         return new SubscriptionResponseDTO(
-            subscriptionCode: $data['id'],
-            status: $this->mapPayPalSubscriptionStatus($data['status'] ?? 'APPROVAL_PENDING'),
-            customer: $data['subscriber']['email_address'] ?? $fallbackCustomerEmail ?? '',
-            plan: $data['plan_id'] ?? '',
-            amount: isset($data['billing_info']['last_payment']['amount']['value']) ? (float) $data['billing_info']['last_payment']['amount']['value'] : null,
-            currency: $data['billing_info']['last_payment']['amount']['currency_code'] ?? 'USD',
-            nextPaymentDate: $data['billing_info']['next_billing_time'] ?? null,
+            subscriptionCode: $this->requireString($data, 'id', 'subscription'),
+            status: $this->mapPayPalSubscriptionStatus($subscription->string('status') ?? 'APPROVAL_PENDING'),
+            customer: $subscription->string('subscriber', 'email_address') ?? $fallbackCustomerEmail ?? '',
+            plan: $subscription->string('plan_id') ?? '',
+            amount: $lastPayment->float('value'),
+            currency: $lastPayment->string('currency_code') ?? 'USD',
+            nextPaymentDate: $subscription->string('billing_info', 'next_billing_time'),
             metadata: $metadata,
             provider: $this->getName(),
         );

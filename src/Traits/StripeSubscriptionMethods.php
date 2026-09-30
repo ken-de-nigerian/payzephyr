@@ -307,7 +307,7 @@ trait StripeSubscriptionMethods
     public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
     {
         try {
-            $atPeriodEnd = (bool) $action->option('at_period_end', false);
+            $atPeriodEnd = $action->flagOption('at_period_end', false);
 
             $this->markRequestSent();
             $subscription = $atPeriodEnd

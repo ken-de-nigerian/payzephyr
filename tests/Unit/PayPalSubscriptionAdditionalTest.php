@@ -97,6 +97,15 @@ test('paypal updatePlan patches the description only', function () {
 
 test('paypal updatePlan updates the pricing scheme when the amount changes with an explicit currency', function () {
     $driver = makePayPalSubscriptionDriver2([
+        // The plan, read for the sequence of the cycle to reprice
+        new Response(200, [], json_encode([
+            'id' => 'P-abc',
+            'name' => 'Plan',
+            'billing_cycles' => [[
+                'frequency' => ['interval_unit' => 'MONTH', 'interval_count' => 1],
+                'pricing_scheme' => ['fixed_price' => ['value' => '10.00', 'currency_code' => 'EUR']],
+            ]],
+        ])),
         new Response(204),
         new Response(200, [], json_encode([
             'id' => 'P-abc',

@@ -172,3 +172,15 @@ test('arrayOrNull tells an absent array from an empty one', function () {
         ->and($payload->arrayOrNull('note'))->toBeNull()
         ->and($payload->arrayOrNull('missing'))->toBeNull();
 });
+
+test('onOff reads a switch, and answers null for anything that is not one', function (mixed $value, ?bool $expected) {
+    expect((new Payload(['switch' => $value]))->onOff('switch'))->toBe($expected);
+})->with([
+    [true, true], [false, false], [1, true], [0, false], [0.0, false],
+    ['yes', true], ['off', false], ['0', false],
+    ['archived', null], [['on'], null], [null, null],
+]);
+
+test('onOff answers null for a missing path', function () {
+    expect((new Payload([]))->onOff('a', 'b'))->toBeNull();
+});

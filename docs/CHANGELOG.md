@@ -64,6 +64,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Stripe refunds, plans and subscriptions carried the SDK's internals as their metadata.**
+  The mappers read `(array) $object->metadata`. On a real `StripeObject` that cast yields the
+  SDK's own properties (`_values`, `_opts`, `_lastResponse`, ...), not the metadata, and that is
+  what every mapped `RefundResponseDTO`, `PlanResponseDTO` and `SubscriptionResponseDTO` - and
+  the refund and subscription logs - held. The tests stood in for the SDK with `stdClass`, where
+  the cast works. The objects are now read through the SDK's own serialisation. A refund whose
+  payment intent was expanded reports the intent's id rather than its JSON, and a response
+  missing its id, status or currency is refused as unreadable rather than mapped with blanks.
+
+- **Stripe refund and subscription metadata was sent as it came.** A nested value - a cart, a
+  list - became nested form fields and Stripe rejected the request. It is flattened the way
+  charge metadata already was: nested values as JSON, booleans as `"true"`/`"false"` (plan
+  metadata sent `"1"` and `""` before).
+
+- **A Stripe plan update's `active` was passed through unchecked.** `'active' => 'archived'`
+  reached Stripe as a string. `updatePlan()` now refuses an `active` that is not a switch
+  before anything is sent, and sends `0`, `"0"`, `"off"` and `"false"` as `false`.
+
 - **`/payments/health` left out a provider configured without an `enabled` key.** The manager
   treats a missing `enabled` as on and charges through that provider; the health route treated
   it as off, so a provider that was taking payments was absent from the report. The route now

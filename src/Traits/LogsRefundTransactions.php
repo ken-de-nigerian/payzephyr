@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 /**
@@ -43,8 +44,8 @@ trait LogsRefundTransactions
         RefundResponseDTO $response,
         ?string $reason = null
     ): void {
-        $config = app('payments.config') ?? config('payments', []);
-        $loggingEnabled = $config['refunds']['logging']['enabled'] ?? ($config['logging']['enabled'] ?? true);
+        $config = PackageConfig::read();
+        $loggingEnabled = $config->flag($config->flag(true, 'logging', 'enabled'), 'refunds', 'logging', 'enabled');
 
         if (! $loggingEnabled) {
             return;

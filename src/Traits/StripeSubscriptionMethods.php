@@ -11,9 +11,8 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use Stripe\Exception\ApiErrorException;
-use Stripe\Product;
-use Stripe\StripeObject;
 
 /**
  * Trait providing Stripe subscription functionality.
@@ -43,7 +42,7 @@ trait StripeSubscriptionMethods
                 'currency' => strtolower($plan->currency),
                 'recurring' => ['interval' => $this->mapIntervalToStripe($plan->interval)],
                 'product' => $product->id,
-                'metadata' => $this->toStripeMetadata($plan->metadata),
+                'metadata' => $this->stripeMetadata($plan->metadata),
             ]);
 
             $this->log('info', 'Subscription plan created', [
@@ -76,19 +75,31 @@ trait StripeSubscriptionMethods
     {
         SubscriptionPlanDTO::assertValidUpdates($updates);
 
+        $changes = new Payload($updates);
+
         try {
             $existingPrice = $this->stripe->prices->retrieve($planCode, ['expand' => ['product']]);
-            $existingProduct = $existingPrice->product;
-            $productId = $existingProduct instanceof Product ? $existingProduct->id : $existingProduct;
+            $existing = $this->stripePayload($existingPrice);
 
-            if (isset($updates['name']) || isset($updates['description'])) {
+            // Expanded, the product is an object carrying its id; otherwise it
+            // is the id.
+            $productId = $existing->string('product', 'id') ?? $this->requireString($existing->all(), 'product', 'plan');
+
+            $name = $changes->string('name');
+            $description = $changes->string('description');
+
+            if ($name !== null || $description !== null) {
                 $this->stripe->products->update($productId, array_filter([
-                    'name' => isset($updates['name']) ? (string) $updates['name'] : null,
-                    'description' => isset($updates['description']) ? (string) $updates['description'] : null,
+                    'name' => $name,
+                    'description' => $description,
                 ], fn ($value) => $value !== null));
             }
 
-            if (isset($updates['amount']) || isset($updates['interval'])) {
+            $amount = $changes->float('amount');
+            $interval = $changes->string('interval');
+            $metadata = $changes->arrayOrNull('metadata');
+
+            if ($amount !== null || $interval !== null) {
                 // Stripe prices are immutable, so changing the amount or the
                 // interval means cloning this price into a new one. Two kinds of
                 // price cannot be cloned faithfully from the fields below, and
@@ -102,14 +113,16 @@ trait StripeSubscriptionMethods
                 //
                 // Neither is something PayZephyr can model, so both are refused
                 // with an explanation rather than approximated.
-                if (($existingPrice->recurring->usage_type ?? null) === 'metered') {
+                if ($existing->string('recurring', 'usage_type') === 'metered') {
                     throw new PlanException(
                         "Cannot change the amount or interval of metered plan [$planCode] through PayZephyr: cloning it would ".
                         'create a flat, licensed price and change how every subscriber on it is billed. Create the new metered price in Stripe directly.'
                     );
                 }
 
-                if (! isset($updates['amount']) && $existingPrice->unit_amount === null) {
+                $unitAmount = $amount !== null ? (int) round($amount * 100) : $existing->int('unit_amount');
+
+                if ($unitAmount === null) {
                     throw new PlanException(
                         "Cannot change the interval of plan [$planCode] without an amount: it has no fixed unit amount ".
                         '(a tiered price), and cloning it would create a free plan. Pass an amount, or create the new price in Stripe directly.'
@@ -117,17 +130,15 @@ trait StripeSubscriptionMethods
                 }
 
                 $price = $this->stripe->prices->create([
-                    'unit_amount' => isset($updates['amount']) ? (int) round($updates['amount'] * 100) : (int) $existingPrice->unit_amount,
-                    'currency' => $existingPrice->currency,
+                    'unit_amount' => $unitAmount,
+                    'currency' => $this->requireString($existing->all(), 'currency', 'plan'),
                     'recurring' => [
-                        'interval' => isset($updates['interval'])
-                            ? $this->mapIntervalToStripe((string) $updates['interval'])
-                            : $existingPrice->recurring->interval,
+                        'interval' => $interval !== null
+                            ? $this->mapIntervalToStripe($interval)
+                            : $this->requireString($existing->array('recurring'), 'interval', 'plan'),
                     ],
                     'product' => $productId,
-                    'metadata' => isset($updates['metadata'])
-                        ? $this->toStripeMetadata($updates['metadata'])
-                        : $this->toStripeMetadata($existingPrice->metadata),
+                    'metadata' => $this->stripeMetadata($metadata ?? $existing->array('metadata')),
                 ]);
 
                 $this->log('info', 'Subscription plan updated with a new price (amount/interval changed)', [
@@ -136,9 +147,9 @@ trait StripeSubscriptionMethods
                 ]);
             } else {
                 $mutable = array_filter([
-                    'metadata' => isset($updates['metadata']) ? $this->toStripeMetadata($updates['metadata']) : null,
-                    'active' => $updates['active'] ?? null,
-                    'nickname' => isset($updates['nickname']) ? (string) $updates['nickname'] : null,
+                    'metadata' => $metadata === null ? null : $this->stripeMetadata($metadata),
+                    'active' => $changes->onOff('active'),
+                    'nickname' => $changes->string('nickname'),
                 ], fn ($value) => $value !== null);
 
                 $price = $mutable !== [] ? $this->stripe->prices->update($planCode, $mutable) : $existingPrice;
@@ -163,7 +174,7 @@ trait StripeSubscriptionMethods
         try {
             $price = $this->stripe->prices->retrieve($planCode, ['expand' => ['product']]);
 
-            return $this->mapPriceToPlanResponse($price, is_object($price->product) ? $price->product : null);
+            return $this->mapPriceToPlanResponse($price);
         } catch (ApiErrorException $e) {
             $this->log('error', 'Failed to get plan', ['plan_code' => $planCode, 'error' => $e->getMessage()]);
             throw new PlanException('Failed to get plan: '.$e->getMessage(), 0, $e);
@@ -199,7 +210,7 @@ trait StripeSubscriptionMethods
 
             return [
                 'data' => array_map(
-                    fn ($price) => $this->mapPriceToPlanResponse($price, is_object($price->product) ? $price->product : null),
+                    fn (object $price) => $this->mapPriceToPlanResponse($price),
                     $prices->data
                 ),
                 'has_more' => $prices->has_more,
@@ -233,10 +244,10 @@ trait StripeSubscriptionMethods
             $customer = $this->findOrCreateStripeCustomer($request->customer);
 
             $params = array_filter([
-                'customer' => $customer->id,
+                'customer' => $this->requireString($customer->all(), 'id', 'customer'),
                 'items' => [['price' => $request->plan, 'quantity' => $request->quantity ?? 1]],
                 'trial_period_days' => $request->trialDays,
-                'metadata' => $request->metadata,
+                'metadata' => $this->stripeMetadata($request->metadata),
                 'default_payment_method' => $request->authorization,
             ], fn ($value) => $value !== null);
 
@@ -273,10 +284,7 @@ trait StripeSubscriptionMethods
                 'expand' => ['customer', 'items.data.price'],
             ]);
 
-            return $this->mapStripeSubscriptionToResponse(
-                $subscription,
-                is_object($subscription->customer) ? $subscription->customer : null
-            );
+            return $this->mapStripeSubscriptionToResponse($subscription);
         } catch (ApiErrorException $e) {
             $this->log('error', 'Failed to fetch subscription', [
                 'subscription_code' => $subscriptionCode,
@@ -392,17 +400,17 @@ trait StripeSubscriptionMethods
 
             if ($customer) {
                 $customerObj = $this->findStripeCustomerByEmail($customer);
-                if (! $customerObj) {
+                if ($customerObj === null) {
                     return ['data' => [], 'has_more' => false];
                 }
-                $params['customer'] = $customerObj->id;
+                $params['customer'] = $this->requireString($customerObj->all(), 'id', 'customer');
             }
 
             $subscriptions = $this->stripe->subscriptions->all($params);
 
             return [
                 'data' => array_map(
-                    fn ($s) => $this->mapStripeSubscriptionToResponse($s, is_object($s->customer) ? $s->customer : null),
+                    fn (object $subscription) => $this->mapStripeSubscriptionToResponse($subscription),
                     $subscriptions->data
                 ),
                 'has_more' => $subscriptions->has_more,
@@ -413,35 +421,18 @@ trait StripeSubscriptionMethods
         }
     }
 
-    private function findStripeCustomerByEmail(string $email): ?object
+    private function findStripeCustomerByEmail(string $email): ?Payload
     {
         $existing = $this->stripe->customers->all(['email' => $email, 'limit' => 1]);
+        $customer = $existing->data[0] ?? null;
 
-        return $existing->data[0] ?? null;
+        return $customer === null ? null : $this->stripePayload($customer);
     }
 
-    private function findOrCreateStripeCustomer(string $email): object
+    private function findOrCreateStripeCustomer(string $email): Payload
     {
-        return $this->findStripeCustomerByEmail($email) ?? $this->stripe->customers->create(['email' => $email]);
-    }
-
-    /**
-     * Stripe's `metadata` request parameter is always array<string, string>.
-     * Neither of this method's callers can prove that statically: a
-     * StripeObject (Price::$metadata coming back from the API) stores its
-     * values dynamically/untyped, and this package's own DTOs declare
-     * metadata as array<string, mixed> since they're a general-purpose bag.
-     * Stripe's metadata values are always strings in practice (that's the
-     * API's own contract), so casting is safe rather than lossy.
-     *
-     * @param  array<string, mixed>|StripeObject  $metadata
-     * @return array<string, string>
-     */
-    private function toStripeMetadata(array|StripeObject $metadata): array
-    {
-        $array = $metadata instanceof StripeObject ? $metadata->toArray() : $metadata;
-
-        return array_map(strval(...), $array);
+        return $this->findStripeCustomerByEmail($email)
+            ?? $this->stripePayload($this->stripe->customers->create(['email' => $email]));
     }
 
     private function mapIntervalToStripe(string $interval): string
@@ -465,38 +456,53 @@ trait StripeSubscriptionMethods
         };
     }
 
+    /**
+     * @param  object  $price  A Stripe Price.
+     * @param  object|null  $product  Its Product when fetched separately;
+     *                                otherwise the one expanded on the price.
+     */
     private function mapPriceToPlanResponse(object $price, ?object $product = null): PlanResponseDTO
     {
+        $data = $this->stripePayload($price);
+        $product = $product === null ? $data->at('product') : $this->stripePayload($product);
+        $unitAmount = $data->float('unit_amount');
+
         return new PlanResponseDTO(
-            planCode: $price->id,
-            name: $product->name ?? '',
-            amount: isset($price->unit_amount) ? (float) $price->unit_amount / 100 : null,
-            interval: $this->mapIntervalFromStripe($price->recurring->interval ?? 'month'),
-            currency: strtoupper($price->currency),
-            description: $product->description ?? null,
-            metadata: (array) ($price->metadata ?? []),
+            planCode: $this->requireString($data->all(), 'id', 'plan'),
+            name: $product->string('name') ?? '',
+            amount: $unitAmount === null ? null : $unitAmount / 100,
+            interval: $this->mapIntervalFromStripe($data->string('recurring', 'interval') ?? 'month'),
+            currency: strtoupper($this->requireString($data->all(), 'currency', 'plan')),
+            description: $product->string('description'),
+            metadata: $data->array('metadata'),
             provider: $this->getName(),
         );
     }
 
-    private function mapStripeSubscriptionToResponse(object $subscription, ?object $customer = null): SubscriptionResponseDTO
+    /**
+     * @param  object  $subscription  A Stripe Subscription.
+     * @param  Payload|null  $customer  Its Customer when already in hand;
+     *                                  otherwise the one expanded on it.
+     */
+    private function mapStripeSubscriptionToResponse(object $subscription, ?Payload $customer = null): SubscriptionResponseDTO
     {
-        $item = $subscription->items->data[0] ?? null;
-        $price = $item->price ?? null;
+        $data = $this->stripePayload($subscription);
+        $item = $data->at('items', 'data', 0);
+
+        // Expanded, the price is an object; otherwise it is the price's id.
+        $price = $item->at('price');
+        $unitAmount = $price->float('unit_amount');
+        $periodEnd = $data->int('current_period_end');
 
         return new SubscriptionResponseDTO(
-            subscriptionCode: $subscription->id,
-            status: $this->mapStripeSubscriptionStatus($subscription->status),
-            customer: $customer->email
-                ?? (is_object($subscription->customer ?? null) ? $subscription->customer->email : '')
-                ?? '',
-            plan: is_object($price) ? $price->id : $item->price ?? '',
-            amount: is_object($price) && isset($price->unit_amount) ? (float) $price->unit_amount / 100 : null,
-            currency: is_object($price) ? strtoupper($price->currency) : 'USD',
-            nextPaymentDate: isset($subscription->current_period_end)
-                ? date('Y-m-d H:i:s', $subscription->current_period_end)
-                : null,
-            metadata: (array) ($subscription->metadata ?? []),
+            subscriptionCode: $this->requireString($data->all(), 'id', 'subscription'),
+            status: $this->mapStripeSubscriptionStatus($this->requireString($data->all(), 'status', 'subscription')),
+            customer: $customer?->string('email') ?? $data->string('customer', 'email') ?? '',
+            plan: $price->string('id') ?? $item->string('price') ?? '',
+            amount: $unitAmount === null ? null : $unitAmount / 100,
+            currency: strtoupper($price->string('currency') ?? 'USD'),
+            nextPaymentDate: $periodEnd === null ? null : date('Y-m-d H:i:s', $periodEnd),
+            metadata: $data->array('metadata'),
             provider: $this->getName(),
         );
     }

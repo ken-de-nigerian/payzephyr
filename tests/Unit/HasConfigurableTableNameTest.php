@@ -64,3 +64,16 @@ test('getTable falls back to the default and logs a warning when the configured 
 
     expect($model->getTable())->toBe('payment_transactions');
 });
+
+test('getTable falls back to the default when the configured name is not a string, instead of raising a TypeError', function () {
+    config(['payments.logging.table' => ['payment_transactions']]);
+    app()->forgetInstance('payments.config');
+
+    Log::shouldReceive('channel')->once()->with('payments')->andReturnSelf();
+    Log::shouldReceive('warning')->once()->with(
+        'Invalid table name in config, using default',
+        ['attempted_table' => ['payment_transactions']]
+    );
+
+    expect((new PaymentTransaction)->getTable())->toBe('payment_transactions');
+});

@@ -148,7 +148,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
                 'cancel_url' => $cancelUrl,
                 'client_reference_id' => $reference,
                 'customer_email' => $request->email,
-                'metadata' => $this->chargeMetadata(array_merge($request->metadata, [
+                'metadata' => $this->stripeMetadata(array_merge($request->metadata, [
                     'reference' => $reference,
                 ])),
             ];
@@ -427,14 +427,16 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      *
      * PayZephyr's metadata is a general-purpose bag, and callers put nested
      * values in it - a cart, an address. Sent as it is, a nested value becomes
-     * nested form fields and Stripe rejects the whole charge. A scalar is sent
-     * as its string, null as an empty string, and anything else as JSON, so
-     * it survives the round trip readable.
+     * nested form fields and Stripe rejects the whole request. A scalar is
+     * sent as its string, null as an empty string, and anything else as JSON,
+     * so it survives the round trip readable. Every request that carries
+     * metadata - a charge, a refund, a plan, a subscription - goes through
+     * here.
      *
      * @param  array<array-key, mixed>  $metadata
      * @return array<string, string>
      */
-    private function chargeMetadata(array $metadata): array
+    private function stripeMetadata(array $metadata): array
     {
         $flat = [];
 
@@ -449,6 +451,21 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         return $flat;
+    }
+
+    /**
+     * A Stripe SDK object as a typed reader.
+     *
+     * The SDK answers with StripeObjects: their fields are untyped magic
+     * properties, their nested values are more StripeObjects, and an `(array)`
+     * cast of one yields the SDK's own internals (`_values`, `_opts`, ...)
+     * rather than the data. Encoding it is the SDK's supported way to get the
+     * plain data out, and works the same on the stdClass tree a test stands in
+     * for one with.
+     */
+    private function stripePayload(object $object): Payload
+    {
+        return Payload::of(json_decode((string) json_encode($object), true));
     }
 
     /**

@@ -118,6 +118,16 @@ final readonly class Payload
      */
     public function flag(bool $default, string|int ...$path): bool
     {
+        return $this->onOff(...$path) ?? $default;
+    }
+
+    /**
+     * The same reading as flag(), for a caller with no default to fall back
+     * on: null when the value is absent or is not a switch, so that "not
+     * said" can be told apart from "off".
+     */
+    public function onOff(string|int ...$path): ?bool
+    {
         $value = $this->get(...$path);
 
         if (is_bool($value)) {
@@ -129,10 +139,10 @@ final readonly class Payload
         }
 
         if (is_string($value)) {
-            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $default;
+            return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         }
 
-        return $default;
+        return null;
     }
 
     /**

@@ -29,7 +29,7 @@ trait StripeRefundMethods
             $params = array_filter([
                 'payment_intent' => $request->transactionReference,
                 'amount' => $request->getAmountInMinorUnits(),
-                'metadata' => $request->metadata ?: null,
+                'metadata' => $request->metadata === [] ? null : $this->stripeMetadata($request->metadata),
             ], fn ($value) => $value !== null);
 
             $options = $request->idempotencyKey ? ['idempotency_key' => $request->idempotencyKey] : [];
@@ -91,20 +91,24 @@ trait StripeRefundMethods
     }
 
     /**
-     * @param  object{id: string, payment_intent?: string|null, status: string, amount?: int|null, currency: string, metadata?: array<string, mixed>|object}  $refund
+     * @param  object  $refund  A Stripe Refund.
      *
      * @throws ChargeException
      */
     private function mapStripeRefundToResponse(object $refund, ?string $reason = null): RefundResponseDTO
     {
+        $data = $this->stripePayload($refund);
+
         return new RefundResponseDTO(
-            refundReference: $refund->id,
-            transactionReference: (string) ($refund->payment_intent ?? ''),
-            status: $refund->status,
-            amount: $this->requireAmountValue($refund->amount ?? null, 'amount', 'refund') / 100,
-            currency: strtoupper($refund->currency),
+            refundReference: $this->requireString($data->all(), 'id', 'refund'),
+            // The payment intent's id, or - when the caller expanded it - the
+            // intent itself.
+            transactionReference: $data->string('payment_intent') ?? $data->string('payment_intent', 'id') ?? '',
+            status: $this->requireString($data->all(), 'status', 'refund'),
+            amount: $this->requireAmountValue($data->get('amount'), 'amount', 'refund') / 100,
+            currency: strtoupper($this->requireString($data->all(), 'currency', 'refund')),
             reason: $reason,
-            metadata: (array) ($refund->metadata ?? []),
+            metadata: $data->array('metadata'),
             provider: $this->getName(),
         );
     }

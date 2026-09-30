@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 /**
@@ -44,8 +45,8 @@ trait LogsSubscriptionTransactions
         ?string $planCode = null,
         ?string $customerEmail = null
     ): void {
-        $config = app('payments.config') ?? config('payments', []);
-        $loggingEnabled = $config['subscriptions']['logging']['enabled'] ?? ($config['logging']['enabled'] ?? true);
+        $config = PackageConfig::read();
+        $loggingEnabled = $config->flag($config->flag(true, 'logging', 'enabled'), 'subscriptions', 'logging', 'enabled');
 
         if (! $loggingEnabled) {
             return;

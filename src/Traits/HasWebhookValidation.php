@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 /**
@@ -119,8 +120,10 @@ trait HasWebhookValidation
                 $value = $payload[$field];
                 $candidate = null;
 
-                if (is_string($value) && strtotime($value) !== false) {
-                    $candidate = strtotime($value);
+                $parsed = is_string($value) ? strtotime($value) : false;
+
+                if ($parsed !== false) {
+                    $candidate = $parsed;
                 } elseif (is_numeric($value)) {
                     $candidate = (int) $value;
                 }
@@ -157,10 +160,9 @@ trait HasWebhookValidation
      */
     protected function webhookTimestampTolerance(): int
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $configured = $config['security']['webhook_timestamp_tolerance'] ?? null;
+        $configured = PackageConfig::read()->float('security', 'webhook_timestamp_tolerance');
 
-        return is_numeric($configured) && (int) $configured > 0
+        return $configured !== null && (int) $configured > 0
             ? (int) $configured
             : PaymentConstants::WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS;
     }
@@ -177,10 +179,9 @@ trait HasWebhookValidation
      */
     protected function webhookReplayWindow(): int
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $configured = $config['webhook']['events']['replay_window'] ?? null;
+        $configured = PackageConfig::read()->float('webhook', 'events', 'replay_window');
 
-        return is_numeric($configured) && (int) $configured > 0
+        return $configured !== null && (int) $configured > 0
             ? (int) $configured
             : PaymentConstants::WEBHOOK_REPLAY_WINDOW_SECONDS;
     }

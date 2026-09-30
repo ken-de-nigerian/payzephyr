@@ -423,7 +423,7 @@ trait MollieSubscriptionMethods
             'amount' => $amount,
             'interval' => $interval,
             'currency' => $currency,
-        ]));
+        ], JSON_THROW_ON_ERROR));
     }
 
     /**

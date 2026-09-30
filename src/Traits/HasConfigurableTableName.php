@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+
 /**
  * Allows a model's table name to be overridden via config, with validation
  * against SQL-injection-shaped values before trusting it.
@@ -21,15 +23,15 @@ trait HasConfigurableTableName
 
     public function getTable(): string
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $tableName = data_get($config, $this->configuredTableNameKey()) ?? $this->table;
+        $default = parent::getTable();
+        $tableName = PackageConfig::read()->get(...explode('.', $this->configuredTableNameKey())) ?? $default;
 
-        if (! $this->isValidTableName($tableName)) {
+        if (! is_string($tableName) || ! $this->isValidTableName($tableName)) {
             $this->log('warning', 'Invalid table name in config, using default', [
                 'attempted_table' => $tableName,
             ]);
 
-            return $this->table;
+            return $default;
         }
 
         return $tableName;

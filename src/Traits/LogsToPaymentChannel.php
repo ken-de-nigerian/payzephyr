@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 trait LogsToPaymentChannel
@@ -29,8 +30,7 @@ trait LogsToPaymentChannel
     protected function log(string $level, string $message, array $context = []): void
     {
         try {
-            $config = app('payments.config') ?? config('payments', []);
-            $channelName = $config['logging']['channel'] ?? 'payments';
+            $channelName = PackageConfig::read()->string('logging', 'channel') ?? 'payments';
 
             try {
                 Log::channel($channelName)->{$level}($message, $context);

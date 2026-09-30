@@ -290,7 +290,7 @@ test('stripe updatePlan casts non-string metadata values before sending them to 
     $sentMetadata = $pricesResource->updateCalls[0][1]['metadata'];
 
     expect($sentMetadata['count'])->toBe('5')
-        ->and($sentMetadata['active_flag'])->toBe('1');
+        ->and($sentMetadata['active_flag'])->toBe('true');
 });
 
 test('stripe updatePlan returns the existing price unchanged when no mutable attributes are given', function () {

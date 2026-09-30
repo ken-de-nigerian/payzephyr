@@ -91,6 +91,13 @@ final readonly class SubscriptionPlanDTO
                 'Nothing was updated.'
             );
         }
+
+        // A driver sends `active` on as a boolean. A value that is not a
+        // switch would have to be dropped or guessed at, and guessing wrong
+        // takes a plan off sale.
+        if (array_key_exists('active', $updates) && Payload::of($updates)->onOff('active') === null) {
+            throw new PlanException('Plan active must be true or false. Nothing was updated.');
+        }
     }
 
     public function getAmountInMinorUnits(): int

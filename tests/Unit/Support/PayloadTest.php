@@ -163,3 +163,12 @@ test('flag answers the default for a missing path', function () {
     expect((new Payload([]))->flag(true, 'a', 'b'))->toBeTrue()
         ->and((new Payload([]))->flag(false, 'a', 'b'))->toBeFalse();
 });
+
+test('arrayOrNull tells an absent array from an empty one', function () {
+    $payload = new Payload(['customer' => ['email' => 'a@b.test'], 'split' => [], 'note' => 'text']);
+
+    expect($payload->arrayOrNull('customer'))->toBe(['email' => 'a@b.test'])
+        ->and($payload->arrayOrNull('split'))->toBe([])
+        ->and($payload->arrayOrNull('note'))->toBeNull()
+        ->and($payload->arrayOrNull('missing'))->toBeNull();
+});

@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 use Throwable;
 
@@ -51,19 +52,21 @@ final readonly class VerificationResponseDTO
      */
     public static function fromArray(array $data): VerificationResponseDTO
     {
+        $input = new Payload($data);
+
         return new self(
-            reference: $data['reference'] ?? '',
-            status: $data['status'] ?? 'unknown',
-            amount: (float) ($data['amount'] ?? 0),
-            currency: strtoupper($data['currency'] ?? ''),
-            paidAt: $data['paid_at'] ?? null,
-            metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            provider: $data['provider'] ?? null,
-            channel: $data['channel'] ?? null,
-            cardType: $data['card_type'] ?? null,
-            bank: $data['bank'] ?? null,
-            customer: $data['customer'] ?? null,
-            authorizationCode: $data['authorization_code'] ?? null,
+            reference: $input->string('reference') ?? '',
+            status: $input->string('status') ?? 'unknown',
+            amount: $input->float('amount') ?? 0.0,
+            currency: strtoupper($input->string('currency') ?? ''),
+            paidAt: $input->string('paid_at'),
+            metadata: self::normalizeMetadata($input->get('metadata')),
+            provider: $input->string('provider'),
+            channel: $input->string('channel'),
+            cardType: $input->string('card_type'),
+            bank: $input->string('bank'),
+            customer: $input->arrayOrNull('customer'),
+            authorizationCode: $input->string('authorization_code'),
         );
     }
 

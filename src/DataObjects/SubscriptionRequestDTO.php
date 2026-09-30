@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionRequestDTO
@@ -53,16 +54,18 @@ final readonly class SubscriptionRequestDTO
      */
     public static function fromArray(array $data): self
     {
+        $input = new Payload($data);
+
         return new self(
-            customer: $data['customer'] ?? '',
-            plan: $data['plan'] ?? '',
-            quantity: $data['quantity'] ?? 1,
-            startDate: $data['start_date'] ?? null,
-            trialDays: $data['trial_days'] ?? null,
+            customer: $input->string('customer') ?? '',
+            plan: $input->string('plan') ?? '',
+            quantity: $input->int('quantity') ?? 1,
+            startDate: $input->string('start_date'),
+            trialDays: $input->int('trial_days'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            authorization: $data['authorization'] ?? null,
-            idempotencyKey: $data['idempotency_key'] ?? self::generateIdempotencyKey(),
-            callbackUrl: $data['callback_url'] ?? null,
+            authorization: $input->string('authorization'),
+            idempotencyKey: $input->string('idempotency_key') ?? self::generateIdempotencyKey(),
+            callbackUrl: $input->string('callback_url'),
         );
     }
 

@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionPlanDTO
@@ -102,15 +103,17 @@ final readonly class SubscriptionPlanDTO
      */
     public static function fromArray(array $data): self
     {
+        $input = new Payload($data);
+
         return new self(
-            name: $data['name'] ?? '',
-            amount: (float) ($data['amount'] ?? 0),
-            interval: $data['interval'] ?? 'monthly',
-            currency: $data['currency'] ?? 'NGN',
-            description: $data['description'] ?? null,
-            invoiceLimit: $data['invoice_limit'] ?? null,
-            sendInvoices: $data['send_invoices'] ?? true,
-            sendSms: $data['send_sms'] ?? true,
+            name: $input->string('name') ?? '',
+            amount: $input->float('amount') ?? 0.0,
+            interval: $input->string('interval') ?? 'monthly',
+            currency: $input->string('currency') ?? 'NGN',
+            description: $input->string('description'),
+            invoiceLimit: $input->int('invoice_limit'),
+            sendInvoices: $input->flag(true, 'send_invoices'),
+            sendSms: $input->flag(true, 'send_sms'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
         );
     }

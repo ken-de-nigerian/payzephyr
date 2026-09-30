@@ -98,3 +98,29 @@ test('charge request accepts a quoted local part of exactly 64 characters includ
         'email' => $email,
     ])->email)->toBe($email);
 });
+
+/*
+ * fromArray() is public API and is handed whatever an application collected.
+ * A value of the wrong kind used to reach a typed constructor parameter and
+ * fail there with a TypeError; it is now read as the type it should be, or
+ * left for validation to reject.
+ */
+test('fromArray turns a wrong-typed value into a validation error, not a TypeError', function () {
+    expect(fn () => ChargeRequestDTO::fromArray(['amount' => 100, 'currency' => 'NGN', 'email' => ['not', 'a', 'string']]))
+        ->toThrow(InvalidArgumentException::class, 'Invalid email address');
+});
+
+test('fromArray keeps only the channel names from a channels list', function () {
+    $dto = ChargeRequestDTO::fromArray([
+        'amount' => 100, 'currency' => 'NGN', 'email' => 'a@b.test',
+        'channels' => ['card', 42, null, 'bank_transfer'],
+    ]);
+
+    expect($dto->channels)->toBe(['card', 'bank_transfer']);
+});
+
+test('fromArray rejects an idempotency key that is not a string or a number', function () {
+    expect(fn () => ChargeRequestDTO::fromArray([
+        'amount' => 100, 'currency' => 'NGN', 'email' => 'a@b.test', 'idempotency_key' => ['nested'],
+    ]))->toThrow(InvalidArgumentException::class, 'Invalid idempotency key format');
+});

@@ -148,6 +148,19 @@ final readonly class Payload
     }
 
     /**
+     * The array at a path, or null - for a field whose absence means something
+     * different from its being empty.
+     *
+     * @return array<array-key, mixed>|null
+     */
+    public function arrayOrNull(string|int ...$path): ?array
+    {
+        $value = $this->get(...$path);
+
+        return is_array($value) ? $value : null;
+    }
+
+    /**
      * A reader over the array at a path, empty when there is none - so a chain
      * of reads into a missing branch answers null instead of failing.
      */

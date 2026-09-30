@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use JsonSerializable;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class PlanResponseDTO implements JsonSerializable
@@ -31,16 +32,19 @@ final readonly class PlanResponseDTO implements JsonSerializable
      */
     public static function fromArray(array $data): self
     {
+        $input = new Payload($data);
+        $amount = $input->float('amount');
+
         return new self(
-            planCode: $data['plan_code'] ?? $data['id'] ?? '',
-            name: $data['name'] ?? '',
-            amount: isset($data['amount']) ? (float) $data['amount'] / 100 : null,
-            interval: $data['interval'] ?? 'monthly',
-            currency: $data['currency'] ?? 'NGN',
-            description: $data['description'] ?? null,
-            invoiceLimit: $data['invoice_limit'] ?? null,
+            planCode: $input->string('plan_code') ?? $input->string('id') ?? '',
+            name: $input->string('name') ?? '',
+            amount: $amount === null ? null : $amount / 100,
+            interval: $input->string('interval') ?? 'monthly',
+            currency: $input->string('currency') ?? 'NGN',
+            description: $input->string('description'),
+            invoiceLimit: $input->int('invoice_limit'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            provider: $data['provider'] ?? null,
+            provider: $input->string('provider'),
         );
     }
 

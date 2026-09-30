@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\SubscriptionStatus;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class SubscriptionResponseDTO
@@ -32,17 +33,19 @@ final readonly class SubscriptionResponseDTO
      */
     public static function fromArray(array $data): self
     {
+        $input = new Payload($data);
+
         return new self(
-            subscriptionCode: $data['subscription_code'] ?? '',
-            status: $data['status'] ?? 'unknown',
-            customer: $data['customer'] ?? '',
-            plan: $data['plan'] ?? '',
-            amount: isset($data['amount']) ? (float) $data['amount'] : null,
-            currency: $data['currency'] ?? 'NGN',
-            nextPaymentDate: $data['next_payment_date'] ?? null,
-            emailToken: $data['email_token'] ?? null,
+            subscriptionCode: $input->string('subscription_code') ?? '',
+            status: $input->string('status') ?? 'unknown',
+            customer: $input->string('customer') ?? '',
+            plan: $input->string('plan') ?? '',
+            amount: $input->float('amount'),
+            currency: $input->string('currency') ?? 'NGN',
+            nextPaymentDate: $input->string('next_payment_date'),
+            emailToken: $input->string('email_token'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            provider: $data['provider'] ?? null,
+            provider: $input->string('provider'),
         );
     }
 

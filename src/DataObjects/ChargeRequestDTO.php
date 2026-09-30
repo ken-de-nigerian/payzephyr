@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class ChargeRequestDTO
@@ -165,33 +166,38 @@ final readonly class ChargeRequestDTO
      */
     public static function fromArray(array $data): ChargeRequestDTO
     {
-        $amount = isset($data['amount']) ? round((float) $data['amount'], 2) : 0.0;
-        $reference = $data['reference'] ?? null;
+        $input = new Payload($data);
+        $amount = round($input->float('amount') ?? 0.0, 2);
+        $reference = $input->string('reference');
 
-        if (isset($data['idempotency_key'])) {
-            $key = $data['idempotency_key'];
+        if ($input->has('idempotency_key')) {
+            // Anything that is not a string or a number cannot be a key.
+            $key = $input->string('idempotency_key') ?? '';
             if (strlen($key) > PaymentConstants::MAX_REFERENCE_LENGTH || ! preg_match('/^[a-zA-Z0-9_-]+$/', $key)) {
                 throw new InvalidArgumentException('Invalid idempotency key format. Must be alphanumeric with dashes/underscores and max '.PaymentConstants::MAX_REFERENCE_LENGTH.' characters.');
             }
             $idempotencyKey = $key;
-        } elseif (is_string($reference) && $reference !== '') {
+        } elseif ($reference !== null && $reference !== '') {
             $idempotencyKey = $reference;
         } else {
             $idempotencyKey = self::generateIdempotencyKey();
         }
 
+        $channels = $input->arrayOrNull('channels');
+
         return new self(
             amount: $amount,
-            currency: strtoupper($data['currency'] ?? ''),
-            email: $data['email'] ?? '',
-            reference: $data['reference'] ?? null,
-            callbackUrl: $data['callback_url'] ?? null,
-            metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            description: $data['description'] ?? null,
-            customer: $data['customer'] ?? null,
-            customFields: $data['custom_fields'] ?? null,
-            split: $data['split'] ?? null,
-            channels: $data['channels'] ?? null,
+            currency: strtoupper($input->string('currency') ?? ''),
+            email: $input->string('email') ?? '',
+            reference: $reference,
+            callbackUrl: $input->string('callback_url'),
+            metadata: self::normalizeMetadata($input->get('metadata')),
+            description: $input->string('description'),
+            customer: $input->arrayOrNull('customer'),
+            customFields: $input->arrayOrNull('custom_fields'),
+            split: $input->arrayOrNull('split'),
+            // A channel is a name; anything else in the list cannot be one.
+            channels: $channels === null ? null : array_values(array_filter($channels, 'is_string')),
             idempotencyKey: $idempotencyKey,
         );
     }

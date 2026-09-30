@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\DataObjects;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class RefundRequestDTO
@@ -54,21 +55,26 @@ final readonly class RefundRequestDTO
      */
     public static function fromArray(array $data): self
     {
-        $idempotencyKey = $data['idempotency_key'] ?? self::generateIdempotencyKey();
+        $input = new Payload($data);
+        $idempotencyKey = self::generateIdempotencyKey();
 
-        if (isset($data['idempotency_key'])) {
-            $key = $data['idempotency_key'];
+        if ($input->has('idempotency_key')) {
+            // Anything that is not a string or a number cannot be a key.
+            $key = $input->string('idempotency_key') ?? '';
             if (strlen($key) > PaymentConstants::MAX_REFERENCE_LENGTH || ! preg_match('/^[a-zA-Z0-9_-]+$/', $key)) {
                 throw new InvalidArgumentException('Invalid idempotency key format. Must be alphanumeric with dashes/underscores and max '.PaymentConstants::MAX_REFERENCE_LENGTH.' characters.');
             }
             $idempotencyKey = $key;
         }
 
+        $amount = $input->float('amount');
+        $currency = $input->string('currency');
+
         return new self(
-            transactionReference: $data['transaction_reference'] ?? '',
-            amount: isset($data['amount']) ? round((float) $data['amount'], 2) : null,
-            currency: isset($data['currency']) ? strtoupper($data['currency']) : null,
-            reason: $data['reason'] ?? null,
+            transactionReference: $input->string('transaction_reference') ?? '',
+            amount: $amount === null ? null : round($amount, 2),
+            currency: $currency === null ? null : strtoupper($currency),
+            reason: $input->string('reason'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
             idempotencyKey: $idempotencyKey,
         );

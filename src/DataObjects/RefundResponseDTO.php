@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\DataObjects;
 
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\NormalizesMetadata;
 
 final readonly class RefundResponseDTO
@@ -30,15 +31,17 @@ final readonly class RefundResponseDTO
      */
     public static function fromArray(array $data): self
     {
+        $input = new Payload($data);
+
         return new self(
-            refundReference: $data['refund_reference'] ?? '',
-            transactionReference: $data['transaction_reference'] ?? '',
-            status: $data['status'] ?? 'unknown',
-            amount: (float) ($data['amount'] ?? 0),
-            currency: $data['currency'] ?? 'NGN',
-            reason: $data['reason'] ?? null,
+            refundReference: $input->string('refund_reference') ?? '',
+            transactionReference: $input->string('transaction_reference') ?? '',
+            status: $input->string('status') ?? 'unknown',
+            amount: $input->float('amount') ?? 0.0,
+            currency: $input->string('currency') ?? 'NGN',
+            reason: $input->string('reason'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
-            provider: $data['provider'] ?? null,
+            provider: $input->string('provider'),
         );
     }
 

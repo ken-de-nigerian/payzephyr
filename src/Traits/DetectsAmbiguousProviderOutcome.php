@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use Psr\Http\Message\ResponseInterface;
 use Stripe\Exception\ApiConnectionException;
 
 /**
@@ -46,7 +47,7 @@ trait DetectsAmbiguousProviderOutcome
             }
 
             if ($current instanceof RequestException) {
-                return $current->getResponse() === null;
+                return ! $current->getResponse() instanceof ResponseInterface;
             }
 
             if ($current instanceof ApiConnectionException) {

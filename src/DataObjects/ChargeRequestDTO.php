@@ -197,7 +197,7 @@ final readonly class ChargeRequestDTO
             customFields: $input->arrayOrNull('custom_fields'),
             split: $input->arrayOrNull('split'),
             // A channel is a name; anything else in the list cannot be one.
-            channels: $channels === null ? null : array_values(array_filter($channels, 'is_string')),
+            channels: $channels === null ? null : array_values(array_filter($channels, is_string(...))),
             idempotencyKey: $idempotencyKey,
         );
     }

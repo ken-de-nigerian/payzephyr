@@ -34,14 +34,14 @@ final class HealthEndpointMiddleware
         $requiresAuth = $healthConfig->flag(false, 'require_auth');
         // Only a string can be an address or a token; anything else in the
         // list is ignored rather than compared.
-        $allowedIps = array_values(array_filter($healthConfig->array('allowed_ips'), 'is_string'));
-        $allowedTokens = array_values(array_filter($healthConfig->array('allowed_tokens'), 'is_string'));
+        $allowedIps = array_values(array_filter($healthConfig->array('allowed_ips'), is_string(...)));
+        $allowedTokens = array_values(array_filter($healthConfig->array('allowed_tokens'), is_string(...)));
 
-        if (! $requiresAuth && empty($allowedIps) && empty($allowedTokens) && ! app()->environment(['local', 'testing'])) {
+        if (! $requiresAuth && $allowedIps === [] && $allowedTokens === [] && ! app()->environment(['local', 'testing'])) {
             $this->warnOnceIfUnauthenticated();
         }
 
-        if (! empty($allowedIps)) {
+        if ($allowedIps !== []) {
             $clientIp = $request->ip();
             $allowed = false;
 
@@ -60,7 +60,7 @@ final class HealthEndpointMiddleware
         // With require_auth on and nothing to authenticate against, every
         // request is refused - failing closed - and the reason is logged, so
         // the endpoint does not just go dark with nobody knowing why.
-        if ($requiresAuth && empty($allowedIps) && empty($allowedTokens)) {
+        if ($requiresAuth && $allowedIps === [] && $allowedTokens === []) {
             $this->warnOnceIfMisconfigured();
 
             return response()->json(['error' => 'Unauthorized'], HttpStatusCodes::UNAUTHORIZED);
@@ -70,7 +70,7 @@ final class HealthEndpointMiddleware
         // on and only an IP allowlist, the allowlist - already enforced above -
         // is the authentication: demanding a token nobody could configure
         // refused every request, although the docs say either is enough.
-        if (! empty($allowedTokens)) {
+        if ($allowedTokens !== []) {
             $token = $request->bearerToken()
                 ?? $request->header('X-Health-Token')
                 ?? $request->query('token');

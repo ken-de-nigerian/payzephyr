@@ -41,7 +41,7 @@ trait FlutterwaveSubscriptionMethods
                     'interval' => $this->mapIntervalToFlutterwave($plan->interval),
                     'currency' => $plan->currency,
                     'duration' => $plan->invoiceLimit,
-                ], fn ($value) => $value !== null),
+                ], fn ($value): bool => $value !== null),
             ]);
 
             $data = $this->parseResponse($response);
@@ -77,7 +77,7 @@ trait FlutterwaveSubscriptionMethods
             $payload = array_filter([
                 'name' => $updates['name'] ?? null,
                 'status' => $updates['status'] ?? null,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             if ($payload !== []) {
                 $this->makeRequest('PUT', 'payment-plans/'.rawurlencode($planCode), ['json' => $payload]);
@@ -177,7 +177,7 @@ trait FlutterwaveSubscriptionMethods
                     'email' => $request->customer,
                     'tx_ref' => $reference,
                     'payment_plan' => $request->plan,
-                ], fn ($value) => $value !== null),
+                ], fn ($value): bool => $value !== null),
             ]);
             $this->parseResponse($chargeResponse);
 
@@ -284,7 +284,7 @@ trait FlutterwaveSubscriptionMethods
         try {
             // The email filter is Flutterwave's; the one below is kept so a
             // page that ignored it still answers only for this customer.
-            $query = array_filter(['page' => $page ?? 1, 'email' => $customer], fn ($value) => $value !== null);
+            $query = array_filter(['page' => $page ?? 1, 'email' => $customer], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('GET', 'subscriptions', ['query' => $query]);
             $data = $this->parseResponse($response);
@@ -297,7 +297,7 @@ trait FlutterwaveSubscriptionMethods
             if ($customer) {
                 $items = array_values(array_filter(
                     $items,
-                    fn ($item) => Payload::of($item)->string('customer', 'email') === $customer
+                    fn ($item): bool => Payload::of($item)->string('customer', 'email') === $customer
                 ));
             }
 
@@ -406,7 +406,6 @@ trait FlutterwaveSubscriptionMethods
             plan: $this->flutterwavePlanId($subscription) ?? '',
             amount: $subscription->float('amount'),
             currency: $subscription->string('customer', 'currency') ?? 'NGN',
-            nextPaymentDate: null,
             metadata: [],
             provider: $this->getName(),
         );

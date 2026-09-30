@@ -71,11 +71,11 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtoupper($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtoupper($channel),
             $channels
         );
 
-        return array_filter($mapped, fn ($channel) => in_array($channel, ['CARD', 'ACCOUNT_TRANSFER', 'USSD', 'PHONE_NUMBER']));
+        return array_filter($mapped, fn ($channel): bool => in_array($channel, ['CARD', 'ACCOUNT_TRANSFER', 'USSD', 'PHONE_NUMBER']));
     }
 
     /**
@@ -96,7 +96,7 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtolower($channel),
             $channels
         );
 
@@ -109,7 +109,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'paypal',
         ];
 
-        return array_filter($mapped, fn ($option) => in_array($option, $validOptions));
+        return array_filter($mapped, fn ($option): bool => in_array($option, $validOptions));
     }
 
     /**
@@ -128,7 +128,7 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtolower($channel),
             $channels
         );
 
@@ -139,7 +139,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'eps', 'p24', 'blik', 'boleto', 'oxxo',
         ];
 
-        return array_filter($mapped, fn ($type) => in_array($type, $validTypes));
+        return array_filter($mapped, fn ($type): bool => in_array($type, $validTypes));
     }
 
     /**
@@ -158,13 +158,13 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtoupper($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtoupper($channel),
             $channels
         );
 
         $validMethods = ['CARD', 'CASH', 'OTHER', 'SQUARE_GIFT_CARD', 'EXTERNAL'];
 
-        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+        return array_filter($mapped, fn ($method): bool => in_array($method, $validMethods));
     }
 
     /**
@@ -215,7 +215,7 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtolower($channel),
             $channels
         );
 
@@ -227,7 +227,7 @@ final class ChannelMapper implements ChannelMapperInterface
             'blik', 'paylater', 'sliceit', 'voucher',
         ];
 
-        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+        return array_filter($mapped, fn ($method): bool => in_array($method, $validMethods));
     }
 
     /**
@@ -249,13 +249,13 @@ final class ChannelMapper implements ChannelMapperInterface
         ];
 
         $mapped = array_map(
-            fn ($channel) => $mapping[strtolower($channel)] ?? strtolower($channel),
+            fn ($channel): string => $mapping[strtolower($channel)] ?? strtolower($channel),
             $channels
         );
 
         $validMethods = ['card', 'netbanking', 'upi', 'wallet'];
 
-        return array_filter($mapped, fn ($method) => in_array($method, $validMethods));
+        return array_filter($mapped, fn ($method): bool => in_array($method, $validMethods));
     }
 
     /**

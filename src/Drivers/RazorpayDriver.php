@@ -17,6 +17,7 @@ use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\RazorpayRefundMethods;
+use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 /**
@@ -175,7 +176,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -227,7 +228,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$this->describeFailure($e), 0, $e);
         }
@@ -375,7 +376,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
 
         return implode(':', array_filter(
             [$event, $subjectId, $paymentId],
-            fn ($part) => $part !== null && $part !== ''
+            fn ($part): bool => $part !== null && $part !== ''
         ));
     }
 
@@ -477,8 +478,8 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     protected function describeFailure(Throwable $e): string
     {
-        for ($current = $e; $current !== null; $current = $current->getPrevious()) {
-            if ($current instanceof RequestException && $current->getResponse() !== null) {
+        for ($current = $e; $current instanceof \Throwable; $current = $current->getPrevious()) {
+            if ($current instanceof RequestException && $current->getResponse() instanceof ResponseInterface) {
                 $error = Payload::of(json_decode((string) $current->getResponse()->getBody(), true))->get('error');
 
                 if (is_array($error) && is_string($error['description'] ?? null) && $error['description'] !== '') {
@@ -505,7 +506,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             'email' => $request->email,
             'name' => is_scalar($name) ? (string) $name : '',
             'contact' => is_scalar($contact) ? (string) $contact : '',
-        ], fn (string $value) => $value !== '');
+        ], fn (string $value): bool => $value !== '');
     }
 
     /**

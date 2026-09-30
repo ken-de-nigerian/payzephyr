@@ -51,9 +51,6 @@ abstract class AbstractDriver implements DriverInterface
 
     protected Client $client;
 
-    /** @var array<array-key, mixed> */
-    protected array $config;
-
     protected string $name;
 
     /**
@@ -120,9 +117,8 @@ abstract class AbstractDriver implements DriverInterface
      *
      * @throws InvalidConfigurationException If required, config is missing.
      */
-    public function __construct(array $config)
+    public function __construct(protected array $config)
     {
-        $this->config = $config;
         $this->validateConfig();
         $this->initializeClient();
     }
@@ -272,7 +268,7 @@ abstract class AbstractDriver implements DriverInterface
                 : TraceEvent::PROVIDER_EXCEPTION;
         }
 
-        if ($e instanceof RequestException && $e->getResponse() !== null) {
+        if ($e instanceof RequestException && $e->getResponse() instanceof ResponseInterface) {
             return TraceEvent::PROVIDER_ERROR;
         }
 
@@ -522,7 +518,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function getSupportedCurrencies(): array
     {
-        return array_values(array_filter($this->settings()->array('currencies'), 'is_string'));
+        return array_values(array_filter($this->settings()->array('currencies'), is_string(...)));
     }
 
     /**
@@ -536,7 +532,7 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function generateReference(?string $prefix = null): string
     {
-        $prefix = $prefix ?? strtoupper($this->getName());
+        $prefix ??= strtoupper($this->getName());
 
         return $prefix.'_'.time().'_'.bin2hex(random_bytes(8));
     }
@@ -677,17 +673,13 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function getStatusNormalizer(): StatusNormalizer
     {
-        if ($this->statusNormalizer === null) {
-            $this->statusNormalizer = app(StatusNormalizer::class);
-        }
+        $this->statusNormalizer ??= app(StatusNormalizer::class);
 
         return $this->statusNormalizer;
     }
 
     /**
      * Set a custom status normalizer (mainly for testing).
-     *
-     * @return $this
      */
     public function setStatusNormalizer(StatusNormalizer $normalizer): self
     {
@@ -702,17 +694,13 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function getChannelMapper(): ChannelMapper
     {
-        if ($this->channelMapper === null) {
-            $this->channelMapper = app(ChannelMapper::class);
-        }
+        $this->channelMapper ??= app(ChannelMapper::class);
 
         return $this->channelMapper;
     }
 
     /**
      * Set a custom channel mapper (mainly for testing).
-     *
-     * @return $this
      */
     public function setChannelMapper(ChannelMapper $mapper): self
     {
@@ -727,17 +715,13 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function getSubscriptionRepository(): SubscriptionRepositoryInterface
     {
-        if ($this->subscriptionRepository === null) {
-            $this->subscriptionRepository = app(SubscriptionRepositoryInterface::class);
-        }
+        $this->subscriptionRepository ??= app(SubscriptionRepositoryInterface::class);
 
         return $this->subscriptionRepository;
     }
 
     /**
      * Set a custom subscription repository (mainly for testing).
-     *
-     * @return $this
      */
     public function setSubscriptionRepository(SubscriptionRepositoryInterface $repository): self
     {
@@ -752,17 +736,13 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function getRefundRepository(): RefundRepositoryInterface
     {
-        if ($this->refundRepository === null) {
-            $this->refundRepository = app(RefundRepositoryInterface::class);
-        }
+        $this->refundRepository ??= app(RefundRepositoryInterface::class);
 
         return $this->refundRepository;
     }
 
     /**
      * Set a custom refund repository (mainly for testing).
-     *
-     * @return $this
      */
     public function setRefundRepository(RefundRepositoryInterface $repository): self
     {

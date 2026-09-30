@@ -36,7 +36,7 @@ trait MonnifyRefundMethods
                 'refundReference' => $refundReference,
                 'refundAmount' => $refundAmount,
                 'refundReason' => $request->reason ?? 'Refund requested',
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/api/v1/refunds/initiate-refund', [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],

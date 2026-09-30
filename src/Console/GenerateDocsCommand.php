@@ -42,7 +42,7 @@ final class GenerateDocsCommand extends Command
      * exercising "the markers are missing" against the real README would mean
      * damaging the repository to prove the guard works.
      */
-    public function __construct(private ?string $basePath = null)
+    public function __construct(private readonly ?string $basePath = null)
     {
         parent::__construct();
     }

@@ -275,7 +275,7 @@ final readonly class Timeline
         }
 
         $terminal = $this->terminal();
-        $lines[] = '- Status: '.($terminal !== null ? $terminal->event->value : 'incomplete (no terminal event)');
+        $lines[] = '- Status: '.($terminal instanceof PaymentTraceEvent ? $terminal->event->value : 'incomplete (no terminal event)');
 
         return implode("\n", $lines);
     }

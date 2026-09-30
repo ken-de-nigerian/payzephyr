@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr;
 
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
@@ -25,8 +26,6 @@ use KenDeNigerian\PayZephyr\Support\Payload;
  */
 final class SubscriptionQuery
 {
-    protected PaymentManager $manager;
-
     protected ?string $provider = null;
 
     protected ?string $customer = null;
@@ -43,10 +42,7 @@ final class SubscriptionQuery
 
     protected int $page = 1;
 
-    public function __construct(PaymentManager $manager)
-    {
-        $this->manager = $manager;
-    }
+    public function __construct(protected PaymentManager $manager) {}
 
     /**
      * Filter subscriptions by customer email.
@@ -236,7 +232,7 @@ final class SubscriptionQuery
     {
         $subscriptions = $results['data'] ?? $results;
 
-        if (! is_array($subscriptions) || empty($subscriptions)) {
+        if (! is_array($subscriptions) || $subscriptions === []) {
             return $results;
         }
 
@@ -304,7 +300,7 @@ final class SubscriptionQuery
         ];
     }
 
-    protected function getDriver(): Contracts\DriverInterface
+    protected function getDriver(): DriverInterface
     {
         $providerName = $this->getProviderName();
 

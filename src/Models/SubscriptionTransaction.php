@@ -86,8 +86,8 @@ final class SubscriptionTransaction extends Model
     protected function stateAsOf(): Attribute
     {
         return Attribute::make(
-            get: fn (?string $value) => $value === null ? null : CarbonImmutable::parse($value),
-            set: fn (CarbonInterface|string|null $value) => $value === null
+            get: fn (?string $value): ?CarbonImmutable => $value === null ? null : CarbonImmutable::parse($value),
+            set: fn (CarbonInterface|string|null $value): ?string => $value === null
                 ? null
                 : CarbonImmutable::parse($value)->format('Y-m-d H:i:s.u'),
         );

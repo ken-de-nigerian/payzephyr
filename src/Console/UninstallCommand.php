@@ -58,7 +58,7 @@ final class UninstallCommand extends Command
 
         $installed = $this->option('features') !== null
             ? $resources
-            : array_filter($resources, fn (array $resource) => $this->isInstalled($resource));
+            : array_filter($resources, $this->isInstalled(...));
 
         if ($installed === []) {
             $this->info('PayZephyr does not appear to be installed (no matching migrations were found) - nothing to do.');
@@ -144,9 +144,7 @@ final class UninstallCommand extends Command
             return $resources;
         }
 
-        $resources = array_map(function ($feature) {
-            return $this->describeResource($feature);
-        }, Features::core());
+        $resources = array_map($this->describeResource(...), Features::core());
 
         foreach (Features::optional() as $key => $feature) {
             $resources[$key] = $this->describeResource($feature);
@@ -188,11 +186,11 @@ final class UninstallCommand extends Command
      */
     private function printWarning(array $installed): void
     {
-        $tables = array_map(fn (array $resource) => $this->tableName($resource), $installed);
-        $labels = array_map(fn (array $resource) => $resource['label'], $installed);
+        $tables = array_map($this->tableName(...), $installed);
+        $labels = array_map(fn (array $resource): string => $resource['label'], $installed);
 
         $message = "This will permanently drop the following PayZephyr table(s) and all data in them:\n"
-            .implode("\n", array_map(fn (string $label, string $table) => "  - $label ($table)", $labels, $tables))
+            .implode("\n", array_map(fn (string $label, string $table): string => "  - $label ($table)", $labels, $tables))
             ."\n\nThis cannot be undone. config/payments.php and any other application data are not affected.";
 
         if ($this->option('no-interaction')) {

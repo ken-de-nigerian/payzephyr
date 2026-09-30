@@ -160,7 +160,7 @@ trait RazorpayRefundMethods
 
             $settled = array_values(array_filter(
                 Payload::of($link)->array('payments'),
-                fn ($payment) => in_array(Payload::of($payment)->string('status'), ['captured', 'refunded'], true)
+                fn ($payment): bool => in_array(Payload::of($payment)->string('status'), ['captured', 'refunded'], true)
             ));
             $settledId = count($settled) === 1 ? Payload::of($settled[0])->string('payment_id') : null;
 

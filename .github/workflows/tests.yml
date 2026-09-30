@@ -31,6 +31,11 @@ jobs:
       - name: Run PHPStan
         run: composer analyse
 
+      # Dry run: any change Rector would make fails the build. rector.php
+      # records which rules are skipped and why.
+      - name: Run Rector
+        run: composer rector
+
       - name: Check code style
         run: vendor/bin/pint --test
 

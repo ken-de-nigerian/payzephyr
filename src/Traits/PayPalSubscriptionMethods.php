@@ -41,7 +41,7 @@ trait PayPalSubscriptionMethods
                     'description' => $plan->description,
                     'type' => 'SERVICE',
                     'category' => 'SOFTWARE',
-                ], fn ($value) => $value !== null),
+                ], fn ($value): bool => $value !== null),
             ]));
 
             $data = $this->parseResponse($this->makeRequest('POST', '/v1/billing/plans', [
@@ -225,7 +225,7 @@ trait PayPalSubscriptionMethods
                     'user_action' => 'SUBSCRIBE_NOW',
                 ],
                 'custom_id' => $request->metadata['reference'] ?? null,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $headers = ['Authorization' => 'Bearer '.$this->getAccessToken()];
             if ($request->idempotencyKey) {

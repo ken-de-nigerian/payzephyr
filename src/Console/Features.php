@@ -140,7 +140,7 @@ final class Features
      */
     public static function parseList(string $value): array
     {
-        $tokens = array_filter(array_map('trim', explode(',', $value)), fn (string $t) => $t !== '');
+        $tokens = array_filter(array_map(trim(...), explode(',', $value)), fn (string $t): bool => $t !== '');
 
         if ($tokens === []) {
             throw new InvalidArgumentException('--features was given but contained no feature names.');
@@ -181,7 +181,7 @@ final class Features
      */
     public static function resolveDependencies(array $selected, ?array $dependencies = null): array
     {
-        $dependencies ??= array_map(fn (array $feature) => $feature['dependencies'], self::optional());
+        $dependencies ??= array_map(fn (array $feature): array => $feature['dependencies'], self::optional());
         $resolved = [];
         $visiting = [];
 

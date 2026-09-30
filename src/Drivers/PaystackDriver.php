@@ -121,7 +121,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -179,7 +179,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -265,7 +265,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
             $clientException = null;
             $current = $e;
-            while ($current !== null) {
+            while ($current instanceof \Throwable) {
                 if ($current instanceof ClientException) {
                     $clientException = $current;
                     break;
@@ -273,7 +273,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 $current = $current->getPrevious();
             }
 
-            if ($clientException !== null) {
+            if ($clientException instanceof ClientException) {
                 $response = $clientException->getResponse();
                 $statusCode = $response->getStatusCode();
                 if (in_array($statusCode, [HttpStatusCodes::BAD_REQUEST, HttpStatusCodes::NOT_FOUND], true)) {
@@ -287,8 +287,8 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
             $this->log('error', 'Health check failed', [
                 'error' => $e->getMessage(),
-                'exception_class' => get_class($e),
-                'previous_class' => $previous ? get_class($previous) : null,
+                'exception_class' => $e::class,
+                'previous_class' => $previous ? $previous::class : null,
             ]);
 
             return false;

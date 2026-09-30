@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
@@ -60,7 +61,7 @@ final readonly class RefundValidator
             return;
         }
 
-        if ($transaction === null) {
+        if (! $transaction instanceof PaymentTransaction) {
             return;
         }
 

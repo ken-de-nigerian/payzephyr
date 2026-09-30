@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Support\Str;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
@@ -25,8 +26,6 @@ final class Subscription
 {
     use RecordsTraceEvents;
 
-    protected PaymentManager $manager;
-
     /** @var array<string, mixed> */
     protected array $data = [];
 
@@ -40,10 +39,7 @@ final class Subscription
     /** @var array<string, mixed> Provider-specific options for cancel/enable actions. */
     protected array $actionOptions = [];
 
-    public function __construct(PaymentManager $manager)
-    {
-        $this->manager = $manager;
-    }
+    public function __construct(protected PaymentManager $manager) {}
 
     /**
      * Set the provider(s) to use
@@ -300,7 +296,7 @@ final class Subscription
             $driver,
             'cancel',
             TraceEvent::SUBSCRIPTION_CANCELLED,
-            fn () => $driver->cancelSubscription($this->buildAction($this->subscriptionCode, $token)),
+            fn (): SubscriptionResponseDTO => $driver->cancelSubscription($this->buildAction($this->subscriptionCode, $token)),
         );
 
         if ($driver instanceof SubscriptionLifecycleHooks) {
@@ -331,7 +327,7 @@ final class Subscription
             $driver,
             'enable',
             TraceEvent::SUBSCRIPTION_ENABLED,
-            fn () => $driver->enableSubscription($this->buildAction($this->subscriptionCode, $token)),
+            fn (): SubscriptionResponseDTO => $driver->enableSubscription($this->buildAction($this->subscriptionCode, $token)),
         );
     }
 
@@ -342,7 +338,7 @@ final class Subscription
      * @param  callable(): SubscriptionResponseDTO  $operation
      */
     private function traceSubscriptionOperation(
-        Contracts\DriverInterface $driver,
+        DriverInterface $driver,
         string $name,
         TraceEvent $success,
         callable $operation
@@ -548,7 +544,7 @@ final class Subscription
         return $driver->listPlans($perPage, $page);
     }
 
-    protected function getDriver(): Contracts\DriverInterface
+    protected function getDriver(): DriverInterface
     {
         $providerName = $this->getProviderName();
 
@@ -557,7 +553,7 @@ final class Subscription
 
     protected function getProviderName(): string
     {
-        if (! empty($this->providers)) {
+        if ($this->providers !== []) {
             return $this->providers[0];
         }
 

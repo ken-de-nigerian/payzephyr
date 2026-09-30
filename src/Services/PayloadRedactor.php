@@ -28,7 +28,7 @@ final readonly class PayloadRedactor
     public function redact(array $payload, ?int $maxDepth = null): array
     {
         $trace = PackageConfig::read()->at('trace');
-        $fields = array_values(array_filter($trace->array('redact_fields'), 'is_string'));
+        $fields = array_values(array_filter($trace->array('redact_fields'), is_string(...)));
 
         $maxDepth ??= $trace->int('redaction_max_depth') ?? PaymentConstants::METADATA_MAX_DEPTH;
 

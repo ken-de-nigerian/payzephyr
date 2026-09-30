@@ -139,7 +139,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -201,7 +201,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }

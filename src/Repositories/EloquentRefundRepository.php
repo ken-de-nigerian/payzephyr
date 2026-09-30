@@ -87,7 +87,7 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
             fn (RefundStatus $status) => $status->value,
             array_filter(
                 RefundStatus::cases(),
-                fn (RefundStatus $status) => $status->countsTowardRefundedAmount()
+                fn (RefundStatus $status): bool => $status->countsTowardRefundedAmount()
             )
         ));
     }

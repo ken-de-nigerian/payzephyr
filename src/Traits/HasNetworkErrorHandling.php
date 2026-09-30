@@ -10,6 +10,7 @@ use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\TransferException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Trait providing network error handling functionality.
@@ -34,7 +35,7 @@ trait HasNetworkErrorHandling
             'method' => $method,
             'uri' => $uri,
             'provider' => $this->getName(),
-            'error_class' => get_class($exception),
+            'error_class' => $exception::class,
         ];
 
         if ($exception instanceof ConnectException) {
@@ -52,7 +53,7 @@ trait HasNetworkErrorHandling
             $errorType = 'request_error';
             $userMessage = 'Request to payment provider failed. Please check your request and try again.';
             $response = $exception->getResponse();
-            if ($response !== null) {
+            if ($response instanceof ResponseInterface) {
                 $context['status_code'] = $response->getStatusCode();
             }
         } elseif ($exception instanceof TransferException) {
@@ -92,7 +93,7 @@ trait HasNetworkErrorHandling
 
         if ($exception instanceof RequestException) {
             $response = $exception->getResponse();
-            if ($response !== null) {
+            if ($response instanceof ResponseInterface) {
                 $statusCode = $response->getStatusCode();
                 if ($statusCode === HttpStatusCodes::TOO_MANY_REQUESTS) {
                     return 'Too many requests. Please wait a moment and try again.';

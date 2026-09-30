@@ -33,7 +33,7 @@ trait PayPalRefundMethods
                     'currency_code' => $refundCurrency,
                 ] : null,
                 'note_to_payer' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $requestOptions = [
                 'headers' => ['Authorization' => 'Bearer '.$this->getAccessToken()],

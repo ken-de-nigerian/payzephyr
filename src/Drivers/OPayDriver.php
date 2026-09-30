@@ -111,7 +111,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 $payload['payMethod'] = $channels;
             }
 
-            $payload = array_filter($payload, fn ($value) => $value !== null);
+            $payload = array_filter($payload, fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/api/v1/international/cashier/create', [
                 'json' => $payload,
@@ -145,7 +145,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -226,7 +226,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -313,7 +313,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
         } catch (Throwable $e) {
             $clientException = null;
             $current = $e;
-            while ($current !== null) {
+            while ($current instanceof \Throwable) {
                 if ($current instanceof ClientException) {
                     $clientException = $current;
                     break;
@@ -321,7 +321,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 $current = $current->getPrevious();
             }
 
-            if ($clientException !== null) {
+            if ($clientException instanceof ClientException) {
                 $response = $clientException->getResponse();
                 $statusCode = $response->getStatusCode();
                 if (in_array($statusCode, [HttpStatusCodes::BAD_REQUEST, HttpStatusCodes::NOT_FOUND], true)) {

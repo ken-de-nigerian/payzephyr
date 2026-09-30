@@ -53,7 +53,7 @@ final class ProcessWebhook implements ShouldQueue
      * worker happens to pick the job up. Null only for a job queued by a
      * version that did not record it.
      */
-    public ?int $receivedAt = null;
+    public ?int $receivedAt;
 
     /**
      * Refund outcome keys this attempt has claimed (see claimRefundOutcome()),
@@ -260,7 +260,7 @@ final class ProcessWebhook implements ShouldQueue
             return true;
         }
 
-        if (! ($driver instanceof RequiresAsyncWebhookVerification && $driver->requiresAsyncVerification())) {
+        if (! $driver instanceof RequiresAsyncWebhookVerification || ! $driver->requiresAsyncVerification()) {
             return true;
         }
 

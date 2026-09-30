@@ -27,7 +27,7 @@ trait FlutterwaveRefundMethods
             $payload = array_filter([
                 'amount' => $request->amount,
                 'comments' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $requestOptions = ['json' => $payload];
             if ($request->idempotencyKey) {
@@ -97,7 +97,6 @@ trait FlutterwaveRefundMethods
                 status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($result, 'amount_refunded', 'fetch refund'),
                 currency: $this->requireString($result, 'currency', 'fetch refund'),
-                reason: null,
                 metadata: [],
                 provider: $this->getName(),
             );

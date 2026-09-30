@@ -30,7 +30,7 @@ trait StripeRefundMethods
                 'payment_intent' => $request->transactionReference,
                 'amount' => $request->getAmountInMinorUnits(),
                 'metadata' => $request->metadata === [] ? null : $this->stripeMetadata($request->metadata),
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $options = $request->idempotencyKey ? ['idempotency_key' => $request->idempotencyKey] : [];
 

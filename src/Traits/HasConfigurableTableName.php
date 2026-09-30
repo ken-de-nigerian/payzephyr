@@ -43,10 +43,6 @@ trait HasConfigurableTableName
             return false;
         }
 
-        if (preg_match('/^\d/', $tableName) === 1) {
-            return false;
-        }
-
-        return true;
+        return preg_match('/^\d/', $tableName) !== 1;
     }
 }

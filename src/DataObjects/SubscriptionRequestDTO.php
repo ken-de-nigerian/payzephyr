@@ -83,7 +83,7 @@ final readonly class SubscriptionRequestDTO
             'metadata' => $this->metadata,
             'authorization' => $this->authorization,
             'callback_url' => $this->callbackUrl,
-        ], fn ($value) => $value !== null);
+        ], fn ($value): bool => $value !== null);
     }
 
     /**

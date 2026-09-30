@@ -64,29 +64,23 @@ final class PaymentServiceProvider extends ServiceProvider
         $this->app->singleton(PayloadRedactor::class);
         $this->app->singleton(TraceTimelineBuilder::class);
 
-        $this->app->singleton(TraceRecorderInterface::class, function (Application $app) {
-            return PackageConfig::read()->flag(false, 'features', 'trace')
-                ? $app->make(TraceRecorder::class)
-                : $app->make(NullTraceRecorder::class);
-        });
+        $this->app->singleton(TraceRecorderInterface::class, fn (Application $app) => PackageConfig::read()->flag(false, 'features', 'trace')
+            ? $app->make(TraceRecorder::class)
+            : $app->make(NullTraceRecorder::class));
 
         $this->app->singleton(TransactionRepositoryInterface::class, EloquentTransactionRepository::class);
         $this->app->singleton(SubscriptionRepositoryInterface::class, EloquentSubscriptionRepository::class);
         $this->app->singleton(RefundRepositoryInterface::class, EloquentRefundRepository::class);
         $this->app->singleton(WebhookEventRepositoryInterface::class, EloquentWebhookEventRepository::class);
 
-        $this->app->singleton(PaymentManager::class, function (Application $app) {
-            return new PaymentManager(
-                $app->make(ProviderDetectorInterface::class),
-                $app->make(DriverFactory::class),
-                $app->make(MetadataSanitizer::class),
-                $app->make(TransactionRepositoryInterface::class)
-            );
-        });
+        $this->app->singleton(PaymentManager::class, fn (Application $app): PaymentManager => new PaymentManager(
+            $app->make(ProviderDetectorInterface::class),
+            $app->make(DriverFactory::class),
+            $app->make(MetadataSanitizer::class),
+            $app->make(TransactionRepositoryInterface::class)
+        ));
 
-        $this->app->bind(Payment::class, function (Application $app) {
-            return new Payment($app->make(PaymentManager::class));
-        });
+        $this->app->bind(Payment::class, fn (Application $app): Payment => new Payment($app->make(PaymentManager::class)));
     }
 
     public function boot(): void
@@ -151,7 +145,7 @@ final class PaymentServiceProvider extends ServiceProvider
             'prefix' => $webhookPath,
             'middleware' => ['api', 'throttle:'.$rateLimit],
             'namespace' => 'KenDeNigerian\PayZephyr\Http\Controllers',
-        ], function () {
+        ], function (): void {
             Route::post('/{provider}', [WebhookController::class, 'handle'])
                 ->name('payments.webhook');
         });

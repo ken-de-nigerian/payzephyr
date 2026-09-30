@@ -152,7 +152,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -202,7 +202,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }

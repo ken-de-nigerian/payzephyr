@@ -31,7 +31,7 @@ trait PaystackRefundMethods
                 'transaction' => $request->transactionReference,
                 'amount' => $request->getAmountInMinorUnits(),
                 'customer_note' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $requestOptions = ['json' => $payload];
             if ($request->idempotencyKey) {

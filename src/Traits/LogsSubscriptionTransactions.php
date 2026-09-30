@@ -53,8 +53,8 @@ trait LogsSubscriptionTransactions
         }
 
         try {
-            $planCode = $planCode ?? $response->metadata['plan_code'] ?? $response->plan;
-            $customerEmail = $customerEmail ?? $response->customer;
+            $planCode ??= $response->metadata['plan_code'] ?? $response->plan;
+            $customerEmail ??= $response->customer;
             $sanitizedMetadata = app(MetadataSanitizer::class)->sanitize($response->metadata);
 
             $attributes = [

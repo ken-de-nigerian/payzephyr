@@ -17,9 +17,11 @@ use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\StripeRefundMethods;
 use KenDeNigerian\PayZephyr\Traits\StripeSubscriptionMethods;
 use Random\RandomException;
+use Stripe\Checkout\Session;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\AuthenticationException;
 use Stripe\Exception\SignatureVerificationException;
+use Stripe\PaymentIntent;
 use Stripe\StripeClient;
 use Stripe\Webhook;
 use Throwable;
@@ -187,7 +189,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             $this->log('error', 'Charge failed', ['error' => $e->getMessage()]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
         } catch (Throwable $e) {
-            $this->log('error', 'Charge failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
+            $this->log('error', 'Charge failed', ['error' => $e->getMessage(), 'error_class' => $e::class]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
         } finally {
             $this->clearCurrentRequest();
@@ -253,13 +255,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             throw new VerificationException("Payment not found for reference [$reference]");
         } catch (VerificationException $e) {
             throw $e;
-        } catch (ApiErrorException $e) {
-            throw new VerificationException(
-                'Stripe verification failed: '.$e->getMessage(),
-                0,
-                $e
-            );
         } catch (Throwable $e) {
+            // An API error and anything else fail the same way.
             throw new VerificationException(
                 'Stripe verification failed: '.$e->getMessage(),
                 0,
@@ -323,7 +320,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         } catch (Throwable $e) {
             $this->log('warning', 'Webhook validation failed', [
                 'error' => $e->getMessage(),
-                'exception_type' => get_class($e),
+                'exception_type' => $e::class,
             ]);
 
             return false;
@@ -366,7 +363,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  \Stripe\Checkout\Session  $session
+     * @param  Session  $session
      */
     private function mapFromCheckoutSession(object $session): VerificationResponseDTO
     {
@@ -401,7 +398,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * @param  \Stripe\PaymentIntent  $intent
+     * @param  PaymentIntent  $intent
      */
     private function mapFromPaymentIntent(object $intent): VerificationResponseDTO
     {

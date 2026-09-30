@@ -215,7 +215,7 @@ trait HasWebhookValidation
      */
     protected function isDefinitiveVerificationRejection(Throwable $e): bool
     {
-        for ($current = $e; $current !== null; $current = $current->getPrevious()) {
+        for ($current = $e; $current instanceof \Throwable; $current = $current->getPrevious()) {
             if ($current instanceof ClientException) {
                 return ! in_array($current->getResponse()->getStatusCode(), [
                     HttpStatusCodes::UNAUTHORIZED,

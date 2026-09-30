@@ -175,7 +175,7 @@ trait MollieSubscriptionMethods
                 'times' => Payload::of($request->metadata)->int('times'),
                 'webhookUrl' => $request->callbackUrl,
                 'metadata' => $request->metadata ?: null,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/v2/customers/'.rawurlencode($customerId).'/subscriptions', [
                 'json' => $payload,

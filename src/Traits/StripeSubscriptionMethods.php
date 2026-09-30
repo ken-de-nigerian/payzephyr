@@ -35,7 +35,7 @@ trait StripeSubscriptionMethods
             $product = $this->stripe->products->create(array_filter([
                 'name' => $plan->name,
                 'description' => $plan->description,
-            ], fn ($value) => $value !== null));
+            ], fn ($value): bool => $value !== null));
 
             $price = $this->stripe->prices->create([
                 'unit_amount' => $plan->getAmountInMinorUnits(),
@@ -92,7 +92,7 @@ trait StripeSubscriptionMethods
                 $this->stripe->products->update($productId, array_filter([
                     'name' => $name,
                     'description' => $description,
-                ], fn ($value) => $value !== null));
+                ], fn ($value): bool => $value !== null));
             }
 
             $amount = $changes->float('amount');
@@ -150,7 +150,7 @@ trait StripeSubscriptionMethods
                     'metadata' => $metadata === null ? null : $this->stripeMetadata($metadata),
                     'active' => $changes->onOff('active'),
                     'nickname' => $changes->string('nickname'),
-                ], fn ($value) => $value !== null);
+                ], fn ($value): bool => $value !== null);
 
                 $price = $mutable !== [] ? $this->stripe->prices->update($planCode, $mutable) : $existingPrice;
 
@@ -249,7 +249,7 @@ trait StripeSubscriptionMethods
                 'trial_period_days' => $request->trialDays,
                 'metadata' => $this->stripeMetadata($request->metadata),
                 'default_payment_method' => $request->authorization,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $options = $request->idempotencyKey ? ['idempotency_key' => $request->idempotencyKey] : [];
 

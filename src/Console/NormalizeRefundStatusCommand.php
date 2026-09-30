@@ -58,7 +58,7 @@ final class NormalizeRefundStatusCommand extends Command
             ];
             $canonical = RefundStatus::tryFromString($change['from']);
 
-            if ($canonical === null) {
+            if (! $canonical instanceof RefundStatus) {
                 $unmappable[] = $change;
 
                 continue;
@@ -93,7 +93,7 @@ final class NormalizeRefundStatusCommand extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($table, $toUpdate) {
+        DB::transaction(function () use ($table, $toUpdate): void {
             foreach ($toUpdate as $change) {
                 DB::table($table)->where('id', $change['id'])->update(['status' => $change['to']]);
             }

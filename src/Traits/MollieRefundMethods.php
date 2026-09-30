@@ -35,7 +35,7 @@ trait MollieRefundMethods
                     'value' => number_format($request->amount, 2, '.', ''),
                 ] : null,
                 'description' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $requestOptions = ['json' => $payload];
             if ($request->idempotencyKey) {

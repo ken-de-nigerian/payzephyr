@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
@@ -31,18 +32,13 @@ final class Refund
      */
     private const LOCK_TTL_SECONDS = 60;
 
-    protected PaymentManager $manager;
-
     /** @var array<string, mixed> */
     protected array $data = [];
 
     /** @var array<int, string> */
     protected array $providers = [];
 
-    public function __construct(PaymentManager $manager)
-    {
-        $this->manager = $manager;
-    }
+    public function __construct(protected PaymentManager $manager) {}
 
     /**
      * Set the provider(s) to use
@@ -169,7 +165,7 @@ final class Refund
         }
 
         try {
-            $response = $this->withTraceContext($driver, $reference, fn () => $driver->refund($request));
+            $response = $this->withTraceContext($driver, $reference, fn (): RefundResponseDTO => $driver->refund($request));
         } catch (Throwable $e) {
             $this->trace($reference, TraceEvent::REFUND_FAILED, TraceDirection::INBOUND,
                 payload: [
@@ -242,7 +238,7 @@ final class Refund
         return $driver->fetchRefund($refundReference);
     }
 
-    protected function getDriver(): Contracts\DriverInterface
+    protected function getDriver(): DriverInterface
     {
         $providerName = $this->getProviderName();
 
@@ -251,7 +247,7 @@ final class Refund
 
     protected function getProviderName(): string
     {
-        if (! empty($this->providers)) {
+        if ($this->providers !== []) {
             return $this->providers[0];
         }
 

@@ -160,9 +160,7 @@ final class InstallCommand extends Command
 
         $alreadyInstalled = $this->installedFeatures();
 
-        $options = array_map(function ($feature) {
-            return "{$feature['label']} - {$feature['description']}";
-        }, Features::optional());
+        $options = array_map(fn (array $feature): string => "{$feature['label']} - {$feature['description']}", Features::optional());
 
         $selected = multiselect(
             label: 'Select the optional features you want to install',
@@ -171,7 +169,7 @@ final class InstallCommand extends Command
             hint: 'Space to select, Enter to continue. Deselecting an already-installed feature does not remove it.',
         );
 
-        return Features::resolveDependencies(array_map('strval', array_values($selected)));
+        return Features::resolveDependencies(array_map(strval(...), array_values($selected)));
     }
 
     /**
@@ -213,7 +211,7 @@ final class InstallCommand extends Command
 
         if (! File::exists($envPath)) {
             $this->comment('No .env file found - set these manually: '.
-                implode(', ', array_map(fn (string $k) => Features::get($k)['envVar'].'=true', $newlySelected)));
+                implode(', ', array_map(fn (string $k): string => Features::get($k)['envVar'].'=true', $newlySelected)));
 
             return;
         }
@@ -247,7 +245,7 @@ final class InstallCommand extends Command
         $this->line('Core (always installed): payments, webhooks');
 
         if ($newlySelected !== []) {
-            $labels = array_map(fn (string $k) => Features::get($k)['label'], $newlySelected);
+            $labels = array_map(fn (string $k): string => Features::get($k)['label'], $newlySelected);
             $this->line('Newly enabled: '.implode(', ', $labels));
         }
 
@@ -255,7 +253,7 @@ final class InstallCommand extends Command
         $notInstalled = array_values(array_diff(Features::optionalKeys(), $stillInstalled));
 
         if ($notInstalled !== []) {
-            $labels = array_map(fn (string $k) => Features::get($k)['label'], $notInstalled);
+            $labels = array_map(fn (string $k): string => Features::get($k)['label'], $notInstalled);
             $this->line('Not installed: '.implode(', ', $labels).' (run `php artisan payzephyr:install --features='.implode(',', $notInstalled).'` any time to add them)');
         }
 

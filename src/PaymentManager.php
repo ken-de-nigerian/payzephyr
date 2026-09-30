@@ -13,7 +13,6 @@ use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
-use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Events\PaymentInitiated;
@@ -73,7 +72,7 @@ final class PaymentManager
      */
     public function driver(?string $name = null): DriverInterface
     {
-        $name = $name ?? $this->getDefaultDriver();
+        $name ??= $this->getDefaultDriver();
 
         if (isset($this->drivers[$name])) {
             return $this->drivers[$name];
@@ -107,7 +106,7 @@ final class PaymentManager
     public function chargeWithFallback(ChargeRequestDTO $request, ?array $providers = null): ChargeResponseDTO
     {
         $request = $this->resolveChargeReference($request);
-        $providers = $providers ?? $this->getFallbackChain();
+        $providers ??= $this->getFallbackChain();
         $exceptions = [];
 
         $this->trace($request->reference, TraceEvent::PAYMENT_INITIATED, payload: [
@@ -119,7 +118,7 @@ final class PaymentManager
         $claimed = $this->claimChargeInFlight($request);
 
         try {
-            return $this->attemptChargeChain($request, $providers, $exceptions, $claimed);
+            return $this->attemptChargeChain($request, $providers, $exceptions);
         } catch (Throwable $e) {
             if ($claimed !== null && ! $this->isAmbiguousOutcome($e)) {
                 $this->releaseChargeClaim($claimed);
@@ -183,8 +182,7 @@ final class PaymentManager
     private function attemptChargeChain(
         ChargeRequestDTO $request,
         array $providers,
-        array $exceptions,
-        ?string $claimed
+        array $exceptions
     ): ChargeResponseDTO {
         foreach ($providers as $providerName) {
             try {
@@ -246,7 +244,7 @@ final class PaymentManager
                 $exceptions[$providerName] = $e;
                 $this->log('error', "Provider [$providerName] failed", [
                     'error' => $e->getMessage(),
-                    'error_class' => get_class($e),
+                    'error_class' => $e::class,
                     'trace' => $e->getTraceAsString(),
                     'request_context' => [
                         'amount' => $request->amount,
@@ -268,12 +266,12 @@ final class PaymentManager
 
         $this->trace($request->reference, TraceEvent::PAYMENT_FAILED, payload: [
             'providers_tried' => array_keys($exceptions),
-            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+            'errors' => array_map(fn (Throwable $e): string => $e->getMessage(), $exceptions),
         ]);
 
         throw ProviderException::withContext(
             'All payment providers failed',
-            ['exceptions' => array_map(fn ($e) => $e->getMessage(), $exceptions)]
+            ['exceptions' => array_map(fn ($e): string => $e->getMessage(), $exceptions)]
         );
     }
 
@@ -602,7 +600,7 @@ final class PaymentManager
                 $exceptions[$providerName] = $e;
                 $this->log('error', "Provider [$providerName] verification failed", [
                     'error' => $e->getMessage(),
-                    'error_class' => get_class($e),
+                    'error_class' => $e::class,
                     'reference' => $reference,
                     'provider' => $providerName,
                     'trace' => $e->getTraceAsString(),
@@ -617,12 +615,12 @@ final class PaymentManager
 
         $this->trace($reference, TraceEvent::VERIFICATION_FAILED, payload: [
             'providers_tried' => array_keys($exceptions),
-            'errors' => array_map(fn (Throwable $e) => $e->getMessage(), $exceptions),
+            'errors' => array_map(fn (Throwable $e): string => $e->getMessage(), $exceptions),
         ]);
 
         throw ProviderException::withContext(
             "Unable to verify payment reference: $reference",
-            ['exceptions' => array_map(fn ($e) => $e->getMessage(), $exceptions)]
+            ['exceptions' => array_map(fn ($e): string => $e->getMessage(), $exceptions)]
         );
     }
 
@@ -802,7 +800,7 @@ final class PaymentManager
         $chain = [$this->getDefaultDriver()];
 
         $fallback = $this->settings()->string('fallback');
-        if ($fallback !== null && $fallback !== '' && $fallback !== $chain[0]) {
+        if (! in_array($fallback, [null, '', $chain[0]], true)) {
             $chain[] = $fallback;
         }
 

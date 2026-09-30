@@ -19,18 +19,13 @@ use Throwable;
 
 final class Payment
 {
-    protected PaymentManager $manager;
-
     /** @var array<string, mixed> */
     protected array $data = [];
 
     /** @var array<int, string> */
     protected array $providers = [];
 
-    public function __construct(PaymentManager $manager)
-    {
-        $this->manager = $manager;
-    }
+    public function __construct(protected PaymentManager $manager) {}
 
     public function amount(float $amount): Payment
     {

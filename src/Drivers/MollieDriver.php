@@ -171,7 +171,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -225,7 +225,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -383,7 +383,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $this->log('error', 'Webhook validation could not reach Mollie', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
 
             throw new WebhookException('Mollie webhook verification failed: '.$e->getMessage(), 0, $e);

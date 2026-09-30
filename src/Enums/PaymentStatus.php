@@ -46,7 +46,7 @@ enum PaymentStatus: string
 
     public static function isValid(string $value): bool
     {
-        return self::tryFromString($value) !== null;
+        return self::tryFromString($value) instanceof \KenDeNigerian\PayZephyr\Enums\PaymentStatus;
     }
 
     public static function isSuccessfulString(string $status): bool

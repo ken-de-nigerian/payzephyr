@@ -152,7 +152,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         } catch (Throwable $e) {
             $this->log('error', 'PayPal authentication failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('PayPal authentication failed: '.$e->getMessage(), 0, $e);
         }
@@ -244,7 +244,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -313,7 +313,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         } catch (Throwable $e) {
             $this->log('error', 'Verification failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -427,7 +427,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
 
             $this->log('error', 'PayPal webhook verification API failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
 
             throw new WebhookException(
@@ -493,7 +493,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
         } catch (Throwable $e) {
             $this->log('error', 'PayPal capture failed', [
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
 
             throw new VerificationException('PayPal capture failed: '.$e->getMessage(), 0, $e);

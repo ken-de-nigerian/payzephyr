@@ -194,8 +194,8 @@ trait SquareSubscriptionMethods
             $body = Payload::of($this->parseResponse($response));
             $objects = $body->array('objects');
 
-            $plans = array_filter($objects, fn ($o) => Payload::of($o)->string('type') === 'SUBSCRIPTION_PLAN');
-            $variations = array_filter($objects, fn ($o) => Payload::of($o)->string('type') === 'SUBSCRIPTION_PLAN_VARIATION');
+            $plans = array_filter($objects, fn ($o): bool => Payload::of($o)->string('type') === 'SUBSCRIPTION_PLAN');
+            $variations = array_filter($objects, fn ($o): bool => Payload::of($o)->string('type') === 'SUBSCRIPTION_PLAN_VARIATION');
 
             $result = [];
             foreach ($variations as $variation) {
@@ -248,7 +248,7 @@ trait SquareSubscriptionMethods
                 'customer_id' => $this->requireString($customer, 'id', 'customer'),
                 'card_id' => $request->authorization,
                 'start_date' => $request->startDate,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/v2/subscriptions', ['json' => $payload]);
             $data = $this->parseResponse($response);
@@ -318,7 +318,7 @@ trait SquareSubscriptionMethods
             $payload = array_filter([
                 'pause_effective_date' => $action->option('pause_effective_date'),
                 'pause_cycle_duration' => $action->option('pause_cycle_duration'),
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/v2/subscriptions/'.rawurlencode($action->subscriptionCode).'/pause', [
                 'json' => $payload,
@@ -355,7 +355,7 @@ trait SquareSubscriptionMethods
             $payload = array_filter([
                 'resume_effective_date' => $action->option('resume_effective_date'),
                 'resume_change_timing' => $action->option('resume_change_timing'),
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/v2/subscriptions/'.rawurlencode($action->subscriptionCode).'/resume', [
                 'json' => $payload,

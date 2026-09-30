@@ -178,7 +178,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                 'status_code' => $statusCode,
                 'error' => $errorMessage,
                 'errors' => $responseData['errors'] ?? [],
-                'error_class' => get_class($previous),
+                'error_class' => $previous::class,
             ]);
 
             throw new ChargeException('Payment initialization failed: '.$errorMessage, 0, $previous);
@@ -186,7 +186,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $this->log('error', 'Charge failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new ChargeException('Payment initialization failed: '.$e->getMessage(), 0, $e);
         } finally {
@@ -206,12 +206,12 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     {
         try {
             $result = $this->verifyByPaymentId($reference);
-            if ($result !== null) {
+            if ($result instanceof VerificationResponseDTO) {
                 return $result;
             }
 
             $result = $this->verifyByPaymentLinkId($reference);
-            if ($result !== null) {
+            if ($result instanceof VerificationResponseDTO) {
                 return $result;
             }
 
@@ -233,7 +233,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                     'status_code' => $statusCode,
                     'error' => $errorMessage,
                     'errors' => $responseData['errors'] ?? [],
-                    'error_class' => get_class($previous),
+                    'error_class' => $previous::class,
                 ]);
 
                 throw new VerificationException('Payment verification failed: '.$errorMessage, 0, $previous);
@@ -244,7 +244,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $this->log('error', 'Verification failed', [
                 'reference' => $reference,
                 'error' => $e->getMessage(),
-                'error_class' => get_class($e),
+                'error_class' => $e::class,
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -421,7 +421,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                             'sort_order' => 'DESC',
                         ],
                     ],
-                ], fn ($value) => $value !== null),
+                ], fn ($value): bool => $value !== null),
             ]);
 
             return $this->parseResponse($response);
@@ -665,7 +665,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                 return false;
             }
 
-            $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => get_class($e)]);
+            $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => $e::class]);
 
             return true;
         }

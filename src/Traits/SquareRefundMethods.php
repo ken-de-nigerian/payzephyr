@@ -34,7 +34,7 @@ trait SquareRefundMethods
                 'payment_id' => $request->transactionReference,
                 'amount_money' => $amountMoney,
                 'reason' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/v2/refunds', ['json' => $payload]);
             $data = $this->parseResponse($response);

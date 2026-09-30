@@ -43,7 +43,7 @@ trait OPayRefundMethods
                     'currency' => $request->currency ?? $this->settings()->string('currencies', 0) ?? 'NGN',
                 ] : null,
                 'refundReason' => $request->reason,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $payloadJson = (string) json_encode($payload, JSON_UNESCAPED_SLASHES);
             $signature = hash_hmac('sha512', $payloadJson, $privateKey);
@@ -129,7 +129,6 @@ trait OPayRefundMethods
                 status: $refund->string('status') ?? 'unknown',
                 amount: $this->requireAmount($this->requireArray($result, 'amount', 'refund'), 'total', 'refund') / 100,
                 currency: $this->requireString($this->requireArray($result, 'amount', 'refund'), 'currency', 'refund'),
-                reason: null,
                 metadata: [],
                 provider: $this->getName(),
             );

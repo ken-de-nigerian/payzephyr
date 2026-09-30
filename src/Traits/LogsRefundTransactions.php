@@ -52,7 +52,7 @@ trait LogsRefundTransactions
         }
 
         try {
-            $reason = $reason ?? $response->reason;
+            $reason ??= $response->reason;
             $sanitizer = app(MetadataSanitizer::class);
             $sanitizedMetadata = $sanitizer->sanitize($response->metadata);
             $sanitizedReason = $reason !== null ? $sanitizer->sanitize($reason) : null;

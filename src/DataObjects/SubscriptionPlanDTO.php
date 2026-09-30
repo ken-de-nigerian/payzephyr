@@ -76,12 +76,12 @@ final readonly class SubscriptionPlanDTO
      */
     public static function assertValidUpdates(array $updates): void
     {
-        if (array_key_exists('name', $updates) && ! (is_string($updates['name']) && trim($updates['name']) !== '')) {
+        if (array_key_exists('name', $updates) && (! is_string($updates['name']) || trim($updates['name']) === '')) {
             throw new PlanException('Plan name cannot be updated to an empty value.');
         }
 
         if (array_key_exists('amount', $updates)
-            && ! (is_numeric($updates['amount']) && (float) $updates['amount'] > 0)) {
+            && (! is_numeric($updates['amount']) || (float) $updates['amount'] <= 0)) {
             throw new PlanException('Plan amount must be a number greater than zero.');
         }
 
@@ -140,6 +140,6 @@ final readonly class SubscriptionPlanDTO
             'send_invoices' => $this->sendInvoices,
             'send_sms' => $this->sendSms,
             'metadata' => $this->metadata,
-        ], fn ($value) => $value !== null);
+        ], fn ($value): bool => $value !== null);
     }
 }

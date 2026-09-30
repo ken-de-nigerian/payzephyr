@@ -45,7 +45,7 @@ trait PaystackSubscriptionMethods
                 'invoice_limit' => $plan->invoiceLimit,
                 'send_invoices' => $plan->sendInvoices,
                 'send_sms' => $plan->sendSms,
-            ], fn ($value) => $value !== null);
+            ], fn ($value): bool => $value !== null);
 
             $response = $this->makeRequest('POST', '/plan', [
                 'json' => $payload,

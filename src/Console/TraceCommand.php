@@ -153,7 +153,7 @@ final class TraceCommand extends Command
         }
 
         $terminal = $timeline->terminal();
-        $this->line('  Outcome:  '.($terminal !== null
+        $this->line('  Outcome:  '.($terminal instanceof PaymentTraceEvent
             ? $terminal->event->value
             : 'still open - no terminal event recorded'));
     }

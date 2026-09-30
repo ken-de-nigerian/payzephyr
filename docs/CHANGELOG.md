@@ -53,6 +53,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the reference, status and channel were read from the top level, so the reference came back
   null. They are now read from `payload`, with the top level kept as a fallback.
 
+- **Monnify refund webhooks were dropped.** A refund webhook was read from `data` or
+  `resource`; Monnify sends it under `eventData` and names its state `refundStatus`. The job
+  logged "missing refund reference" and did nothing, so the refund stayed pending and
+  `RefundCompleted` never fired. Both are read now.
+
 - **Monnify webhooks never updated the transaction.** Monnify wraps a webhook's fields in
   `eventData`, and the driver's event-id code already read them there, but the reference,
   status and channel were read from the top level, where the current format has nothing. The

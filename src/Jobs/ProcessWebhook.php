@@ -30,6 +30,8 @@ use KenDeNigerian\PayZephyr\Events\SubscriptionRenewed;
 use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use KenDeNigerian\PayZephyr\Traits\RecordsTraceEvents;
 use Throwable;
@@ -72,12 +74,11 @@ final class ProcessWebhook implements ShouldQueue
         public readonly array $payload,
         public readonly array $headers = []
     ) {
-        $config = app('payments.config') ?? config('payments', []);
-        $webhookConfig = $config['webhook'] ?? [];
+        $webhookConfig = PackageConfig::read()->at('webhook');
 
         $this->receivedAt = time();
-        $this->tries = (int) ($webhookConfig['max_retries'] ?? 3);
-        $this->backoff = (int) ($webhookConfig['retry_backoff'] ?? 60);
+        $this->tries = $webhookConfig->int('max_retries') ?? 3;
+        $this->backoff = $webhookConfig->int('retry_backoff') ?? 60;
     }
 
     public function handle(
@@ -148,8 +149,7 @@ final class ProcessWebhook implements ShouldQueue
                 metadata: ['event_key' => $eventKey],
             );
 
-            $config = app('payments.config') ?? config('payments', []);
-            if ($reference && ($config['logging']['enabled'] ?? true)) {
+            if ($reference && PackageConfig::read()->flag(true, 'logging', 'enabled')) {
                 $this->updateTransactionFromWebhook($manager, $statusNormalizer, $transactionRepository, $reference);
             }
 
@@ -242,8 +242,7 @@ final class ProcessWebhook implements ShouldQueue
      */
     protected function verifyDeferredSignature(PaymentManager $manager): bool
     {
-        $config = app('payments.config') ?? config('payments', []);
-        if (! ($config['webhook']['verify_signature'] ?? true)) {
+        if (! PackageConfig::read()->flag(true, 'webhook', 'verify_signature')) {
             return true;
         }
 
@@ -429,13 +428,26 @@ final class ProcessWebhook implements ShouldQueue
 
             return $statusNormalizer->normalize($status, $this->provider);
         } catch (DriverNotFoundException) {
-            $status = $this->payload['status']
-                ?? $this->payload['paymentStatus']
-                ?? $this->payload['payment_status']
+            $body = new Payload($this->payload);
+            $status = $body->string('status')
+                ?? $body->string('paymentStatus')
+                ?? $body->string('payment_status')
                 ?? 'unknown';
 
             return $statusNormalizer->normalize($status, $this->provider);
         }
+    }
+
+    /**
+     * The event name, wherever this provider puts it, lower-cased.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function eventType(array $payload): string
+    {
+        $body = new Payload($payload);
+
+        return strtolower($body->string('event') ?? $body->string('eventType') ?? $body->string('event_type') ?? '');
     }
 
     /**
@@ -445,7 +457,7 @@ final class ProcessWebhook implements ShouldQueue
      */
     protected function isSubscriptionWebhook(array $payload): bool
     {
-        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+        $eventType = $this->eventType($payload);
 
         $subscriptionKeywords = [
             'subscription',
@@ -471,10 +483,11 @@ final class ProcessWebhook implements ShouldQueue
      */
     protected function processSubscriptionWebhook(array $payload, string $provider, PaymentManager $manager): void
     {
-        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
-        $data = $payload['data'] ?? $payload;
+        $eventType = $this->eventType($payload);
+        $data = Payload::of($payload)->arrayOrNull('data') ?? $payload;
+        $details = new Payload($data);
 
-        $subscriptionCode = $data['subscription_code'] ?? $data['subscriptionCode'] ?? $data['subscription'] ?? null;
+        $subscriptionCode = $details->string('subscription_code') ?? $details->string('subscriptionCode') ?? $details->string('subscription');
 
         if (! $subscriptionCode) {
             $this->log('warning', 'Subscription webhook missing subscription_code', [
@@ -490,13 +503,13 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'subscription.created') ||
             str_contains($eventType, 'customer.subscription.created')
         ) {
-            $this->trace((string) $subscriptionCode, TraceEvent::SUBSCRIPTION_CREATED, TraceDirection::INBOUND,
+            $this->trace($subscriptionCode, TraceEvent::SUBSCRIPTION_CREATED, TraceDirection::INBOUND,
                 payload: ['event' => $eventType],
                 provider: $provider,
             );
 
             SubscriptionCreated::dispatch(
-                (string) $subscriptionCode,
+                $subscriptionCode,
                 $provider,
                 $data
             );
@@ -506,24 +519,24 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'invoice.payment_succeeded') ||
             str_contains($eventType, 'invoice.paid')
         ) {
-            $invoiceReference = $data['reference'] ?? $data['invoice_reference'] ?? $data['invoiceReference'] ?? '';
+            $invoiceReference = $details->string('reference') ?? $details->string('invoice_reference') ?? $details->string('invoiceReference') ?? '';
 
             try {
                 $driver = $manager->driver($provider);
                 if ($driver instanceof SubscriptionLifecycleHooks) {
-                    $driver->beforeSubscriptionRenewal((string) $subscriptionCode);
-                    $driver->afterSubscriptionRenewal((string) $subscriptionCode, $invoiceReference);
+                    $driver->beforeSubscriptionRenewal($subscriptionCode);
+                    $driver->afterSubscriptionRenewal($subscriptionCode, $invoiceReference);
                 }
             } catch (DriverNotFoundException) {
             }
 
-            $this->trace((string) $subscriptionCode, TraceEvent::SUBSCRIPTION_RENEWED, TraceDirection::INBOUND,
+            $this->trace($subscriptionCode, TraceEvent::SUBSCRIPTION_RENEWED, TraceDirection::INBOUND,
                 payload: ['event' => $eventType, 'invoice_reference' => $invoiceReference],
                 provider: $provider,
             );
 
             SubscriptionRenewed::dispatch(
-                (string) $subscriptionCode,
+                $subscriptionCode,
                 $provider,
                 $invoiceReference,
                 $data
@@ -534,13 +547,13 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'subscription.cancelled') ||
             str_contains($eventType, 'customer.subscription.deleted')
         ) {
-            $this->trace((string) $subscriptionCode, TraceEvent::SUBSCRIPTION_CANCELLED, TraceDirection::INBOUND,
+            $this->trace($subscriptionCode, TraceEvent::SUBSCRIPTION_CANCELLED, TraceDirection::INBOUND,
                 payload: ['event' => $eventType],
                 provider: $provider,
             );
 
             SubscriptionCancelled::dispatch(
-                (string) $subscriptionCode,
+                $subscriptionCode,
                 $provider,
                 $data
             );
@@ -549,23 +562,23 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'payment.failed') ||
             str_contains($eventType, 'subscription.payment_failed')
         ) {
-            $reason = $data['reason'] ?? $data['message'] ?? 'Payment failed';
+            $reason = $details->string('reason') ?? $details->string('message') ?? 'Payment failed';
 
-            $this->trace((string) $subscriptionCode, TraceEvent::SUBSCRIPTION_PAYMENT_FAILED, TraceDirection::INBOUND,
-                payload: ['event' => $eventType, 'reason' => (string) $reason],
+            $this->trace($subscriptionCode, TraceEvent::SUBSCRIPTION_PAYMENT_FAILED, TraceDirection::INBOUND,
+                payload: ['event' => $eventType, 'reason' => $reason],
                 provider: $provider,
             );
 
             try {
                 $driver = $manager->driver($provider);
                 if ($driver instanceof SubscriptionLifecycleHooks) {
-                    $driver->onSubscriptionRenewalFailed((string) $subscriptionCode, $reason);
+                    $driver->onSubscriptionRenewalFailed($subscriptionCode, $reason);
                 }
             } catch (DriverNotFoundException) {
             }
 
             SubscriptionPaymentFailed::dispatch(
-                (string) $subscriptionCode,
+                $subscriptionCode,
                 $provider,
                 $reason,
                 $data
@@ -586,7 +599,7 @@ final class ProcessWebhook implements ShouldQueue
      */
     protected function isRefundWebhook(array $payload): bool
     {
-        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
+        $eventType = $this->eventType($payload);
 
         return str_contains($eventType, 'refund') || str_contains($eventType, 'charge.refunded');
     }
@@ -609,22 +622,24 @@ final class ProcessWebhook implements ShouldQueue
         RefundRepositoryInterface $refundRepository,
         WebhookEventRepositoryInterface $webhookEventRepository
     ): void {
-        $eventType = strtolower($payload['event'] ?? $payload['eventType'] ?? $payload['event_type'] ?? '');
-        $data = $payload['data'] ?? $payload['resource'] ?? $payload;
-        $object = $data['object'] ?? $payload['payload']['refund']['entity'] ?? $data;
+        $eventType = $this->eventType($payload);
+        // Where a provider puts the refund: `data` (Paystack, Stripe, Paddle),
+        // `resource` (PayPal), `eventData` (Monnify), or the top level.
+        $body = new Payload($payload);
+        $data = $body->arrayOrNull('data') ?? $body->arrayOrNull('resource') ?? $body->arrayOrNull('eventData') ?? $payload;
+        $details = new Payload($data);
+        $object = new Payload($details->arrayOrNull('object') ?? $body->arrayOrNull('payload', 'refund', 'entity') ?? $data);
 
-        $refundReference = $object['id']
-            ?? $object['refund_reference']
-            ?? $data['refundReference']
-            ?? null;
+        $refundReference = $object->string('id')
+            ?? $object->string('refund_reference')
+            ?? $details->string('refundReference');
 
-        $transactionReference = $object['transaction_reference']
-            ?? $object['payment_intent']
-            ?? $data['transactionReference']
-            ?? (is_array($object['transaction'] ?? null) ? ($object['transaction']['reference'] ?? null) : null)
-            ?? $object['notes']['payzephyr_reference']
-            ?? ($provider === 'razorpay' ? ($object['payment_id'] ?? null) : null)
-            ?? null;
+        $transactionReference = $object->string('transaction_reference')
+            ?? $object->string('payment_intent')
+            ?? $details->string('transactionReference')
+            ?? $object->string('transaction', 'reference')
+            ?? $object->string('notes', 'payzephyr_reference')
+            ?? ($provider === 'razorpay' ? $object->string('payment_id') : null);
 
         if (! $refundReference) {
             $this->log('warning', 'Refund webhook missing refund reference', [
@@ -635,27 +650,27 @@ final class ProcessWebhook implements ShouldQueue
             return;
         }
 
-        $status = strtolower((string) ($object['status'] ?? $data['status'] ?? ''));
+        $status = strtolower($object->string('status') ?? $details->string('status') ?? $details->string('refundStatus') ?? '');
 
         if (
             str_contains($eventType, 'failed') ||
             in_array($status, ['failed', 'declined', 'error'], true)
         ) {
-            $reason = $object['reason'] ?? $object['message'] ?? $data['reason'] ?? 'Refund failed';
+            $reason = $object->string('reason') ?? $object->string('message') ?? $details->string('reason') ?? 'Refund failed';
 
-            $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::FAILED);
+            $this->persistRefundStatus($refundRepository, $refundReference, RefundStatus::FAILED);
 
-            if ($this->claimRefundOutcome($webhookEventRepository, (string) $refundReference, RefundStatus::FAILED)) {
-                $this->trace($transactionReference === null ? null : (string) $transactionReference, TraceEvent::REFUND_FAILED, TraceDirection::INBOUND,
-                    payload: ['stage' => 'settlement', 'refund_reference' => (string) $refundReference, 'reason' => (string) $reason],
+            if ($this->claimRefundOutcome($webhookEventRepository, $refundReference, RefundStatus::FAILED)) {
+                $this->trace($transactionReference, TraceEvent::REFUND_FAILED, TraceDirection::INBOUND,
+                    payload: ['stage' => 'settlement', 'refund_reference' => $refundReference, 'reason' => $reason],
                     provider: $provider,
                 );
 
                 RefundFailed::dispatch(
-                    (string) $refundReference,
-                    (string) ($transactionReference ?? ''),
+                    $refundReference,
+                    $transactionReference ?? '',
                     $provider,
-                    (string) $reason,
+                    $reason,
                     $data
                 );
             }
@@ -665,25 +680,25 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'completed') ||
             in_array($status, ['completed', 'succeeded', 'success', 'processed', 'refunded'], true)
         ) {
-            $this->persistRefundStatus($refundRepository, (string) $refundReference, RefundStatus::COMPLETED);
+            $this->persistRefundStatus($refundRepository, $refundReference, RefundStatus::COMPLETED);
 
-            if ($this->claimRefundOutcome($webhookEventRepository, (string) $refundReference, RefundStatus::COMPLETED)) {
-                $this->trace($transactionReference === null ? null : (string) $transactionReference, TraceEvent::PAYMENT_REFUNDED, TraceDirection::INBOUND,
-                    payload: ['refund_reference' => (string) $refundReference],
+            if ($this->claimRefundOutcome($webhookEventRepository, $refundReference, RefundStatus::COMPLETED)) {
+                $this->trace($transactionReference, TraceEvent::PAYMENT_REFUNDED, TraceDirection::INBOUND,
+                    payload: ['refund_reference' => $refundReference],
                     provider: $provider,
                 );
 
                 RefundCompleted::dispatch(
-                    (string) $refundReference,
-                    (string) ($transactionReference ?? ''),
+                    $refundReference,
+                    $transactionReference ?? '',
                     $provider,
                     $data
                 );
             }
         } else {
             RefundCreated::dispatch(
-                (string) $refundReference,
-                (string) ($transactionReference ?? ''),
+                $refundReference,
+                $transactionReference ?? '',
                 $provider,
                 $data
             );
@@ -747,8 +762,8 @@ final class ProcessWebhook implements ShouldQueue
 
     protected function persistRefundStatus(RefundRepositoryInterface $refundRepository, string $refundReference, RefundStatus $status): void
     {
-        $config = app('payments.config') ?? config('payments', []);
-        $loggingEnabled = $config['refunds']['logging']['enabled'] ?? ($config['logging']['enabled'] ?? true);
+        $config = PackageConfig::read();
+        $loggingEnabled = $config->flag($config->flag(true, 'logging', 'enabled'), 'refunds', 'logging', 'enabled');
 
         if (! $loggingEnabled) {
             return;

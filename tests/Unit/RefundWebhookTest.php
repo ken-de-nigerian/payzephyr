@@ -319,3 +319,60 @@ test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the
 
     expect($announced)->toBe(1);
 });
+
+/*
+ * Monnify nests a refund under eventData and names its state refundStatus.
+ * The job looked only in data and resource, so a Monnify refund webhook was
+ * logged as "missing refund reference" and dropped.
+ */
+
+function enableMonnifyForRefundWebhooks(): void
+{
+    config(['payments.providers.monnify' => [
+        'driver' => 'monnify', 'api_key' => 'k', 'secret_key' => 's', 'contract_code' => 'c',
+        'enabled' => true, 'currencies' => ['NGN'],
+    ]]);
+    app()->forgetInstance('payments.config');
+    app()->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+}
+
+test('a monnify successful-refund webhook completes the refund', function () {
+    enableMonnifyForRefundWebhooks();
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+    RefundTransaction::create([
+        'refund_reference' => 'RFND_MNFY_1', 'transaction_reference' => 'MNFY|20|1', 'provider' => 'monnify',
+        'status' => 'pending', 'amount' => 1000, 'currency' => 'NGN',
+    ]);
+
+    app()->call([new ProcessWebhook('monnify', ['eventType' => 'SUCCESSFUL_REFUND', 'eventData' => [
+        'refundReference' => 'RFND_MNFY_1', 'transactionReference' => 'MNFY|20|1', 'refundStatus' => 'COMPLETED',
+    ]]), 'handle']);
+
+    Event::assertDispatched(RefundCompleted::class, fn (RefundCompleted $event) => $event->refundReference === 'RFND_MNFY_1'
+        && $event->transactionReference === 'MNFY|20|1'
+        && $event->provider === 'monnify');
+    Event::assertNotDispatched(RefundCreated::class);
+    expect(RefundTransaction::where('refund_reference', 'RFND_MNFY_1')->value('status'))->toBe('completed');
+});
+
+test('a monnify failed-refund webhook fails the refund', function () {
+    enableMonnifyForRefundWebhooks();
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    app()->call([new ProcessWebhook('monnify', ['eventType' => 'FAILED_REFUND', 'eventData' => [
+        'refundReference' => 'RFND_MNFY_2', 'transactionReference' => 'MNFY|20|2', 'refundStatus' => 'FAILED',
+    ]]), 'handle']);
+
+    Event::assertDispatched(RefundFailed::class, fn (RefundFailed $event) => $event->refundReference === 'RFND_MNFY_2');
+    Event::assertNotDispatched(RefundCompleted::class);
+});
+
+test('a refund webhook whose reference is not a string or a number is dropped, not fatal', function () {
+    // The body is a provider's, or a forger's. An array where the id belongs
+    // used to be cast to the string "Array" and carried on as a reference.
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
+
+    app()->call([new ProcessWebhook('paystack', ['event' => 'refund.processed', 'data' => ['id' => ['nested'], 'status' => 'processed']]), 'handle']);
+
+    Event::assertNotDispatched(RefundCompleted::class);
+});

@@ -281,15 +281,23 @@ test('a zero-decimal currency is neither multiplied nor divided', function () {
     expect($driver->verify('txn_1')->amount)->toBe(5000.0);
 });
 
-test('the zero-decimal list matches the one PayPal already uses', function () {
+test('every zero-decimal currency is sent and read in its major unit', function (string $currency) {
     // A merchant adding KRW or ISK to their Paddle currencies would otherwise
-    // have amounts sent a hundred times too large.
-    $paddle = (new ReflectionClass(PaddleDriver::class))->getConstant('ZERO_DECIMAL_CURRENCIES');
+    // have amounts sent a hundred times too large. Each code is pinned, so
+    // dropping one from the list fails here.
+    $driver = paddleFixDriver([]);
+    $toMinor = new ReflectionMethod($driver, 'toMinorUnits');
+    $fromMinor = new ReflectionMethod($driver, 'fromMinorUnits');
 
-    expect($paddle)->toContain('KRW')
-        ->and($paddle)->toContain('ISK')
-        ->and($paddle)->toContain('XOF')
-        ->and($paddle)->toContain('JPY');
+    expect($toMinor->invoke($driver, 1500.0, $currency))->toBe('1500')
+        ->and($fromMinor->invoke($driver, '1500', strtolower($currency)))->toBe(1500.0);
+})->with(['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
+
+test('a currency with a minor unit is sent and read in hundredths', function () {
+    $driver = paddleFixDriver([]);
+
+    expect((new ReflectionMethod($driver, 'toMinorUnits'))->invoke($driver, 15.0, 'USD'))->toBe('1500')
+        ->and((new ReflectionMethod($driver, 'fromMinorUnits'))->invoke($driver, '1500', 'USD'))->toBe(15.0);
 });
 
 test('an unexpected failure during a charge is still reported as a charge failure', function () {

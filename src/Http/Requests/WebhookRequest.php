@@ -25,9 +25,6 @@ class WebhookRequest extends FormRequest
 
     private const UNVERIFIED_WARNING_CACHE_KEY = 'payzephyr:webhook:unverified_warning';
 
-    /** Matches the health endpoint's warning interval. */
-    private const UNVERIFIED_WARNING_INTERVAL_SECONDS = 3600;
-
     /**
      * Authorize webhook request.
      */
@@ -148,7 +145,8 @@ class WebhookRequest extends FormRequest
         }
 
         try {
-            if (! Cache::add(self::UNVERIFIED_WARNING_CACHE_KEY, true, self::UNVERIFIED_WARNING_INTERVAL_SECONDS)) {
+            // Once an hour, as the health endpoint warns.
+            if (! Cache::add(self::UNVERIFIED_WARNING_CACHE_KEY, true, 3600)) {
                 return;
             }
         } catch (Throwable) {

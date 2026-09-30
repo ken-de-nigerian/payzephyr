@@ -182,3 +182,40 @@ test('the disabled-verification warning is still logged when the cache cannot an
     expect($request->authorize())->toBeTrue()
         ->and(implode(' ', $logged))->toContain('DISABLED');
 });
+
+test('the disabled-verification warning repeats after an hour, not before', function () {
+    app()['env'] = 'production';
+    config(['payments.webhook.verify_signature' => false]);
+    app()->forgetInstance('payments.config');
+    Cache::flush();
+
+    $errors = 0;
+    Log::shouldReceive('channel')->andReturnSelf();
+    Log::shouldReceive('error')->andReturnUsing(function () use (&$errors) {
+        $errors++;
+
+        return true;
+    });
+    Log::shouldReceive('info', 'warning')->andReturnTrue();
+
+    $authorize = function (): void {
+        $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
+        $request->setContainer(app());
+        $request->setRouteResolver(fn () => new class
+        {
+            public function parameter(string $name): string
+            {
+                return 'paystack';
+            }
+        });
+        $request->authorize();
+    };
+
+    $authorize();
+    $this->travel(3599)->seconds();
+    $authorize();
+    $this->travel(2)->seconds();
+    $authorize();
+
+    expect($errors)->toBe(2);
+});

@@ -488,3 +488,24 @@ test('razorpay health check fails when razorpay cannot be reached', function () 
 
     expect($driver->healthCheck())->toBeFalse();
 });
+
+test('every currency is billed with the exponent Razorpay uses for it', function (string $currency, int $exponent) {
+    // Each code is pinned: dropping one from a list would bill it a hundred
+    // (or ten) times too much or too little.
+    $driver = RazorpayDriverTestHelper::driver();
+
+    expect((new ReflectionMethod($driver, 'currencyExponent'))->invoke($driver, strtolower($currency)))->toBe($exponent);
+})->with([
+    ['BIF', 0], ['CLP', 0], ['DJF', 0], ['GNF', 0], ['ISK', 0], ['JPY', 0], ['KMF', 0], ['KRW', 0],
+    ['PYG', 0], ['RWF', 0], ['UGX', 0], ['VND', 0], ['VUV', 0], ['XAF', 0], ['XOF', 0], ['XPF', 0],
+    ['BHD', 3], ['IQD', 3], ['JOD', 3], ['KWD', 3], ['OMR', 3], ['TND', 3],
+    ['INR', 2], ['USD', 2],
+]);
+
+test('razorpay charge accepts a reference of exactly 40 characters', function () {
+    $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
+
+    $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com', reference: str_repeat('A', 40)));
+
+    expect(json_decode((string) $history[0]['request']->getBody(), true)['reference_id'])->toBe(str_repeat('A', 40));
+});

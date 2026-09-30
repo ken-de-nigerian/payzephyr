@@ -300,6 +300,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Rector and mutation testing gate CI.** `composer rector` runs Rector as a dry run over
+  `src`; `composer mutation` runs Pest's mutation testing over the webhook verification path,
+  the webhook job and all ten drivers, and fails unless every one of its 2,754 mutations is
+  caught. PHPStan runs at level 10. See [ADR-0003](architecture/adr/0003-adr-process-and-quality-gates.md#outcome).
+
 - **Tracing now covers refunds and subscriptions.** A refund used to leave no trace rows at
   all. It is now recorded on the timeline of the payment it refunds - `refund.requested`, the
   provider round trip, `refund.accepted` or `refund.failed` (with the stage, and whether a

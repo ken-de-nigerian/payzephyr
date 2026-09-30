@@ -132,6 +132,41 @@ jobs:
       - name: Execute tests
         run: vendor/bin/pest --parallel
 
+  # Every mutation of the webhook trust boundary and the drivers must be
+  # caught by a test: the code that decides whether a delivery is genuine,
+  # fresh and new, and the code that turns a provider's answer into money.
+  # See ADR-0003. Pest's own mutation testing, since the suite is Pest.
+  mutation:
+    runs-on: ubuntu-latest
+    name: Mutation Testing
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: 8.4
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, intl, soap, gd, exif, iconv
+          coverage: pcov
+
+      - name: Configure dependencies for Laravel 12
+        run: |
+          composer require "laravel/framework:12.*" --no-interaction --no-update
+          composer require --dev "orchestra/testbench:10.*" --no-interaction --no-update
+          composer require --dev "pestphp/pest:^3.0" --no-interaction --no-update
+          composer require --dev "pestphp/pest-plugin-laravel:^3.0" --no-interaction --no-update
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare test environment
+        run: mkdir -p .phpunit.cache
+
+      - name: Run mutation testing
+        run: composer mutation
+
   coverage:
     runs-on: ubuntu-latest
     name: Coverage Report

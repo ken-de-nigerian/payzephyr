@@ -26,12 +26,6 @@ use Throwable;
  */
 final class SquareDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
-    /** Orders per page of the verify-by-reference search; Square allows up to 1000. */
-    private const ORDER_SEARCH_PAGE_SIZE = 500;
-
-    /** Default pages the verify-by-reference search reads before giving up. */
-    private const ORDER_SEARCH_MAX_PAGES = 10;
-
     use SquareRefundMethods;
     use SquareSubscriptionMethods;
 
@@ -364,7 +358,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     private function findOrderByReference(string $reference): array
     {
-        $maxPages = max(1, $this->settings()->int('verify_search_pages') ?? self::ORDER_SEARCH_MAX_PAGES);
+        // Ten pages of 500 by default: the five thousand most recent orders.
+        $maxPages = max(1, $this->settings()->int('verify_search_pages') ?? 10);
         $cursor = null;
         $searched = 0;
 
@@ -408,7 +403,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $response = $this->makeRequest('POST', '/v2/orders/search', [
                 'json' => array_filter([
                     'location_ids' => [$this->config['location_id']],
-                    'limit' => self::ORDER_SEARCH_PAGE_SIZE,
+                    // Square allows up to 1000 orders a page.
+                    'limit' => 500,
                     'cursor' => $cursor,
                     'query' => [
                         'filter' => [

@@ -371,3 +371,21 @@ test('a page limit that is not a positive number still searches one page', funct
     expect(fn () => $driver->verify('SQ_X'))->toThrow(VerificationException::class, 'in the 1 most recent Square orders');
     expect(squareSearchBodies($history))->toHaveCount(1);
 });
+
+test('square searches ten pages of five hundred orders by default', function () {
+    $history = [];
+    $pages = [squareNotFound()];
+    foreach (range(1, 11) as $page) {
+        $pages[] = squareOrdersPage(["ORDER_$page"], 'cursor_'.($page + 1)); // the eleventh is never requested
+    }
+
+    $driver = squareSearchDriver($pages, $history);
+
+    expect(fn () => $driver->verify('SQ_OLD'))
+        ->toThrow(VerificationException::class, 'in the 10 most recent Square orders');
+
+    $searches = squareSearchBodies($history);
+
+    expect($searches)->toHaveCount(10)
+        ->and(array_unique(array_column($searches, 'limit')))->toBe([500]);
+});

@@ -1,6 +1,6 @@
 # ADR-0003: Adopt ADRs and phase in PR quality gates
 
-- **Status**: Accepted (gates), Proposed (target end-state)
+- **Status**: Accepted; target end-state reached 2026-09-30 (see [Outcome](#outcome))
 - **Date**: 2026-07-31
 
 ## Problem
@@ -64,3 +64,32 @@ credibility of "gates are green" as a signal.
 ## Backward Compatibility
 
 N/A: process change, no code contract affected.
+
+## Outcome
+
+Every gate this ADR phased in is enforced in CI as of 2026-09-30:
+
+- **PHPStan level 10**, reached through levels 7, 8 and 9 each in its own commit, with no
+  baseline and no ignore comments. Reads of data PayZephyr did not write go through
+  `Support\Payload`, which is what made the upper levels reachable without casts. The level 7
+  and 8 commits were checked with a filter that missed errors reported inside traits; those
+  were found and cleared before level 9, whose check reads PHPStan's full output.
+- **Rector**, enforced as a dry run over `src`. `rector.php` lists the rules that are skipped
+  and why: each changes behaviour rather than style.
+- **Mutation testing at 100%** over the webhook trust boundary and the drivers:
+  `HasWebhookValidation`, `ProcessWebhook`, `WebhookRequest`, `WebhookController`,
+  `AbstractDriver` and all ten drivers - 2,754 mutations, every one caught. The scope is whole
+  classes rather than the `validateWebhook()`/`verify()` methods named above, because the tool
+  mutates classes; that is a superset.
+- **100% line coverage**, already in place before this outcome.
+
+One departure from the decision: mutation testing uses **Pest's `--mutate`**, not Infection.
+Infection 0.35 has no Pest adapter and needs PHP 8.3, while the package supports 8.2. Pest's
+plugin mutates by class, reads coverage from the same run, and gates with `--min`. Its one
+limitation is Windows, where it builds paths and a test filter the platform rejects; CI runs
+on Linux.
+
+Reaching 100% surfaced one class of gap coverage cannot see: class constants. A removed
+currency in a zero-decimal list, or a changed page size, is a mutation no coverage report maps
+to a test, because a constant's declaration never executes. Those values now live in the code
+that uses them, and tests pin every entry.

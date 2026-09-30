@@ -33,17 +33,6 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     protected string $name = 'paddle';
 
     /**
-     * Currencies Paddle bills in the major unit (no minor unit at all), so
-     * amounts are neither multiplied nor divided by 100.
-     *
-     * @var array<int, string>
-     */
-    private const ZERO_DECIMAL_CURRENCIES = [
-        'BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'MGA',
-        'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
-    ];
-
-    /**
      * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
@@ -369,7 +358,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function toMinorUnits(float $amount, string $currency): string
     {
-        if (in_array(strtoupper($currency), self::ZERO_DECIMAL_CURRENCIES, true)) {
+        if ($this->isZeroDecimal($currency)) {
             return (string) (int) round($amount);
         }
 
@@ -378,10 +367,22 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
 
     protected function fromMinorUnits(string|int|float $amount, string $currency): float
     {
-        if (in_array(strtoupper($currency), self::ZERO_DECIMAL_CURRENCIES, true)) {
+        if ($this->isZeroDecimal($currency)) {
             return (float) $amount;
         }
 
         return ((float) $amount) / 100;
+    }
+
+    /**
+     * Whether Paddle bills this currency in its major unit - it has no minor
+     * unit - so amounts are neither multiplied nor divided by 100.
+     *
+     * The list is here rather than in a constant so that mutation testing
+     * can see it: each code is exercised by a test, and removing one fails.
+     */
+    private function isZeroDecimal(string $currency): bool
+    {
+        return in_array(strtoupper($currency), ['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'], true);
     }
 }

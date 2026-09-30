@@ -36,43 +36,6 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     protected string $name = 'razorpay';
 
     /**
-     * Razorpay rejects a Payment Link `reference_id` longer than this.
-     */
-    private const MAX_REFERENCE_ID_LENGTH = 40;
-
-    /**
-     * Razorpay accepts at most 15 notes per entity, each value up to 256 characters.
-     */
-    private const MAX_NOTES = 15;
-
-    private const MAX_NOTE_LENGTH = 256;
-
-    /**
-     * The method groups a Payment Link's `options.checkout.method` can show or hide.
-     *
-     * @var array<int, string>
-     */
-    private const CHECKOUT_METHODS = ['card', 'netbanking', 'upi', 'wallet'];
-
-    /**
-     * Currencies Razorpay bills without a minor unit.
-     *
-     * @var array<int, string>
-     */
-    private const ZERO_DECIMAL_CURRENCIES = [
-        'BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW',
-        'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
-    ];
-
-    /**
-     * Currencies Razorpay bills in thousandths. The last digit of the amount
-     * must be 0, so these are only precise to the hundredth.
-     *
-     * @var array<int, string>
-     */
-    private const THREE_DECIMAL_CURRENCIES = ['BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'];
-
-    /**
      * Make sure both halves of the API key pair are configured.
      *
      * @throws InvalidConfigurationException
@@ -121,9 +84,12 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
         try {
             $reference = $request->reference ?? $this->generateReference('RAZORPAY');
 
-            if (strlen($reference) > self::MAX_REFERENCE_ID_LENGTH) {
+            // Razorpay rejects a Payment Link `reference_id` longer than this.
+            $maxReferenceLength = 40;
+
+            if (strlen($reference) > $maxReferenceLength) {
                 throw new ChargeException(
-                    'Razorpay references are limited to '.self::MAX_REFERENCE_ID_LENGTH." characters; [$reference] is ".strlen($reference).'.'
+                    "Razorpay references are limited to $maxReferenceLength characters; [$reference] is ".strlen($reference).'.'
                 );
             }
 
@@ -453,10 +419,14 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     protected function buildNotes(array $metadata, string $reference): array
     {
+        // Razorpay accepts at most 15 notes per entity, each value up to 256
+        // characters.
+        $maxNotes = 15;
+        $maxNoteLength = 256;
         $notes = ['payzephyr_reference' => $reference];
 
         foreach ($metadata as $key => $value) {
-            if (count($notes) >= self::MAX_NOTES) {
+            if (count($notes) >= $maxNotes) {
                 break;
             }
 
@@ -464,7 +434,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
                 continue;
             }
 
-            $notes[(string) $key] = mb_substr((string) $value, 0, self::MAX_NOTE_LENGTH);
+            $notes[(string) $key] = mb_substr((string) $value, 0, $maxNoteLength);
         }
 
         return $notes;
@@ -515,8 +485,10 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     private function buildCheckoutMethods(array $methods): array
     {
+        // The method groups a Payment Link's `options.checkout.method` can
+        // show or hide.
         $shown = [];
-        foreach (self::CHECKOUT_METHODS as $method) {
+        foreach (['card', 'netbanking', 'upi', 'wallet'] as $method) {
             $shown[$method] = in_array($method, $methods, true);
         }
 
@@ -554,11 +526,15 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     {
         $currency = strtoupper($currency);
 
-        if (in_array($currency, self::ZERO_DECIMAL_CURRENCIES, true)) {
+        // Billed without a minor unit. Each list is in the code, not a
+        // constant, so mutation testing can check that every entry is tested.
+        if (in_array($currency, ['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF'], true)) {
             return 0;
         }
 
-        if (in_array($currency, self::THREE_DECIMAL_CURRENCIES, true)) {
+        // Billed in thousandths. The last digit must be 0, so these are only
+        // precise to the hundredth.
+        if (in_array($currency, ['BHD', 'IQD', 'JOD', 'KWD', 'OMR', 'TND'], true)) {
             return 3;
         }
 

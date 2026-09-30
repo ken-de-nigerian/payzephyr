@@ -49,14 +49,18 @@ You don't need real payment provider credentials to work on PayZephyr itself: th
 # ...make your changes...
 
 composer test       # run the test suite (Pest)
-composer analyse     # static analysis (PHPStan)
-composer format      # auto-fix code style (Laravel Pint)
+composer analyse    # static analysis (PHPStan, level 10, no baseline)
+composer rector     # Rector, as a dry run: any change it would make is a failure
+composer format     # auto-fix code style (Laravel Pint)
+composer mutation   # mutation testing of the webhook and driver code (needs pcov)
 
-# all three together
-composer test && composer analyse && composer format
+# the everyday four together
+composer test && composer analyse && composer rector && composer format
 ```
 
-Run all three before opening a pull request: CI runs the same checks, and catching a formatting or static-analysis issue locally is faster than waiting for CI to tell you.
+Run them before opening a pull request: CI runs the same checks, and catching a formatting or static-analysis issue locally is faster than waiting for CI to tell you. CI also requires 100% line coverage (`vendor/bin/pest --coverage --min=100`).
+
+`composer mutation` changes each line of the webhook verification path, the webhook job and every driver in small ways - a `>` to `>=`, a removed array entry - and runs the tests that cover that line. Every change must make a test fail; one that does not is a behaviour no test pins, and CI fails until one does. It takes a couple of minutes, and needs the pcov extension. Pest's mutation plugin does not run reliably on Windows (it builds paths and a test filter Windows rejects); run it on Linux, macOS or WSL, or leave it to CI.
 
 ## Coding standards
 
@@ -116,9 +120,11 @@ chore: Update dependencies
 
 ## Before opening a pull request
 
-- [ ] `composer test` passes
-- [ ] `composer analyse` passes (no new PHPStan errors)
+- [ ] `composer test` passes, with 100% line coverage
+- [ ] `composer analyse` passes (PHPStan level 10; no baseline and no ignores)
+- [ ] `composer rector` reports nothing to change
 - [ ] `composer format` has been run (or your code already matches Pint's formatting)
+- [ ] `composer mutation` passes, if you touched webhook handling or a driver
 - [ ] Documentation is updated if behavior changed, including [CHANGELOG.md](CHANGELOG.md), and specifically calling out anything **breaking**
 - [ ] Your branch is rebased on (or merged with) the latest `main`
 

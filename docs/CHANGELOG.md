@@ -64,6 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Square plans with an introductory phase were read, and repriced, by it.** A plan variation
+  lists an introductory phase (one with `periods`) before the phase it bills on indefinitely.
+  The driver took `phases[0]` as the plan's price and cadence and repriced `phases[0]`, leaving
+  the price subscribers pay unchanged. It uses the first phase without `periods` now, or the
+  last when every phase ends.
+
+- **Listing Square subscriptions looked up the customer once per subscription.** Each
+  subscription names only its customer's id, so a page of fifty made fifty-one API calls, and a
+  listing already filtered to one customer looked that customer up again for every row.
+  Customers are looked up once per listing now.
+
 - **PayPal plans with a trial were read, and repriced, by their trial.** PayPal lists a trial
   cycle before the regular one. `fetchPlan()`/`listPlans()` took the first cycle as the plan's
   price and interval, so a yearly plan with a free first week reported itself as weekly and

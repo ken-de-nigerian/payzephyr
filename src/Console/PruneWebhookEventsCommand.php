@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Models\WebhookEvent;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 use function Laravel\Prompts\confirm;
 
@@ -173,10 +174,9 @@ final class PruneWebhookEventsCommand extends Command
             return (int) $override;
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $configured = data_get($config, 'webhook.events.retention_days');
+        $configured = PackageConfig::read()->float('webhook', 'events', 'retention_days');
 
-        return is_numeric($configured) ? (int) $configured : null;
+        return $configured === null ? null : (int) $configured;
     }
 
     private function chunkSize(): int

@@ -9,6 +9,7 @@ use Illuminate\Database\QueryException;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 use KenDeNigerian\PayZephyr\Services\Timeline;
 use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 /**
  * Answers "what happened to this payment?" from the command line.
@@ -90,9 +91,7 @@ final class TraceCommand extends Command
             return self::SUCCESS;
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-
-        if (! (data_get($config, 'features.trace') ?? false)) {
+        if (! PackageConfig::read()->flag(false, 'features', 'trace')) {
             $this->line('Tracing is switched off - set PAYZEPHYR_FEATURE_TRACE=true to record new payments.');
         } else {
             $this->line('Tracing is on, so this payment either predates it or was never traced.');

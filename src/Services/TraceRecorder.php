@@ -9,6 +9,7 @@ use KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface;
 use KenDeNigerian\PayZephyr\DataObjects\TraceEventDTO;
 use KenDeNigerian\PayZephyr\Jobs\RecordTraceEvent;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 use Throwable;
 
@@ -91,37 +92,25 @@ final readonly class TraceRecorder implements TraceRecorderInterface
      */
     private function recordAsync(TraceEventDTO $event): void
     {
-        $config = $this->config();
+        $queueConfig = PackageConfig::read()->at('trace', 'queue');
 
         $job = new RecordTraceEvent($event);
 
-        $connection = data_get($config, 'trace.queue.connection');
-        if (is_string($connection) && $connection !== '') {
+        $connection = $queueConfig->string('connection');
+        if ($connection !== null && $connection !== '') {
             $job->onConnection($connection);
         }
 
-        $queue = data_get($config, 'trace.queue.name', 'default');
-        dispatch($job->onQueue(is_string($queue) ? $queue : 'default'));
+        dispatch($job->onQueue($queueConfig->string('name') ?? 'default'));
     }
 
     private function isEnabled(): bool
     {
-        return (bool) (data_get($this->config(), 'features.trace') ?? false);
+        return PackageConfig::read()->flag(false, 'features', 'trace');
     }
 
     private function shouldRecordAsync(): bool
     {
-        return (bool) (data_get($this->config(), 'trace.async') ?? false);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function config(): array
-    {
-        /** @var array<string, mixed> $config */
-        $config = app('payments.config') ?? config('payments', []);
-
-        return $config;
+        return PackageConfig::read()->flag(false, 'trace', 'async');
     }
 }

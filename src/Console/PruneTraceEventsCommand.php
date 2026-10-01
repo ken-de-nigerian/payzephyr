@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Console;
 use Illuminate\Console\Command;
 use Illuminate\Database\QueryException;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 
 use function Laravel\Prompts\confirm;
 
@@ -103,10 +104,9 @@ final class PruneTraceEventsCommand extends Command
             return (int) $override;
         }
 
-        $config = app('payments.config') ?? config('payments', []);
-        $configured = data_get($config, 'trace.retention_days');
+        $configured = PackageConfig::read()->float('trace', 'retention_days');
 
-        return is_numeric($configured) ? (int) $configured : null;
+        return $configured === null ? null : (int) $configured;
     }
 
     private function chunkSize(): int

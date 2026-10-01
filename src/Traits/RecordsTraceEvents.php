@@ -10,6 +10,7 @@ use KenDeNigerian\PayZephyr\DataObjects\TraceEventDTO;
 use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use Throwable;
 
 /**
@@ -149,13 +150,11 @@ trait RecordsTraceEvents
     protected function traceRecordsHttpBodies(): bool
     {
         try {
-            $config = app('payments.config') ?? config('payments', []);
+            $config = PackageConfig::read();
 
-            if (! (data_get($config, 'features.trace') ?? false)) {
-                return false;
-            }
-
-            return (bool) (data_get($config, 'trace.record_http_bodies') ?? true);
+            // Read as switches: "false" is a truthy string, and used to keep
+            // provider request and response bodies being recorded.
+            return $config->flag(false, 'features', 'trace') && $config->flag(true, 'trace', 'record_http_bodies');
         } catch (Throwable) {
             return false;
         }

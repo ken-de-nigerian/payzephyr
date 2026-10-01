@@ -112,6 +112,15 @@ test('body capture can be switched off on its own', function () {
     expect(tracingSubject()->bodiesAllowed())->toBeFalse();
 });
 
+test('body capture switched off with the string an env file produces is off', function (string $off) {
+    // "false" is a truthy string; it used to leave provider request and
+    // response bodies being recorded after the operator had turned that off.
+    config(['payments.trace.record_http_bodies' => $off]);
+    app()->forgetInstance('payments.config');
+
+    expect(tracingSubject()->bodiesAllowed())->toBeFalse();
+})->with(['false', 'off', '0']);
+
 test('a well-formed step is recorded through the container binding', function () {
     tracingSubject()->record('PZ_1755000000_abcdef01', TraceEvent::PAYMENT_COMPLETED);
 

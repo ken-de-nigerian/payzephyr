@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
+use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Traits\HasConfigurableTableName;
 use KenDeNigerian\PayZephyr\Traits\LogsToPaymentChannel;
 
@@ -93,11 +94,9 @@ final class PaymentTraceEvent extends Model
      */
     public function getConnectionName(): ?string
     {
-        $config = app('payments.config') ?? config('payments', []);
+        $configured = PackageConfig::read()->string('trace', 'connection');
 
-        $configured = data_get($config, 'trace.connection');
-
-        if (is_string($configured) && $configured !== '') {
+        if ($configured !== null && $configured !== '') {
             return $configured;
         }
 

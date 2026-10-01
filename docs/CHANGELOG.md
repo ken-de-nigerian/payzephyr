@@ -64,6 +64,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Security: unsigned query-string input reached the webhook job, and defeated deduplication.**
+  The controller queued `$request->all()`, which merges the query string into the body. No
+  provider signs the query string. A captured genuine delivery replayed to
+  `/payments/webhook/paystack?x=1`, `?x=2`, ... passed signature verification each time and, for
+  every provider deduplicated by a hash of the body (Paystack, Flutterwave, Monnify, OPay),
+  hashed differently each time - so it was processed, and `WebhookReceived` fired, once per
+  replay. Only the body the provider signed is queued now.
+
 - **Refund and subscription webhooks were dropped for most providers.** The webhook job read the
   event name from `event`, `eventType` and `event_type`, and found a subscription only under
   Paystack's field names. Stripe and Square name the event in `type`, and every other provider

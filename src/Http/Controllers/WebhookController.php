@@ -24,7 +24,7 @@ final class WebhookController extends Controller
     public function handle(WebhookRequest $request, string $provider): JsonResponse
     {
         try {
-            $payload = $request->all();
+            $payload = $request->payload();
 
             ProcessWebhook::dispatch($provider, $payload, $request->headers->all());
 
@@ -41,7 +41,7 @@ final class WebhookController extends Controller
                 'trace' => $e->getTraceAsString(),
             ]);
 
-            $this->trace($this->referenceFor($provider, $request->all()), TraceEvent::WEBHOOK_QUEUE_FAILED, TraceDirection::INBOUND,
+            $this->trace($this->referenceFor($provider, $request->payload()), TraceEvent::WEBHOOK_QUEUE_FAILED, TraceDirection::INBOUND,
                 payload: ['error' => $e->getMessage(), 'error_class' => $e::class],
                 provider: $provider,
                 metadata: ['ip' => $request->ip()],

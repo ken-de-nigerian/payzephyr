@@ -26,6 +26,24 @@ class WebhookRequest extends FormRequest
     private const UNVERIFIED_WARNING_CACHE_KEY = 'payzephyr:webhook:unverified_warning';
 
     /**
+     * The delivery, as the provider sent and signed it: the JSON body, or a
+     * form body (Mollie's classic webhook is `id=tr_...`).
+     *
+     * Not all(). That merges the query string in, which no provider signs, so
+     * a captured genuine delivery replayed with `?x=1`, `?x=2`, ... reached the
+     * job with a different body each time - and for every provider deduplicated
+     * by a hash of the body, each one was new.
+     *
+     * @return array<array-key, mixed>
+     */
+    public function payload(): array
+    {
+        $decoded = json_decode($this->getContent(), true);
+
+        return is_array($decoded) ? $decoded : $this->request->all();
+    }
+
+    /**
      * Authorize webhook request.
      */
     public function authorize(): bool

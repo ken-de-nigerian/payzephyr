@@ -339,7 +339,7 @@ jobs:
           mkdir -p build/logs
 
       - name: Execute tests with coverage
-        run: vendor/bin/pest --coverage --min=100 --coverage-clover=build/logs/clover.xml --coverage-html=build/coverage --coverage-text=build/coverage.txt
+        run: vendor/bin/pest --coverage --min=100 --exclude-group=arch --coverage-clover=build/logs/clover.xml --coverage-html=build/coverage --coverage-text=build/coverage.txt
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3

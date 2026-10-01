@@ -4,6 +4,11 @@ use KenDeNigerian\PayZephyr\Tests\TestCase;
 
 uses(TestCase::class)->in('Feature', 'Unit', 'Integration');
 
+// Static checks of the source. They run with every suite, and are left out of
+// the coverage run (--exclude-group=arch): they cover nothing, and loading the
+// whole package under a coverage driver multiplies the report's size.
+uses(TestCase::class)->group('arch')->in('Arch');
+
 require_once __DIR__.'/Helpers/fake_drivers.php';
 require_once __DIR__.'/Helpers/webhook_requests.php';
 

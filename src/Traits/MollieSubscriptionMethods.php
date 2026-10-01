@@ -367,13 +367,13 @@ trait MollieSubscriptionMethods
                 }
             }
 
-            // The next page is named by the customer id it starts from.
-            parse_str(parse_url($body->string('_links', 'next', 'href') ?? '', PHP_URL_QUERY) ?: '', $next);
-            $from = Payload::of($next)->string('from');
-
-            if ($from === null) {
+            // The next page is named by the customer id it starts from, in the
+            // `from` parameter of its link.
+            if (preg_match('/[?&]from=([^&#]+)/', $body->string('_links', 'next', 'href') ?? '', $next) !== 1) {
                 return null;
             }
+
+            $from = rawurldecode($next[1]);
 
             $query['from'] = $from;
         }

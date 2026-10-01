@@ -35,7 +35,7 @@ trait SquareSubscriptionMethods
         try {
             $response = $this->makeRequest('POST', '/v2/catalog/batch-upsert', [
                 'json' => [
-                    'idempotency_key' => uniqid('square_plan_', true),
+                    'idempotency_key' => $this->newIdempotencyKey(),
                     'batches' => [[
                         'objects' => [
                             [
@@ -115,7 +115,7 @@ trait SquareSubscriptionMethods
                 data_set($planObject, 'subscription_plan_data.name', $name);
                 $this->makeRequest('POST', '/v2/catalog/object', [
                     'json' => [
-                        'idempotency_key' => uniqid('square_plan_upd_', true),
+                        'idempotency_key' => $this->newIdempotencyKey(),
                         'object' => $planObject,
                     ],
                 ]);
@@ -135,7 +135,7 @@ trait SquareSubscriptionMethods
 
                 $this->makeRequest('POST', '/v2/catalog/object', [
                     'json' => [
-                        'idempotency_key' => uniqid('square_plan_upd_', true),
+                        'idempotency_key' => $this->newIdempotencyKey(),
                         'object' => $variationObject,
                     ],
                 ]);
@@ -242,7 +242,7 @@ trait SquareSubscriptionMethods
             $customer = $this->findOrCreateSquareCustomer($request->customer);
 
             $payload = array_filter([
-                'idempotency_key' => $request->idempotencyKey ?? uniqid('square_sub_', true),
+                'idempotency_key' => $request->idempotencyKey ?? $this->newIdempotencyKey(),
                 'location_id' => $this->settings()->string('location_id'),
                 'plan_variation_id' => $request->plan,
                 'customer_id' => $this->requireString($customer, 'id', 'customer'),
@@ -535,7 +535,7 @@ trait SquareSubscriptionMethods
     {
         $response = $this->makeRequest('POST', '/v2/customers', [
             'json' => [
-                'idempotency_key' => uniqid('square_cust_', true),
+                'idempotency_key' => $this->newIdempotencyKey(),
                 'email_address' => $email,
             ],
         ]);

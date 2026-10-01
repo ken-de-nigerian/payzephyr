@@ -30,7 +30,7 @@ trait SquareRefundMethods
                 ] : $this->fetchOriginalPaymentAmountMoney($request->transactionReference);
 
             $payload = array_filter([
-                'idempotency_key' => $request->idempotencyKey ?? uniqid('square_refund_', true),
+                'idempotency_key' => $request->idempotencyKey ?? $this->newIdempotencyKey(),
                 'payment_id' => $request->transactionReference,
                 'amount_money' => $amountMoney,
                 'reason' => $request->reason,

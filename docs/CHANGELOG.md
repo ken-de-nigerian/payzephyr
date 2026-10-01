@@ -64,6 +64,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Square idempotency keys could collide.** Where the caller gave none, the Square driver made
+  one with `uniqid()`, which is built from the clock: two requests in the same microsecond could
+  share a key, and Square answers a repeated key with the first request's result. Keys are
+  random UUIDs now.
+
 - **Security: a credential that was not a string could leave webhooks signed with an empty key.**
   Drivers checked their config with `empty()`, which a non-string passes - `PAYSTACK_SECRET_KEY=true`
   reaches the config as boolean `true` - and then read the value as a string, found none, and

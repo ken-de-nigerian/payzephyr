@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
+use Illuminate\Support\Str;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
@@ -82,7 +83,7 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
         try {
 
             $payload = [
-                'idempotency_key' => $request->idempotencyKey ?? uniqid('square_', true),
+                'idempotency_key' => $request->idempotencyKey ?? $this->newIdempotencyKey(),
                 'order' => [
                     'location_id' => $this->config['location_id'],
                     'reference_id' => $reference,
@@ -431,6 +432,21 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             }
             throw $e;
         }
+    }
+
+    /**
+     * A fresh idempotency key for a request the caller gave none for.
+     *
+     * Square answers a repeated key with the first request's result, so a key
+     * must never be shared by two different requests. uniqid() is built from
+     * the clock: two processes in the same microsecond could send the same
+     * key and the second would be handed the first one's object. A random
+     * UUID cannot collide, and its 36 characters fit Square's 45-character
+     * limit.
+     */
+    private function newIdempotencyKey(): string
+    {
+        return Str::uuid()->toString();
     }
 
     /**

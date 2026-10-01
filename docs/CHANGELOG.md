@@ -25,6 +25,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   open. Closes the decision [ADR-0002](architecture/adr/0002-remove-insecure-defaults.md)
   deferred; see [ADR-0018](architecture/adr/0018-health-endpoint-auth-by-default.md).
 
+- **Breaking: Flutterwave webhooks need `FLUTTERWAVE_WEBHOOK_SECRET`.** Flutterwave signs
+  nothing; it sends back the Secret Hash set in its dashboard, and the driver compared it with
+  `webhook_secret` - which the shipped config filled from `FLUTTERWAVE_ENCRYPTION_KEY`, the
+  card-encryption key, not the Secret Hash - and, when that was empty, with the API secret key. A
+  driver set up as documented therefore accepted any delivery whose `verif-hash` header held the
+  secret key, and comparing an API credential with a header invites putting it in one. The config
+  reads `FLUTTERWAVE_WEBHOOK_SECRET` now, there is no fallback, and without it every Flutterwave
+  webhook is rejected and the rejection logged.
+
+- **Breaking: a Paystack subscription's `plan` is the plan's code.** It was the plan's *name* on
+  Paystack and the code on every other provider, so code comparing it with what it passed to
+  `->plan()` worked everywhere but Paystack, where the code was tucked into
+  `metadata['plan_code']`. `plan` holds the code now, and the name is the new `planName`.
+  `metadata` no longer carries a `plan_code` entry.
+
+- **Breaking: Paystack's `listSubscriptions()` and `listPlans()` return DTOs, like every other
+  provider's.** They returned Paystack's raw rows as a plain list. Both return
+  `['data' => [...DTOs], 'meta' => ...]` now - `SubscriptionResponseDTO`s and
+  `PlanResponseDTO`s - with Paystack's paging under `meta`. `SubscriptionQuery` no longer reads
+  raw rows: an entry that is not a `SubscriptionResponseDTO`, from a custom driver, matches no
+  filter.
+
+- **Breaking for custom repositories: `SubscriptionRepositoryInterface::openSubscriptionCodes()`.**
+  The PayPal duplicate check below reads the subscription log through it. A class implementing the
+  interface must add it; extending `EloquentSubscriptionRepository` needs nothing.
+
 ### Removed
 
 - **Breaking: `PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK`.** Nothing has read it since
@@ -32,6 +58,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   un-redacted. It was kept as public API pending a decision; this is that decision.
 
 ### Fixed
+
+- **Paystack's `listSubscriptions(customer: ...)` filtered by an email Paystack does not filter
+  by.** Paystack's `customer` filter takes its numeric customer id, and the email was sent as is,
+  so `forCustomer()` and the duplicate check did not get that customer's subscriptions. The email
+  is looked up first; a numeric id is passed through, and a customer Paystack does not know lists
+  nothing rather than failing.
+
+- **A Flutterwave subscription created for a returning customer could be reported as their old
+  one.** The subscription a tokenized charge creates is found by customer and plan, and the first
+  match was taken - possibly the customer's earlier, cancelled subscription to the same plan. The
+  active one is preferred now, then the newest.
+
+- **Every webhook's headers were queued with it.** Cookies and any `Authorization` header a
+  proxy added were serialized into the job, and kept wherever queued and failed jobs are stored,
+  for every provider. Only a provider whose signature is checked in the job (PayPal, Mollie
+  without a secret) gets headers now, and never credentials, cookies or CSRF tokens.
 
 - **Requiring health-endpoint authentication with only an IP allowlist refused everyone.** The
   production checklist said to set `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=true` with tokens *or*
@@ -56,11 +98,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`subscriptions.prevent_duplicates` did nothing on Stripe, Square, Mollie or Flutterwave.**
   Those drivers list subscriptions as `SubscriptionResponseDTO`s. The duplicate check indexed
   each one as an array - an `Error` on an object - which it caught, logged as "Failed to check
-  for duplicate subscriptions", and then allowed the subscription. Only Paystack, which returns
-  raw rows, was ever checked. Both shapes are read now, as `SubscriptionQuery` already did. When
-  the provider cannot list at all (PayPal), the exception now says that
-  `payments.subscriptions.prevent_duplicates` required the listing, instead of surfacing a bare
-  "PayPal does not provide an API to list subscriptions" from a subscribe call;
+  for duplicate subscriptions", and then allowed the subscription. Only Paystack, which returned
+  raw rows, was ever checked. Every driver lists DTOs now, and the check reads them. When the
+  listing fails, the exception says that `payments.subscriptions.prevent_duplicates` required
+  it, instead of surfacing the provider's bare message from a subscribe call;
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
@@ -75,9 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   computed signatures with `''`, a key anyone can sign with. This affected Paystack, Monnify,
   Stripe and Mollie webhooks. A credential must now be a non-empty string; anything else is
   missing, and a driver without a required one fails when it is built.
-
-- **A blank `FLUTTERWAVE_WEBHOOK_SECRET=` rejected every Flutterwave webhook.** It read as `''`,
-  which stopped the documented fallback to the secret key. It falls back now.
 
 - **A Paddle delivery signed during a secret rotation could be rejected.** The signature header
   can carry one `h1` per secret; only the last was kept. Any matching `h1` is accepted now.
@@ -353,6 +391,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rejected. See [ADR-0017](architecture/adr/0017-webhook-replay-model.md).
 
 ### Added
+
+- **`SubscriptionResponseDTO::$planName` and `$createdAt`**, filled where the provider reports
+  them, and carried by `toArray()`/`fromArray()` as `plan_name` and `created_at`.
+  `createdAfter()`/`createdBefore()` filter on `createdAt`. A DTO carried no creation time, so
+  on every provider but Paystack they kept every subscription.
+
+- **`subscriptions.prevent_duplicates` works on PayPal.** PayPal cannot list subscriptions, so
+  the setting refused every PayPal subscribe. The check reads the customer's subscriptions to the
+  plan from the subscription log, and fetches each that has not ended from PayPal for its current
+  status; with subscription logging off it refuses, saying why. A driver whose provider cannot
+  list marks itself with the new `HasNoSubscriptionListing` contract.
 
 - **CI runs the suite on MySQL and PostgreSQL, and the queue and cache paths on Redis.** The
   suite ran only on in-memory SQLite, with a synchronous queue and an array cache - none of which

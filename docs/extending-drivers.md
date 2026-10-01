@@ -283,7 +283,7 @@ final class AcmepayDriver extends AbstractDriver implements
 | `createPlan(SubscriptionPlanDTO $plan)` | `PlanResponseDTO` | Creates a recurring price |
 | `updatePlan(string $planCode, array $updates)` | `PlanResponseDTO` | Changes an existing plan |
 | `fetchPlan(string $planCode)` | `PlanResponseDTO` | Reads one plan back |
-| `listPlans(?int $perPage, ?int $page)` | `array` of `PlanResponseDTO` | Lists plans, paginated |
+| `listPlans(?int $perPage, ?int $page)` | `array`: `data` holds `PlanResponseDTO`s, other keys your provider's paging | Lists plans, paginated |
 
 ### Subscriptions
 
@@ -293,7 +293,7 @@ final class AcmepayDriver extends AbstractDriver implements
 | `fetchSubscription(string $subscriptionCode)` | `SubscriptionResponseDTO` | Reads one subscription back |
 | `cancelSubscription(SubscriptionActionDTO $action)` | `SubscriptionResponseDTO` | Stops future billing |
 | `enableSubscription(SubscriptionActionDTO $action)` | `SubscriptionResponseDTO` | Restarts it |
-| `listSubscriptions(?int $perPage, ?int $page, ?string $customer)` | `array` of `SubscriptionResponseDTO` | Lists subscriptions, optionally for one customer |
+| `listSubscriptions(?int $perPage, ?int $page, ?string $customer)` | `array`: `data` holds `SubscriptionResponseDTO`s, other keys your provider's paging | Lists subscriptions, optionally for one customer. If your provider cannot list, throw `SubscriptionException` and implement `HasNoSubscriptionListing`, so `prevent_duplicates` reads the subscription log instead |
 
 ## Step 3: the DTOs, field by field
 

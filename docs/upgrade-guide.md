@@ -65,6 +65,46 @@ webhooks - is now rejected, because Mollie signs those and there is nothing to c
 against. The classic webhook (a bare payment id, verified through the API) is unaffected. If you
 have set up next-gen webhooks, set the secret Mollie showed when you created them.
 
+### Required if you use Flutterwave: the webhook Secret Hash
+
+Set the Secret Hash from Flutterwave Dashboard → Settings → Webhooks:
+
+```env
+FLUTTERWAVE_WEBHOOK_SECRET=the-secret-hash-from-your-dashboard
+```
+
+Without it every Flutterwave webhook is now rejected, and the rejection is logged. The shipped
+config used to fill the webhook secret from `FLUTTERWAVE_ENCRYPTION_KEY`, and fall back to
+`FLUTTERWAVE_SECRET_KEY` when that was empty; neither is read for webhooks any more. If you set
+your dashboard's Secret Hash to one of those values to make webhooks pass, choose a new random
+value, set it in both places, and keep your API secret key out of the dashboard's webhook
+settings.
+
+### Required if you use Paystack subscriptions: `plan` is the plan's code
+
+A Paystack `SubscriptionResponseDTO::$plan` held the plan's name; it holds the plan's code now,
+as on every other provider, and the name is `$planName`. If you displayed `$subscription->plan`
+as a name, show `$planName`; if you read `$subscription->metadata['plan_code']`, read `$plan`.
+
+Paystack's `listSubscriptions()` and `listPlans()` - and `SubscriptionQuery::get()` on Paystack -
+return `['data' => [...], 'meta' => ...]` with DTOs under `data`, instead of Paystack's raw rows
+as a plain list:
+
+```php
+// Before
+foreach (Payment::subscriptions()->from('paystack')->get() as $row) {
+    $row['subscription_code'];
+}
+
+// After
+foreach (Payment::subscriptions()->from('paystack')->get()['data'] as $subscription) {
+    $subscription->subscriptionCode;
+}
+```
+
+Rows already in `subscription_transactions` keep whatever `plan_code` they were written with.
+Paystack rows written before this release hold the code, so nothing needs migrating.
+
 ### Check your config: switches written as text are now read as what they say
 
 Every on/off setting is read the same way: `true`, `"true"`, `"on"`, `"yes"`, `"1"` and `1` are on;
@@ -87,10 +127,11 @@ Credentials must be non-empty strings. A provider whose key, secret or id is any
 
 ### If you use `subscriptions.prevent_duplicates`
 
-It now works on Stripe, Square, Mollie and Flutterwave; before, it only ever checked Paystack. A
-subscribe that would duplicate an active or non-renewing subscription to the same plan is refused
-with `SubscriptionException`. It still cannot be used with PayPal, which has no API for listing
-subscriptions; see [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions).
+It now works on every subscription provider; before, it only ever checked Paystack. A subscribe
+that would duplicate an active or non-renewing subscription to the same plan is refused with
+`SubscriptionException`. On PayPal, which cannot list subscriptions, it reads the subscription
+log and asks PayPal for each candidate's status, so keep `payments.subscriptions.logging.enabled`
+on; see [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions).
 
 ### If you listen for refund or subscription events
 
@@ -130,8 +171,18 @@ idempotent, as queued listeners must be anyway. Also:
 It is removed. Nothing in PayZephyr had read it since log sanitization stopped skipping short
 strings; if your code used the value, inline `20`.
 
+### If you bind your own `SubscriptionRepositoryInterface`
+
+Add `openSubscriptionCodes(string $provider, string $customerEmail, string $planCode): array`:
+the codes of the logged subscriptions that customer holds to that plan with that provider whose
+status is not `cancelled`, `completed` or `expired`, newest first. A class extending
+`EloquentSubscriptionRepository` already has it.
+
 ### If you wrote a custom driver
 
+- `listSubscriptions()` must return `SubscriptionResponseDTO`s under `data`. Raw provider rows
+  are no longer read by `SubscriptionQuery` or the duplicate check. If your provider cannot list
+  subscriptions, throw `SubscriptionException` and implement `HasNoSubscriptionListing`.
 - `extractWebhookEventId()` must return an id for the **event**, or `null` - never the id of the
   payment or subscription it is about, or later events for that object are dropped as
   duplicates. The default no longer reads a top-level `payment_id`.

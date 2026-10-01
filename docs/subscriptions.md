@@ -76,13 +76,13 @@ Paystack and PayPal don't need this step in the same way: Paystack's own hosted 
 
 ### Preventing duplicate subscriptions
 
-Set `PAYMENTS_SUBSCRIPTIONS_PREVENT_DUPLICATES=true` and `subscribe()` first lists the customer's subscriptions with the provider, refusing with a `SubscriptionException` if one to the same plan is `active` or `non-renewing`. It is off by default, since it costs a provider call on every subscribe.
+Set `PAYMENTS_SUBSCRIPTIONS_PREVENT_DUPLICATES=true` and `subscribe()` first lists the customer's subscriptions with the provider, refusing with a `SubscriptionException` if one to the same plan is `active` or `non-renewing`. It is off by default, since it costs a provider call on every subscribe (two on Paystack, which needs the customer's id looked up from their email first).
 
 Three things to know before turning it on:
 
 - **It is a check, then a create - not a lock.** Two requests arriving together can both pass the check. For a retried or double-submitted request, `->idempotency()` is the guard; this setting is for the customer who subscribes again next week.
 - **If the provider will not list, the subscribe fails.** The check was asked for and could not be made, so PayZephyr does not create the subscription; the exception says `payments.subscriptions.prevent_duplicates` required the listing, and carries the provider's reason.
-- **It cannot be used with PayPal.** PayPal has no API for listing subscriptions, so with the setting on every PayPal subscribe fails in the way just described. The setting is global, not per provider: if PayPal is one of yours, leave it off and check your own records - the `subscription_transactions` table holds `customer_email`, `plan_code` and `status` for every subscription PayZephyr created.
+- **On PayPal it reads your subscription log.** PayPal has no API for listing subscriptions, so the check takes the customer's subscriptions to the plan from the `subscription_transactions` table PayZephyr writes on every subscribe, and fetches each one that has not ended from PayPal for its current status - the logged status is the one at create, and PayPal does not tell the log when the customer approves. Two consequences: a subscription created outside PayZephyr is not seen, and subscription logging (`payments.subscriptions.logging.enabled`) must be on; with it off, every PayPal subscribe fails as just described.
 
 ### What you get back
 
@@ -90,7 +90,9 @@ Three things to know before turning it on:
 $subscription->subscriptionCode;   // save this - it's how you reference this subscription later
 $subscription->status;             // "active", "cancelled", "non-renewing", etc.
 $subscription->customer;
-$subscription->plan;
+$subscription->plan;               // the plan's code - what you pass to ->plan() - on every provider
+$subscription->planName;           // ?string - the plan's name, where the provider reports one
+$subscription->createdAt;          // ?string - when the provider created it, where it reports that
 $subscription->amount;             // ?float - null for a metered or usage-based plan, never 0 in its place
 $subscription->nextPaymentDate;
 $subscription->emailToken;         // Paystack-specific, see below
@@ -158,7 +160,7 @@ $activeSubscriptions = Payment::subscriptions()
     ->forCustomer('customer@example.com')
     ->active()
     ->from('stripe')
-    ->get(); // ['data' => SubscriptionResponseDTO[], 'has_more' => bool]
+    ->get(); // ['data' => SubscriptionResponseDTO[], ...the provider's paging keys]
 
 $count = Payment::subscriptions()->forPlan($plan->planCode)->count();
 $exists = Payment::subscriptions()->forCustomer('customer@example.com')->exists();
@@ -166,7 +168,7 @@ $exists = Payment::subscriptions()->forCustomer('customer@example.com')->exists(
 
 Available filters: `forCustomer()`, `forPlan()`, `whereStatus()`, `active()`, `cancelled()`, `createdAfter()`, `createdBefore()`, plus `take()`/`page()` for pagination and `from()` to scope the query to one provider. Terminal methods: `get()`, `first()`, `count()`, `exists()`.
 
-`get()` returns what the driver's listing returns. For Stripe, Square, Mollie and Flutterwave that is an array whose `data` key holds `SubscriptionResponseDTO`s. **Paystack is the exception:** it returns Paystack's own rows as a plain list of arrays, unmapped. `first()` gives you a `SubscriptionResponseDTO` either way, and the filters and `count()` read both shapes, so reach for those rather than indexing into `get()` if your code has to work across providers.
+`get()` returns what the driver's listing returns: an array whose `data` key holds `SubscriptionResponseDTO`s, next to the provider's own paging information - `has_more` on Stripe, Square and Mollie, `meta` on Paystack and Flutterwave. `forPlan()` matches the plan's code and `createdAfter()`/`createdBefore()` read `createdAt`, so a subscription whose provider does not report when it was created is kept by the date filters rather than dropped.
 
 ## Managing plans
 

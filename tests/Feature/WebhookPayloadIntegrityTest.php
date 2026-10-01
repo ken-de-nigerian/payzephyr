@@ -59,3 +59,43 @@ test('a form-encoded delivery reaches the job as its form fields', function () {
 
     Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job) => $job->payload === ['id' => 'tr_form']);
 });
+
+/*
+ * Every header of every delivery used to ride onto the queue - cookies, an
+ * Authorization header added by a proxy - and sit in whatever stores queued
+ * jobs. Only a provider whose signature is checked in the job needs them.
+ */
+
+test('a delivery verified before it is queued carries no headers onto the queue', function () {
+    Queue::fake();
+    [$json, $server] = signedPaystackDelivery(['event' => 'charge.success', 'data' => ['reference' => 'NO_HEADERS', 'status' => 'success']]);
+
+    $this->call('POST', '/payments/webhook/paystack', [], ['session' => 'abc'], [], $server + ['HTTP_AUTHORIZATION' => 'Bearer proxy'], $json)
+        ->assertStatus(202);
+
+    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job) => $job->headers === []);
+});
+
+test('a delivery verified in the job carries its headers, without credentials or cookies', function () {
+    Queue::fake();
+    config(['payments.providers.mollie.webhook_secret' => null]);
+    app()->forgetInstance('payments.config');
+
+    $this->call('POST', '/payments/webhook/mollie', ['id' => 'tr_headers'], ['session' => 'abc'], [], [
+        'CONTENT_TYPE' => 'application/x-www-form-urlencoded',
+        'HTTP_AUTHORIZATION' => 'Bearer proxy',
+        'HTTP_PROXY_AUTHORIZATION' => 'Basic cHJveHk=',
+        'HTTP_COOKIE' => 'session=abc',
+        'HTTP_X_CSRF_TOKEN' => 'csrf',
+        'HTTP_X_XSRF_TOKEN' => 'xsrf',
+        'HTTP_USER_AGENT' => 'Mollie/1.0',
+    ], 'id=tr_headers')->assertStatus(202);
+
+    Queue::assertPushed(ProcessWebhook::class, function (ProcessWebhook $job): bool {
+        expect($job->headers)->toHaveKey('user-agent')
+            ->and($job->headers['content-type'])->toBe(['application/x-www-form-urlencoded'])
+            ->and($job->headers)->not->toHaveKeys(['authorization', 'proxy-authorization', 'cookie', 'x-csrf-token', 'x-xsrf-token']);
+
+        return true;
+    });
+});

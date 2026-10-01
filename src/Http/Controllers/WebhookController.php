@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
@@ -26,7 +27,7 @@ final class WebhookController extends Controller
         try {
             $payload = $request->payload();
 
-            ProcessWebhook::dispatch($provider, $payload, $request->headers->all());
+            ProcessWebhook::dispatch($provider, $payload, $this->headersForJob($provider, $request));
 
             $this->log('info', 'Webhook queued for processing', [
                 'provider' => $provider,
@@ -49,6 +50,34 @@ final class WebhookController extends Controller
 
             return response()->json(['message' => 'Webhook received but queuing failed internally'], HttpStatusCodes::INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * The request headers the queued job needs: none, unless this provider's
+     * signature is checked in the job (PayPal, Mollie without a secret).
+     *
+     * Every header used to be serialized onto the queue - cookies, an
+     * Authorization header from a proxy - and kept in whatever stores queued
+     * jobs, for every provider. Even when the job does need the headers to
+     * verify a signature, it never needs credentials or cookies.
+     *
+     * @return array<string, list<string|null>>
+     */
+    private function headersForJob(string $provider, WebhookRequest $request): array
+    {
+        try {
+            $driver = app(PaymentManager::class)->driver($provider);
+        } catch (Throwable) {
+            return [];
+        }
+
+        if (! $driver instanceof RequiresAsyncWebhookVerification || ! $driver->requiresAsyncVerification()) {
+            return [];
+        }
+
+        return array_diff_key($request->headers->all(), array_flip([
+            'authorization', 'proxy-authorization', 'cookie', 'x-csrf-token', 'x-xsrf-token',
+        ]));
     }
 
     /**

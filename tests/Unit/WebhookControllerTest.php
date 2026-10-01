@@ -214,7 +214,8 @@ test('webhook controller handles invalid provider gracefully', function () {
     $response = $controller->handle($request, 'invalid_provider');
 
     expect($response->getStatusCode())->toBe(202);
-    Queue::assertPushed(ProcessWebhook::class);
+    // No driver to say its signature is checked in the job, so no headers.
+    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job): bool => $job->headers === []);
 });
 
 test('webhook controller handles exceptions during processing', function () {

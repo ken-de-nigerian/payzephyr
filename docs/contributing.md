@@ -58,7 +58,7 @@ composer mutation   # mutation testing of the webhook and driver code (needs pco
 composer test && composer analyse && composer rector && composer format
 ```
 
-Run them before opening a pull request: CI runs the same checks, and catching a formatting or static-analysis issue locally is faster than waiting for CI to tell you. CI also requires 100% line coverage (`vendor/bin/pest --coverage --min=100`).
+Run them before opening a pull request: CI runs the same checks, and catching a formatting or static-analysis issue locally is faster than waiting for CI to tell you. CI also requires 100% line coverage (`vendor/bin/pest --coverage --min=100 --exclude-group=arch`; the architecture tests in `tests/Arch` cover no lines and are left out of that run). Those architecture tests run with every suite: Pest's `php` and `security` presets, strict types everywhere, and the structural rules in the file.
 
 The suite runs on in-memory SQLite. CI runs it again on MySQL and PostgreSQL, since row locks, unique-violation detection and decimal sums are where those differ; to do the same locally, point it at an empty database:
 

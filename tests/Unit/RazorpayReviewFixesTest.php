@@ -171,20 +171,22 @@ test('a Razorpay refund webhook resolves its reference from the notes', function
     Event::assertDispatched(RefundCompleted::class, fn ($e) => $e->transactionReference === 'PZ_123');
 });
 
-test('a Square refund webhook is left exactly as it was', function () {
-    // payment_id is deliberately not a fallback in the shared chain: Square's
-    // refund webhooks carry one, and reading it would silently change the
-    // reference those events have always dispatched from '' to a Square id.
+test('a Square refund webhook reports the payment it refunds', function () {
+    // Square refunds are made against a payment id, and refund_transactions
+    // records that id as the refund's transaction reference. The event used
+    // to carry '' instead - and, in Square's real shape, nested one level
+    // deeper than the job looked, it never fired at all.
     Event::fake();
 
     app()->call([new ProcessWebhook('square', [
-        'event_type' => 'refund.updated',
-        'data' => ['object' => [
+        'type' => 'refund.updated',
+        'data' => ['type' => 'refund', 'id' => 'sq_refund_1', 'object' => ['refund' => [
             'id' => 'sq_refund_1', 'status' => 'COMPLETED', 'payment_id' => 'sq_payment_999',
-        ]],
+        ]]],
     ]), 'handle']);
 
-    Event::assertDispatched(RefundCompleted::class, fn ($e) => $e->transactionReference === '');
+    Event::assertDispatched(RefundCompleted::class, fn ($e) => $e->refundReference === 'sq_refund_1'
+        && $e->transactionReference === 'sq_payment_999');
 });
 
 // ---------------------------------------------------------------------------

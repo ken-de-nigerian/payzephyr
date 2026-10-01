@@ -72,12 +72,12 @@ This is the most important thing to understand before you build a refund flow: n
 | Provider | Initial response | Final confirmation |
 |---|---|---|
 | Paystack | Queued (`pending`/`processing`) | `refund.processed` / `refund.failed` webhook |
-| Stripe | Often immediate (`succeeded`) for card refunds, `pending` for some payment methods | `charge.refunded` / `refund.updated` webhook if not immediate |
+| Stripe | Often immediate (`succeeded`) for card refunds, `pending` for some payment methods | `refund.updated` / `charge.refund.updated` webhook if not immediate (`charge.refunded` describes the charge, not the refund, and is not used) |
 | PayPal | Usually immediate (`COMPLETED`) | Webhook for edge cases |
 | Square | `PENDING` initially | `refund.updated` webhook |
 | Flutterwave | Immediate in most cases | - |
 | Mollie | `pending`/`processing` | Payment/refund status change, checked via `fetchRefund()` or webhook |
-| Paddle | `pending` (Paddle reviews most live refunds before approving them) | `adjustment.updated` webhook |
+| Paddle | `pending` (Paddle reviews most live refunds before approving them) | `adjustment.updated` webhook: `approved` completes it, `rejected` fails it, `reversed` cancels it |
 | Monnify | `PENDING` | Refund status webhook |
 | OPay | `PENDING` | Refund status webhook |
 | Razorpay | `pending` (instant refunds can already be `processed`) | `refund.processed` / `refund.failed` webhook |

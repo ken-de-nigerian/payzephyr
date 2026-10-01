@@ -165,7 +165,7 @@ final class ProcessWebhook implements ShouldQueue
 
             $this->log('info', "Webhook processed for $this->provider", [
                 'reference' => $reference,
-                'event' => $this->payload['event'] ?? $this->payload['eventType'] ?? $this->payload['event_type'] ?? 'unknown',
+                'event' => $this->eventType($this->payload) ?: 'unknown',
             ]);
         } catch (Throwable $e) {
             $this->log('error', 'Webhook processing failed', [
@@ -439,7 +439,12 @@ final class ProcessWebhook implements ShouldQueue
     }
 
     /**
-     * The event name, wherever this provider puts it, lower-cased.
+     * The event name, wherever this provider puts it, lower-cased: `event`
+     * (Paystack, Flutterwave, Razorpay), `eventType` (Monnify), `event_type`
+     * (PayPal, Paddle) or `type` (Stripe, Square, Mollie's typed webhooks).
+     *
+     * `type` was not read, so no Stripe or Square event was ever recognised
+     * as a refund or a subscription event.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -447,7 +452,63 @@ final class ProcessWebhook implements ShouldQueue
     {
         $body = new Payload($payload);
 
-        return strtolower($body->string('event') ?? $body->string('eventType') ?? $body->string('event_type') ?? '');
+        return strtolower($body->string('event') ?? $body->string('eventType') ?? $body->string('event_type') ?? $body->string('type') ?? '');
+    }
+
+    /**
+     * The object a webhook is about - the refund, the subscription, the
+     * invoice - wherever this provider nests it.
+     *
+     * Square: `data.object.{data.type}`. Stripe: `data.object`. Razorpay:
+     * `payload.{entity}.entity`. PayPal: `resource`. Monnify: `eventData`.
+     * Paystack, Flutterwave and Paddle: `data`. Anything else: the body.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function webhookSubject(array $payload, string $entity): Payload
+    {
+        $body = new Payload($payload);
+        $data = $body->arrayOrNull('data') ?? $body->arrayOrNull('resource') ?? $body->arrayOrNull('eventData') ?? $payload;
+        $details = new Payload($data);
+        $squareType = $details->string('type');
+
+        return new Payload(
+            ($squareType === null ? null : $details->arrayOrNull('object', $squareType))
+            ?? $details->arrayOrNull('object')
+            ?? $body->arrayOrNull('payload', $entity, 'entity')
+            ?? $data
+        );
+    }
+
+    /**
+     * The subscription a webhook is about.
+     *
+     * Paystack names it: `subscription_code`, or for an invoice event
+     * `subscription.subscription_code`. Elsewhere an invoice or a payment
+     * points at it - Stripe's `subscription` (or, from its 2025 API,
+     * `parent.subscription_details.subscription`), Square's and Paddle's
+     * `subscription_id`, a PayPal sale's `billing_agreement_id` - and a
+     * subscription event's subject is the subscription itself, so its `id` is
+     * the code.
+     *
+     * Only Paystack's names were read, so a subscription webhook from any
+     * other provider was logged as "missing subscription_code" and dropped.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function subscriptionCodeOf(array $payload, string $eventType): ?string
+    {
+        $details = new Payload(Payload::of($payload)->arrayOrNull('data') ?? $payload);
+        $subject = $this->webhookSubject($payload, 'subscription');
+
+        return $details->string('subscription_code')
+            ?? $details->string('subscriptionCode')
+            ?? $details->string('subscription', 'subscription_code')
+            ?? $subject->string('subscription')
+            ?? $subject->string('parent', 'subscription_details', 'subscription')
+            ?? $subject->string('subscription_id')
+            ?? $subject->string('billing_agreement_id')
+            ?? (str_contains($eventType, 'subscription') ? $subject->string('id') : null);
     }
 
     /**
@@ -463,6 +524,9 @@ final class ProcessWebhook implements ShouldQueue
             'subscription',
             'invoice.payment_failed',
             'invoice.payment_succeeded',
+            'invoice.paid',
+            'invoice.payment_made',             // Square
+            'invoice.scheduled_charge_failed',  // Square
         ];
 
         foreach ($subscriptionKeywords as $keyword) {
@@ -471,7 +535,11 @@ final class ProcessWebhook implements ShouldQueue
             }
         }
 
-        return false;
+        // A payment that belongs to a subscription: a PayPal sale with a
+        // billing agreement, a Paddle transaction with a subscription. Plain
+        // payments carry neither and are not subscription events.
+        return in_array($eventType, ['payment.sale.completed', 'transaction.completed'], true)
+            && $this->subscriptionCodeOf($payload, $eventType) !== null;
     }
 
     /**
@@ -486,8 +554,14 @@ final class ProcessWebhook implements ShouldQueue
         $eventType = $this->eventType($payload);
         $data = Payload::of($payload)->arrayOrNull('data') ?? $payload;
         $details = new Payload($data);
+        $subject = $this->webhookSubject($payload, 'subscription');
 
-        $subscriptionCode = $details->string('subscription_code') ?? $details->string('subscriptionCode') ?? $details->string('subscription');
+        $subscriptionCode = $this->subscriptionCodeOf($payload, $eventType);
+
+        // Square reports a cancellation as an update whose status is CANCELED
+        // (or DEACTIVATED), not as an event of its own.
+        $cancelledByStatus = str_contains($eventType, 'subscription.updated')
+            && in_array(strtoupper($subject->string('status') ?? ''), ['CANCELED', 'DEACTIVATED'], true);
 
         if (! $subscriptionCode) {
             $this->log('warning', 'Subscription webhook missing subscription_code', [
@@ -517,9 +591,16 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'subscription.success') ||
             str_contains($eventType, 'subscription.renewed') ||
             str_contains($eventType, 'invoice.payment_succeeded') ||
-            str_contains($eventType, 'invoice.paid')
+            str_contains($eventType, 'invoice.paid') ||
+            str_contains($eventType, 'invoice.payment_made') ||
+            $eventType === 'payment.sale.completed' ||
+            $eventType === 'transaction.completed'
         ) {
-            $invoiceReference = $details->string('reference') ?? $details->string('invoice_reference') ?? $details->string('invoiceReference') ?? '';
+            $invoiceReference = $details->string('reference')
+                ?? $details->string('invoice_reference')
+                ?? $details->string('invoiceReference')
+                ?? $subject->string('id')
+                ?? '';
 
             try {
                 $driver = $manager->driver($provider);
@@ -545,7 +626,8 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'subscription.disable') ||
             str_contains($eventType, 'subscription.cancel') ||
             str_contains($eventType, 'subscription.cancelled') ||
-            str_contains($eventType, 'customer.subscription.deleted')
+            str_contains($eventType, 'customer.subscription.deleted') ||
+            $cancelledByStatus
         ) {
             $this->trace($subscriptionCode, TraceEvent::SUBSCRIPTION_CANCELLED, TraceDirection::INBOUND,
                 payload: ['event' => $eventType],
@@ -560,7 +642,9 @@ final class ProcessWebhook implements ShouldQueue
         } elseif (
             str_contains($eventType, 'invoice.payment_failed') ||
             str_contains($eventType, 'payment.failed') ||
-            str_contains($eventType, 'subscription.payment_failed')
+            str_contains($eventType, 'subscription.payment_failed') ||
+            str_contains($eventType, 'invoice.scheduled_charge_failed') ||
+            str_contains($eventType, 'subscription.past_due')
         ) {
             $reason = $details->string('reason') ?? $details->string('message') ?? 'Payment failed';
 
@@ -601,7 +685,10 @@ final class ProcessWebhook implements ShouldQueue
     {
         $eventType = $this->eventType($payload);
 
-        return str_contains($eventType, 'refund') || str_contains($eventType, 'charge.refunded');
+        // Paddle reports a refund as an adjustment whose action is `refund`;
+        // no word in its event name says so.
+        return str_contains($eventType, 'refund')
+            || (str_starts_with($eventType, 'adjustment.') && Payload::of($payload)->string('data', 'action') === 'refund');
     }
 
     /**
@@ -628,7 +715,19 @@ final class ProcessWebhook implements ShouldQueue
         $body = new Payload($payload);
         $data = $body->arrayOrNull('data') ?? $body->arrayOrNull('resource') ?? $body->arrayOrNull('eventData') ?? $payload;
         $details = new Payload($data);
-        $object = new Payload($details->arrayOrNull('object') ?? $body->arrayOrNull('payload', 'refund', 'entity') ?? $data);
+        $object = $this->webhookSubject($payload, 'refund');
+
+        // Stripe's charge.refunded carries the charge, whose id is not a
+        // refund's. Stripe reports each refund in its own refund.* (and
+        // charge.refund.updated) event, which is where it is handled.
+        if ($object->string('object') === 'charge') {
+            $this->log('info', 'Refund webhook carries the charge, not a refund - left to the refund\'s own event', [
+                'provider' => $provider,
+                'event' => $eventType,
+            ]);
+
+            return;
+        }
 
         $refundReference = $object->string('id')
             ?? $object->string('refund_reference')
@@ -639,7 +738,8 @@ final class ProcessWebhook implements ShouldQueue
             ?? $details->string('transactionReference')
             ?? $object->string('transaction', 'reference')
             ?? $object->string('notes', 'payzephyr_reference')
-            ?? ($provider === 'razorpay' ? $object->string('payment_id') : null);
+            ?? $object->string('transaction_id')
+            ?? (in_array($provider, ['razorpay', 'square'], true) ? $object->string('payment_id') : null);
 
         if (! $refundReference) {
             $this->log('warning', 'Refund webhook missing refund reference', [
@@ -652,15 +752,20 @@ final class ProcessWebhook implements ShouldQueue
 
         $status = strtolower($object->string('status') ?? $details->string('status') ?? $details->string('refundStatus') ?? '');
 
+        // `reversed`: a Paddle adjustment undone after it was approved.
+        $cancelled = in_array($status, ['canceled', 'cancelled', 'reversed'], true);
+
         if (
+            $cancelled ||
             str_contains($eventType, 'failed') ||
-            in_array($status, ['failed', 'declined', 'error'], true)
+            in_array($status, ['failed', 'declined', 'error', 'rejected'], true)
         ) {
-            $reason = $object->string('reason') ?? $object->string('message') ?? $details->string('reason') ?? 'Refund failed';
+            $outcome = $cancelled ? RefundStatus::CANCELLED : RefundStatus::FAILED;
+            $reason = $object->string('reason') ?? $object->string('failure_reason') ?? $object->string('message') ?? $details->string('reason') ?? ($cancelled ? 'Refund cancelled' : 'Refund failed');
 
-            $this->persistRefundStatus($refundRepository, $refundReference, RefundStatus::FAILED);
+            $this->persistRefundStatus($refundRepository, $refundReference, $outcome);
 
-            if ($this->claimRefundOutcome($webhookEventRepository, $refundReference, RefundStatus::FAILED)) {
+            if ($this->claimRefundOutcome($webhookEventRepository, $refundReference, $outcome)) {
                 $this->trace($transactionReference, TraceEvent::REFUND_FAILED, TraceDirection::INBOUND,
                     payload: ['stage' => 'settlement', 'refund_reference' => $refundReference, 'reason' => $reason],
                     provider: $provider,
@@ -678,7 +783,8 @@ final class ProcessWebhook implements ShouldQueue
             str_contains($eventType, 'processed') ||
             str_contains($eventType, 'refunded') ||
             str_contains($eventType, 'completed') ||
-            in_array($status, ['completed', 'succeeded', 'success', 'processed', 'refunded'], true)
+            // `approved`: a Paddle adjustment, which Paddle has made.
+            in_array($status, ['completed', 'succeeded', 'success', 'processed', 'refunded', 'approved'], true)
         ) {
             $this->persistRefundStatus($refundRepository, $refundReference, RefundStatus::COMPLETED);
 
@@ -711,21 +817,6 @@ final class ProcessWebhook implements ShouldQueue
         ]);
     }
 
-    /**
-     * Persist a webhook-confirmed terminal refund status to
-     * refund_transactions, so the local row - and the duplicate/over-refund
-     * guards in RefundValidator that depend on it - actually reflects
-     * reality for providers that confirm refunds asynchronously (Paystack,
-     * Stripe, Square, ...). Without this, RefundCompleted/RefundFailed only
-     * ever fired as an in-memory event and the local row stayed "pending"
-     * forever unless the application separately called Refund::fetch().
-     *
-     * Best-effort and additive only: skips silently (via
-     * updateStatusIfExists()) when the row doesn't exist locally, when
-     * refund logging is disabled, or when the repository call itself
-     * fails - a webhook must never fail webhook processing over a
-     * bookkeeping write.
-     */
     /**
      * Claim the right to announce a refund's outcome, so RefundCompleted or
      * RefundFailed fires once per refund however many webhooks report it.
@@ -760,6 +851,21 @@ final class ProcessWebhook implements ShouldQueue
         return false;
     }
 
+    /**
+     * Persist a webhook-confirmed terminal refund status to
+     * refund_transactions, so the local row - and the duplicate/over-refund
+     * guards in RefundValidator that depend on it - actually reflects
+     * reality for providers that confirm refunds asynchronously (Paystack,
+     * Stripe, Square, ...). Without this, RefundCompleted/RefundFailed only
+     * ever fired as an in-memory event and the local row stayed "pending"
+     * forever unless the application separately called Refund::fetch().
+     *
+     * Best-effort and additive only: skips silently (via
+     * updateStatusIfExists()) when the row doesn't exist locally, when
+     * refund logging is disabled, or when the repository call itself
+     * fails - a webhook must never fail webhook processing over a
+     * bookkeeping write.
+     */
     protected function persistRefundStatus(RefundRepositoryInterface $refundRepository, string $refundReference, RefundStatus $status): void
     {
         $config = PackageConfig::read();

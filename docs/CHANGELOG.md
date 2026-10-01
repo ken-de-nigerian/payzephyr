@@ -64,6 +64,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Refund and subscription webhooks were dropped for most providers.** The webhook job read the
+  event name from `event`, `eventType` and `event_type`, and found a subscription only under
+  Paystack's field names. Stripe and Square name the event in `type`, and every other provider
+  nests the subscription or refund elsewhere, so:
+  - Stripe and Square refund webhooks never completed or failed a refund, and Paddle's
+    `adjustment.updated` was never recognised as a refund at all;
+  - `SubscriptionCreated`, `SubscriptionRenewed`, `SubscriptionCancelled` and
+    `SubscriptionPaymentFailed` fired for Paystack only - a Stripe, PayPal, Square, Paddle or
+    Flutterwave subscription webhook was logged as "missing subscription_code" and dropped.
+
+  The job now reads `type`, finds the object each provider's webhook is about, and recognises
+  PayPal sale payments, Paddle subscription transactions and Square invoices as renewals or
+  failed renewals, and a Square `subscription.updated` to `CANCELED` as a cancellation. A
+  refund cancelled at the provider (`canceled`, Paddle's `reversed`) is recorded as
+  `cancelled` and announced with `RefundFailed`. Stripe's `charge.refunded` is no longer read
+  as a refund: it carries the charge, whose id is not the refund's; the refund's own
+  `refund.updated` or `charge.refund.updated` settles it. `RefundCompleted` for a Square refund
+  now carries the refunded payment id rather than an empty transaction reference.
+
 - **Security: an unsigned Mollie `hook.ping` was accepted.** Without `MOLLIE_WEBHOOK_SECRET`,
   Mollie webhooks are verified by looking the posted payment id up through the API. A typed
   event names no payment, and `hook.ping` was accepted without any check at all - so anyone could

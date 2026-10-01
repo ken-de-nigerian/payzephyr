@@ -25,6 +25,25 @@ final class HealthEndpointMiddleware
     private const MISCONFIGURED_WARNING_INTERVAL_SECONDS = 3600;
 
     /**
+     * An allowlist as configured, read for comparison.
+     *
+     * The env variables are comma-separated, and `1.2.3.4, 5.6.7.8` split into
+     * `" 5.6.7.8"`, which no address matches - so the second entry was refused
+     * however it was written. Entries are trimmed, and empty ones dropped (a
+     * trailing comma). Only a string can be an address or a token; anything
+     * else in the list is ignored rather than compared.
+     *
+     * @param  array<array-key, mixed>  $entries
+     * @return list<string>
+     */
+    private function allowList(array $entries): array
+    {
+        $trimmed = array_map(trim(...), array_filter($entries, is_string(...)));
+
+        return array_values(array_filter($trimmed, fn (string $entry): bool => $entry !== ''));
+    }
+
+    /**
      * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next): Response
@@ -32,10 +51,8 @@ final class HealthEndpointMiddleware
         $healthConfig = PackageConfig::read()->at('health_check');
 
         $requiresAuth = $healthConfig->flag(false, 'require_auth');
-        // Only a string can be an address or a token; anything else in the
-        // list is ignored rather than compared.
-        $allowedIps = array_values(array_filter($healthConfig->array('allowed_ips'), is_string(...)));
-        $allowedTokens = array_values(array_filter($healthConfig->array('allowed_tokens'), is_string(...)));
+        $allowedIps = $this->allowList($healthConfig->array('allowed_ips'));
+        $allowedTokens = $this->allowList($healthConfig->array('allowed_tokens'));
 
         if (! $requiresAuth && $allowedIps === [] && $allowedTokens === [] && ! app()->environment(['local', 'testing'])) {
             $this->warnOnceIfUnauthenticated();

@@ -328,6 +328,8 @@ trait FlutterwaveSubscriptionMethods
             'query' => ['email' => $customerEmail, 'plan' => $planCode],
         ]);
 
+        $matches = [];
+
         foreach (Payload::of($this->parseResponse($response))->array('data') as $item) {
             $subscription = Payload::of($item);
 
@@ -335,11 +337,18 @@ trait FlutterwaveSubscriptionMethods
                 $subscription->string('customer', 'email') === $customerEmail
                 && $this->flutterwavePlanId($subscription) === $planCode
             ) {
-                return $subscription->all();
+                $matches[] = $subscription;
             }
         }
 
-        return null;
+        // A customer who subscribed to this plan before has an older,
+        // cancelled subscription to it too, and taking the first match could
+        // return that one in place of the subscription just created. Prefer
+        // an active subscription, then the newest - Flutterwave's ids increase.
+        usort($matches, fn (Payload $a, Payload $b): int => [$b->string('status') === 'active', $b->int('id') ?? 0]
+            <=> [$a->string('status') === 'active', $a->int('id') ?? 0]);
+
+        return $matches === [] ? null : $matches[0]->all();
     }
 
     /**

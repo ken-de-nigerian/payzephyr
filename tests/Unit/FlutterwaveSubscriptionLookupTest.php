@@ -72,3 +72,28 @@ test('the subscription a charge created is looked up by customer and plan', func
         ->and($subscription->subscriptionCode)->toBe('8')
         ->and($subscription->plan)->toBe('3807');
 });
+
+test('the subscription a charge created is the customer\'s active one, newest first, not an older cancelled one', function () {
+    // A customer who subscribed to the plan before has an older, cancelled
+    // subscription to it too - listed here first, and newest last.
+    $row = fn (int $id, string $status): array => array_merge(flutterwaveSubscriptionRow($id, 'a@b.com', 3807), ['status' => $status]);
+    $history = [];
+    $driver = flutterwaveLookupDriver([
+        new Response(200, [], json_encode(['status' => 'success', 'data' => ['id' => 99]])),
+        new Response(200, [], json_encode(['status' => 'success', 'data' => [
+            $row(10, 'cancelled'),
+            $row(11, 'active'),
+            $row(12, 'active'),
+            $row(13, 'cancelled'),
+        ]])),
+    ], $history);
+
+    $subscription = $driver->createSubscription(new SubscriptionRequestDTO(
+        customer: 'a@b.com',
+        plan: '3807',
+        authorization: 'flw-t1nf-token-1234',
+    ));
+
+    expect($subscription->subscriptionCode)->toBe('12')
+        ->and($subscription->status)->toBe('active');
+});

@@ -54,7 +54,7 @@ and the reason is logged once an hour.
 - **Breaking** for installs that do not publish `config/payments.php` and run outside
   local/testing with no tokens or IPs configured: the health endpoint now answers 401. Migration:
   set `PAYMENTS_HEALTH_CHECK_ALLOWED_TOKENS` or `PAYMENTS_HEALTH_CHECK_ALLOWED_IPS`, or set
-  `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=false` to keep it open. Target: the next major version.
+  `PAYMENTS_HEALTH_CHECK_REQUIRE_AUTH=false` to keep it open. Shipped in 5.0.0.
 - Installs with a published config are unaffected by the default. Those that had set
   `REQUIRE_AUTH=true` with only an allowlist go from refused to working.
 - Closes the deferral recorded in ADR-0002.

@@ -8,9 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.0.0] - 2026-10-02
+
 > **Contains breaking changes** - see [Changed](#changed) and [Removed](#removed), and the
-> [upgrade guide](upgrade-guide.md#upgrading-to-the-next-major-version). This release needs a
-> major version.
+> [upgrade guide](upgrade-guide.md#upgrading-to-v500).
 
 ### Changed
 

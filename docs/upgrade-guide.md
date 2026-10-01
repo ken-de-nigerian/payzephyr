@@ -2,10 +2,10 @@
 
 This chapter walks through what changes when you move between PayZephyr's major versions. For the complete, exhaustive list of every change (not just breaking ones), see [CHANGELOG.md](CHANGELOG.md): this chapter is the narrative, tutorial version of the same information, focused on *what you need to actually do*.
 
-## Upgrading to the next major version
+## Upgrading to v5.0.0
 
-Not yet released; this is what the current `main` needs. Most of it fixes webhooks that were being
-rejected or dropped, so the steps are short and the payoff is events you were silently losing.
+Most of this release fixes webhooks that were being rejected or dropped, so the steps are short
+and the payoff is events you were silently losing.
 
 ### Required: publish and run the new migrations
 

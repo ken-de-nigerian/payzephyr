@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
+use KenDeNigerian\PayZephyr\Contracts\HasNoSubscriptionListing;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
@@ -28,7 +29,7 @@ use Throwable;
  * verify-webhook-signature call), so it's deferred to the queued webhook job
  * instead of running synchronously in the request cycle.
  */
-final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
+final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionListing, RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
 {
     use PayPalRefundMethods;
     use PayPalSubscriptionMethods;

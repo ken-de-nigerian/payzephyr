@@ -24,4 +24,17 @@ interface SubscriptionRepositoryInterface
      * @param  array<string, mixed>  $attributes
      */
     public function updateOrCreateAtomic(string $subscriptionCode, array $attributes): SubscriptionTransaction;
+
+    /**
+     * The codes of the logged subscriptions $customerEmail holds to
+     * $planCode with $provider that have not ended - status not cancelled,
+     * completed or expired - newest first.
+     *
+     * The duplicate check reads these for a provider that cannot list
+     * subscriptions (HasNoSubscriptionListing), and fetches each from the
+     * provider: a logged status is the one at the last call that wrote it.
+     *
+     * @return list<string>
+     */
+    public function openSubscriptionCodes(string $provider, string $customerEmail, string $planCode): array;
 }

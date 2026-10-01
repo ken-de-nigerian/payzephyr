@@ -25,6 +25,19 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
      */
     private array $orderingSupported = [];
 
+    public function openSubscriptionCodes(string $provider, string $customerEmail, string $planCode): array
+    {
+        /** @var list<string> */
+        return SubscriptionTransaction::query()
+            ->where('provider', $provider)
+            ->where('customer_email', $customerEmail)
+            ->where('plan_code', $planCode)
+            ->whereNotIn('status', ['cancelled', 'completed', 'expired'])
+            ->orderByDesc('id')
+            ->pluck('subscription_code')
+            ->all();
+    }
+
     /**
      * {@inheritDoc}
      *

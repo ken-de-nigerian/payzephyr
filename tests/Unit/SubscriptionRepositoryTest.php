@@ -282,3 +282,26 @@ test('state_as_of round-trips with its microseconds, and can be cleared', functi
 
     expect($row->fresh()->state_as_of)->toBeNull();
 });
+
+test('openSubscriptionCodes lists the customer\'s logged subscriptions to the plan that have not ended, newest first', function () {
+    $log = fn (string $code, array $overrides = []) => $this->repository->updateOrCreateAtomic($code, array_merge([
+        'provider' => 'paypal',
+        'status' => 'active',
+        'plan_code' => 'P-1',
+        'customer_email' => 'a@b.com',
+        'currency' => 'USD',
+    ], $overrides));
+
+    $log('I-OLD', ['status' => 'attention']);
+    $log('I-SUSPENDED', ['status' => 'non-renewing']);
+    $log('I-NEW');
+    $log('I-CANCELLED', ['status' => 'cancelled']);
+    $log('I-COMPLETED', ['status' => 'completed']);
+    $log('I-EXPIRED', ['status' => 'expired']);
+    $log('I-OTHER-PLAN', ['plan_code' => 'P-2']);
+    $log('I-OTHER-CUSTOMER', ['customer_email' => 'c@d.com']);
+    $log('SUB-OTHER-PROVIDER', ['provider' => 'stripe']);
+
+    expect($this->repository->openSubscriptionCodes('paypal', 'a@b.com', 'P-1'))->toBe(['I-NEW', 'I-SUSPENDED', 'I-OLD'])
+        ->and($this->repository->openSubscriptionCodes('paypal', 'nobody@b.com', 'P-1'))->toBe([]);
+});

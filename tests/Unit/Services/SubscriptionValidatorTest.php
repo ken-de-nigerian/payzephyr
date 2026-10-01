@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use KenDeNigerian\PayZephyr\Contracts\HasNoSubscriptionListing;
+use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use KenDeNigerian\PayZephyr\Services\SubscriptionValidator;
 
@@ -238,4 +241,108 @@ test('a provider that cannot list subscriptions stops the subscribe, and the err
         SubscriptionException::class,
         'Could not check for an existing subscription to plan PLN_1, which payments.subscriptions.prevent_duplicates requires: PayPal does not provide an API to list subscriptions'
     );
+});
+
+/*
+ * PayPal has no API to list subscriptions, so prevent_duplicates used to
+ * refuse every PayPal subscribe. It reads the candidates from the
+ * subscription log now, and asks PayPal for each one's current status: the
+ * log holds the status at create - approval pending - and nothing updates it
+ * when the customer approves.
+ */
+
+function unlistableDriver(array $statuses): HasNoSubscriptionListing
+{
+    config(['payments.subscriptions.prevent_duplicates' => true]);
+    app()->forgetInstance('payments.config');
+
+    $driver = Mockery::mock(HasNoSubscriptionListing::class);
+    $driver->shouldReceive('getName')->andReturn('paypal');
+    $driver->shouldReceive('fetchPlan')->with('P-1')->andReturn(activePlan('P-1'));
+    $driver->shouldNotReceive('listSubscriptions');
+
+    foreach ($statuses as $code => $status) {
+        $driver->shouldReceive('fetchSubscription')->with($code)->andReturn(new SubscriptionResponseDTO(
+            subscriptionCode: $code, status: $status, customer: 'a@b.com', plan: 'P-1', amount: 10.0, currency: 'USD',
+        ));
+    }
+
+    return $driver;
+}
+
+function loggedCodes(array $codes): SubscriptionRepositoryInterface
+{
+    $repository = Mockery::mock(SubscriptionRepositoryInterface::class);
+    $repository->shouldReceive('openSubscriptionCodes')->with('paypal', 'a@b.com', 'P-1')->andReturn($codes);
+
+    return $repository;
+}
+
+test('a logged subscription the provider reports active blocks a duplicate on a provider that cannot list', function (string $status) {
+    $validator = new SubscriptionValidator(loggedCodes(['I-PENDING', 'I-LIVE']));
+    $driver = unlistableDriver(['I-PENDING' => 'attention', 'I-LIVE' => $status]);
+
+    expect(fn () => $validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'), $driver))
+        ->toThrow(SubscriptionException::class, 'Customer already has an active subscription to plan P-1');
+})->with(['active', 'non-renewing', 'Active']);
+
+test('the check stops at the first active subscription it fetches', function () {
+    $validator = new SubscriptionValidator(loggedCodes(['I-LIVE', 'I-NEVER-FETCHED']));
+    $driver = unlistableDriver(['I-LIVE' => 'active']);
+    $driver->shouldNotReceive('fetchSubscription')->with('I-NEVER-FETCHED');
+
+    expect(fn () => $validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'), $driver))
+        ->toThrow(SubscriptionException::class, 'already has an active subscription');
+});
+
+test('logged subscriptions the provider reports pending or ended do not block', function () {
+    $validator = new SubscriptionValidator(loggedCodes(['I-PENDING', 'I-GONE']));
+
+    $driver = unlistableDriver(['I-PENDING' => 'attention', 'I-GONE' => 'cancelled']);
+
+    expect(fn () => $validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'), $driver))
+        ->not->toThrow(Throwable::class);
+});
+
+test('the duplicate check reads the log through the bound repository when none is given', function () {
+    app(SubscriptionRepositoryInterface::class)->updateOrCreateAtomic('I-LOGGED', [
+        'provider' => 'paypal', 'status' => 'attention', 'plan_code' => 'P-1', 'customer_email' => 'a@b.com', 'currency' => 'USD',
+    ]);
+
+    expect(fn () => (new SubscriptionValidator)->validateCreation(
+        new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'),
+        unlistableDriver(['I-LOGGED' => 'active']),
+    ))->toThrow(SubscriptionException::class, 'already has an active subscription');
+});
+
+test('a provider that cannot list stops the subscribe when its subscription cannot be fetched', function () {
+    $validator = new SubscriptionValidator(loggedCodes(['I-BROKEN']));
+    $driver = unlistableDriver([]);
+    $driver->shouldReceive('fetchSubscription')->with('I-BROKEN')->andThrow(new SubscriptionException('PayPal is down'));
+
+    expect(fn () => $validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'), $driver))->toThrow(
+        SubscriptionException::class,
+        'Could not check for an existing subscription to plan P-1, which payments.subscriptions.prevent_duplicates requires: PayPal is down'
+    );
+});
+
+test('a provider that cannot list stops the subscribe when the subscription log is off', function (array $logging) {
+    $repository = Mockery::mock(SubscriptionRepositoryInterface::class);
+    $repository->shouldNotReceive('openSubscriptionCodes');
+    $driver = unlistableDriver([]);
+    config($logging);
+    app()->forgetInstance('payments.config');
+
+    expect(fn () => (new SubscriptionValidator($repository))->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'P-1'), $driver))->toThrow(
+        SubscriptionException::class,
+        'Could not check for an existing subscription to plan P-1: paypal cannot list subscriptions, so '.
+        'payments.subscriptions.prevent_duplicates reads the subscription log, and payments.subscriptions.logging.enabled is off.'
+    );
+})->with([
+    'subscription logging off' => [['payments.subscriptions.logging.enabled' => false]],
+    'all logging off, subscription logging unset' => [['payments.logging.enabled' => false, 'payments.subscriptions.logging' => ['table' => 'subscription_transactions']]],
+]);
+
+test('paypal is a provider that cannot list subscriptions', function () {
+    expect(new PayPalDriver(['client_id' => 'id', 'client_secret' => 'secret', 'currencies' => ['USD']]))->toBeInstanceOf(HasNoSubscriptionListing::class);
 });

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\Facades\Log;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaddleDriver;
@@ -45,12 +46,23 @@ test('a mollie webhook secret that is not a string sends verification to the api
         ->and($driver->validateWebhook(['x-mollie-signature' => [hash_hmac('sha256', $body, '')]], $body))->toBeFalse();
 });
 
-test('a blank flutterwave webhook secret falls back to the secret key instead of rejecting everything', function () {
+test('a flutterwave webhook is rejected without a secret hash, never checked against the secret key', function (?string $secret) {
     // FLUTTERWAVE_WEBHOOK_SECRET= in an .env file reads as '', not null.
-    $driver = new FlutterwaveDriver(['secret_key' => 'FLWSECK_TEST-1', 'webhook_secret' => '']);
+    $channel = Mockery::spy();
+    Log::shouldReceive('channel')->andReturn($channel);
+    $driver = new FlutterwaveDriver(['secret_key' => 'FLWSECK_TEST-1', 'webhook_secret' => $secret]);
 
-    expect($driver->validateWebhook(['verif-hash' => ['FLWSECK_TEST-1']], '{}'))->toBeTrue()
+    expect($driver->validateWebhook(['verif-hash' => ['FLWSECK_TEST-1']], '{}'))->toBeFalse()
         ->and($driver->validateWebhook(['verif-hash' => ['']], '{}'))->toBeFalse();
+
+    $channel->shouldHaveReceived('error')->withArgs(fn (string $message): bool => $message === '[flutterwave] Webhook rejected: no Secret Hash configured');
+})->with(['blank' => [''], 'unset' => [null]]);
+
+test('a flutterwave webhook carrying the configured secret hash is accepted', function () {
+    $driver = new FlutterwaveDriver(['secret_key' => 'FLWSECK_TEST-1', 'webhook_secret' => 'my-secret-hash']);
+
+    expect($driver->validateWebhook(['verif-hash' => ['my-secret-hash']], '{}'))->toBeTrue()
+        ->and($driver->validateWebhook(['verif-hash' => ['FLWSECK_TEST-1']], '{}'))->toBeFalse();
 });
 
 test('a paddle delivery signed for a rotated secret is accepted whichever h1 matches', function () {

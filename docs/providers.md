@@ -101,7 +101,7 @@ PAYPAL_ENABLED=true
 ```env
 FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST_xxxxx
 FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_TEST_xxxxx
-FLUTTERWAVE_ENCRYPTION_KEY=xxxxx
+FLUTTERWAVE_WEBHOOK_SECRET=the-secret-hash-from-your-dashboard
 FLUTTERWAVE_ENABLED=true
 ```
 
@@ -109,7 +109,7 @@ FLUTTERWAVE_ENABLED=true
 - **Channels:** card, bank transfer, USSD, mobile money
 - **Subscriptions:** ✅ supported: subscribing a customer is a side effect of a tokenized charge (`->authorization(...)` required), not a standalone API call; see [Subscriptions](subscriptions.md)
 - **Refunds:** ✅ full support, usually immediate
-- Flutterwave's webhook signature check uses `FLUTTERWAVE_ENCRYPTION_KEY` (mapped internally to the webhook secret), not a separate dedicated webhook-secret field
+- Flutterwave signs nothing: it sends the Secret Hash you set in its dashboard (Settings → Webhooks) back in a `verif-hash` header. Set the same value as `FLUTTERWAVE_WEBHOOK_SECRET`. Without it every Flutterwave webhook is rejected, and the rejection is logged
 
 ### Square
 

@@ -102,12 +102,7 @@ test('flutterwave driver rejects webhook when verif-hash header is missing', fun
     expect($result)->toBeFalse();
 });
 
-// Covers the "webhook secret hash not configured" branch of validateWebhook()
-// (lines ~222-228). Note that secret_key is mandatory (validateConfig()
-// rejects an empty one), so the only way to make `$secretHash` empty is for
-// webhook_secret to be explicitly set to an empty string - the `??` operator
-// only falls through on null, so '' short-circuits before the secret_key
-// fallback is ever consulted.
+// A blank webhook_secret is no secret hash at all, and rejects the delivery.
 test('flutterwave driver rejects webhook when configured secret hash is empty', function () {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'test_secret',

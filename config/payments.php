@@ -69,7 +69,9 @@ return [
             'reference_prefix' => 'FLW',
             'secret_key' => env('FLUTTERWAVE_SECRET_KEY'),
             'public_key' => env('FLUTTERWAVE_PUBLIC_KEY'),
-            'webhook_secret' => env('FLUTTERWAVE_ENCRYPTION_KEY'),
+            // The Secret Hash you set in Flutterwave's dashboard (Settings → Webhooks),
+            // which Flutterwave sends back in the verif-hash header.
+            'webhook_secret' => env('FLUTTERWAVE_WEBHOOK_SECRET'),
             'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com/v3/'),
             'currencies' => ['NGN', 'USD', 'EUR', 'GBP', 'KES', 'UGX', 'TZS'],
             'enabled' => env('FLUTTERWAVE_ENABLED', false),

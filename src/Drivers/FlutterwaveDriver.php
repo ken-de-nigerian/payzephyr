@@ -230,17 +230,26 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
             return false;
         }
 
-        // A blank FLUTTERWAVE_WEBHOOK_SECRET= reads as '', which used to stop
-        // the fallback and reject every webhook. The secret key is always
-        // there to fall back to: validateConfig() refuses a driver without it.
-        $secretHash = $this->credential('webhook_secret') ?? (string) $this->credential('secret_key');
+        // There is no fallback. The secret key this used to fall back to is
+        // an API credential: comparing it with a header put it on the wire
+        // whenever a dashboard was set up that way, and a driver with no
+        // Secret Hash set accepted any delivery whose header held the key.
+        $secretHash = $this->credential('webhook_secret');
+
+        if ($secretHash === null) {
+            $this->log('error', 'Webhook rejected: no Secret Hash configured', [
+                'hint' => 'Set FLUTTERWAVE_WEBHOOK_SECRET to the Secret Hash in Flutterwave Dashboard → Settings → Webhooks',
+            ]);
+
+            return false;
+        }
 
         $isValid = hash_equals($signature, $secretHash);
 
         if (! $isValid) {
             $this->log('warning', 'Webhook validation failed', [
                 'reason' => 'Secret hash mismatch',
-                'hint' => 'The verif-hash header does not match your configured secret. Ensure FLUTTERWAVE_WEBHOOK_SECRET (or FLUTTERWAVE_SECRET_KEY) matches the Secret Hash in Flutterwave Dashboard → Settings → Webhooks',
+                'hint' => 'The verif-hash header does not match your configured secret. Ensure FLUTTERWAVE_WEBHOOK_SECRET matches the Secret Hash in Flutterwave Dashboard → Settings → Webhooks',
                 'received_hash_length' => strlen($signature),
                 'expected_hash_length' => strlen($secretHash),
             ]);

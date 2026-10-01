@@ -106,13 +106,16 @@ test('mollie fetchSubscription decodes the composite code and maps the response'
             'amount' => ['currency' => 'EUR', 'value' => '10.00'],
             'interval' => '1 month',
             'description' => 'Pro Plan',
+            'createdAt' => '2024-12-01T00:00:00+00:00',
         ])),
     ]);
 
     $result = $driver->fetchSubscription('cst_1:sub_1');
 
     expect($result->subscriptionCode)->toBe('cst_1:sub_1')
-        ->and($result->status)->toBe('active');
+        ->and($result->status)->toBe('active')
+        ->and($result->planName)->toBe('Pro Plan')
+        ->and($result->createdAt)->toBe('2024-12-01T00:00:00+00:00');
 });
 
 test('mollie fetchSubscription rejects a malformed subscription code', function () {

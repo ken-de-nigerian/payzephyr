@@ -242,7 +242,7 @@ test('subscription list handles last page with fewer results', function () {
 
     $result = $subscription->perPage(50)->page(999)->list();
 
-    expect($result)->toBeArray()->toHaveCount(1);
+    expect($result['data'])->toHaveCount(1);
 });
 
 test('subscription list handles first page correctly', function () {
@@ -271,7 +271,7 @@ test('subscription listPlans handles empty result set', function () {
 
     $result = $subscription->listPlans();
 
-    expect($result)->toBeArray()->toBeEmpty();
+    expect($result)->toBe(['data' => [], 'meta' => null]);
 });
 
 // ==================== Response Structure Edge Cases ====================
@@ -323,7 +323,8 @@ test('subscription handles nested plan object in response', function () {
 
     $result = $subscription->code('SUB_123')->fetch();
 
-    expect($result->plan)->toBe('Test Plan');
+    expect($result->plan)->toBe('PLN_123')
+        ->and($result->planName)->toBe('Test Plan');
 });
 
 test('subscription handles missing nested objects gracefully', function () {
@@ -370,8 +371,9 @@ test('subscription handles empty metadata array', function () {
         ->metadata([])
         ->create();
 
-    // Metadata will contain plan_code even if empty array was passed
-    expect($result->metadata)->toBeArray()->toHaveKey('plan_code');
+    // The plan's code is the DTO's plan, not an entry slipped into the metadata.
+    expect($result->metadata)->toBe([])
+        ->and($result->plan)->toBe('PLN_123');
 });
 
 test('subscription handles null metadata in response', function () {
@@ -613,7 +615,8 @@ test('subscription handles provider-specific response formats', function () {
     expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class)
         ->and($result->subscriptionCode)->toBe('SUB_123')
         ->and($result->customer)->toBe('test@example.com')
-        ->and($result->plan)->toBe('Test Plan');
+        ->and($result->plan)->toBe('PLN_123')
+        ->and($result->planName)->toBe('Test Plan');
 });
 
 // ==================== Memory and Performance Edge Cases ====================

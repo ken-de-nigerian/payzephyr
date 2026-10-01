@@ -89,9 +89,7 @@ test('validateCreation throws when duplicate prevention is enabled and an active
     $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
     $driver->shouldReceive('fetchPlan')->with('PLN_1')->andReturn(activePlan());
     $driver->shouldReceive('listSubscriptions')->andReturn([
-        'data' => [
-            ['plan' => ['plan_code' => 'PLN_1'], 'status' => 'active'],
-        ],
+        'data' => [listedSubscription('PLN_1', 'active')],
     ]);
 
     $this->validator->validateCreation($request, $driver);
@@ -161,11 +159,10 @@ test('validateCancellation passes when the subscription is still active', functi
 })->throwsNoExceptions();
 
 /*
- * Every driver but Paystack lists subscriptions as SubscriptionResponseDTOs.
- * The duplicate check indexed each entry as an array; on a DTO that is an
- * Error, which it logged as "failed to check" - and then let the duplicate
- * through. prevent_duplicates did nothing on Stripe, Square, Mollie or
- * Flutterwave.
+ * Every driver lists subscriptions as SubscriptionResponseDTOs. The duplicate
+ * check used to index each entry as an array; on a DTO that is an Error,
+ * which it logged as "failed to check" - and then let the duplicate through.
+ * prevent_duplicates did nothing on Stripe, Square, Mollie or Flutterwave.
  */
 
 function listedSubscription(string $plan, string $status): SubscriptionResponseDTO
@@ -200,8 +197,7 @@ test('an active subscription listed as a DTO blocks a duplicate', function (arra
 })->with([
     'under data, as the drivers return it' => [['data' => [listedSubscription('PLN_1', 'active')], 'has_more' => false]],
     'as a bare list' => [[listedSubscription('PLN_2', 'active'), listedSubscription('PLN_1', 'non-renewing')]],
-    'a raw row naming its plan by code' => [['data' => [['plan' => 'PLN_1', 'status' => 'Active']]]],
-    'a raw row with a top-level plan_code' => [['data' => [['plan_code' => 'PLN_1', 'status' => 'active']]]],
+    'with a status in capitals' => [['data' => [listedSubscription('PLN_1', 'Active')]]],
 ]);
 
 test('a listed DTO for another plan, or one that has ended, does not block', function () {
@@ -209,8 +205,9 @@ test('a listed DTO for another plan, or one that has ended, does not block', fun
     $driver = duplicateCheckingDriver(['data' => [
         listedSubscription('PLN_2', 'active'),
         listedSubscription('PLN_1', 'cancelled'),
+        // A custom driver's raw rows are not read as subscriptions.
         'not a subscription',
-        ['status' => 'active'],
+        ['plan' => 'PLN_1', 'status' => 'active'],
     ]]);
 
     $this->validator->validateCreation($request, $driver);

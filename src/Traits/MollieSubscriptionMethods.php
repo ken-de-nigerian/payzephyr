@@ -529,6 +529,8 @@ trait MollieSubscriptionMethods
             nextPaymentDate: $subscription->string('nextPaymentDate'),
             metadata: array_filter(['mandate_id' => $subscription->string('mandateId')]),
             provider: $this->getName(),
+            planName: $subscription->string('description'),
+            createdAt: $subscription->string('createdAt'),
         );
     }
 }

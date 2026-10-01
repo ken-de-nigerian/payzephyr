@@ -500,6 +500,7 @@ trait PayPalSubscriptionMethods
             nextPaymentDate: $subscription->string('billing_info', 'next_billing_time'),
             metadata: $metadata,
             provider: $this->getName(),
+            createdAt: $subscription->string('create_time'),
         );
     }
 }

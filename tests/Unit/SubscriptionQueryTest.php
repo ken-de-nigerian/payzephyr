@@ -27,7 +27,7 @@ function makeQueryManager(string $provider, DriverInterface $driver): PaymentMan
     return $manager;
 }
 
-test('get() works against Paystack raw-array results with no filters', function () {
+test('get() returns Paystack subscriptions as DTOs with no filters', function () {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
@@ -41,7 +41,9 @@ test('get() works against Paystack raw-array results with no filters', function 
     $query = new SubscriptionQuery(makeQueryManager('paystack', $driver));
     $result = $query->from('paystack')->get();
 
-    expect($result)->toHaveCount(1);
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0])->toBeInstanceOf(SubscriptionResponseDTO::class)
+        ->and($result['data'][0]->plan)->toBe('PLN_1');
 });
 
 test('regression: whereStatus/active/forPlan filters no longer crash on DTO-shaped results from Stripe/PayPal/Flutterwave/Square/Mollie', function () {

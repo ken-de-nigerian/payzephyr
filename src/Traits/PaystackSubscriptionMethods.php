@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use GuzzleHttp\Exception\ClientException;
+use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
@@ -183,7 +185,13 @@ trait PaystackSubscriptionMethods
                 );
             }
 
-            return Payload::of($data)->array('data');
+            return [
+                'data' => array_map(
+                    fn ($plan): PlanResponseDTO => PlanResponseDTO::fromArray(array_merge(Payload::of($plan)->all(), ['provider' => $this->getName()])),
+                    Payload::of($data)->array('data')
+                ),
+                'meta' => Payload::of($data)->arrayOrNull('meta'),
+            ];
         } catch (PlanException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -434,7 +442,13 @@ trait PaystackSubscriptionMethods
             ];
 
             if ($customer) {
-                $query['customer'] = $customer;
+                $customerId = $this->paystackCustomerId($customer);
+
+                if ($customerId === null) {
+                    return ['data' => [], 'meta' => null];
+                }
+
+                $query['customer'] = $customerId;
             }
 
             $response = $this->makeRequest('GET', '/subscription', [
@@ -449,7 +463,13 @@ trait PaystackSubscriptionMethods
                 );
             }
 
-            return Payload::of($data)->array('data');
+            return [
+                'data' => array_map(
+                    fn ($subscription): SubscriptionResponseDTO => $this->mapPaystackSubscriptionToResponse(Payload::of($subscription)->all()),
+                    Payload::of($data)->array('data')
+                ),
+                'meta' => Payload::of($data)->arrayOrNull('meta'),
+            ];
         } catch (SubscriptionException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -467,36 +487,62 @@ trait PaystackSubscriptionMethods
     /**
      * A Paystack subscription as the shared DTO.
      *
-     * `plan` is the plan's name, as it has always been for Paystack; the plan
-     * code is kept in metadata['plan_code'], which is where the subscription
-     * log reads it from. A create response can omit what the request already
-     * said, so the request fills those gaps.
+     * `plan` is the plan's code, as it is for every provider; the name is
+     * `planName`. Paystack embeds the plan as an object when it lists or
+     * fetches a subscription, but answers a create with only the plan's
+     * numeric id - not a code anything else accepts - so on a create the
+     * request supplies the code, and the other gaps the response leaves.
      *
      * @param  array<array-key, mixed>  $result
      */
     private function mapPaystackSubscriptionToResponse(array $result, ?SubscriptionRequestDTO $request = null): SubscriptionResponseDTO
     {
         $subscription = new Payload($result);
-        $metadata = self::normalizeMetadata($subscription->get('metadata'));
-        $planCode = $subscription->string('plan', 'plan_code') ?? $subscription->string('plan', 'code') ?? $request?->plan;
-
-        if ($planCode !== null && ! isset($metadata['plan_code'])) {
-            $metadata['plan_code'] = $planCode;
-        }
-
         $amount = $subscription->float('amount');
 
         return new SubscriptionResponseDTO(
             subscriptionCode: $subscription->string('subscription_code') ?? $subscription->string('code') ?? '',
             status: $subscription->string('status') ?? 'unknown',
             customer: $subscription->string('customer', 'email') ?? $request->customer ?? '',
-            plan: $subscription->string('plan', 'name') ?? $request->plan ?? '',
+            plan: $subscription->string('plan', 'plan_code') ?? $request->plan ?? $subscription->string('plan') ?? '',
             amount: $amount === null ? null : $amount / 100,
             currency: $subscription->string('currency') ?? 'NGN',
             nextPaymentDate: $subscription->string('next_payment_date'),
             emailToken: $subscription->string('email_token'),
-            metadata: $metadata,
+            metadata: self::normalizeMetadata($subscription->get('metadata')),
             provider: $this->getName(),
+            planName: $subscription->string('plan', 'name'),
+            createdAt: $subscription->string('createdAt') ?? $subscription->string('created_at'),
         );
+    }
+
+    /**
+     * Paystack's id for a customer given by email or customer code, or null
+     * when Paystack has no such customer.
+     *
+     * The subscription list filters by that id. It was sent the email (or
+     * code) as given, which is not what the filter takes - so the duplicate
+     * check could read every customer's subscriptions as this one's, and
+     * refuse a new customer because someone else was on the plan.
+     */
+    private function paystackCustomerId(string $customer): ?string
+    {
+        if (ctype_digit($customer)) {
+            return $customer;
+        }
+
+        try {
+            $body = Payload::of($this->parseResponse($this->makeRequest('GET', '/customer/'.rawurlencode($customer))));
+        } catch (Throwable $e) {
+            for ($current = $e; $current instanceof Throwable; $current = $current->getPrevious()) {
+                if ($current instanceof ClientException && $current->getResponse()->getStatusCode() === HttpStatusCodes::NOT_FOUND) {
+                    return null;
+                }
+            }
+
+            throw $e;
+        }
+
+        return $body->flag(false, 'status') ? $body->string('data', 'id') : null;
     }
 }

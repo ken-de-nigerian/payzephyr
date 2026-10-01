@@ -26,7 +26,7 @@ function makeGapsQueryManager(string $provider, DriverInterface $driver): Paymen
     return $manager;
 }
 
-test('first() converts a raw provider array (Paystack-shaped) into a SubscriptionResponseDTO', function () {
+test('first() returns the first Paystack subscription as a SubscriptionResponseDTO', function () {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
@@ -45,7 +45,7 @@ test('first() converts a raw provider array (Paystack-shaped) into a Subscriptio
         ->and($first->plan)->toBe('PLN_1');
 });
 
-test('createdAfter filters out array-shaped subscriptions created before the cutoff', function () {
+test('createdAfter filters out Paystack subscriptions created before the cutoff', function () {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
@@ -60,11 +60,11 @@ test('createdAfter filters out array-shaped subscriptions created before the cut
     $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
     $result = $query->from('paystack')->createdAfter('2024-01-01')->get();
 
-    expect($result)->toHaveCount(1)
-        ->and($result[0]['subscription_code'])->toBe('SUB_NEW');
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0]->subscriptionCode)->toBe('SUB_NEW');
 });
 
-test('createdBefore filters out array-shaped subscriptions created after the cutoff', function () {
+test('createdBefore filters out Paystack subscriptions created after the cutoff', function () {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
@@ -79,8 +79,8 @@ test('createdBefore filters out array-shaped subscriptions created after the cut
     $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
     $result = $query->from('paystack')->createdBefore('2024-01-01')->get();
 
-    expect($result)->toHaveCount(1)
-        ->and($result[0]['subscription_code'])->toBe('SUB_OLD');
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0]->subscriptionCode)->toBe('SUB_OLD');
 });
 
 test('getProviderName falls back to the manager default driver when from() is never called', function () {
@@ -109,28 +109,40 @@ test('an entry that is neither a DTO nor a row does not stop the query', functio
         ->and($query->from('stripe')->forPlan('PLN_1')->count())->toBe(0);
 });
 
-test('forPlan matches a raw row that names its plan by code', function () {
+test('forPlan matches subscriptions by plan code, and not a raw row a custom driver lists', function () {
     $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
     $driver->shouldReceive('listSubscriptions')->andReturn(['data' => [
-        ['subscription_code' => 'SUB_1', 'plan' => 'PLN_1', 'status' => 'active'],
-        ['subscription_code' => 'SUB_2', 'plan' => 'PLN_2', 'status' => 'active'],
+        new SubscriptionResponseDTO(subscriptionCode: 'SUB_1', status: 'active', customer: 'a@b.com', plan: 'PLN_1', amount: 10.0, currency: 'NGN'),
+        new SubscriptionResponseDTO(subscriptionCode: 'SUB_2', status: 'active', customer: 'a@b.com', plan: 'PLN_2', amount: 10.0, currency: 'NGN'),
+        ['subscription_code' => 'SUB_3', 'plan' => 'PLN_1', 'status' => 'active'],
     ]]);
 
     $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
     $result = $query->from('paystack')->forPlan('PLN_1')->get();
 
-    expect(array_column($result['data'], 'subscription_code'))->toBe(['SUB_1'])
+    expect(array_map(fn (SubscriptionResponseDTO $s): string => $s->subscriptionCode, $result['data']))->toBe(['SUB_1'])
         ->and($result['meta'])->toBe(['filtered_count' => 1]);
 });
 
 test('filtering keeps the meta a driver already returned', function () {
     $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
     $driver->shouldReceive('listSubscriptions')->andReturn([
-        'data' => [['subscription_code' => 'SUB_1', 'plan_code' => 'PLN_1', 'status' => 'active']],
+        'data' => [new SubscriptionResponseDTO(subscriptionCode: 'SUB_1', status: 'active', customer: 'a@b.com', plan: 'PLN_1', amount: 10.0, currency: 'NGN')],
         'meta' => ['total' => 40, 'filtered_count' => 99],
     ]);
 
     $query = new SubscriptionQuery(makeGapsQueryManager('paystack', $driver));
 
     expect($query->from('paystack')->forPlan('PLN_1')->get()['meta'])->toBe(['total' => 40, 'filtered_count' => 1]);
+});
+
+test('a driver listing a bare list of subscriptions gets a filtered bare list back', function () {
+    $dto = fn (string $code, string $plan): SubscriptionResponseDTO => new SubscriptionResponseDTO(subscriptionCode: $code, status: 'active', customer: 'a@b.com', plan: $plan, amount: 10.0, currency: 'NGN');
+    $driver = Mockery::mock(CombinedSubscriptionDriverForGaps::class);
+    $driver->shouldReceive('listSubscriptions')->andReturn([$dto('SUB_1', 'PLN_1'), $dto('SUB_2', 'PLN_2')]);
+
+    $result = (new SubscriptionQuery(makeGapsQueryManager('custom', $driver)))->from('custom')->forPlan('PLN_2')->get();
+
+    expect($result)->toHaveCount(1)
+        ->and($result[0]->subscriptionCode)->toBe('SUB_2');
 });

@@ -329,6 +329,7 @@ test('square fetchSubscription retrieves and maps a subscription', function () {
                 'status' => 'ACTIVE',
                 'plan_variation_id' => 'VAR123',
                 'customer_id' => '',
+                'created_at' => '2024-12-01T00:00:00Z',
             ],
         ])),
     ]);
@@ -336,7 +337,8 @@ test('square fetchSubscription retrieves and maps a subscription', function () {
     $result = $driver->fetchSubscription('SUB1');
 
     expect($result->subscriptionCode)->toBe('SUB1')
-        ->and($result->customer)->toBe('');
+        ->and($result->customer)->toBe('')
+        ->and($result->createdAt)->toBe('2024-12-01T00:00:00Z');
 });
 
 test('square fetchSubscription throws SubscriptionException when no subscription is returned', function () {

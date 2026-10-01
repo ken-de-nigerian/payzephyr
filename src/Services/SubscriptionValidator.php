@@ -62,11 +62,10 @@ final readonly class SubscriptionValidator
             $subscriptions = (new Payload($existing))->arrayOrNull('data') ?? $existing;
 
             foreach ($subscriptions as $sub) {
-                [$subPlanCode, $subStatus] = $this->planAndStatus($sub);
-
                 if (
-                    $subPlanCode === $request->plan &&
-                    in_array(strtolower($subStatus), ['active', 'non-renewing'], true)
+                    $sub instanceof SubscriptionResponseDTO &&
+                    $sub->plan === $request->plan &&
+                    in_array(strtolower($sub->status), ['active', 'non-renewing'], true)
                 ) {
                     throw new SubscriptionException(
                         "Customer already has an active subscription to plan $request->plan. ".
@@ -81,31 +80,6 @@ final readonly class SubscriptionValidator
                 'Invalid authorization code format. Authorization codes must be at least 10 characters long.'
             );
         }
-    }
-
-    /**
-     * The plan code and status of one listed subscription.
-     *
-     * A driver lists subscriptions as the DTOs it maps them to; Paystack lists
-     * the provider's own rows, where the plan is an object carrying its code.
-     * Reading only the second shape made this check a no-op for every other
-     * driver: indexing a DTO as an array is an Error, which the caller logged
-     * as "failed to check" and then allowed the duplicate.
-     *
-     * @return array{0: string|null, 1: string}
-     */
-    private function planAndStatus(mixed $subscription): array
-    {
-        if ($subscription instanceof SubscriptionResponseDTO) {
-            return [$subscription->plan, $subscription->status];
-        }
-
-        $row = Payload::of($subscription);
-
-        return [
-            $row->string('plan', 'plan_code') ?? $row->string('plan_code') ?? $row->string('plan'),
-            $row->string('status') ?? 'unknown',
-        ];
     }
 
     /**

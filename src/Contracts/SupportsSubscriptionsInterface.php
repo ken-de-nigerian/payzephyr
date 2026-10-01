@@ -38,7 +38,8 @@ interface SupportsSubscriptionsInterface
     /**
      * List all subscription plans
      *
-     * @return array<array-key, mixed> Array with 'data' key containing array of PlanResponseDTO or arrays
+     * @return array<array-key, mixed> `data`: a list of PlanResponseDTO; any other keys are the
+     *                                 provider's paging information
      */
     public function listPlans(?int $perPage = 50, ?int $page = 1): array;
 
@@ -68,7 +69,7 @@ interface SupportsSubscriptionsInterface
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO;
 
     /**
-     * List customer subscriptions
+     * List subscriptions, for one customer when one is given.
      *
      * @return array<array-key, mixed>
      */

@@ -417,6 +417,8 @@ trait FlutterwaveSubscriptionMethods
             currency: $subscription->string('customer', 'currency') ?? 'NGN',
             metadata: [],
             provider: $this->getName(),
+            planName: $subscription->string('plan', 'name'),
+            createdAt: $subscription->string('created_at'),
         );
     }
 }

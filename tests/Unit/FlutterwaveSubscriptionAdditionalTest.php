@@ -231,8 +231,9 @@ test('flutterwave fetchSubscription retrieves and maps a subscription', function
                 'id' => 9911,
                 'amount' => 5000,
                 'customer' => ['email' => 'test@example.com', 'currency' => 'NGN'],
-                'plan' => 3807,
+                'plan' => ['id' => 3807, 'name' => 'Gold'],
                 'status' => 'active',
+                'created_at' => '2024-12-01T00:00:00.000Z',
             ],
         ])),
     ]);
@@ -240,7 +241,10 @@ test('flutterwave fetchSubscription retrieves and maps a subscription', function
     $result = $driver->fetchSubscription('9911');
 
     expect($result->subscriptionCode)->toBe('9911')
-        ->and($result->status)->toBe('active');
+        ->and($result->status)->toBe('active')
+        ->and($result->plan)->toBe('3807')
+        ->and($result->planName)->toBe('Gold')
+        ->and($result->createdAt)->toBe('2024-12-01T00:00:00.000Z');
 });
 
 test('flutterwave fetchSubscription throws SubscriptionException when the API reports failure', function () {

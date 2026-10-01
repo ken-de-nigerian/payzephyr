@@ -217,7 +217,7 @@ test('subscription listPlans handles empty response', function () {
 
     $result = $subscription->listPlans();
 
-    expect($result)->toBeArray()->toBeEmpty();
+    expect($result)->toBe(['data' => [], 'meta' => null]);
 });
 
 test('subscription listPlans respects pagination', function () {
@@ -527,11 +527,13 @@ test('subscription list handles empty results', function () {
 
     $result = $subscription->list();
 
-    expect($result)->toBeArray()->toBeEmpty();
+    expect($result)->toBe(['data' => [], 'meta' => null]);
 });
 
 test('subscription list filters by customer', function () {
     $subscription = SubscriptionTestHelper::createWithMock([
+        // Paystack filters by its customer id, so the email is looked up first.
+        new Response(200, [], json_encode(['status' => true, 'data' => ['id' => 42]])),
         new Response(200, [], json_encode([
             'status' => true,
             'data' => [
@@ -542,7 +544,8 @@ test('subscription list filters by customer', function () {
 
     $result = $subscription->list('customer@example.com');
 
-    expect($result)->toBeArray()->toHaveCount(1);
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0]->subscriptionCode)->toBe('SUB_1');
 });
 
 test('subscription list respects pagination', function () {

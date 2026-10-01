@@ -675,6 +675,7 @@ trait SquareSubscriptionMethods
             nextPaymentDate: $data->string('charged_through_date'),
             metadata: array_filter(['customer_id' => $data->string('customer_id')]),
             provider: $this->getName(),
+            createdAt: $data->string('created_at'),
         );
     }
 }

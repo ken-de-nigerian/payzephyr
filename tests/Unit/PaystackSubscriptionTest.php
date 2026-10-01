@@ -2,10 +2,17 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Tests\Helpers\PaystackDriverTestHelper;
@@ -155,9 +162,12 @@ test('paystack listPlans succeeds', function () {
 
     $result = $driver->listPlans(50, 1);
 
-    expect($result)->toBeArray()
-        ->and(count($result))->toBe(2)
-        ->and($result[0]['plan_code'])->toBe('PLN_001');
+    expect($result['data'])->toHaveCount(2)
+        ->each->toBeInstanceOf(PlanResponseDTO::class)
+        ->and($result['data'][0]->planCode)->toBe('PLN_001')
+        ->and($result['data'][1]->name)->toBe('Plan 2')
+        ->and($result['data'][0]->provider)->toBe('paystack')
+        ->and($result['meta'])->toBeNull();
 });
 
 test('paystack listPlans with pagination', function () {
@@ -165,15 +175,17 @@ test('paystack listPlans with pagination', function () {
         new Response(200, [], json_encode([
             'status' => true,
             'data' => [
-                ['plan_code' => 'PLN_003', 'name' => 'Plan 3'],
+                ['plan_code' => 'PLN_003', 'name' => 'Plan 3', 'amount' => 500000],
             ],
+            'meta' => ['total' => 11, 'page' => 2, 'perPage' => 10],
         ])),
     ]);
 
     $result = $driver->listPlans(10, 2);
 
-    expect($result)->toBeArray()
-        ->and(count($result))->toBe(1);
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0]->amount)->toBe(5000.0)
+        ->and($result['meta'])->toBe(['total' => 11, 'page' => 2, 'perPage' => 10]);
 });
 
 test('paystack listPlans throws exception on error', function () {
@@ -225,7 +237,8 @@ test('paystack createSubscription succeeds', function () {
     expect($result->subscriptionCode)->toBe('SUB_test123')
         ->and($result->status)->toBe('active')
         ->and($result->customer)->toBe('customer@example.com')
-        ->and($result->plan)->toBe('Monthly Plan')
+        ->and($result->plan)->toBe('PLN_test123')
+        ->and($result->planName)->toBe('Monthly Plan')
         ->and($result->amount)->toBe(5000.0)
         ->and($result->currency)->toBe('NGN')
         ->and($result->emailToken)->toBe('token_abc123')
@@ -427,6 +440,9 @@ test('paystack listSubscriptions succeeds', function () {
                 [
                     'subscription_code' => 'SUB_001',
                     'status' => 'active',
+                    'plan' => ['plan_code' => 'PLN_001', 'name' => 'Monthly'],
+                    'customer' => ['email' => 'a@example.com'],
+                    'createdAt' => '2024-01-15T10:00:00.000Z',
                 ],
                 [
                     'subscription_code' => 'SUB_002',
@@ -438,13 +454,20 @@ test('paystack listSubscriptions succeeds', function () {
 
     $result = $driver->listSubscriptions(50, 1);
 
-    expect($result)->toBeArray()
-        ->and(count($result))->toBe(2)
-        ->and($result[0]['subscription_code'])->toBe('SUB_001');
+    expect($result['data'])->toHaveCount(2)
+        ->each->toBeInstanceOf(SubscriptionResponseDTO::class)
+        ->and($result['data'][0]->subscriptionCode)->toBe('SUB_001')
+        ->and($result['data'][0]->plan)->toBe('PLN_001')
+        ->and($result['data'][0]->planName)->toBe('Monthly')
+        ->and($result['data'][0]->customer)->toBe('a@example.com')
+        ->and($result['data'][0]->createdAt)->toBe('2024-01-15T10:00:00.000Z')
+        ->and($result['data'][1]->status)->toBe('cancelled');
 });
 
 test('paystack listSubscriptions with customer filter', function () {
-    $driver = PaystackDriverTestHelper::createWithMock([
+    $history = [];
+    $driver = paystackWithHistory($history, [
+        new Response(200, [], json_encode(['status' => true, 'data' => ['id' => 4821, 'email' => 'customer@example.com']])),
         new Response(200, [], json_encode([
             'status' => true,
             'data' => [
@@ -458,10 +481,52 @@ test('paystack listSubscriptions with customer filter', function () {
 
     $result = $driver->listSubscriptions(50, 1, 'customer@example.com');
 
-    expect($result)->toBeArray()
-        ->and(count($result))->toBe(1)
-        ->and($result[0]['subscription_code'])->toBe('SUB_001');
+    // Paystack filters subscriptions by its numeric customer id, and ignores
+    // an email it is given in its place - so the email is looked up first.
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['data'][0]->subscriptionCode)->toBe('SUB_001')
+        ->and((string) $history[0]['request']->getUri())->toEndWith('/customer/customer%40example.com')
+        ->and($history[1]['request']->getUri()->getQuery())->toContain('customer=4821');
 });
+
+test('paystack listSubscriptions passes a numeric customer id through without a lookup', function () {
+    $history = [];
+    $driver = paystackWithHistory($history, [
+        new Response(200, [], json_encode(['status' => true, 'data' => []])),
+    ]);
+
+    $driver->listSubscriptions(50, 1, '4821');
+
+    expect($history)->toHaveCount(1)
+        ->and($history[0]['request']->getUri()->getPath())->toEndWith('/subscription')
+        ->and($history[0]['request']->getUri()->getQuery())->toContain('customer=4821');
+});
+
+test('paystack listSubscriptions for a customer paystack does not know is empty, not every subscription', function () {
+    $history = [];
+    $driver = paystackWithHistory($history, [
+        new Response(404, [], json_encode(['status' => false, 'message' => 'Customer not found'])),
+    ]);
+
+    expect($driver->listSubscriptions(50, 1, 'nobody@example.com'))->toBe(['data' => [], 'meta' => null])
+        ->and($history)->toHaveCount(1);
+});
+
+test('paystack listSubscriptions for a customer lookup answered without status is empty', function () {
+    $driver = PaystackDriverTestHelper::createWithMock([
+        new Response(200, [], json_encode(['status' => false, 'data' => ['id' => 4821]])),
+    ]);
+
+    expect($driver->listSubscriptions(50, 1, 'customer@example.com'))->toBe(['data' => [], 'meta' => null]);
+});
+
+test('paystack listSubscriptions fails when the customer lookup fails for another reason', function () {
+    $driver = PaystackDriverTestHelper::createWithMock([
+        new Response(401, [], json_encode(['status' => false, 'message' => 'Invalid key'])),
+    ]);
+
+    $driver->listSubscriptions(50, 1, 'customer@example.com');
+})->throws(SubscriptionException::class);
 
 test('paystack listSubscriptions with pagination', function () {
     $driver = PaystackDriverTestHelper::createWithMock([
@@ -470,13 +535,14 @@ test('paystack listSubscriptions with pagination', function () {
             'data' => [
                 ['subscription_code' => 'SUB_003', 'status' => 'active'],
             ],
+            'meta' => ['total' => 11, 'page' => 2],
         ])),
     ]);
 
     $result = $driver->listSubscriptions(10, 2);
 
-    expect($result)->toBeArray()
-        ->and(count($result))->toBe(1);
+    expect($result['data'])->toHaveCount(1)
+        ->and($result['meta'])->toBe(['total' => 11, 'page' => 2]);
 });
 
 test('paystack listSubscriptions throws exception on error', function () {
@@ -600,3 +666,18 @@ test('paystack createSubscription validates request DTO', function () {
         quantity: 0
     ))->toThrow(InvalidArgumentException::class, 'Quantity must be at least 1');
 });
+
+/**
+ * @param  array<int, array<string, mixed>>  $history
+ * @param  list<Response>  $responses
+ */
+function paystackWithHistory(array &$history, array $responses): PaystackDriver
+{
+    $stack = HandlerStack::create(new MockHandler($responses));
+    $stack->push(Middleware::history($history));
+
+    $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'base_url' => 'https://api.paystack.co', 'currencies' => ['NGN']]);
+    $driver->setClient(new Client(['handler' => $stack]));
+
+    return $driver;
+}

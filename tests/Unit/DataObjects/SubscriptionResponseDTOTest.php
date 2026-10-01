@@ -43,6 +43,8 @@ test('fromArray builds a DTO from a full data array', function () {
         'email_token' => 'token456',
         'metadata' => ['plan_name' => 'Gold'],
         'provider' => 'stripe',
+        'plan_name' => 'Gold',
+        'created_at' => '2026-08-01T09:00:00+00:00',
     ]);
 
     expect($dto->subscriptionCode)->toBe('SUB_456')
@@ -54,7 +56,9 @@ test('fromArray builds a DTO from a full data array', function () {
         ->and($dto->nextPaymentDate)->toBe('2026-09-01')
         ->and($dto->emailToken)->toBe('token456')
         ->and($dto->metadata)->toBe(['plan_name' => 'Gold'])
-        ->and($dto->provider)->toBe('stripe');
+        ->and($dto->provider)->toBe('stripe')
+        ->and($dto->planName)->toBe('Gold')
+        ->and($dto->createdAt)->toBe('2026-08-01T09:00:00+00:00');
 });
 
 test('fromArray applies defaults for missing keys', function () {
@@ -70,7 +74,9 @@ test('fromArray applies defaults for missing keys', function () {
         ->and($dto->nextPaymentDate)->toBeNull()
         ->and($dto->emailToken)->toBeNull()
         ->and($dto->metadata)->toBe([])
-        ->and($dto->provider)->toBeNull();
+        ->and($dto->provider)->toBeNull()
+        ->and($dto->planName)->toBeNull()
+        ->and($dto->createdAt)->toBeNull();
 });
 
 test('toArray serializes the DTO back into an array', function () {
@@ -85,6 +91,8 @@ test('toArray serializes the DTO back into an array', function () {
         emailToken: 'tok',
         metadata: ['a' => 1],
         provider: 'flutterwave',
+        planName: 'Gold',
+        createdAt: '2026-08-01T09:00:00Z',
     );
 
     expect($dto->toArray())->toBe([
@@ -98,6 +106,8 @@ test('toArray serializes the DTO back into an array', function () {
         'email_token' => 'tok',
         'metadata' => ['a' => 1],
         'provider' => 'flutterwave',
+        'plan_name' => 'Gold',
+        'created_at' => '2026-08-01T09:00:00Z',
     ]);
 });
 

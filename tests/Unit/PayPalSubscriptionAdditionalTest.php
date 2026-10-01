@@ -281,13 +281,15 @@ test('paypal fetchSubscription retrieves and maps a subscription', function () {
             'status' => 'ACTIVE',
             'plan_id' => 'P-123',
             'subscriber' => ['email_address' => 'test@example.com'],
+            'create_time' => '2024-12-01T00:00:00Z',
         ])),
     ]);
 
     $result = $driver->fetchSubscription('I-XYZ');
 
     expect($result->subscriptionCode)->toBe('I-XYZ')
-        ->and($result->status)->toBe('active');
+        ->and($result->status)->toBe('active')
+        ->and($result->createdAt)->toBe('2024-12-01T00:00:00Z');
 });
 
 test('paypal fetchSubscription throws SubscriptionException on API error', function () {

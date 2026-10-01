@@ -182,15 +182,9 @@ final class SubscriptionQuery
             return null;
         }
 
-        // A list of subscriptions, or - from a driver that answers with one
-        // row rather than a list of them - the subscription itself.
-        $first = $subscriptions[0] ?? $subscriptions;
+        $first = $subscriptions[0] ?? null;
 
-        if ($first instanceof SubscriptionResponseDTO) {
-            return $first;
-        }
-
-        return is_array($first) ? SubscriptionResponseDTO::fromArray(Payload::of($first)->all()) : null;
+        return $first instanceof SubscriptionResponseDTO ? $first : null;
     }
 
     /**
@@ -276,27 +270,23 @@ final class SubscriptionQuery
      * subscription-capable driver) - into a common shape the filters above
      * can read uniformly.
      *
-     * An entry that is neither reads as a subscription with no plan and no
-     * status, so it matches no filter rather than stopping the query.
+     * Every bundled driver lists SubscriptionResponseDTOs. An entry that is
+     * not one - from a custom driver still returning provider rows - reads as
+     * a subscription with no plan, status or date, so it matches no filter
+     * rather than stopping the query.
      *
      * @return array{plan_code: ?string, status: string, created_at: ?string}
      */
     private function normalizeForFiltering(mixed $subscription): array
     {
-        if ($subscription instanceof SubscriptionResponseDTO) {
-            return [
-                'plan_code' => $subscription->plan,
-                'status' => $subscription->status,
-                'created_at' => null,
-            ];
+        if (! $subscription instanceof SubscriptionResponseDTO) {
+            return ['plan_code' => null, 'status' => '', 'created_at' => null];
         }
 
-        $row = Payload::of($subscription);
-
         return [
-            'plan_code' => $row->string('plan', 'plan_code') ?? $row->string('plan_code') ?? $row->string('plan'),
-            'status' => $row->string('status') ?? '',
-            'created_at' => $row->string('created_at') ?? $row->string('createdAt'),
+            'plan_code' => $subscription->plan,
+            'status' => $subscription->status,
+            'created_at' => $subscription->createdAt,
         ];
     }
 

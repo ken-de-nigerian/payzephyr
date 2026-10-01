@@ -13,7 +13,11 @@ final readonly class SubscriptionResponseDTO
     use NormalizesMetadata;
 
     /**
+     * @param  string  $plan  The plan's code - the id you pass back to the provider - for every
+     *                        provider. Paystack used to put the plan's name here.
      * @param  array<string, mixed>  $metadata
+     * @param  string|null  $planName  The plan's display name, where the provider sends one.
+     * @param  string|null  $createdAt  When the provider created the subscription, as it reported it.
      */
     public function __construct(
         public string $subscriptionCode,
@@ -26,6 +30,8 @@ final readonly class SubscriptionResponseDTO
         public ?string $emailToken = null,
         public array $metadata = [],
         public ?string $provider = null,
+        public ?string $planName = null,
+        public ?string $createdAt = null,
     ) {}
 
     /**
@@ -46,6 +52,8 @@ final readonly class SubscriptionResponseDTO
             emailToken: $input->string('email_token'),
             metadata: self::normalizeMetadata($data['metadata'] ?? null),
             provider: $input->string('provider'),
+            planName: $input->string('plan_name'),
+            createdAt: $input->string('created_at'),
         );
     }
 
@@ -65,6 +73,8 @@ final readonly class SubscriptionResponseDTO
             'email_token' => $this->emailToken,
             'metadata' => $this->metadata,
             'provider' => $this->provider,
+            'plan_name' => $this->planName,
+            'created_at' => $this->createdAt,
         ];
     }
 

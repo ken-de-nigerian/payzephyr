@@ -127,7 +127,7 @@ test('a created subscription whose response omits its status is reported as unkn
         ->and($subscription->amount)->toBe(5000.0);
 });
 
-test('subscription metadata Paystack returns as a JSON string is read, and keeps the plan code', function () {
+test('subscription metadata Paystack returns as a JSON string is read', function () {
     $driver = \Tests\Helpers\PaystackDriverTestHelper::createWithMock([
         new \GuzzleHttp\Psr7\Response(200, [], json_encode([
             'status' => true,
@@ -142,6 +142,7 @@ test('subscription metadata Paystack returns as a JSON string is read, and keeps
 
     $subscription = $driver->fetchSubscription('SUB_json');
 
-    expect($subscription->metadata)->toBe(['source' => 'web', 'plan_code' => 'PLN_9'])
-        ->and($subscription->plan)->toBe('Gold');
+    expect($subscription->metadata)->toBe(['source' => 'web'])
+        ->and($subscription->plan)->toBe('PLN_9')
+        ->and($subscription->planName)->toBe('Gold');
 });

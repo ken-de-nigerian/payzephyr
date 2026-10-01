@@ -500,10 +500,11 @@ test('stripe fetchSubscription retrieves and maps a subscription', function () {
                 'id' => $id,
                 'status' => 'active',
                 'current_period_end' => 1735689600,
+                'created' => 1733011200,
                 'metadata' => [],
                 'customer' => ['id' => 'cus_123', 'email' => 'test@example.com'],
                 'items' => ['data' => [
-                    ['price' => ['id' => 'price_123', 'unit_amount' => 2000, 'currency' => 'usd']],
+                    ['price' => ['id' => 'price_123', 'nickname' => 'Pro monthly', 'unit_amount' => 2000, 'currency' => 'usd']],
                 ]],
             ]);
         }
@@ -519,7 +520,10 @@ test('stripe fetchSubscription retrieves and maps a subscription', function () {
 
     expect($result->subscriptionCode)->toBe('sub_123')
         ->and($result->customer)->toBe('test@example.com')
-        ->and($result->plan)->toBe('price_123');
+        ->and($result->plan)->toBe('price_123')
+        ->and($result->planName)->toBe('Pro monthly')
+        // Stripe reports a Unix time; the DTO carries a date strtotime() reads.
+        ->and($result->createdAt)->toBe('2024-12-01T00:00:00+00:00');
 });
 
 test('stripe fetchSubscription throws SubscriptionException on API error', function () {

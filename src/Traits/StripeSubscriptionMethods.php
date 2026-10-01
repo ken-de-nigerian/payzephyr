@@ -493,6 +493,7 @@ trait StripeSubscriptionMethods
         $price = $item->at('price');
         $unitAmount = $price->float('unit_amount');
         $periodEnd = $data->int('current_period_end');
+        $created = $data->int('created');
 
         return new SubscriptionResponseDTO(
             subscriptionCode: $this->requireString($data->all(), 'id', 'subscription'),
@@ -504,6 +505,9 @@ trait StripeSubscriptionMethods
             nextPaymentDate: $periodEnd === null ? null : date('Y-m-d H:i:s', $periodEnd),
             metadata: self::normalizeMetadata($data->get('metadata')),
             provider: $this->getName(),
+            planName: $price->string('nickname') ?? $price->string('product', 'name'),
+            // Stripe reports a Unix time; the date filters need one strtotime() reads.
+            createdAt: $created === null ? null : date(DATE_ATOM, $created),
         );
     }
 

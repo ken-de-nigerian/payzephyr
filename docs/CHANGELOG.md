@@ -64,6 +64,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions) documents the setting,
   which the configuration page pointed to and nothing described.
 
+- **Security: a credential that was not a string could leave webhooks signed with an empty key.**
+  Drivers checked their config with `empty()`, which a non-string passes - `PAYSTACK_SECRET_KEY=true`
+  reaches the config as boolean `true` - and then read the value as a string, found none, and
+  computed signatures with `''`, a key anyone can sign with. This affected Paystack, Monnify,
+  Stripe and Mollie webhooks. A credential must now be a non-empty string; anything else is
+  missing, and a driver without a required one fails when it is built.
+
+- **A blank `FLUTTERWAVE_WEBHOOK_SECRET=` rejected every Flutterwave webhook.** It read as `''`,
+  which stopped the documented fallback to the secret key. It falls back now.
+
+- **A Paddle delivery signed during a secret rotation could be rejected.** The signature header
+  can carry one `h1` per secret; only the last was kept. Any matching `h1` is accepted now.
+
+- **A health allowlist written with spaces refused its second entry.**
+  `PAYMENTS_HEALTH_CHECK_ALLOWED_IPS="203.0.113.5, 198.51.100.7"` split into `" 198.51.100.7"`,
+  which no address matches. Entries are trimmed, and empty ones (a trailing comma) dropped.
+
+- **Trace switches written as text were read by truthiness.** `trace.record_http_bodies`,
+  `features.trace` and `trace.async` set to `"false"` or `"off"` were on - provider request and
+  response bodies kept being recorded after they had been switched off. They are read as
+  switches, like every other setting.
+
 - **Security: unsigned query-string input reached the webhook job, and defeated deduplication.**
   The controller queued `$request->all()`, which merges the query string into the body. No
   provider signs the query string. A captured genuine delivery replayed to

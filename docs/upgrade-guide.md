@@ -58,6 +58,73 @@ Schedule::command('payzephyr:webhooks:prune --force')->daily();
 It only deletes deduplication records that can no longer stop a replayed webhook. See
 [Security](security.md#pruning-deduplication-records-safely).
 
+### Required if you use Mollie without a webhook secret: typed webhooks
+
+Without `MOLLIE_WEBHOOK_SECRET`, a typed Mollie webhook - `hook.ping`, and Mollie's next-gen
+webhooks - is now rejected, because Mollie signs those and there is nothing to check the signature
+against. The classic webhook (a bare payment id, verified through the API) is unaffected. If you
+have set up next-gen webhooks, set the secret Mollie showed when you created them.
+
+### Check your config: switches written as text are now read as what they say
+
+Every on/off setting is read the same way: `true`, `"true"`, `"on"`, `"yes"`, `"1"` and `1` are on;
+`false`, `"false"`, `"off"`, `"no"`, `"0"` and `0` are off. Before, several settings were read by
+PHP truthiness, so the *strings* `"false"` and `"off"` meant **on**. If any of these is set to such
+a string, it now does what it says:
+
+- `providers.<name>.enabled` - a provider set to `"false"` stops taking charges and leaves the
+  verify chain;
+- `features.trace`, `logging.enabled`, `refunds.logging.enabled`, `subscriptions.logging.enabled`;
+- `subscriptions.prevent_duplicates`, `refunds.prevent_duplicates`, `refunds.validation.enabled`,
+  `subscriptions.validation.enabled`, `health_check.enabled`, `health_check.require_auth`,
+  `webhook.verify_signature`.
+
+Values from `env()` were already booleans; this only matters for strings set some other way.
+
+Credentials must be non-empty strings. A provider whose key, secret or id is anything else -
+`PAYSTACK_SECRET_KEY=true`, an array - now fails when the driver is built, with
+`InvalidConfigurationException`, instead of later signing webhooks with an empty key.
+
+### If you use `subscriptions.prevent_duplicates`
+
+It now works on Stripe, Square, Mollie and Flutterwave; before, it only ever checked Paystack. A
+subscribe that would duplicate an active or non-renewing subscription to the same plan is refused
+with `SubscriptionException`. It still cannot be used with PayPal, which has no API for listing
+subscriptions; see [Subscriptions](subscriptions.md#preventing-duplicate-subscriptions).
+
+### If you listen for refund or subscription events
+
+They now fire for the providers whose webhooks were being dropped: `SubscriptionCreated`,
+`SubscriptionRenewed`, `SubscriptionCancelled` and `SubscriptionPaymentFailed` for Stripe, PayPal,
+Square, Paddle and Flutterwave, and `RefundCompleted` / `RefundFailed` for Stripe, Square and
+Paddle. Listeners that only ever saw Paystack will start receiving these - make sure they are
+idempotent, as queued listeners must be anyway. Also:
+
+- `SubscriptionRenewed` fires for every paid subscription invoice or payment, the first included.
+- A refund cancelled at the provider is recorded as `cancelled` and announced with `RefundFailed`.
+- Stripe's `charge.refunded` no longer counts as a refund event; the refund's own
+  `refund.updated` / `charge.refund.updated` does. Subscribe your Stripe endpoint to those.
+- A Square `RefundCompleted` carries the refunded payment id as its transaction reference, where
+  it carried `''`.
+- `WebhookReceived`'s payload is the body the provider signed. Query-string parameters on the
+  webhook URL are no longer merged into it.
+
+### Smaller behaviour changes
+
+- `PaymentManager::getDefaultDriver()` throws `DriverNotFoundException` when no default is set and
+  no provider is configured; it used to fail with a `TypeError`.
+- `getEnabledProviders()` returns provider configs keyed by name (as it always did; its docblock
+  now says so), and no longer lists an entry that is not an array.
+- `/payments/health` reports a provider configured without an `enabled` key, as the manager
+  charges it.
+- Stripe metadata is sent string to string: nested values as JSON, booleans as `"true"`/`"false"`.
+  Plan metadata used to send `"1"` and `""`.
+- `updatePlan()` refuses an `active` that is not a switch, before calling the provider.
+- A Mollie customer lookup past the first 5,000 customers throws `SubscriptionException` rather
+  than answering "not found" and creating a duplicate customer.
+- A Paystack subscription created without a status in the response is returned with status
+  `unknown` instead of failing.
+
 ### If you referenced `PaymentConstants::MAX_STRING_LENGTH_FOR_TOKEN_CHECK`
 
 It is removed. Nothing in PayZephyr had read it since log sanitization stopped skipping short
@@ -74,6 +141,17 @@ strings; if your code used the value, inline `20`.
 - `PayPalDriver::validateWebhook()` and Mollie's API-verified `validateWebhook()` may now throw
   `WebhookException` when the provider could not be asked, instead of returning `false`. Only
   relevant if you call them directly.
+- `HasWebhookValidation::extractWebhookTimestampFrom()` is removed. Override
+  `extractWebhookTimestamp()` instead, and only to return the time the *event* happened - never
+  a payment's or subscription's creation time, which a retry repeats.
+- `validateWebhookTimestamp()` takes `?int $toleranceSeconds = null` (null reads
+  `security.webhook_timestamp_tolerance`). A driver overriding it must match the new signature.
+- Payload parameters are documented as `array<array-key, mixed>`, which is what a decoded JSON
+  body is. If your driver's docblocks say `array<string, mixed>`, PHPStan may ask you to widen
+  them.
+- New on `AbstractDriver`: `settings()`, a typed reader over the driver's config, and
+  `credential()`, a non-empty string or null. Use `credential()` in `validateConfig()` rather than
+  `empty($this->config[...])`, which accepts values that are not strings.
 
 ### What you will notice
 

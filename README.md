@@ -219,12 +219,9 @@ The full table of contents, if you'd rather browse than read linearly, is in [do
 
 ## Changelog
 
-The current release is **v3.0.0**. See [CHANGELOG.md](docs/CHANGELOG.md) for the full version history.
-
-**v3.0.0 contains one breaking change.** If you bind your own implementation of
-`WebhookEventRepositoryInterface`, it now needs a `forget()` method. If you don't (and most
-apps don't), upgrading needs no code changes from you. The [Upgrade Guide](docs/upgrade-guide.md)
-walks through it.
+The latest release is the one on the Packagist badge above; [CHANGELOG.md](docs/CHANGELOG.md) has
+the full history. Every major version's breaking changes, and what to do about each, are in the
+[Upgrade Guide](docs/upgrade-guide.md).
 
 ## License
 

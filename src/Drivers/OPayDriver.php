@@ -31,10 +31,10 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['merchant_id'])) {
+        if ($this->credential('merchant_id') === null) {
             throw new InvalidConfigurationException('OPay merchant ID is required');
         }
-        if (empty($this->config['public_key'])) {
+        if ($this->credential('public_key') === null) {
             throw new InvalidConfigurationException('OPay public key is required');
         }
     }
@@ -254,7 +254,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
         // The secret key only. This used to fall back to the public key, which
         // is not a secret: a webhook signed with it proves nothing.
-        $secretKey = $this->settings()->string('secret_key');
+        $secretKey = $this->credential('secret_key');
 
         if (! $secretKey) {
             $this->log('warning', 'OPay secret key not configured for webhook validation');

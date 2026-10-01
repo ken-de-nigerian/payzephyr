@@ -59,7 +59,7 @@ final class PayPalDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['client_id']) || empty($this->config['client_secret'])) {
+        if ($this->credential('client_id') === null || $this->credential('client_secret') === null) {
             throw new InvalidConfigurationException('PayPal client ID and secret are required');
         }
     }

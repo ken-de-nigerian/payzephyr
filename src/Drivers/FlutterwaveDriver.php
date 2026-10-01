@@ -35,7 +35,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['secret_key'])) {
+        if ($this->credential('secret_key') === null) {
             throw new InvalidConfigurationException('Flutterwave secret key is required');
         }
     }
@@ -230,15 +230,10 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
             return false;
         }
 
-        $secretHash = $this->settings()->string('webhook_secret') ?? $this->settings()->string('secret_key');
-
-        if (empty($secretHash)) {
-            $this->log('warning', 'Webhook secret hash not configured', [
-                'hint' => 'Set FLUTTERWAVE_WEBHOOK_SECRET in your .env file, or ensure FLUTTERWAVE_SECRET_KEY is set. Get the Secret Hash from Flutterwave Dashboard → Settings → Webhooks → Secret Hash',
-            ]);
-
-            return false;
-        }
+        // A blank FLUTTERWAVE_WEBHOOK_SECRET= reads as '', which used to stop
+        // the fallback and reject every webhook. The secret key is always
+        // there to fall back to: validateConfig() refuses a driver without it.
+        $secretHash = $this->credential('webhook_secret') ?? (string) $this->credential('secret_key');
 
         $isValid = hash_equals($signature, $secretHash);
 

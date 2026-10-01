@@ -48,7 +48,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['secret_key'])) {
+        if ($this->credential('secret_key') === null) {
             throw new InvalidConfigurationException('Stripe secret key is required');
         }
     }
@@ -286,7 +286,9 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        if (empty($this->config['webhook_secret'])) {
+        $webhookSecret = $this->credential('webhook_secret');
+
+        if ($webhookSecret === null) {
             $this->log('warning', 'Webhook secret not configured', [
                 'hint' => 'Set STRIPE_WEBHOOK_SECRET in your .env file. Get it from Stripe Dashboard → Developers → Webhooks → Select endpoint → Signing secret',
             ]);
@@ -303,7 +305,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             Webhook::constructEvent(
                 $body,
                 $signature,
-                (string) $this->settings()->string('webhook_secret'),
+                $webhookSecret,
                 $this->webhookTimestampTolerance()
             );
 

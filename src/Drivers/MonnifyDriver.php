@@ -40,10 +40,10 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['api_key']) || empty($this->config['secret_key'])) {
+        if ($this->credential('api_key') === null || $this->credential('secret_key') === null) {
             throw new InvalidConfigurationException('Monnify API key and secret key are required');
         }
-        if (empty($this->config['contract_code'])) {
+        if ($this->credential('contract_code') === null) {
             throw new InvalidConfigurationException('Monnify contract code is required');
         }
     }

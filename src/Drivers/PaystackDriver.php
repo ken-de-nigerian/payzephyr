@@ -34,7 +34,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['secret_key'])) {
+        if ($this->credential('secret_key') === null) {
             throw new InvalidConfigurationException('Paystack secret key is required');
         }
     }

@@ -44,7 +44,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function requiresAsyncVerification(): bool
     {
-        return empty($this->config['webhook_secret']);
+        return $this->credential('webhook_secret') === null;
     }
 
     /**
@@ -68,7 +68,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['api_key'])) {
+        if ($this->credential('api_key') === null) {
             throw new InvalidConfigurationException('Mollie API key is required');
         }
     }
@@ -240,7 +240,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        if (! empty($this->config['webhook_secret'])) {
+        if ($this->credential('webhook_secret') !== null) {
             return $this->validateWebhookSignature($headers, $body);
         }
 

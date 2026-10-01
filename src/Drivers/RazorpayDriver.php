@@ -42,7 +42,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['key_id']) || empty($this->config['key_secret'])) {
+        if ($this->credential('key_id') === null || $this->credential('key_secret') === null) {
             throw new InvalidConfigurationException('Razorpay key id and key secret are required');
         }
     }
@@ -217,8 +217,8 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        $secret = $this->settings()->string('webhook_secret');
-        if (empty($secret)) {
+        $secret = $this->credential('webhook_secret');
+        if ($secret === null) {
             $this->log('warning', 'Webhook rejected: no webhook secret configured', [
                 'hint' => 'Set RAZORPAY_WEBHOOK_SECRET to the secret entered for this webhook in the Razorpay Dashboard.',
             ]);

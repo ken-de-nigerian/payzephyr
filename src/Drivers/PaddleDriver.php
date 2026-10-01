@@ -37,7 +37,7 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['api_key'])) {
+        if ($this->credential('api_key') === null) {
             throw new InvalidConfigurationException('Paddle API key is required');
         }
     }
@@ -206,8 +206,8 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function validateWebhook(array $headers, string $body): bool
     {
-        $secret = $this->settings()->string('webhook_secret');
-        if (empty($secret)) {
+        $secret = $this->credential('webhook_secret');
+        if ($secret === null) {
             $this->log('warning', 'Webhook rejected: no webhook secret configured', [
                 'hint' => 'Set PADDLE_WEBHOOK_SECRET to the endpoint secret key from Paddle > Developer tools > Notifications.',
             ]);
@@ -224,25 +224,34 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $parts = [];
+        // `ts=...;h1=...`, with one h1 per secret while a secret is being
+        // rotated. Keeping only the last h1 rejected a delivery whose match was
+        // an earlier one.
+        $timestamp = null;
+        $signatures = [];
         foreach (explode(';', $header) as $segment) {
             $pair = explode('=', $segment, 2);
-            if (count($pair) === 2) {
-                $parts[trim($pair[0])] = trim($pair[1]);
+            if (count($pair) !== 2) {
+                continue;
+            }
+
+            [$name, $value] = [trim($pair[0]), trim($pair[1])];
+
+            if ($name === 'ts') {
+                $timestamp = $value;
+            } elseif ($name === 'h1') {
+                $signatures[] = $value;
             }
         }
 
-        $timestamp = $parts['ts'] ?? null;
-        $signature = $parts['h1'] ?? null;
-
-        if (! $timestamp || ! $signature || ! ctype_digit($timestamp)) {
+        if (! $timestamp || $signatures === [] || ! ctype_digit($timestamp)) {
             $this->log('warning', 'Webhook signature header malformed');
 
             return false;
         }
 
         $expected = hash_hmac('sha256', $timestamp.':'.$body, $secret);
-        if (! hash_equals($expected, $signature)) {
+        if (array_filter($signatures, fn (string $signature): bool => hash_equals($expected, $signature)) === []) {
             $this->log('warning', 'Webhook signature validation failed', [
                 'hint' => 'PADDLE_WEBHOOK_SECRET must match the secret key of the notification destination that sent this event.',
             ]);

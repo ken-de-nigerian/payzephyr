@@ -36,10 +36,10 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function validateConfig(): void
     {
-        if (empty($this->config['access_token'])) {
+        if ($this->credential('access_token') === null) {
             throw new InvalidConfigurationException('Square access token is required');
         }
-        if (empty($this->config['location_id'])) {
+        if ($this->credential('location_id') === null) {
             throw new InvalidConfigurationException('Square location ID is required');
         }
     }
@@ -573,9 +573,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             return false;
         }
 
-        $webhookSignatureKey = $this->settings()->string('webhook_signature_key');
+        $webhookSignatureKey = $this->credential('webhook_signature_key');
 
-        if (! $webhookSignatureKey) {
+        if ($webhookSignatureKey === null) {
             $this->log('warning', 'Webhook signature key not configured', [
                 'hint' => 'Set SQUARE_WEBHOOK_SIGNATURE_KEY in your .env file. Get it from Square Dashboard → Developers → Webhooks → Select endpoint → Signature Key',
             ]);

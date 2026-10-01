@@ -620,6 +620,23 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * A configured credential - a key, a secret, an id - or null when there is
+     * none worth the name.
+     *
+     * Checking the raw config with empty() let through any value that was not
+     * a string: `PAYSTACK_SECRET_KEY=true` reaches the config as boolean true
+     * from env(). The signing code then read it as a string, found none, and
+     * signed with an empty key - one anyone can sign with too. A credential is
+     * a non-empty string or it is missing.
+     */
+    protected function credential(string $key): ?string
+    {
+        $value = $this->settings()->string($key);
+
+        return $value === null || $value === '' ? null : $value;
+    }
+
+    /**
      * Record that a request to the provider is about to be sent.
      *
      * makeRequest() calls this for every HTTP request; a driver that talks to

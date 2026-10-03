@@ -84,6 +84,7 @@
         "rector": "vendor/bin/rector process --dry-run",
         "mutation": [
             "Composer\\Config::disableProcessTimeout",
+            "@php scripts/patch-pest-mutate.php",
             "@php -d pcov.enabled=1 vendor/bin/pest --mutate --parallel --min=100 --class=\"KenDeNigerian\\PayZephyr\\Traits\\HasWebhookValidation,KenDeNigerian\\PayZephyr\\Jobs\\ProcessWebhook,KenDeNigerian\\PayZephyr\\Http\\Requests\\WebhookRequest,KenDeNigerian\\PayZephyr\\Http\\Controllers\\WebhookController,KenDeNigerian\\PayZephyr\\Drivers\\AbstractDriver,KenDeNigerian\\PayZephyr\\Drivers\\FlutterwaveDriver,KenDeNigerian\\PayZephyr\\Drivers\\MollieDriver,KenDeNigerian\\PayZephyr\\Drivers\\MonnifyDriver,KenDeNigerian\\PayZephyr\\Drivers\\OPayDriver,KenDeNigerian\\PayZephyr\\Drivers\\PaddleDriver,KenDeNigerian\\PayZephyr\\Drivers\\PayPalDriver,KenDeNigerian\\PayZephyr\\Drivers\\PaystackDriver,KenDeNigerian\\PayZephyr\\Drivers\\RazorpayDriver,KenDeNigerian\\PayZephyr\\Drivers\\SquareDriver,KenDeNigerian\\PayZephyr\\Drivers\\StripeDriver\""
         ],
         "format": "vendor/bin/pint"

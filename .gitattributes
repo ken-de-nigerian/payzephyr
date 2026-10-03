@@ -13,6 +13,7 @@
 /pint.json export-ignore
 /composer-require-checker.json export-ignore
 /rector.php export-ignore
+/scripts export-ignore
 
 # Internal engineering history. Kept in the repository - ADR-0011 cites it as
 # the origin of refund support, and three tests reference its finding IDs as

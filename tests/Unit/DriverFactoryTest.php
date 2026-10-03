@@ -106,3 +106,23 @@ test('driver factory register throws exception if class does not implement Drive
     expect(fn () => $factory->register('bad', stdClass::class))
         ->toThrow(DriverNotFoundException::class, 'must implement DriverInterface');
 });
+
+test('each bundled driver resolves by name to its exact class', function (string $name, string $class) {
+    // Exact, case included: "paypal" used to resolve to PaypalDriver, which
+    // only loads where file names ignore case, or once PayPalDriver was loaded.
+    $resolve = (new ReflectionClass(DriverFactory::class))->getMethod('resolveDriverClass');
+
+    expect($resolve->invoke(new DriverFactory, $name))->toBe($class)
+        ->and($resolve->invoke(new DriverFactory, strtoupper($name)))->toBe($class);
+})->with([
+    ['flutterwave', \KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver::class],
+    ['mollie', \KenDeNigerian\PayZephyr\Drivers\MollieDriver::class],
+    ['monnify', \KenDeNigerian\PayZephyr\Drivers\MonnifyDriver::class],
+    ['opay', \KenDeNigerian\PayZephyr\Drivers\OPayDriver::class],
+    ['paddle', \KenDeNigerian\PayZephyr\Drivers\PaddleDriver::class],
+    ['paypal', \KenDeNigerian\PayZephyr\Drivers\PayPalDriver::class],
+    ['paystack', \KenDeNigerian\PayZephyr\Drivers\PaystackDriver::class],
+    ['razorpay', \KenDeNigerian\PayZephyr\Drivers\RazorpayDriver::class],
+    ['square', \KenDeNigerian\PayZephyr\Drivers\SquareDriver::class],
+    ['stripe', \KenDeNigerian\PayZephyr\Drivers\StripeDriver::class],
+]);

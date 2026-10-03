@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **On Linux, a PayPal or OPay provider configured without `driver_class` could not be
+  resolved.** A driver name was turned into a class name - `paypal` into `PaypalDriver` - and
+  the classes are `PayPalDriver` and `OPayDriver`. PHP class names ignore case, so this worked
+  on Windows and macOS, or once the class happened to be loaded; on Linux the autoloader looked
+  for `PaypalDriver.php` and failed with "Driver class not found". The shipped config sets
+  `driver_class`, so this hit configs published before it did. Bundled drivers now resolve by
+  name to their exact class.
+
 - **On PostgreSQL, a webhook delivered twice failed instead of being skipped as a duplicate.**
   A duplicate key was recognised by SQLSTATE 23000, which is SQLite's and MySQL's code;
   PostgreSQL reports 23505, so the second delivery's insert into `webhook_events` threw and the

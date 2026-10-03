@@ -172,15 +172,8 @@ abstract class AbstractDriver implements DriverInterface
 
             $headers = Payload::of($options)->array('headers');
 
-            $headersAlreadySet = false;
-            foreach (array_keys($idempotencyHeaders) as $headerName) {
-                if (isset($headers[$headerName])) {
-                    $headersAlreadySet = true;
-                    break;
-                }
-            }
-
-            if (! $headersAlreadySet) {
+            // A caller that set the header itself keeps its own value.
+            if (array_intersect_key($idempotencyHeaders, $headers) === []) {
                 $options['headers'] = array_merge(
                     $headers,
                     $idempotencyHeaders
@@ -192,7 +185,7 @@ abstract class AbstractDriver implements DriverInterface
         $traceable = $reference !== null && $reference !== '';
         $withBodies = $traceable && $this->traceRecordsHttpBodies();
 
-        $startedAt = microtime(true);
+        $startedAt = $this->nowInMilliseconds();
 
         if ($traceable) {
             $this->trace($reference, TraceEvent::PROVIDER_REQUEST_SENT, TraceDirection::OUTBOUND,
@@ -220,7 +213,7 @@ abstract class AbstractDriver implements DriverInterface
                     httpMethod: $method,
                     httpUrl: $this->absoluteUri($uri),
                     httpStatusCode: $e instanceof RequestException ? $e->getResponse()?->getStatusCode() : null,
-                    responseTimeMs: (int) round((microtime(true) - $startedAt) * 1000),
+                    responseTimeMs: $this->nowInMilliseconds() - $startedAt,
                 );
             }
 
@@ -245,11 +238,20 @@ abstract class AbstractDriver implements DriverInterface
                 httpMethod: $method,
                 httpUrl: $this->absoluteUri($uri),
                 httpStatusCode: $response->getStatusCode(),
-                responseTimeMs: (int) round((microtime(true) - $startedAt) * 1000),
+                responseTimeMs: $this->nowInMilliseconds() - $startedAt,
             );
         }
 
         return $response;
+    }
+
+    /**
+     * The current time in whole milliseconds, through Carbon - so a test that
+     * freezes or advances time sees the response time it set.
+     */
+    private function nowInMilliseconds(): int
+    {
+        return (int) now()->getPreciseTimestamp(3);
     }
 
     /**

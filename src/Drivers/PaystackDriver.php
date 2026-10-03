@@ -288,7 +288,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             $this->log('error', 'Health check failed', [
                 'error' => $e->getMessage(),
                 'exception_class' => $e::class,
-                'previous_class' => $previous ? $previous::class : null,
+                'previous_class' => $previous instanceof Throwable ? $previous::class : null,
             ]);
 
             return false;

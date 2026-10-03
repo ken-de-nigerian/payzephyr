@@ -85,7 +85,11 @@ test('sensitive payload fields are redacted before they reach the database', fun
 
     $stored = PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->first();
 
-    expect($stored->payload)->toBe(['amount' => 5000, 'cvv' => PayloadRedactor::REDACTED]);
+    // Key by key: MySQL's JSON type stores an object's keys sorted, so the
+    // order they come back in is the database's, not the one written.
+    expect($stored->payload)->toEqual(['amount' => 5000, 'cvv' => PayloadRedactor::REDACTED])
+        ->and($stored->payload['cvv'])->toBe(PayloadRedactor::REDACTED)
+        ->and($stored->payload['amount'])->toBe(5000);
 });
 
 test('trace rows are append-only, so recording twice keeps both steps', function () {

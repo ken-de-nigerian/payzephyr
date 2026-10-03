@@ -232,6 +232,17 @@ abstract class TestCase extends Orchestra
             return;
         }
 
+        // Every test boots a new application, and with it new connections; a
+        // server keeps each one open until it is closed, and refuses new ones
+        // once a few hundred tests have run ("too many connections").
+        $this->beforeApplicationDestroyed(function (): void {
+            $db = $this->app->make('db');
+
+            foreach (array_keys($db->getConnections()) as $name) {
+                $db->purge($name);
+            }
+        });
+
         // Not loadMigrationsFrom(): Testbench rolls those migrations back
         // after every test, which would rebuild a server database each time.
         $this->app->make('migrator')->path(__DIR__.'/../database/migrations');

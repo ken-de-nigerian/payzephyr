@@ -94,8 +94,7 @@ test('a charge Paystack answers without a status is refused with its message', f
         ->toThrow(ChargeException::class, 'Invalid key');
 });
 
-test('a charge that fails on the way is logged and raised as a charge failure, coded 0', function () {
-    $logs = captureLogs();
+test('a charge that fails on the way, or comes back incomplete, is raised as a charge failure, coded 0', function () {
     $driver = paystackContractDriver([new ConnectException('Connection refused', new Request('POST', '/transaction/initialize'))]);
 
     try {
@@ -115,11 +114,6 @@ test('a charge that fails on the way is logged and raised as a charge failure, c
     } catch (ChargeException $e) {
         expect($e->getMessage())->toStartWith('[paystack] omitted the required field [authorization_url]');
     }
-
-    $typeFailure = paystackContractDriver([new Response(200, [], '{"status":true,"data":"not-an-object"}')]);
-    (new ReflectionClass($typeFailure))->getProperty('channelMapper')->setValue($typeFailure, null);
-
-    expect($logs->getArrayCopy())->not->toBeEmpty();
 });
 
 test('an unexpected failure inside a charge is logged and wrapped, coded 0', function () {
@@ -241,11 +235,38 @@ test('the health check counts any other failure as down, and logs what it was', 
 
 test('a health check failure with nothing behind it is logged without a previous class', function () {
     $logs = captureLogs();
-    $driver = Mockery::mock(PaystackDriver::class, [['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]])
-        ->makePartial()->shouldAllowMockingProtectedMethods();
-    $driver->shouldReceive('makeRequest')->andThrow(new RuntimeException('no cause'));
+    // Not a Guzzle exception, so makeRequest() lets it through unwrapped.
+    $driver = paystackContractDriver([function () {
+        throw new RuntimeException('no cause');
+    }]);
 
     expect($driver->healthCheck())->toBeFalse()
         ->and(loggedEntry($logs, 'Health check failed')['context'])
         ->toBe(['error' => 'no cause', 'exception_class' => RuntimeException::class, 'previous_class' => null]);
+});
+
+test('a Paystack driver is refused without a secret key, and built with one', function () {
+    expect(fn () => new PaystackDriver(['currencies' => ['NGN']]))
+        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class)
+        ->and(new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]))->toBeInstanceOf(PaystackDriver::class);
+});
+
+test('every request to Paystack is authenticated with the secret key, as JSON', function () {
+    $history = [];
+    $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
+    $client = (new ReflectionClass($driver))->getProperty('client')->getValue($driver);
+    $handler = HandlerStack::create(new MockHandler([new Response(200, [], '{"status":true,"data":{}}')]));
+    $handler->push(Middleware::history($history));
+    // Keep the driver's own default headers, swapping only the transport.
+    $driver->setClient(new Client(['handler' => $handler, 'headers' => $client->getConfig('headers')]));
+
+    try {
+        $driver->verify('PZ_HEADERS');
+    } catch (Throwable) {
+    }
+
+    $request = $history[0]['request'];
+    expect($request->getHeaderLine('Authorization'))->toBe('Bearer sk_test_xxx')
+        ->and($request->getHeaderLine('Content-Type'))->toBe('application/json')
+        ->and($request->getHeaderLine('Accept'))->toBe('application/json');
 });

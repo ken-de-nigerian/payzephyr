@@ -59,7 +59,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function initializeClient(): void
     {
         parent::initializeClient();
-        $this->stripe = new StripeClient((string) $this->settings()->string('secret_key'));
+        $this->stripe = new StripeClient($this->requiredCredential('secret_key'));
     }
 
     /**

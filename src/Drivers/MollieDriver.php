@@ -272,7 +272,7 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
         }
 
         $signature = str_replace('sha256=', '', $signature);
-        $expectedSignature = hash_hmac('sha256', $body, (string) $this->settings()->string('webhook_secret'));
+        $expectedSignature = hash_hmac('sha256', $body, $this->requiredCredential('webhook_secret'));
         $isValid = hash_equals($signature, $expectedSignature);
 
         if (! $isValid) {

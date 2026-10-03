@@ -639,6 +639,22 @@ abstract class AbstractDriver implements DriverInterface
     }
 
     /**
+     * A credential the driver cannot work without, which validateConfig()
+     * has already required.
+     *
+     * Reading it as `(string) credential()` turned a missing one into an empty
+     * string - a key anyone can sign with - wherever validateConfig() had not
+     * run first. This fails instead.
+     *
+     * @throws InvalidConfigurationException
+     */
+    protected function requiredCredential(string $key): string
+    {
+        return $this->credential($key)
+            ?? throw new InvalidConfigurationException("[{$this->getName()}] $key is not configured.");
+    }
+
+    /**
      * Record that a request to the provider is about to be sent.
      *
      * makeRequest() calls this for every HTTP request; a driver that talks to

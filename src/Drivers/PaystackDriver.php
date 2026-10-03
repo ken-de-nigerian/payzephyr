@@ -207,7 +207,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             return false;
         }
 
-        $hash = hash_hmac('sha512', $body, (string) $this->settings()->string('secret_key'));
+        $hash = hash_hmac('sha512', $body, $this->requiredCredential('secret_key'));
         $signatureValid = hash_equals($signature, $hash);
 
         if (! $signatureValid) {

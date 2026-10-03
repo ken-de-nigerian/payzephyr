@@ -54,7 +54,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
             'Content-Type' => 'application/json',
             'Accept' => 'application/json',
             'Authorization' => 'Bearer '.$this->settings()->string('public_key'),
-            'MerchantId' => (string) $this->settings()->string('merchant_id'),
+            'MerchantId' => $this->requiredCredential('merchant_id'),
         ];
     }
 
@@ -179,7 +179,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 'json' => $payload,
                 'headers' => [
                     'Authorization' => 'Bearer '.$signature,
-                    'MerchantId' => (string) $this->settings()->string('merchant_id'),
+                    'MerchantId' => $this->requiredCredential('merchant_id'),
                 ],
             ]);
 

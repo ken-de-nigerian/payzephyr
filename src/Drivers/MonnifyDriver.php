@@ -235,7 +235,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
         if (! $signature) {
             return false;
         }
-        $hash = hash_hmac('sha512', $body, (string) $this->settings()->string('secret_key'));
+        $hash = hash_hmac('sha512', $body, $this->requiredCredential('secret_key'));
 
         // No payload replay window: no field in Monnify's payloads is confirmed
         // to be the time of the event rather than of the payment or refund it

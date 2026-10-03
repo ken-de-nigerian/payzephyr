@@ -256,3 +256,11 @@ test('channels are not mapped for a provider that does not take them', function 
 
     expect(callDriver($driver, 'mapChannels', new ChargeRequestDTO(amount: 10, currency: 'NGN', email: 'a@b.com', channels: ['card'])))->toBeNull();
 });
+
+test('a required credential that is missing fails rather than reading as an empty string', function () {
+    $driver = driverWith([]);
+    (new ReflectionClass($driver))->getProperty('config')->setValue($driver, ['secret_key' => '']);
+
+    expect(fn () => callDriver($driver, 'requiredCredential', 'secret_key'))
+        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class, '[paystack] secret_key is not configured.');
+});

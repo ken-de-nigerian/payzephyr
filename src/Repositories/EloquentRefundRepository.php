@@ -29,10 +29,12 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
                 return $existing;
             }
 
+            // In a savepoint: PostgreSQL aborts the whole transaction on a
+            // failed statement, and the lookup below must still run.
             try {
-                return RefundTransaction::create(
+                return DB::connection()->transaction(fn (): RefundTransaction => RefundTransaction::create(
                     array_merge(['refund_reference' => $refundReference], $attributes)
-                );
+                ));
             } catch (QueryException $e) {
                 if (! $this->isUniqueConstraintViolation($e)) {
                     throw $e;

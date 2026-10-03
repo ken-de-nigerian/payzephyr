@@ -222,15 +222,10 @@ test('the create-race path also keeps a terminal outcome it lost the race to', f
     // The select finds nothing, then a concurrent writer inserts the refund -
     // already completed - before this create runs. The create hits the unique
     // index and falls back to updating the row that won.
-    RefundTransaction::creating(function (RefundTransaction $refund) {
-        if ($refund->refund_reference === 'REF_RACE' && ! RefundTransaction::where('refund_reference', 'REF_RACE')->exists()) {
-            \Illuminate\Support\Facades\DB::table((new RefundTransaction)->getTable())->insert([
-                'refund_reference' => 'REF_RACE', 'transaction_reference' => 'TXN_RACE', 'provider' => 'paystack',
-                'status' => 'completed', 'amount' => 1000, 'currency' => 'NGN',
-                'created_at' => now(), 'updated_at' => now(),
-            ]);
-        }
-    });
+    insertConcurrentlyAfterLookup((new RefundTransaction)->getTable(), [
+        'refund_reference' => 'REF_RACE', 'transaction_reference' => 'TXN_RACE', 'provider' => 'paystack',
+        'status' => 'completed', 'amount' => 1000, 'currency' => 'NGN',
+    ]);
 
     $result = $this->repository->updateOrCreateAtomic('REF_RACE', [
         'transaction_reference' => 'TXN_RACE', 'provider' => 'paystack',

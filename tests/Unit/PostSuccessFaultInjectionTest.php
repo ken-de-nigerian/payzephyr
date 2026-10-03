@@ -126,30 +126,20 @@ test('a PaymentInitiated listener that throws never reaches the fallback provide
 
 test('updateOrCreateAtomic recovers when another writer wins the create race', function () {
     // Reproduces the lost create race: the row does not exist when we look,
-    // but does by the time we insert. A `creating` hook inserts the competing
-    // row, so create() hits the unique constraint exactly as a concurrent
-    // writer would cause - and the repository must then load and update the
-    // winner's row instead of losing this event's data.
+    // but does by the time we insert, so create() hits the unique constraint
+    // exactly as a concurrent writer would cause - and the repository must
+    // then load and update the winner's row instead of losing this event's
+    // data.
     $repo = new EloquentRefundRepository;
 
-    $raced = false;
-    RefundTransaction::creating(function (RefundTransaction $model) use (&$raced) {
-        if ($raced || $model->refund_reference !== 'rf_raced') {
-            return;
-        }
-        $raced = true;
-
-        RefundTransaction::withoutEvents(function () {
-            RefundTransaction::create([
-                'refund_reference' => 'rf_raced',
-                'transaction_reference' => 'txn_race',
-                'provider' => 'primary',
-                'status' => 'pending',
-                'amount' => 10.00,
-                'currency' => 'NGN',
-            ]);
-        });
-    });
+    insertConcurrentlyAfterLookup((new RefundTransaction)->getTable(), [
+        'refund_reference' => 'rf_raced',
+        'transaction_reference' => 'txn_race',
+        'provider' => 'primary',
+        'status' => 'pending',
+        'amount' => 10.00,
+        'currency' => 'NGN',
+    ]);
 
     $result = $repo->updateOrCreateAtomic('rf_raced', [
         'transaction_reference' => 'txn_race',
@@ -159,10 +149,7 @@ test('updateOrCreateAtomic recovers when another writer wins the create race', f
         'currency' => 'NGN',
     ]);
 
-    RefundTransaction::flushEventListeners();
-
-    expect($raced)->toBeTrue()
-        ->and($result->status)->toBe('completed')
+    expect($result->status)->toBe('completed')
         ->and(RefundTransaction::where('refund_reference', 'rf_raced')->count())->toBe(1);
 });
 

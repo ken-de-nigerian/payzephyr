@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
 
@@ -12,58 +14,28 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
  * then loses a real race to a concurrent insert of the same subscription_code.
  *
  * tests/Unit/SubscriptionRepositoryTest.php's "recovers when the create step
- * loses a race..." test explicitly does NOT exercise this branch (its own
- * comment says so) because it pre-creates the row before calling the
- * repository, so the initial SELECT already finds it and takes the "existing"
- * branch. Here the competing row is inserted *during* create(), via a
- * `creating` model event that simulates the unique-constraint failure a real
- * concurrent writer would cause.
+ * loses a race..." test does not exercise this branch: it pre-creates the row,
+ * so the initial select finds it. Here the competing row lands between the
+ * select and the insert, and the insert hits the real unique index - on every
+ * database the suite runs on, so PostgreSQL's 23505 and its aborted
+ * transaction are exercised too.
  */
 beforeEach(function () {
     $this->repository = new EloquentSubscriptionRepository;
 });
 
-afterEach(function () {
-    // The `creating` listener registered below is stored statically on the
-    // model class - remove it so it doesn't leak into other test files.
-    SubscriptionTransaction::flushEventListeners();
-});
-
 test('updateOrCreateAtomic recovers when create() genuinely loses the insert race', function () {
-    $subscriptionCode = 'SUB_RACE_CODE';
+    insertConcurrentlyAfterLookup((new SubscriptionTransaction)->getTable(), [
+        'subscription_code' => 'SUB_RACE_CODE',
+        'provider' => 'paystack',
+        'status' => 'active',
+        'plan_code' => 'PLN_RACE',
+        'customer_email' => 'racer@example.com',
+        'amount' => 2500,
+        'currency' => 'NGN',
+    ]);
 
-    SubscriptionTransaction::creating(function (SubscriptionTransaction $model) use ($subscriptionCode) {
-        if ($model->subscription_code !== $subscriptionCode) {
-            return;
-        }
-
-        // Simulate a concurrent writer winning the race: insert the
-        // competing row directly (bypassing Eloquent events to avoid
-        // recursion), then throw the QueryException that a real unique
-        // index violation would raise for our own INSERT.
-        \Illuminate\Support\Facades\DB::table('subscription_transactions')->insert([
-            'subscription_code' => $subscriptionCode,
-            'provider' => 'paystack',
-            'status' => 'active',
-            'plan_code' => 'PLN_RACE',
-            'customer_email' => 'racer@example.com',
-            'amount' => 2500,
-            'currency' => 'NGN',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
-
-        $previous = new PDOException('UNIQUE constraint failed: subscription_transactions.subscription_code', 23000);
-
-        throw new \Illuminate\Database\QueryException(
-            'testing',
-            'insert into "subscription_transactions" ...',
-            [],
-            $previous
-        );
-    });
-
-    $result = $this->repository->updateOrCreateAtomic($subscriptionCode, [
+    $result = $this->repository->updateOrCreateAtomic('SUB_RACE_CODE', [
         'provider' => 'paystack',
         'status' => 'renewed-after-race',
         'plan_code' => 'PLN_RACE',
@@ -72,37 +44,30 @@ test('updateOrCreateAtomic recovers when create() genuinely loses the insert rac
         'currency' => 'NGN',
     ]);
 
-    expect($result->subscription_code)->toBe($subscriptionCode)
+    expect($result->subscription_code)->toBe('SUB_RACE_CODE')
         ->and($result->status)->toBe('renewed-after-race')
-        ->and(SubscriptionTransaction::where('subscription_code', $subscriptionCode)->count())->toBe(1);
+        ->and(SubscriptionTransaction::where('subscription_code', 'SUB_RACE_CODE')->count())->toBe(1);
 });
 
-test('updateOrCreateAtomic rethrows a non-unique-constraint QueryException raised during create()', function () {
-    $subscriptionCode = 'SUB_RACE_OTHER_ERROR';
+test('updateOrCreateAtomic rethrows an integrity failure that is not a duplicate', function () {
+    // A missing NOT NULL column is SQLSTATE 23000 on SQLite and MySQL - the
+    // code the duplicate check used to treat as "duplicate key", which sent
+    // this down the race path to a ModelNotFoundException instead.
+    $thrown = null;
 
-    SubscriptionTransaction::creating(function (SubscriptionTransaction $model) use ($subscriptionCode) {
-        if ($model->subscription_code !== $subscriptionCode) {
-            return;
-        }
+    try {
+        $this->repository->updateOrCreateAtomic('SUB_NO_CURRENCY', [
+            'provider' => 'paystack',
+            'status' => 'active',
+            'plan_code' => 'PLN_RACE',
+            'customer_email' => 'racer2@example.com',
+            'amount' => 2500,
+        ]);
+    } catch (Throwable $e) {
+        $thrown = $e;
+    }
 
-        $previous = new PDOException('database is locked', 40001);
-
-        throw new \Illuminate\Database\QueryException(
-            'testing',
-            'insert into "subscription_transactions" ...',
-            [],
-            $previous
-        );
-    });
-
-    expect(fn () => $this->repository->updateOrCreateAtomic($subscriptionCode, [
-        'provider' => 'paystack',
-        'status' => 'active',
-        'plan_code' => 'PLN_RACE',
-        'customer_email' => 'racer2@example.com',
-        'amount' => 2500,
-        'currency' => 'NGN',
-    ]))->toThrow(\Illuminate\Database\QueryException::class);
-
-    expect(SubscriptionTransaction::where('subscription_code', $subscriptionCode)->count())->toBe(0);
+    expect($thrown)->toBeInstanceOf(QueryException::class)
+        ->and($thrown)->not->toBeInstanceOf(UniqueConstraintViolationException::class)
+        ->and(SubscriptionTransaction::where('subscription_code', 'SUB_NO_CURRENCY')->count())->toBe(0);
 });

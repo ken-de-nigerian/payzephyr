@@ -203,15 +203,11 @@ test('the create-race path refuses a stale write too', function () {
     // The select finds nothing, then a concurrent writer inserts the row with
     // newer state before this create runs; the fallback update must still
     // compare send times.
-    SubscriptionTransaction::creating(function (SubscriptionTransaction $row) {
-        if ($row->subscription_code === 'SUB_RACE' && ! SubscriptionTransaction::where('subscription_code', 'SUB_RACE')->exists()) {
-            Illuminate\Support\Facades\DB::table((new SubscriptionTransaction)->getTable())->insert([
-                'subscription_code' => 'SUB_RACE', 'provider' => 'paystack', 'status' => 'cancelled',
-                'plan_code' => 'PLN_1', 'customer_email' => 'test@example.com', 'amount' => 5000, 'currency' => 'NGN',
-                'state_as_of' => '2026-09-28 12:00:05.000000', 'created_at' => now(), 'updated_at' => now(),
-            ]);
-        }
-    });
+    insertConcurrentlyAfterLookup((new SubscriptionTransaction)->getTable(), [
+        'subscription_code' => 'SUB_RACE', 'provider' => 'paystack', 'status' => 'cancelled',
+        'plan_code' => 'PLN_1', 'customer_email' => 'test@example.com', 'amount' => 5000, 'currency' => 'NGN',
+        'state_as_of' => '2026-09-28 12:00:05.000000',
+    ]);
 
     $result = $this->repository->updateOrCreateAtomic('SUB_RACE', subscriptionAttributes('active', Carbon\CarbonImmutable::parse('2026-09-28 12:00:00')));
 

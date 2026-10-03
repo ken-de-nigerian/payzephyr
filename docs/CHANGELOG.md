@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **On PostgreSQL, a webhook delivered twice failed instead of being skipped as a duplicate.**
+  A duplicate key was recognised by SQLSTATE 23000, which is SQLite's and MySQL's code;
+  PostgreSQL reports 23505, so the second delivery's insert into `webhook_events` threw and the
+  job failed and retried. The same check guards the refund and subscription logs, where a lost
+  insert race threw instead of updating the row that won. Duplicates are now recognised by
+  Laravel's `UniqueConstraintViolationException`, which each database driver raises for its own
+  code - which also stops MySQL treating a NOT NULL or foreign-key failure (also 23000) as a
+  duplicate. The insert that can lose the race now runs in a savepoint, since PostgreSQL aborts
+  the whole transaction on a failed statement and the row that won could not otherwise be read.
 
 ---
 ## [5.0.0] - 2026-10-02

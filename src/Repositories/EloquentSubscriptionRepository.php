@@ -62,10 +62,12 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
                 return $this->applyUnlessStale($existing, $attributes);
             }
 
+            // In a savepoint: PostgreSQL aborts the whole transaction on a
+            // failed statement, and the lookup below must still run.
             try {
-                return SubscriptionTransaction::create(
+                return DB::connection()->transaction(fn (): SubscriptionTransaction => SubscriptionTransaction::create(
                     array_merge(['subscription_code' => $subscriptionCode], $attributes)
-                );
+                ));
             } catch (QueryException $e) {
                 if (! $this->isUniqueConstraintViolation($e)) {
                     throw $e;

@@ -423,19 +423,13 @@ final class ProcessWebhook implements ShouldQueue
 
     protected function determineStatus(PaymentManager $manager, StatusNormalizerInterface $statusNormalizer): string
     {
-        try {
-            $status = $manager->driver($this->provider)->extractWebhookStatus($this->payload);
+        // Only called with a reference, which only a resolved driver yields;
+        // the manager caches it, so this resolution cannot fail. The fallback
+        // that read the body's own status fields for an unresolvable driver
+        // could never run.
+        $status = $manager->driver($this->provider)->extractWebhookStatus($this->payload);
 
-            return $statusNormalizer->normalize($status, $this->provider);
-        } catch (DriverNotFoundException) {
-            $body = new Payload($this->payload);
-            $status = $body->string('status')
-                ?? $body->string('paymentStatus')
-                ?? $body->string('payment_status')
-                ?? 'unknown';
-
-            return $statusNormalizer->normalize($status, $this->provider);
-        }
+        return $statusNormalizer->normalize($status, $this->provider);
     }
 
     /**
@@ -560,8 +554,10 @@ final class ProcessWebhook implements ShouldQueue
 
         // Square reports a cancellation as an update whose status is CANCELED
         // (or DEACTIVATED), not as an event of its own.
+        $subjectStatus = $subject->string('status');
         $cancelledByStatus = str_contains($eventType, 'subscription.updated')
-            && in_array(strtoupper($subject->string('status') ?? ''), ['CANCELED', 'DEACTIVATED'], true);
+            && $subjectStatus !== null
+            && in_array(strtoupper($subjectStatus), ['CANCELED', 'DEACTIVATED'], true);
 
         if (! $subscriptionCode) {
             $this->log('warning', 'Subscription webhook missing subscription_code', [
@@ -750,7 +746,8 @@ final class ProcessWebhook implements ShouldQueue
             return;
         }
 
-        $status = strtolower($object->string('status') ?? $details->string('status') ?? $details->string('refundStatus') ?? '');
+        $reportedStatus = $object->string('status') ?? $details->string('status') ?? $details->string('refundStatus');
+        $status = $reportedStatus === null ? null : strtolower($reportedStatus);
 
         // `reversed`: a Paddle adjustment undone after it was approved.
         $cancelled = in_array($status, ['canceled', 'cancelled', 'reversed'], true);

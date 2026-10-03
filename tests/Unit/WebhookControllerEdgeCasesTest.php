@@ -11,20 +11,6 @@ use KenDeNigerian\PayZephyr\PaymentManager;
 
 uses(RefreshDatabase::class);
 
-test('webhook controller handles default status in determineStatus', function () {
-    $job = new ProcessWebhook('unknown_provider', ['unknown_field' => 'value']);
-
-    $manager = app(PaymentManager::class);
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
-
-    $reflection = new \ReflectionClass($job);
-    $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
-    $status = $method->invoke($job, $manager, $statusNormalizer);
-
-    expect($status)->toBe('unknown');
-});
-
 test('webhook controller handles paypal status from event_type', function () {
     $job = new ProcessWebhook('paypal', ['event_type' => 'PAYMENT.CAPTURE.COMPLETED']);
 

@@ -106,14 +106,6 @@ test('webhook controller determineStatus handles all provider status formats', f
     $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
-
-    $job = new ProcessWebhook('unknown', []);
-    $manager = app(PaymentManager::class);
-    $reflection = new \ReflectionClass($job);
-    $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
-    $status = $method->invoke($job, $manager, $statusNormalizer);
-    expect($status)->toBe('unknown');
 });
 
 test('webhook controller updateTransactionFromWebhook updates with channel', function () {

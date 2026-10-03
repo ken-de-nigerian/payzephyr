@@ -99,3 +99,18 @@ test('a delivery verified in the job carries its headers, without credentials or
         return true;
     });
 });
+
+test('a queued delivery is answered with its status, and logged with its provider and sender', function () {
+    Queue::fake();
+    $logs = captureLogs();
+    [$json, $server] = signedPaystackDelivery(['event' => 'charge.success', 'data' => ['reference' => 'LOGGED', 'status' => 'success']]);
+
+    $this->call('POST', '/payments/webhook/paystack', [], [], [], $server + ['REMOTE_ADDR' => '203.0.113.7'], $json)
+        ->assertStatus(202)
+        ->assertExactJson(['status' => 'queued']);
+
+    expect(loggedEntry($logs, 'Webhook queued for processing'))->toMatchArray([
+        'level' => 'info',
+        'context' => ['provider' => 'paystack', 'ip' => '203.0.113.7'],
+    ]);
+});

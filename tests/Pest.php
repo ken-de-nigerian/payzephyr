@@ -12,6 +12,7 @@ uses(TestCase::class)->group('arch')->in('Arch');
 require_once __DIR__.'/Helpers/fake_drivers.php';
 require_once __DIR__.'/Helpers/webhook_requests.php';
 require_once __DIR__.'/Helpers/concurrent_writes.php';
+require_once __DIR__.'/Helpers/log_capture.php';
 
 /**
  * Mock the authenticated user behind the Auth facade.

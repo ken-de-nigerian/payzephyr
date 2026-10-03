@@ -125,3 +125,62 @@ test('drivers that enforce no replay window declare no horizon', function (strin
     // a replay could still get through.
     expect(app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider)->webhookReplayHorizon())->toBeNull();
 })->with(['paystack', 'flutterwave', 'monnify', 'opay', 'mollie', 'razorpay']);
+
+function stripeDriverMethod(string $method, mixed ...$args): mixed
+{
+    $driver = new StripeDriver(['secret_key' => 'sk_test', 'currencies' => ['USD']]);
+
+    return (new ReflectionClass($driver))->getMethod($method)->invoke($driver, ...$args);
+}
+
+test('a missing timestamp is rejected with its own warning, not the tolerance one', function () {
+    $logs = captureLogs();
+
+    expect(validateStripeTimestamp(['event' => 'charge.success']))->toBeFalse();
+
+    $entry = loggedEntry($logs, 'Webhook timestamp missing or unrecognized');
+
+    expect($entry['level'])->toBe('warning')
+        ->and($entry['context']['hint'])->toContain('override extractWebhookTimestamp()')
+        ->and(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'outside tolerance window')))->toBe([]);
+});
+
+test('a timestamp outside the window is logged with what was compared', function () {
+    $logs = captureLogs();
+    $sent = time() - 3600;
+
+    expect(stripeDriverMethod('validateWebhookTimestamp', ['timestamp' => $sent], 300))->toBeFalse();
+
+    $context = loggedEntry($logs, 'Webhook timestamp outside tolerance window')['context'];
+
+    expect($context['timestamp'])->toBe($sent)
+        ->and($context['current_time'])->toBeGreaterThanOrEqual($sent + 3600)
+        ->and($context['difference_seconds'])->toBe($context['current_time'] - $sent)
+        ->and($context['tolerance_seconds'])->toBe(300);
+});
+
+test('a timestamp sent as a numeric string is read as one', function () {
+    // strtotime() does not read a bare number, so the string falls through
+    // to the numeric branch, which must make it an int.
+    expect(validateStripeTimestamp(['timestamp' => (string) time()]))->toBeTrue();
+});
+
+test('a tolerance or replay window below one second falls back to the default', function (string $key, string $method, int $default) {
+    config([$key => 0.5]);
+    app()->forgetInstance('payments.config');
+
+    expect(stripeDriverMethod($method))->toBe($default);
+})->with([
+    'tolerance' => ['payments.security.webhook_timestamp_tolerance', 'webhookTimestampTolerance', KenDeNigerian\PayZephyr\Constants\PaymentConstants::WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS],
+    'replay window' => ['payments.webhook.events.replay_window', 'webhookReplayWindow', KenDeNigerian\PayZephyr\Constants\PaymentConstants::WEBHOOK_REPLAY_WINDOW_SECONDS],
+]);
+
+test('a tolerance or replay window of exactly one second is used', function (string $key, string $method) {
+    config([$key => 1]);
+    app()->forgetInstance('payments.config');
+
+    expect(stripeDriverMethod($method))->toBe(1);
+})->with([
+    'tolerance' => ['payments.security.webhook_timestamp_tolerance', 'webhookTimestampTolerance'],
+    'replay window' => ['payments.webhook.events.replay_window', 'webhookReplayWindow'],
+]);

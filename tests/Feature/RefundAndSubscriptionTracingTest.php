@@ -216,6 +216,7 @@ test('a webhook rejected for its signature is recorded on the payment it names, 
 
     $payload = tracedPayload('PAY_FORGED', TraceEvent::WEBHOOK_VALIDATION_FAILED);
     expect($payload['stage'])->toBe('signature')
+        ->and($payload['ip'])->toBe('127.0.0.1')
         ->and($payload)->not->toHaveKey('amount')
         ->and(json_encode($payload))->not->toContain('999999');
 });

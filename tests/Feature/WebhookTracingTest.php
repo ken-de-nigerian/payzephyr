@@ -290,17 +290,25 @@ test('a webhook that could not be queued is recorded, because nothing else will'
     installWebhookDriver(webhookTracingDriver());
 
     Queue::shouldReceive('connection')->andThrow(new RuntimeException('queue backend unreachable'));
+    $logs = captureLogs();
 
     $response = $this->postJson('/payments/webhook/paystack', [
         'event' => 'charge.success',
         'data' => ['reference' => 'PZ_1755000000_abcdef01'],
-    ]);
+    ], ['REMOTE_ADDR' => '203.0.113.9']);
 
     $response->assertStatus(500);
 
     $failed = PaymentTraceEvent::where('event', TraceEvent::WEBHOOK_QUEUE_FAILED->value)->sole();
+    $logged = loggedEntry($logs, 'Webhook queuing failed');
 
-    expect($failed->reference)->toBe('PZ_1755000000_abcdef01')
+    expect($logged['level'])->toBe('error')
+        ->and($logged['context']['provider'])->toBe('paystack')
+        ->and($logged['context']['error'])->toBe('queue backend unreachable')
+        ->and($logged['context']['trace'])->toBeString()->not->toBeEmpty()
+        ->and($failed->payload['error_class'])->toBe(RuntimeException::class)
+        ->and($failed->metadata['ip'])->toBe('203.0.113.9')
+        ->and($failed->reference)->toBe('PZ_1755000000_abcdef01')
         ->and($failed->provider)->toBe('paystack')
         ->and($failed->payload['error'])->toContain('queue backend unreachable')
         ->and($failed->event->isError())->toBeTrue()

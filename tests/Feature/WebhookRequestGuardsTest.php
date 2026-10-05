@@ -152,3 +152,50 @@ test('each field the request validates must have its type', function (string $fi
 test('the validation rules are all optional', function () {
     expect((new WebhookRequest)->rules())->each->toStartWith('sometimes|');
 });
+
+test('a delivery exactly at the size limit is accepted, by its declared length and by its body', function () {
+    config(['payments.webhook.verify_signature' => false]);
+    app()->forgetInstance('payments.config');
+
+    $declared = makeWebhookRequestFor('paystack', '{}', ['Content-Length' => '64']);
+    $body = makeWebhookRequestFor('paystack', str_pad('{}', 64));
+    $body->headers->remove('Content-Length');
+
+    expect($declared->authorize())->toBeTrue()
+        ->and($body->authorize())->toBeTrue();
+});
+
+test('a declared length is read as a number, so trailing junk does not hide its size', function () {
+    // "100x" compared as a string sorts below "64"; as a number it is 100.
+    // Verification is off, so only the size check can refuse it.
+    config(['payments.webhook.verify_signature' => false]);
+    app()->forgetInstance('payments.config');
+
+    expect(makeWebhookRequestFor('paystack', '{}', ['Content-Length' => '100x'])->authorize())->toBeFalse();
+});
+
+test('the size limit is a megabyte when not configured', function (string $length, bool $accepted) {
+    config(['payments.webhook' => ['verify_signature' => false]]);
+    app()->forgetInstance('payments.config');
+
+    expect(makeWebhookRequestFor('paystack', '{}', ['Content-Length' => $length])->authorize())->toBe($accepted);
+})->with([
+    'a megabyte' => ['1048576', true],
+    'a byte more' => ['1048577', false],
+]);
+
+test('signatures are checked when verification is not configured either way', function () {
+    config(['payments.webhook' => ['max_payload_size' => 1048576]]);
+    app()->forgetInstance('payments.config');
+
+    expect(makeWebhookRequestFor('paystack', '{}', ['x-paystack-signature' => 'forged'])->authorize())->toBeFalse();
+});
+
+test('a request with no provider in its route names none when it is refused', function () {
+    $logs = captureLogs();
+    $request = WebhookRequest::createFrom(Illuminate\Http\Request::create('/payments/webhook', 'POST', [], [], [], [], '{}'));
+    $request->setRouteResolver(fn () => (new Illuminate\Routing\Route('POST', 'payments/webhook', []))->bind($request));
+
+    expect($request->authorize())->toBeFalse()
+        ->and(loggedEntry($logs, 'Webhook authorization failed')['message'])->toContain('for provider []');
+});

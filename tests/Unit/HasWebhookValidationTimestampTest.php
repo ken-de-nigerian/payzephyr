@@ -184,3 +184,35 @@ test('a tolerance or replay window of exactly one second is used', function (str
     'tolerance' => ['payments.security.webhook_timestamp_tolerance', 'webhookTimestampTolerance'],
     'replay window' => ['payments.webhook.events.replay_window', 'webhookReplayWindow'],
 ]);
+
+test('every field name a provider puts its event time under is read', function (string $field) {
+    $driver = new StripeDriver(['secret_key' => 'sk_test', 'currencies' => ['USD']]);
+    $driver->setWebhookReceivedAt(1_800_000_000);
+
+    $validate = (new ReflectionClass($driver))->getMethod('validateWebhookTimestamp');
+
+    expect($validate->invoke($driver, [$field => 1_800_000_000], 300))->toBeTrue();
+})->with(['timestamp', 'created_at', 'createdAt', 'created', 'create_time', 'paid_at', 'paidOn', 'completedOn', 'createdOn', 'event_time', 'eventTime', 'time']);
+
+test('a timestamp exactly at the edge of the window is accepted, and one second past it is not', function (int $age, bool $accepted) {
+    $driver = new StripeDriver(['secret_key' => 'sk_test', 'currencies' => ['USD']]);
+    $driver->setWebhookReceivedAt(1_800_000_000);
+
+    $validate = (new ReflectionClass($driver))->getMethod('validateWebhookTimestamp');
+
+    expect($validate->invoke($driver, ['timestamp' => 1_800_000_000 - $age], 300))->toBe($accepted);
+})->with([
+    'at the edge' => [300, true],
+    'past it' => [301, false],
+]);
+
+test('a plausible timestamp is one from 2000 up to, not including, 2100', function (int $candidate, bool $plausible) {
+    $driver = new StripeDriver(['secret_key' => 'sk_test', 'currencies' => ['USD']]);
+
+    expect((new ReflectionClass($driver))->getMethod('isPlausibleUnixTimestamp')->invoke($driver, $candidate))->toBe($plausible);
+})->with([
+    '2000-01-01 00:00:00' => [946684800, true],
+    'a second before' => [946684799, false],
+    'the last second of 2099' => [4102444799, true],
+    '2100-01-01 00:00:00' => [4102444800, false],
+]);

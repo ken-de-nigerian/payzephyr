@@ -31,9 +31,10 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
     private ?string $accessToken = null;
 
     /**
-     * Unix timestamp when the current access token expires.
+     * Unix timestamp when the current access token expires. Set with the
+     * token, and read only once there is one.
      */
-    private ?int $tokenExpiry = null;
+    private int $tokenExpiry;
 
     /**
      * Ensure the configuration contains the specific keys required for Monnify.
@@ -75,7 +76,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      */
     private function getAccessToken(): string
     {
-        if ($this->accessToken && $this->tokenExpiry && time() < $this->tokenExpiry) {
+        // Through Carbon, so a test can move the clock past an expiry.
+        if ($this->accessToken !== null && now()->getTimestamp() < $this->tokenExpiry) {
             return $this->accessToken;
         }
 
@@ -86,7 +88,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             ]);
             $data = $this->parseResponse($response);
 
-            if (! ($data['requestSuccessful'] ?? false)) {
+            if (Payload::of($data)->bool('requestSuccessful') !== true) {
                 throw new ChargeException('Failed to authenticate with Monnify');
             }
 
@@ -97,7 +99,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
             }
 
             $this->accessToken = $token;
-            $this->tokenExpiry = time() + (Payload::of($data)->int('responseBody', 'expiresIn') ?? 3600) - 60;
+            $this->tokenExpiry = now()->getTimestamp() + (Payload::of($data)->int('responseBody', 'expiresIn') ?? 3600) - 60;
 
             return $token;
         } catch (Throwable $e) {
@@ -147,7 +149,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['requestSuccessful'] ?? false)) {
+            if (Payload::of($data)->bool('requestSuccessful') !== true) {
                 throw new ChargeException(Payload::of($data)->string('responseMessage') ?? 'Failed to initialize Monnify transaction');
             }
 
@@ -186,7 +188,7 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
             $data = $this->parseResponse($response);
 
-            if (! ($data['requestSuccessful'] ?? false)) {
+            if (Payload::of($data)->bool('requestSuccessful') !== true) {
                 throw new VerificationException(Payload::of($data)->string('responseMessage') ?? 'Failed to verify Monnify transaction');
             }
 

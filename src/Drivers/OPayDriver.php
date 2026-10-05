@@ -119,7 +119,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
             $data = $this->parseResponse($response);
 
-            if (($data['code'] ?? '') !== '00000') {
+            if (Payload::of($data)->string('code') !== '00000') {
                 throw new ChargeException(
                     Payload::of($data)->string('message') ?? Payload::of($data)->string('msg') ?? 'Failed to initialize OPay payment'
                 );
@@ -167,24 +167,22 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 'country' => 'NG',
                 'reference' => $reference,
             ];
-            $payloadJson = (string) json_encode($payload, JSON_UNESCAPED_SLASHES);
+            $payloadJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
-            $privateKey = $this->settings()->string('secret_key');
-            if ($privateKey === null || $privateKey === '') {
+            $privateKey = $this->credential('secret_key');
+            if ($privateKey === null) {
                 throw new InvalidConfigurationException('OPay secret key (private key) is required for status API authentication');
             }
 
             $signature = hash_hmac('sha512', $payloadJson, $privateKey);
             $response = $this->makeRequest('POST', '/api/v1/international/cashier/status', [
                 'json' => $payload,
-                'headers' => [
-                    'Authorization' => 'Bearer '.$signature,
-                    'MerchantId' => $this->requiredCredential('merchant_id'),
-                ],
+                // MerchantId comes with every request (getDefaultHeaders()).
+                'headers' => ['Authorization' => 'Bearer '.$signature],
             ]);
 
             $data = $this->parseResponse($response);
-            if (($data['code'] ?? '') !== '00000') {
+            if (Payload::of($data)->string('code') !== '00000') {
                 throw new VerificationException(
                     Payload::of($data)->string('message') ?? Payload::of($data)->string('msg') ?? 'Failed to verify OPay transaction'
                 );
@@ -199,11 +197,9 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
                 'status' => $opayStatus,
             ]);
 
-            $status = match (strtoupper($opayStatus)) {
-                'SUCCESS', 'SUCCEEDED', 'PAID' => 'success',
-                'PENDING', 'PROCESSING' => 'pending',
-                default => $this->normalizeStatus($opayStatus),
-            };
+            // The normalizer maps OPay's SUCCESS, SUCCEEDED, PAID, PENDING and
+            // PROCESSING, in any case.
+            $status = $this->normalizeStatus($opayStatus);
 
             return new VerificationResponseDTO(
                 reference: $details->string('reference') ?? $details->string('orderNo') ?? $reference,

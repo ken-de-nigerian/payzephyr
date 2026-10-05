@@ -113,7 +113,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
+            if (Payload::of($data)->string('status') !== 'success') {
                 throw new ChargeException(
                     Payload::of($data)->string('message') ?? 'Failed to initialize Flutterwave transaction'
                 );
@@ -164,7 +164,7 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
             $data = $this->parseResponse($response);
 
-            if (($data['status'] ?? '') !== 'success') {
+            if (Payload::of($data)->string('status') !== 'success') {
                 throw new VerificationException(
                     Payload::of($data)->string('message') ?? 'Failed to verify Flutterwave transaction'
                 );

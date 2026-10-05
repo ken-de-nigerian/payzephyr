@@ -260,10 +260,12 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
         }
 
         $tolerance = $this->webhookTimestampTolerance();
+        $signedAt = (int) $timestamp;
 
-        if (abs(time() - (int) $timestamp) > $tolerance) {
+        // Through Carbon, so a test can stand at the edge of the window.
+        if (abs(now()->getTimestamp() - $signedAt) > $tolerance) {
             $this->log('warning', 'Webhook timestamp outside tolerance window - potential replay attack', [
-                'timestamp' => (int) $timestamp,
+                'timestamp' => $signedAt,
                 'tolerance_seconds' => $tolerance,
             ]);
 
@@ -326,9 +328,9 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function extractWebhookStatus(array $payload): string
     {
-        $eventType = Payload::of($payload)->string('event_type') ?? '';
+        $eventType = Payload::of($payload)->string('event_type');
 
-        if (! str_starts_with($eventType, 'transaction.')) {
+        if ($eventType === null || ! str_starts_with($eventType, 'transaction.')) {
             return 'unknown';
         }
 
@@ -368,19 +370,19 @@ final class PaddleDriver extends AbstractDriver implements SupportsRefundsInterf
     protected function toMinorUnits(float $amount, string $currency): string
     {
         if ($this->isZeroDecimal($currency)) {
-            return (string) (int) round($amount);
+            return sprintf('%d', round($amount));
         }
 
-        return (string) (int) round($amount * 100);
+        return sprintf('%d', round($amount * 100));
     }
 
-    protected function fromMinorUnits(string|int|float $amount, string $currency): float
+    protected function fromMinorUnits(float $amount, string $currency): float
     {
         if ($this->isZeroDecimal($currency)) {
-            return (float) $amount;
+            return $amount;
         }
 
-        return ((float) $amount) / 100;
+        return $amount / 100;
     }
 
     /**

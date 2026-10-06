@@ -237,7 +237,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
         }
 
         $expected = hash_hmac('sha256', $body, $secret);
-        if (! hash_equals($expected, (string) $signature)) {
+        if (! hash_equals($expected, $signature)) {
             $this->log('warning', 'Webhook signature invalid', [
                 'hint' => 'RAZORPAY_WEBHOOK_SECRET must match the webhook secret, not the API key secret.',
             ]);
@@ -383,9 +383,9 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
             );
         }
 
-        $linkId = Payload::of($links[0])->string('id') ?? '';
+        $linkId = Payload::of($links[0])->string('id');
 
-        if (! str_starts_with($linkId, 'plink_')) {
+        if ($linkId === null || ! str_starts_with($linkId, 'plink_')) {
             throw new VerificationException("Razorpay returned a payment link without an id for reference [$identifier]");
         }
 
@@ -404,9 +404,9 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
         };
     }
 
-    protected function fromMinorUnits(int|float|string $amount, string $currency): float
+    protected function fromMinorUnits(float $amount, string $currency): float
     {
-        return ((float) $amount) / (10 ** $this->currencyExponent($currency));
+        return $amount / (10 ** $this->currencyExponent($currency));
     }
 
     /**
@@ -415,7 +415,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      * the full metadata locally. The package reference is always included.
      *
      * @param  array<array-key, mixed>  $metadata
-     * @return array<string, string>
+     * @return array<array-key, string>
      */
     protected function buildNotes(array $metadata, string $reference): array
     {
@@ -426,18 +426,13 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
         $notes = ['payzephyr_reference' => $reference];
 
         foreach ($metadata as $key => $value) {
-            if (count($notes) >= $maxNotes) {
-                break;
+            // An int key can never be the reserved one.
+            if (is_scalar($value) && $key !== 'payzephyr_reference') {
+                $notes[$key] = mb_substr((string) $value, 0, $maxNoteLength);
             }
-
-            if (! is_scalar($value) || (string) $key === 'payzephyr_reference') {
-                continue;
-            }
-
-            $notes[(string) $key] = mb_substr((string) $value, 0, $maxNoteLength);
         }
 
-        return $notes;
+        return array_slice($notes, 0, $maxNotes, true);
     }
 
     /**

@@ -58,7 +58,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function initializeClient(): void
     {
-        parent::initializeClient();
+        // Stripe is reached only through its SDK, so no HTTP client is built.
         $this->stripe = new StripeClient($this->requiredCredential('secret_key'));
     }
 
@@ -83,10 +83,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     protected function getDefaultHeaders(): array
     {
-        return [
-            'Authorization' => 'Bearer '.$this->settings()->string('secret_key'),
-            'Content-Type' => 'application/json',
-        ];
+        // No request goes through the HTTP client; the SDK authenticates itself.
+        return [];
     }
 
     /**
@@ -112,8 +110,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
-        $this->setCurrentRequest($request);
-
+        // No setCurrentRequest(): it carries the idempotency key and trace
+        // reference into makeRequest(), and Stripe goes through its SDK.
         try {
             $reference = $request->reference ?? $this->generateReference('STRIPE');
             if (empty($request->callbackUrl)) {
@@ -191,8 +189,6 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', ['error' => $e->getMessage(), 'error_class' => $e::class]);
             throw new ChargeException('Stripe charge failed: '.$e->getMessage(), 0, $e);
-        } finally {
-            $this->clearCurrentRequest();
         }
     }
 
@@ -386,7 +382,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             // payment worth nothing, which reconciles against the provider as
             // a missing N and against the customer as a charge they made.
             amount: $this->requireAmountValue($session->amount_total ?? $piAmount, 'amount_total', 'verify') / 100,
-            currency: strtoupper((string) $session->currency),
+            currency: strtoupper($this->requireString(['currency' => $session->currency ?? null], 'currency', 'verify')),
             paidAt: $session->payment_status === 'paid'
                 ? date('Y-m-d H:i:s', $session->created)
                 : null,
@@ -440,12 +436,13 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
         $flat = [];
 
         foreach ($metadata as $key => $value) {
-            $flat[(string) $key] = match (true) {
+            // A string, for the SDK's types; PHP keeps a numeric key an int either way.
+            $flat[sprintf('%s', $key)] = match (true) {
                 is_string($value) => $value,
                 is_int($value), is_float($value) => (string) $value,
                 is_bool($value) => $value ? 'true' : 'false',
                 $value === null => '',
-                default => (string) json_encode($value),
+                default => json_encode($value, JSON_THROW_ON_ERROR),
             };
         }
 
@@ -464,7 +461,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      */
     private function stripePayload(object $object): Payload
     {
-        return Payload::of(json_decode((string) json_encode($object), true));
+        return Payload::of(json_decode(json_encode($object, JSON_THROW_ON_ERROR), true));
     }
 
     /**

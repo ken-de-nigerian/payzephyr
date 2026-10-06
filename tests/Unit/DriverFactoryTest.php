@@ -126,3 +126,14 @@ test('each bundled driver resolves by name to its exact class', function (string
     ['square', \KenDeNigerian\PayZephyr\Drivers\SquareDriver::class],
     ['stripe', \KenDeNigerian\PayZephyr\Drivers\StripeDriver::class],
 ]);
+
+test('a name written in words resolves to the driver class those words spell', function (string $name, string $class) {
+    // Not one of the bundled names, so it reaches the naming convention:
+    // each word capitalised, joined, and "Driver" appended.
+    $resolve = (new ReflectionClass(DriverFactory::class))->getMethod('resolveDriverClass');
+
+    expect($resolve->invoke(new DriverFactory, $name))->toBe($class);
+})->with([
+    ['pay-pal', \KenDeNigerian\PayZephyr\Drivers\PayPalDriver::class],
+    ['o_pay', \KenDeNigerian\PayZephyr\Drivers\OPayDriver::class],
+]);

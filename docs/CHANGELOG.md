@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A Square health check that failed unexpectedly reported Square as healthy.** Anything but a
+  client error or a refused connection - a 503 from Square, say - was logged as "Health check
+  failed" and then answered `true`. It answers `false` now.
+
 - **On Linux, a PayPal or OPay provider configured without `driver_class` could not be
   resolved.** A driver name was turned into a class name - `paypal` into `PaypalDriver` - and
   the classes are `PayPalDriver` and `OPayDriver`. PHP class names ignore case, so this worked

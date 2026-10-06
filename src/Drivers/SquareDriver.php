@@ -154,9 +154,9 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
             $responseData = $this->parseResponse($response);
             $errorMessage = $this->errorDetail($responseData) ?? $previous->getMessage();
 
-            $baseUrl = $this->settings()->string('base_url') ?? '';
-            $isSandboxUrl = str_contains($baseUrl, 'squareupsandbox.com');
-            $isProductionUrl = str_contains($baseUrl, 'squareup.com') && ! $isSandboxUrl;
+            $baseUrl = $this->settings()->string('base_url');
+            $isSandboxUrl = $baseUrl !== null && str_contains($baseUrl, 'squareupsandbox.com');
+            $isProductionUrl = $baseUrl !== null && str_contains($baseUrl, 'squareup.com') && ! $isSandboxUrl;
 
             if ($statusCode === HttpStatusCodes::UNAUTHORIZED || $statusCode === HttpStatusCodes::FORBIDDEN) {
                 $hint = '';
@@ -519,21 +519,6 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
     }
 
     /**
-     * Normalize Square-specific status values.
-     * Square's APPROVED status means the payment was successful.
-     */
-    protected function normalizeStatus(string $status): string
-    {
-        $statusUpper = strtoupper(trim($status));
-
-        if ($statusUpper === 'APPROVED') {
-            return 'success';
-        }
-
-        return parent::normalizeStatus($status);
-    }
-
-    /**
      * Map Square payment data to VerificationResponseDTO.
      *
      * @param  array<array-key, mixed>  $payment
@@ -677,9 +662,12 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
                 return false;
             }
 
+            // A server error or anything unexpected is down. This returned true
+            // while logging "Health check failed", so a Square answering 503
+            // was reported healthy.
             $this->log('error', 'Health check failed', ['error' => $e->getMessage(), 'error_class' => $e::class]);
 
-            return true;
+            return false;
         }
     }
 

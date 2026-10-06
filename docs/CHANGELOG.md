@@ -37,6 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   duplicate. The insert that can lose the race now runs in a savepoint, since PostgreSQL aborts
   the whole transaction on a failed statement and the row that won could not otherwise be read.
 
+### Changed
+
+- **The mutation gate now measures what it claims.** 5.0.0's release notes gave its mutation
+  score as 100%. It was not: on Linux, where CI runs, 59% of the 2,858 mutations were caught, and
+  the local runs that reported 100% were wrong. Two plugin faults made both numbers wrong - a
+  line covered by hundreds of tests was never tried against any of them, and on Windows such a
+  line counted as caught without being tried - and `composer mutation` now patches the plugin
+  first (see [Contributing](contributing.md)). Measured properly, the webhook path, the webhook
+  job and every driver now score 100%, with tests for what each sends, reads and logs; a few
+  pieces of code no test could tell apart from their mutations were simplified or removed. CI
+  also runs the suite on MySQL 8 and PostgreSQL 16 now without exhausting their connections.
+
 ---
 ## [5.0.0] - 2026-10-02
 

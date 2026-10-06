@@ -151,6 +151,8 @@ test('a payment is verified by its reference and read in full', function () {
 
     parse_str($history[0]['request']->getUri()->getQuery(), $query);
     expect($query)->toBe(['tx_ref' => 'FLW_V'])
+        // A GET has no JSON body to set it, so it comes from the driver.
+        ->and($history[0]['request']->getHeaderLine('Content-Type'))->toBe('application/json')
         ->and($result->status)->toBe('success')
         ->and($result->metadata)->toBe(['order' => 1])
         ->and($result->customer)->toBe(['email' => 'a@b.com', 'name' => 'Ada'])

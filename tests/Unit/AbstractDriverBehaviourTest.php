@@ -92,9 +92,9 @@ test('a request and its response are recorded with their bodies, address and tim
     $sent = driverTrace(TraceEvent::PROVIDER_REQUEST_SENT);
     $received = driverTrace(TraceEvent::PROVIDER_RESPONSE_RECEIVED);
 
-    expect($sent->payload)->toBe(['amount' => 500])
+    expect($sent->payload)->toEqual(['amount' => 500])
         ->and($sent->http_url)->toBe('https://api.paystack.co/transaction/initialize')
-        ->and($received->payload)->toBe(['status' => true, 'data' => ['id' => 7]])
+        ->and($received->payload)->toEqual(['status' => true, 'data' => ['id' => 7]])
         ->and($received->http_status_code)->toBe(201)
         ->and($received->response_time_ms)->toBe(250)
         // Peeking at the body for the timeline leaves it for the caller.
@@ -136,7 +136,7 @@ test('a failed request is recorded and logged by what failed, and raised with wh
     $trace = driverTrace($event);
 
     expect($thrown?->getContext())->toBe(['method' => 'GET', 'uri' => '/bank', 'provider' => 'paystack'])
-        ->and($trace->payload)->toBe(['error' => $failure->getMessage(), 'error_class' => $failure::class])
+        ->and($trace->payload)->toEqual(['error' => $failure->getMessage(), 'error_class' => $failure::class])
         ->and($trace->response_time_ms)->toBe(40)
         ->and(loggedEntry($logs, 'Network error during GET request to /bank')['context']['error_type'])->toBe($errorType);
 

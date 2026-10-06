@@ -192,6 +192,8 @@ test('a payment is verified by its reference, without a query string a redirect 
 
     expect((string) $history[1]['request']->getUri())->toEndWith('/api/v2/merchant/transactions/query?paymentReference=MON%20V')
         ->and($history[1]['request']->getHeaderLine('Authorization'))->toBe('Bearer tok-1')
+        // A GET has no JSON body to set it, so it comes from the driver.
+        ->and($history[1]['request']->getHeaderLine('Content-Type'))->toBe('application/json')
         ->and($result->reference)->toBe('MON V?reference=MON V')
         ->and($result->status)->toBe('success')
         ->and($result->metadata)->toBe(['order' => 1])

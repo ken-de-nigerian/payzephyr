@@ -241,8 +241,8 @@ test('each subscription event is recorded with the event that reported it, and l
     processWebhook(['event' => 'subscription.create', 'data' => ['subscription_code' => 'SUB_T1']]);
     processWebhook(['event' => 'subscription.disable', 'data' => ['subscription_code' => 'SUB_T2']]);
 
-    expect(traceFor('SUB_T1', TraceEvent::SUBSCRIPTION_CREATED)->payload)->toBe(['event' => 'subscription.create'])
-        ->and(traceFor('SUB_T2', TraceEvent::SUBSCRIPTION_CANCELLED)->payload)->toBe(['event' => 'subscription.disable']);
+    expect(traceFor('SUB_T1', TraceEvent::SUBSCRIPTION_CREATED)->payload)->toEqual(['event' => 'subscription.create'])
+        ->and(traceFor('SUB_T2', TraceEvent::SUBSCRIPTION_CANCELLED)->payload)->toEqual(['event' => 'subscription.disable']);
 
     $processed = array_values(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'Subscription webhook event processed')));
     expect(array_column($processed, 'context'))->toBe([
@@ -258,7 +258,7 @@ test('a renewal reads its invoice reference from whichever field the provider us
 
     Event::assertDispatched(SubscriptionRenewed::class, fn (SubscriptionRenewed $e): bool => $e->invoiceReference === $expected);
     expect(traceFor('SUB_R', TraceEvent::SUBSCRIPTION_RENEWED)->payload)
-        ->toBe(['event' => 'subscription.renewed', 'invoice_reference' => $expected]);
+        ->toEqual(['event' => 'subscription.renewed', 'invoice_reference' => $expected]);
 })->with([
     'reference' => [['reference' => 'INV_A'], 'INV_A'],
     'invoice_reference' => [['invoice_reference' => 'INV_B'], 'INV_B'],
@@ -273,7 +273,7 @@ test('a failed subscription payment carries the provider\'s message as its reaso
 
     Event::assertDispatched(SubscriptionPaymentFailed::class, fn (SubscriptionPaymentFailed $e): bool => $e->reason === 'Card declined');
     expect(traceFor('SUB_F', TraceEvent::SUBSCRIPTION_PAYMENT_FAILED)->payload)
-        ->toBe(['event' => 'invoice.payment_failed', 'reason' => 'Card declined']);
+        ->toEqual(['event' => 'invoice.payment_failed', 'reason' => 'Card declined']);
 });
 
 test('a subscription update cancels it whatever the case of its status, and not without one', function (?string $status, bool $cancelled) {
@@ -372,7 +372,7 @@ test('a failed refund carries the provider\'s reason from whichever field it use
 
     Event::assertDispatched(RefundFailed::class, fn (RefundFailed $e): bool => $e->reason === $reason);
     expect(traceFor('PZ_REASON', TraceEvent::REFUND_FAILED)->payload)
-        ->toBe(['stage' => 'settlement', 'refund_reference' => 'RF_REASON', 'reason' => $reason]);
+        ->toEqual(['stage' => 'settlement', 'refund_reference' => 'RF_REASON', 'reason' => $reason]);
 })->with([
     'reason' => [['reason' => 'Insufficient balance'], 'Insufficient balance'],
     'reason on the refund, over the one beside it' => [['object' => ['id' => 'RF_REASON', 'transaction_reference' => 'PZ_REASON', 'reason' => 'Own reason'], 'reason' => 'Outer reason'], 'Own reason'],
@@ -411,7 +411,7 @@ test('a completed refund is recorded on the payment with the refund that settled
 
     processWebhook(['event' => 'refund.processed', 'data' => ['id' => 'RF_DONE', 'transaction_reference' => 'PZ_DONE']]);
 
-    expect(traceFor('PZ_DONE', TraceEvent::PAYMENT_REFUNDED)->payload)->toBe(['refund_reference' => 'RF_DONE']);
+    expect(traceFor('PZ_DONE', TraceEvent::PAYMENT_REFUNDED)->payload)->toEqual(['refund_reference' => 'RF_DONE']);
 });
 
 test('a refund outcome already announced is not announced again, and says so', function () {
@@ -541,7 +541,7 @@ test('a webhook that fails is logged and recorded with what went wrong and on wh
     expect($context['provider'])->toBe('acme')
         ->and($context['error'])->toBe('listener failed')
         ->and($context['trace'])->toBeString()->not->toBeEmpty()
-        ->and(traceFor('PZ_FAILING', TraceEvent::WEBHOOK_PROCESSING_FAILED)->payload)->toBe([
+        ->and(traceFor('PZ_FAILING', TraceEvent::WEBHOOK_PROCESSING_FAILED)->payload)->toEqual([
             'error' => 'listener failed', 'error_class' => LogicException::class, 'attempt' => 2, 'max_attempts' => 3,
         ]);
 });

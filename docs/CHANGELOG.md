@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.0.2] - 2026-10-06
+
 ### Fixed
 
 - **Stripe could verify a payment by your reference only if it was among the last few on the

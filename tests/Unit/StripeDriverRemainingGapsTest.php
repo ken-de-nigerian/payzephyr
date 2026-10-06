@@ -141,14 +141,13 @@ test('stripe verify falls back to matching checkout session by client_reference_
         ->and($result->amount)->toBe(75.0);
 });
 
-// Covers the fallback loop finding a matching PaymentIntent by
-// metadata['reference'] (lines ~228-232).
-test('stripe verify falls back to matching payment intent by metadata reference', function () {
+// Covers the fallback search finding a PaymentIntent by metadata['reference'].
+test('stripe verify falls back to searching payment intents by metadata reference', function () {
     $sessionsService = new class
     {
         public function all(): object
         {
-            return (object) ['data' => []];
+            return (object) ['data' => [], 'has_more' => false];
         }
     };
 
@@ -172,7 +171,7 @@ test('stripe verify falls back to matching payment intent by metadata reference'
     {
         public function __construct(private readonly object $intent) {}
 
-        public function all(): object
+        public function search(): object
         {
             return (object) ['data' => [$this->intent]];
         }

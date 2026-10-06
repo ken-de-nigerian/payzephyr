@@ -8,7 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **Stripe could verify a payment by your reference only if it was among the last few on the
+  account.** Stripe cannot look a checkout session up by `client_reference_id`, so `verify()`
+  read the single most recent session and the ten most recent payment intents, and anything
+  older was "not found". That is the path taken whenever the checkout session id is not at
+  hand - transaction logging off and the session cache expired. Recent sessions are now read
+  newest first, a page of 100 at a time up to `STRIPE_VERIFY_SEARCH_PAGES` pages (default 10),
+  and then Stripe's search is asked for a payment intent carrying the reference in its
+  metadata, which covers the account's whole history. Charges now copy their metadata, the
+  reference included, onto the payment intent (`payment_intent_data.metadata`) so that search
+  can find it; payments taken earlier have no reference there. Stripe's search index can trail
+  a new payment by about a minute, which the sessions read first cover. The not-found message
+  says how many sessions were read.
 
 ---
 ## [5.0.1] - 2026-10-06

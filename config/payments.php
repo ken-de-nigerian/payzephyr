@@ -95,6 +95,9 @@ return [
             'secret_key' => env('STRIPE_SECRET_KEY'),
             'public_key' => env('STRIPE_PUBLIC_KEY'),
             'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+            // Pages of 100 checkout sessions verify() reads, newest first, before searching payment intents
+            // for your reference.
+            'verify_search_pages' => env('STRIPE_VERIFY_SEARCH_PAGES', 10),
             'base_url' => env('STRIPE_BASE_URL', 'https://api.stripe.com'),
             'currencies' => ['USD', 'EUR', 'GBP', 'CAD', 'AUD'],
             'enabled' => env('STRIPE_ENABLED', false),

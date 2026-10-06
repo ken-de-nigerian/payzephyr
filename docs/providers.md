@@ -79,6 +79,7 @@ STRIPE_ENABLED=true
 - **Subscriptions:** ✅ full support; subscribing a customer requires a saved payment method (`->authorization(...)`); see [Subscriptions](subscriptions.md#the-building-blocks)
 - **Refunds:** ✅ full support via Stripe's native refunds resource; card refunds are usually immediate, some payment methods confirm via webhook
 - `STRIPE_WEBHOOK_SECRET` isn't optional in practice: Stripe's webhook signature verification needs it to function at all
+- **Verifying by your own reference is a search.** A charge stores its checkout session id, and `Payment::verify()` uses that whenever the transaction log or the session cache has it. Without it, Stripe offers no way to look a checkout session up by reference, so PayZephyr reads sessions newest-first, up to `STRIPE_VERIFY_SEARCH_PAGES` pages of 100 (default 10), then searches payment intents for the reference each charge copies into their metadata. That search covers the account's whole history, but Stripe's search index can trail a new payment by about a minute, and payments taken with an earlier PayZephyr version carry no reference on their payment intent.
 
 ### PayPal
 

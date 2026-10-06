@@ -131,6 +131,10 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
             $paymentMethods = $this->mapChannels($request) ?? ['card'];
 
+            $metadata = $this->stripeMetadata(array_merge($request->metadata, [
+                'reference' => $reference,
+            ]));
+
             $params = [
                 'payment_method_types' => $paymentMethods,
                 'line_items' => [[
@@ -148,9 +152,11 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
                 'cancel_url' => $cancelUrl,
                 'client_reference_id' => $reference,
                 'customer_email' => $request->email,
-                'metadata' => $this->stripeMetadata(array_merge($request->metadata, [
-                    'reference' => $reference,
-                ])),
+                'metadata' => $metadata,
+                // The session's metadata stays on the session. Copied to the
+                // payment intent, the reference can be found by Stripe's search
+                // however old the payment is - see findByReference().
+                'payment_intent_data' => ['metadata' => $metadata],
             ];
 
             $options = [];
@@ -219,36 +225,7 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
                 return $this->mapFromPaymentIntent($intent);
             }
 
-            $sessions = $this->stripe->checkout->sessions->all([
-                'limit' => 1,
-            ])->data;
-
-            $found = null;
-
-            foreach ($sessions as $session) {
-                if (($session->client_reference_id ?? null) === $reference) {
-                    $found = $session;
-                    break;
-                }
-            }
-
-            if ($found) {
-                $session = $this->stripe->checkout->sessions->retrieve($found->id, [
-                    'expand' => ['payment_intent'],
-                ]);
-
-                return $this->mapFromCheckoutSession($session);
-            }
-
-            $intents = $this->stripe->paymentIntents->all(['limit' => 10])->data;
-
-            foreach ($intents as $intent) {
-                if (($intent->metadata['reference'] ?? null) === $reference) {
-                    return $this->mapFromPaymentIntent($intent);
-                }
-            }
-
-            throw new VerificationException("Payment not found for reference [$reference]");
+            return $this->findByReference($reference);
         } catch (VerificationException $e) {
             throw $e;
         } catch (Throwable $e) {
@@ -358,6 +335,67 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
             return ! HttpStatusCodes::isServerError($statusCode);
         }
+    }
+
+    /**
+     * Find a payment by the reference PayZephyr gave it.
+     *
+     * Stripe cannot look a checkout session up by client_reference_id, and
+     * this used to check only the most recent session and the ten most recent
+     * payment intents, so a payment that was not among the last few on the
+     * account could not be verified by reference.
+     *
+     * Recent checkout sessions are read first, newest first, a page of 100 at
+     * a time up to verify_search_pages (ten by default): that finds a session
+     * the customer has not paid yet, which has no payment intent. Then the
+     * payment intents are searched for the reference charge() copies into
+     * their metadata, which covers the account's whole history. Stripe's
+     * search index trails new payments by up to a minute; the sessions read
+     * first cover that gap.
+     *
+     * @throws VerificationException
+     */
+    private function findByReference(string $reference): VerificationResponseDTO
+    {
+        $maxPages = max(1, $this->settings()->int('verify_search_pages') ?? 10);
+        $params = ['limit' => 100];
+        $searched = 0;
+
+        for ($page = 1; $page <= $maxPages; $page++) {
+            $sessions = $this->stripe->checkout->sessions->all($params);
+            $searched += count($sessions->data);
+
+            foreach ($sessions->data as $session) {
+                if (($session->client_reference_id ?? null) === $reference) {
+                    return $this->mapFromCheckoutSession($this->stripe->checkout->sessions->retrieve($session->id, [
+                        'expand' => ['payment_intent'],
+                    ]));
+                }
+            }
+
+            if (! $sessions->has_more || $sessions->data === []) {
+                break;
+            }
+
+            $params['starting_after'] = $sessions->data[count($sessions->data) - 1]->id;
+        }
+
+        $intents = $this->stripe->paymentIntents->search([
+            // Search strings are single-quoted; a quote or backslash in the
+            // reference is escaped so it cannot end the string early.
+            'query' => "metadata['reference']:'".addcslashes($reference, "'\\")."'",
+            'limit' => 1,
+        ])->data;
+
+        if ($intents !== []) {
+            return $this->mapFromPaymentIntent($intents[0]);
+        }
+
+        throw new VerificationException(
+            "Payment not found for reference [$reference] among the $searched most recent Stripe checkout sessions, ".
+            'or by searching payment intents. Stripe\'s search can trail a new payment by a minute; '.
+            'verify with the cs_ or pi_ id to read it directly.'
+        );
     }
 
     /**

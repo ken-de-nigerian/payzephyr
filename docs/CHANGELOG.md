@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **PayPal reported a missing callback URL as a failed charge.** Every other driver throws
+  `InvalidConfigurationException` for it; PayPal wrapped it in a `ChargeException`. It throws
+  `InvalidConfigurationException` now. Code catching `ChargeException` for this case specifically
+  should catch `InvalidConfigurationException`, or `PaymentException`, which covers both.
+
 - **A Square health check that failed unexpectedly reported Square as healthy.** Anything but a
   client error or a refused connection - a 503 from Square, say - was logged as "Health check
   failed" and then answered `true`. It answers `false` now.

@@ -44,7 +44,7 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
     /**
      * Timestamp when the current access token expires.
      */
-    private ?int $tokenExpiry = null;
+    private int $tokenExpiry;
 
     /**
      * PayPal verification always calls PayPal's API - no local-only path
@@ -124,7 +124,8 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
      */
     private function getAccessToken(): string
     {
-        if ($this->accessToken && $this->tokenExpiry && time() < $this->tokenExpiry) {
+        // Through Carbon, so a test can move the clock past an expiry.
+        if ($this->accessToken !== null && now()->getTimestamp() < $this->tokenExpiry) {
             return $this->accessToken;
         }
 
@@ -147,7 +148,7 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
             }
 
             $this->accessToken = $token;
-            $this->tokenExpiry = time() + (Payload::of($data)->int('expires_in') ?? 3600) - 60;
+            $this->tokenExpiry = now()->getTimestamp() + (Payload::of($data)->int('expires_in') ?? 3600) - 60;
 
             return $token;
         } catch (Throwable $e) {
@@ -240,7 +241,9 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
                 ],
                 provider: $this->getName(),
             );
-        } catch (ChargeException $e) {
+        } catch (InvalidConfigurationException|ChargeException $e) {
+            // A missing callback URL is a configuration error, as it is on every
+            // other driver, not a failed charge.
             throw $e;
         } catch (Throwable $e) {
             $this->log('error', 'Charge failed', [
@@ -403,13 +406,14 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
                     'auth_algo' => $authAlgo,
                     'transmission_sig' => $transmissionSig,
                     'webhook_id' => $webhookId,
-                    'webhook_event' => json_decode($body, true),
+                    // As objects, so an empty object stays {} rather than becoming [].
+                    'webhook_event' => json_decode($body),
                 ],
             ]);
 
             $data = $this->parseResponse($response);
 
-            $isValid = ($data['verification_status'] ?? '') === 'SUCCESS';
+            $isValid = Payload::of($data)->string('verification_status') === 'SUCCESS';
 
             $this->log($isValid ? 'info' : 'warning', 'PayPal webhook validation result', [
                 'valid' => $isValid,

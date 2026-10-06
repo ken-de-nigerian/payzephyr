@@ -38,14 +38,12 @@ function paypalRemainingGapsDriver(array $responses): PayPalDriver
 }
 
 test('paypal driver charge throws invalid configuration exception when callback url is missing', function () {
-    // InvalidConfigurationException is thrown from inside charge()'s try
-    // block, so it is not a ChargeException itself and gets caught by the
-    // generic catch (Throwable $e) block, re-wrapped as a ChargeException
-    // whose message carries the original text.
+    // Let through as the configuration error it is, as on every other
+    // driver; it used to be re-wrapped as a ChargeException.
     $driver = new PayPalDriver(paypalRemainingGapsConfig());
 
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com'));
-})->throws(ChargeException::class, 'PayPal requires a callback URL for its redirect flow');
+})->throws(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class, 'PayPal requires a callback URL for its redirect flow');
 
 test('paypal driver charge throws when order id missing from creation response', function () {
     $driver = paypalRemainingGapsDriver([

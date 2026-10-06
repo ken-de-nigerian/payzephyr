@@ -19,9 +19,11 @@
         "Illuminate\\Contracts\\Queue\\ShouldQueue",
         "Illuminate\\Database\\Eloquent\\Builder",
         "Illuminate\\Database\\Eloquent\\Casts\\AsArrayObject",
+        "Illuminate\\Database\\Eloquent\\Casts\\Attribute",
         "Illuminate\\Database\\Eloquent\\Model",
         "Illuminate\\Database\\Migrations\\Migrator",
         "Illuminate\\Database\\QueryException",
+        "Illuminate\\Database\\UniqueConstraintViolationException",
         "Illuminate\\Foundation\\Application",
         "Illuminate\\Foundation\\Bus\\Dispatchable",
         "Illuminate\\Foundation\\Events\\Dispatchable",
@@ -58,6 +60,7 @@
         "dispatch",
         "now",
         "redirect",
-        "response"
+        "response",
+        "route"
     ]
 }

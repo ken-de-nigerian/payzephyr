@@ -71,7 +71,7 @@ test('webhook controller handles webhook update with channel', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -123,7 +123,7 @@ test('webhook controller handles database error in updateTransactionFromWebhook'
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -181,7 +181,7 @@ test('webhook controller handles successful status with paid_at', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

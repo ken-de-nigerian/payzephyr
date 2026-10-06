@@ -42,7 +42,7 @@ test('webhook request validates payload structure', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -86,7 +86,7 @@ test('webhook request authorizes valid signature', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -126,7 +126,7 @@ test('webhook request rejects invalid signature', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -164,7 +164,7 @@ test('webhook request bypasses signature when verification disabled', function (
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -203,7 +203,7 @@ test('webhook request validation rules accept optional fields', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -235,7 +235,7 @@ test('webhook request handles missing provider gracefully', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

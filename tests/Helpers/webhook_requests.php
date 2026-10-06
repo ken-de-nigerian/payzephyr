@@ -34,7 +34,7 @@ function makeWebhookRequestFor(string $provider, string $body, array $headers = 
                 $base->server->all(),
                 $body
             );
-            $this->headers = $base->headers;
+            $this->headers->replace($base->headers->all());
         }
 
         public function getContent(bool $asResource = false): false|string

@@ -28,7 +28,7 @@ function makeSizeLimitedWebhookRequest(Request $baseRequest, string $body): Webh
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

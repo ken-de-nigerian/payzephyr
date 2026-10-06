@@ -856,7 +856,7 @@ test('webhook controller handles webhook without reference', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -905,7 +905,7 @@ test('webhook controller handles webhook with signature verification disabled', 
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -946,7 +946,7 @@ test('webhook controller handles exception during processing', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

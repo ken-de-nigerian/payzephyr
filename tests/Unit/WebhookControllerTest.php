@@ -64,7 +64,7 @@ test('webhook controller queues webhook processing', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -111,7 +111,7 @@ test('webhook controller rejects invalid signature via form request', function (
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -154,7 +154,7 @@ test('webhook controller bypasses signature verification when disabled', functio
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -196,7 +196,7 @@ test('webhook controller handles invalid provider gracefully', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -243,7 +243,7 @@ test('webhook controller handles exceptions during processing', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -292,7 +292,7 @@ test('webhook controller dispatches both provider-specific and general events', 
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -345,7 +345,7 @@ test('webhook controller handles flutterwave webhook with valid signature', func
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -398,7 +398,7 @@ test('webhook controller logs webhook processing', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -442,7 +442,7 @@ test('webhook controller handles empty payload', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -510,7 +510,7 @@ test('webhook controller handles complex nested payload', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

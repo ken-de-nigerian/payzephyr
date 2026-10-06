@@ -60,7 +60,7 @@ test('webhook controller routes monnify requests correctly', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -111,7 +111,7 @@ test('webhook controller routes stripe requests correctly', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 
@@ -157,7 +157,7 @@ test('webhook controller routes paypal requests correctly', function () {
                 $request->server->all(),
                 $body
             );
-            $this->headers = $request->headers;
+            $this->headers->replace($request->headers->all());
             $this->body = $body;
         }
 

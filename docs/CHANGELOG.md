@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.0.1] - 2026-10-06
+
 ### Fixed
 
 - **PayPal reported a missing callback URL as a failed charge.** Every other driver throws

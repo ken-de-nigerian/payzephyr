@@ -15,7 +15,7 @@ function makeSizeLimitedWebhookRequest(Request $baseRequest, string $body): Webh
 {
     return new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -44,7 +44,7 @@ function makeSizeLimitedWebhookRequest(Request $baseRequest, string $body): Webh
     };
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -57,7 +57,7 @@ beforeEach(function () {
     ]);
 });
 
-test('webhook request rejects payload whose Content-Length header exceeds the configured max', function () {
+test('webhook request rejects payload whose Content-Length header exceeds the configured max', function (): void {
     config(['payments.webhook.max_payload_size' => 100]);
     app()->forgetInstance('payments.config');
 
@@ -70,7 +70,7 @@ test('webhook request rejects payload whose Content-Length header exceeds the co
     expect($request->authorize())->toBeFalse();
 });
 
-test('webhook request rejects payload whose actual body size exceeds the configured max', function () {
+test('webhook request rejects payload whose actual body size exceeds the configured max', function (): void {
     config(['payments.webhook.max_payload_size' => 10]);
     app()->forgetInstance('payments.config');
 
@@ -82,7 +82,7 @@ test('webhook request rejects payload whose actual body size exceeds the configu
     expect($request->authorize())->toBeFalse();
 });
 
-test('webhook request accepts payload within the configured max payload size', function () {
+test('webhook request accepts payload within the configured max payload size', function (): void {
     config(['payments.webhook.max_payload_size' => 1048576, 'payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
 

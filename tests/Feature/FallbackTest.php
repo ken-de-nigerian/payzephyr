@@ -4,7 +4,7 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('falls back to secondary provider when primary fails', function () {
+test('falls back to secondary provider when primary fails', function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.fallback' => 'stripe',
@@ -18,7 +18,7 @@ test('falls back to secondary provider when primary fails', function () {
 
 test(/**
  * @throws ProviderException
- */ 'throws exception when all providers fail', function () {
+ */ 'throws exception when all providers fail', function (): void {
     config([
         'payments.providers.paystack.enabled' => false,
         'payments.providers.stripe.enabled' => false,

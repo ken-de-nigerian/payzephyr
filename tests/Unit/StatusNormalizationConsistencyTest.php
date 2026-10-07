@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Tests\Unit;
 
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -147,7 +150,7 @@ class StatusNormalizationConsistencyTest extends TestCase
         $this->assertTrue($this->isProviderEnabled($provider), "Provider {$provider} is not enabled in the test configuration");
 
         foreach ($statuses as $status) {
-            $dto = new \KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO(
+            $dto = new VerificationResponseDTO(
                 reference: 'test_ref',
                 status: $status,
                 amount: 100.00,
@@ -181,7 +184,7 @@ class StatusNormalizationConsistencyTest extends TestCase
 
             $normalized = $normalizer->normalize($status, $provider);
 
-            $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+            $transaction = PaymentTransaction::create([
                 'reference' => 'test_ref_'.$provider,
                 'provider' => $provider,
                 'status' => $normalized,
@@ -207,7 +210,7 @@ class StatusNormalizationConsistencyTest extends TestCase
                 continue;
             }
 
-            $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
+            $driver = app(PaymentManager::class)->driver($provider);
             $webhookPayload = $this->getProviderWebhookPayload($provider);
 
             $status = $driver->extractWebhookStatus($webhookPayload);

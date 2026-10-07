@@ -34,11 +34,11 @@ function makeRefundResponse(): RefundResponseDTO
     );
 }
 
-afterEach(function () {
+afterEach(function (): void {
     app()->forgetInstance('payments.config');
 });
 
-test('logRefundFromResponse returns early without touching the repository when logging is disabled', function () {
+test('logRefundFromResponse returns early without touching the repository when logging is disabled', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.refunds.logging.enabled' => false]);
 
@@ -56,7 +56,7 @@ test('logRefundFromResponse returns early without touching the repository when l
     expect(true)->toBeTrue();
 });
 
-test('logRefundFromResponse falls back to the top-level logging.enabled flag when refunds.logging is not set', function () {
+test('logRefundFromResponse falls back to the top-level logging.enabled flag when refunds.logging is not set', function (): void {
     app()->forgetInstance('payments.config');
     config([
         'payments.refunds' => [],
@@ -77,7 +77,7 @@ test('logRefundFromResponse falls back to the top-level logging.enabled flag whe
     expect(true)->toBeTrue();
 });
 
-test('logRefundFromResponse logs and swallows an exception raised by the repository', function () {
+test('logRefundFromResponse logs and swallows an exception raised by the repository', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.refunds.logging.enabled' => true]);
 
@@ -98,7 +98,7 @@ test('logRefundFromResponse logs and swallows an exception raised by the reposit
     expect(true)->toBeTrue();
 });
 
-test('refund metadata is sanitized before being persisted to refund_transactions', function () {
+test('refund metadata is sanitized before being persisted to refund_transactions', function (): void {
     // Mirrors the regression this guards against for subscriptions
     // (RELEASE_AUDIT_2026-07-31.md, finding C-3): the assertion must be on
     // the persisted database row, not just the returned DTO's type, or this
@@ -123,7 +123,7 @@ test('refund metadata is sanitized before being persisted to refund_transactions
         ->and($metadata['html'] ?? '')->not->toContain('onerror=');
 });
 
-test('logRefundFromResponse normalizes a raw uppercase provider status before persisting', function () {
+test('logRefundFromResponse normalizes a raw uppercase provider status before persisting', function (): void {
     // Regression: Square/PayPal/Monnify return raw statuses like "PENDING"/
     // "COMPLETED" (uppercase), but RefundRepository::hasInFlightRefund() and
     // sumRefundedAmount() match against the fixed lowercase set
@@ -155,7 +155,7 @@ test('logRefundFromResponse normalizes a raw uppercase provider status before pe
         ->and($repository->sumRefundedAmount('TXN_CASE_TEST'))->toBe(5000.0);
 });
 
-test('logRefundFromResponse normalizes a differently-worded completed status before persisting', function () {
+test('logRefundFromResponse normalizes a differently-worded completed status before persisting', function (): void {
     // Paystack's create-refund response can report "processed" rather than
     // "completed" - RefundStatus::fromString() maps it to COMPLETED, and
     // that canonical value (not the raw word "processed") must be what's
@@ -183,7 +183,7 @@ test('logRefundFromResponse normalizes a differently-worded completed status bef
     expect($repository->sumRefundedAmount('TXN_WORD_TEST'))->toBe(2500.0);
 });
 
-test('refund reason is sanitized before being persisted to refund_transactions', function () {
+test('refund reason is sanitized before being persisted to refund_transactions', function (): void {
     // reason is free text supplied via Refund::reason() (e.g. from a
     // merchant's own customer-facing "why are you refunding this" field)
     // and is also frequently echoed back by providers (Paystack

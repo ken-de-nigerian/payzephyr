@@ -6,11 +6,11 @@ use Illuminate\Database\QueryException;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 use KenDeNigerian\PayZephyr\Repositories\EloquentRefundRepository;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->repository = new EloquentRefundRepository;
 });
 
-test('updateStatusIfExists updates the status of an existing pending refund', function () {
+test('updateStatusIfExists updates the status of an existing pending refund', function (): void {
     $this->repository->updateOrCreateAtomic('REF_UPD_1', [
         'transaction_reference' => 'TXN_UPD_1',
         'provider' => 'paystack',
@@ -25,14 +25,14 @@ test('updateStatusIfExists updates the status of an existing pending refund', fu
         ->and(RefundTransaction::where('refund_reference', 'REF_UPD_1')->first()->status)->toBe('completed');
 });
 
-test('updateStatusIfExists is a safe no-op when the refund does not exist locally', function () {
+test('updateStatusIfExists is a safe no-op when the refund does not exist locally', function (): void {
     $applied = $this->repository->updateStatusIfExists('REF_DOES_NOT_EXIST', 'completed');
 
     expect($applied)->toBeFalse()
         ->and(RefundTransaction::where('refund_reference', 'REF_DOES_NOT_EXIST')->exists())->toBeFalse();
 });
 
-test('updateStatusIfExists never regresses a refund that already reached a terminal state', function () {
+test('updateStatusIfExists never regresses a refund that already reached a terminal state', function (): void {
     // Guards against an out-of-order or replayed webhook delivery (e.g. a
     // stale "processing" event arriving after "completed" already landed)
     // flipping a resolved refund's status backward.
@@ -50,7 +50,7 @@ test('updateStatusIfExists never regresses a refund that already reached a termi
         ->and(RefundTransaction::where('refund_reference', 'REF_TERMINAL')->first()->status)->toBe('completed');
 });
 
-test('updateOrCreateAtomic creates a new refund transaction', function () {
+test('updateOrCreateAtomic creates a new refund transaction', function (): void {
     $result = $this->repository->updateOrCreateAtomic('REF_1', [
         'transaction_reference' => 'TXN_1',
         'provider' => 'paystack',
@@ -64,7 +64,7 @@ test('updateOrCreateAtomic creates a new refund transaction', function () {
         ->and(RefundTransaction::where('refund_reference', 'REF_1')->count())->toBe(1);
 });
 
-test('updateOrCreateAtomic updates the existing row for a known refund_reference', function () {
+test('updateOrCreateAtomic updates the existing row for a known refund_reference', function (): void {
     $this->repository->updateOrCreateAtomic('REF_2', [
         'transaction_reference' => 'TXN_2',
         'provider' => 'paystack',
@@ -85,7 +85,7 @@ test('updateOrCreateAtomic updates the existing row for a known refund_reference
         ->and(RefundTransaction::where('refund_reference', 'REF_2')->count())->toBe(1);
 });
 
-test('updateOrCreateAtomic does not lose data across repeated concurrent-style calls for a new reference', function () {
+test('updateOrCreateAtomic does not lose data across repeated concurrent-style calls for a new reference', function (): void {
     for ($i = 0; $i < 3; $i++) {
         $this->repository->updateOrCreateAtomic('REF_3', [
             'transaction_reference' => 'TXN_3',
@@ -100,7 +100,7 @@ test('updateOrCreateAtomic does not lose data across repeated concurrent-style c
         ->and(RefundTransaction::where('refund_reference', 'REF_3')->first()->status)->toBe('state_2');
 });
 
-test('updateOrCreateAtomic recovers when the create step loses a race to a concurrent insert', function () {
+test('updateOrCreateAtomic recovers when the create step loses a race to a concurrent insert', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_4',
         'transaction_reference' => 'TXN_4',
@@ -122,7 +122,7 @@ test('updateOrCreateAtomic recovers when the create step loses a race to a concu
         ->and(RefundTransaction::where('refund_reference', 'REF_4')->count())->toBe(1);
 });
 
-test('isUniqueConstraintViolation correctly classifies a unique index violation', function () {
+test('isUniqueConstraintViolation correctly classifies a unique index violation', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_5',
         'transaction_reference' => 'TXN_5',
@@ -134,7 +134,6 @@ test('isUniqueConstraintViolation correctly classifies a unique index violation'
 
     $reflection = new ReflectionClass($this->repository);
     $method = $reflection->getMethod('isUniqueConstraintViolation');
-    $method->setAccessible(true);
 
     try {
         RefundTransaction::create([
@@ -151,7 +150,7 @@ test('isUniqueConstraintViolation correctly classifies a unique index violation'
     }
 });
 
-test('sumRefundedAmount sums pending, processing, and completed refunds but excludes failed and cancelled ones', function () {
+test('sumRefundedAmount sums pending, processing, and completed refunds but excludes failed and cancelled ones', function (): void {
     $this->repository->updateOrCreateAtomic('REF_SUM_1', [
         'transaction_reference' => 'TXN_SUM', 'provider' => 'paystack', 'status' => 'completed', 'amount' => 1000, 'currency' => 'NGN',
     ]);
@@ -168,7 +167,7 @@ test('sumRefundedAmount sums pending, processing, and completed refunds but excl
     expect($this->repository->sumRefundedAmount('TXN_SUM'))->toBe(1500.0);
 });
 
-test('sumRefundedAmount returns 0.0 for a transaction with no refunds', function () {
+test('sumRefundedAmount returns 0.0 for a transaction with no refunds', function (): void {
     expect($this->repository->sumRefundedAmount('TXN_NONE'))->toBe(0.0);
 });
 
@@ -186,7 +185,7 @@ function seedRefundRow(string $reference, string $status): void
     ]);
 }
 
-test('a stale non-terminal status does not move a refund out of a terminal one', function () {
+test('a stale non-terminal status does not move a refund out of a terminal one', function (): void {
     seedRefundRow('REF_STALE', 'completed');
 
     $this->repository->updateOrCreateAtomic('REF_STALE', [
@@ -200,7 +199,7 @@ test('a stale non-terminal status does not move a refund out of a terminal one',
         ->and($row->reason)->toBe('customer request');
 });
 
-test('a terminal refund does not switch to a different terminal outcome', function () {
+test('a terminal refund does not switch to a different terminal outcome', function (): void {
     seedRefundRow('REF_DONE', 'completed');
 
     $this->repository->updateOrCreateAtomic('REF_DONE', ['status' => 'failed']);
@@ -208,7 +207,7 @@ test('a terminal refund does not switch to a different terminal outcome', functi
     expect(RefundTransaction::where('refund_reference', 'REF_DONE')->first()->status)->toBe('completed');
 });
 
-test('a refund that is not yet terminal still moves forward', function () {
+test('a refund that is not yet terminal still moves forward', function (): void {
     seedRefundRow('REF_MOVING', 'pending');
 
     $this->repository->updateOrCreateAtomic('REF_MOVING', ['status' => 'processing']);
@@ -218,7 +217,7 @@ test('a refund that is not yet terminal still moves forward', function () {
     expect(RefundTransaction::where('refund_reference', 'REF_MOVING')->first()->status)->toBe('completed');
 });
 
-test('the create-race path also keeps a terminal outcome it lost the race to', function () {
+test('the create-race path also keeps a terminal outcome it lost the race to', function (): void {
     // The select finds nothing, then a concurrent writer inserts the refund -
     // already completed - before this create runs. The create hits the unique
     // index and falls back to updating the row that won.

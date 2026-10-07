@@ -6,7 +6,7 @@ use KenDeNigerian\PayZephyr\Drivers\OPayDriver;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
-test('opay driver getIdempotencyHeader returns correct header', function () {
+test('opay driver getIdempotencyHeader returns correct header', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -21,7 +21,7 @@ test('opay driver getIdempotencyHeader returns correct header', function () {
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
-test('opay driver healthCheck returns true for successful response', function () {
+test('opay driver healthCheck returns true for successful response', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -41,7 +41,7 @@ test('opay driver healthCheck returns true for successful response', function ()
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('opay driver healthCheck returns true for 4xx errors', function () {
+test('opay driver healthCheck returns true for 4xx errors', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -61,7 +61,7 @@ test('opay driver healthCheck returns true for 4xx errors', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('opay driver healthCheck returns false for network errors', function () {
+test('opay driver healthCheck returns false for network errors', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -78,7 +78,7 @@ test('opay driver healthCheck returns false for network errors', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('opay driver validateWebhook returns false when signature missing', function () {
+test('opay driver validateWebhook returns false when signature missing', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -90,7 +90,7 @@ test('opay driver validateWebhook returns false when signature missing', functio
     expect($result)->toBeFalse();
 });
 
-test('opay driver validateWebhook returns false when secret key missing', function () {
+test('opay driver validateWebhook returns false when secret key missing', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -99,7 +99,6 @@ test('opay driver validateWebhook returns false when secret key missing', functi
 
     $reflection = new ReflectionClass($driver);
     $configProperty = $reflection->getProperty('config');
-    $configProperty->setAccessible(true);
     $config = $configProperty->getValue($driver);
     $config['public_key'] = '';
     $config['secret_key'] = '';
@@ -110,7 +109,7 @@ test('opay driver validateWebhook returns false when secret key missing', functi
     expect($result)->toBeFalse();
 });
 
-test('opay driver validateWebhook handles case-insensitive header', function () {
+test('opay driver validateWebhook handles case-insensitive header', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -122,7 +121,7 @@ test('opay driver validateWebhook handles case-insensitive header', function () 
     expect($result)->toBeFalse();
 });
 
-test('opay driver extractWebhookReference extracts reference', function () {
+test('opay driver extractWebhookReference extracts reference', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -134,7 +133,7 @@ test('opay driver extractWebhookReference extracts reference', function () {
     expect($driver->extractWebhookReference($payload))->toBe('OPAY123');
 });
 
-test('opay driver extractWebhookReference extracts orderNo', function () {
+test('opay driver extractWebhookReference extracts orderNo', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -146,7 +145,7 @@ test('opay driver extractWebhookReference extracts orderNo', function () {
     expect($driver->extractWebhookReference($payload))->toBe('ORDER123');
 });
 
-test('opay driver extractWebhookStatus extracts status', function () {
+test('opay driver extractWebhookStatus extracts status', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -158,7 +157,7 @@ test('opay driver extractWebhookStatus extracts status', function () {
     expect($driver->extractWebhookStatus($payload))->toBe('SUCCESS');
 });
 
-test('opay driver extractWebhookStatus extracts orderStatus', function () {
+test('opay driver extractWebhookStatus extracts orderStatus', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -170,7 +169,7 @@ test('opay driver extractWebhookStatus extracts orderStatus', function () {
     expect($driver->extractWebhookStatus($payload))->toBe('PENDING');
 });
 
-test('opay driver extractWebhookChannel extracts paymentChannel', function () {
+test('opay driver extractWebhookChannel extracts paymentChannel', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',
@@ -182,7 +181,7 @@ test('opay driver extractWebhookChannel extracts paymentChannel', function () {
     expect($driver->extractWebhookChannel($payload))->toBe('card');
 });
 
-test('opay driver resolveVerificationId returns reference', function () {
+test('opay driver resolveVerificationId returns reference', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'test_merchant',
         'public_key' => 'test_public',

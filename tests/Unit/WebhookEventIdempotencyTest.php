@@ -6,8 +6,9 @@ use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\Models\WebhookEvent;
+use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -30,10 +31,10 @@ function paystackDeliveryKey(array $payload): string
 function dispatchPaystackWebhookJob(array $payload): void
 {
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 }
 
-test('a duplicate webhook delivery is skipped and does not redispatch events (ADR-0005)', function () {
+test('a duplicate webhook delivery is skipped and does not redispatch events (ADR-0005)', function (): void {
     $payload = [
         'event' => 'charge.success',
         'data' => ['id' => 999888777, 'reference' => 'ref_dedupe_1'],
@@ -48,7 +49,7 @@ test('a duplicate webhook delivery is skipped and does not redispatch events (AD
     Event::assertDispatchedTimes(WebhookReceived::class, 1);
 });
 
-test('two different webhook deliveries are both processed', function () {
+test('two different webhook deliveries are both processed', function (): void {
     dispatchPaystackWebhookJob([
         'event' => 'charge.success',
         'data' => ['id' => 111, 'reference' => 'ref_a'],
@@ -61,7 +62,7 @@ test('two different webhook deliveries are both processed', function () {
     Event::assertDispatchedTimes(WebhookReceived::class, 2);
 });
 
-test('a duplicate delivery without a native event id falls back to a content hash', function () {
+test('a duplicate delivery without a native event id falls back to a content hash', function (): void {
     // No 'id' anywhere in this payload - resolveEventKey() must fall back to
     // hashing the payload rather than crashing or always treating every
     // delivery as unique.
@@ -74,7 +75,7 @@ test('a duplicate delivery without a native event id falls back to a content has
     expect(WebhookEvent::count())->toBe(1);
 });
 
-test('a delivery whose processing fails after being recorded can still be retried', function () {
+test('a delivery whose processing fails after being recorded can still be retried', function (): void {
     // Regression: recordIfNew() marks a delivery "seen" before processing
     // runs. If something after that throws (a WebhookReceived listener, a
     // transient failure), the event used to stay marked "seen" forever -
@@ -92,7 +93,7 @@ test('a delivery whose processing fails after being recorded can still be retrie
     // simulate "fails on first delivery, succeeds on retry" instead.
     $shouldThrow = true;
     $processedAgain = false;
-    Event::listen(WebhookReceived::class, function () use (&$shouldThrow, &$processedAgain) {
+    Event::listen(WebhookReceived::class, function () use (&$shouldThrow, &$processedAgain): void {
         if ($shouldThrow) {
             throw new RuntimeException('listener exploded');
         }
@@ -126,7 +127,7 @@ test('a delivery whose processing fails after being recorded can still be retrie
         ->and(WebhookEvent::where('provider', 'paystack')->where('event_key', paystackDeliveryKey($payload))->count())->toBe(1);
 });
 
-test('a genuinely duplicate delivery is still skipped after a successful first attempt', function () {
+test('a genuinely duplicate delivery is still skipped after a successful first attempt', function (): void {
     // The forget()-on-failure fix must not weaken the normal dedup path:
     // once a delivery is fully processed without error, a second identical
     // delivery is still a duplicate and must be skipped.
@@ -149,11 +150,11 @@ test('a genuinely duplicate delivery is still skipped after a successful first a
 function dispatchWebhookJob(string $provider, array $payload): void
 {
     app()->forgetInstance('payments.config');
-    app()->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+    app()->forgetInstance(PaymentManager::class);
     app()->call([new ProcessWebhook($provider, $payload), 'handle']);
 }
 
-test('a paystack subscription cancellation is not dropped as a duplicate of its creation', function () {
+test('a paystack subscription cancellation is not dropped as a duplicate of its creation', function (): void {
     dispatchWebhookJob('paystack', ['event' => 'subscription.create', 'data' => ['id' => 4242, 'subscription_code' => 'SUB_1', 'status' => 'active']]);
     dispatchWebhookJob('paystack', ['event' => 'subscription.disable', 'data' => ['id' => 4242, 'subscription_code' => 'SUB_1', 'status' => 'complete']]);
 
@@ -161,28 +162,28 @@ test('a paystack subscription cancellation is not dropped as a duplicate of its 
     expect(WebhookEvent::where('provider', 'paystack')->count())->toBe(2);
 });
 
-test('flutterwave events about one transaction are each processed', function () {
+test('flutterwave events about one transaction are each processed', function (): void {
     dispatchWebhookJob('flutterwave', ['event' => 'charge.completed', 'data' => ['id' => 777, 'tx_ref' => 'FLW_1', 'status' => 'pending']]);
     dispatchWebhookJob('flutterwave', ['event' => 'charge.completed', 'data' => ['id' => 777, 'tx_ref' => 'FLW_1', 'status' => 'successful']]);
 
     Event::assertDispatchedTimes(WebhookReceived::class, 2);
 });
 
-test('a monnify refund outcome is not dropped as a duplicate of the payment it refunds', function () {
+test('a monnify refund outcome is not dropped as a duplicate of the payment it refunds', function (): void {
     dispatchWebhookJob('monnify', ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => ['transactionReference' => 'MNFY_1', 'paymentReference' => 'REF_1', 'paymentStatus' => 'PAID']]);
     dispatchWebhookJob('monnify', ['eventType' => 'SUCCESSFUL_REFUND', 'eventData' => ['transactionReference' => 'MNFY_1', 'refundReference' => 'RFND_1', 'refundStatus' => 'COMPLETED']]);
 
     Event::assertDispatchedTimes(WebhookReceived::class, 2);
 });
 
-test('opay status changes for one transaction are each processed', function () {
+test('opay status changes for one transaction are each processed', function (): void {
     dispatchWebhookJob('opay', ['type' => 'transaction-status', 'payload' => ['transactionId' => 'OP_1', 'reference' => 'REF_OP', 'status' => 'PENDING']]);
     dispatchWebhookJob('opay', ['type' => 'transaction-status', 'payload' => ['transactionId' => 'OP_1', 'reference' => 'REF_OP', 'status' => 'SUCCESS']]);
 
     Event::assertDispatchedTimes(WebhookReceived::class, 2);
 });
 
-test('a byte-identical retry of a keyless provider is still deduplicated', function () {
+test('a byte-identical retry of a keyless provider is still deduplicated', function (): void {
     // The fix must not trade dropped events for double processing: a retry
     // is the same body, so it still hashes to the same key.
     $payload = ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => ['transactionReference' => 'MNFY_2', 'paymentStatus' => 'PAID']];
@@ -193,7 +194,7 @@ test('a byte-identical retry of a keyless provider is still deduplicated', funct
     Event::assertDispatchedTimes(WebhookReceived::class, 1);
 });
 
-test('every classic mollie ping is processed, because its body cannot tell one status change from the next', function () {
+test('every classic mollie ping is processed, because its body cannot tell one status change from the next', function (): void {
     // Paid, then refunded: Mollie sends {"id": "tr_..."} both times. Each is
     // "go and look"; deduplicating would hide the refund from every listener.
     config(['payments.providers.mollie.webhook_secret' => 'whsec_test']);
@@ -205,7 +206,7 @@ test('every classic mollie ping is processed, because its body cannot tell one s
     expect(WebhookEvent::where('provider', 'mollie')->count())->toBe(0);
 });
 
-test('a typed mollie event carries its own id and is deduplicated normally', function () {
+test('a typed mollie event carries its own id and is deduplicated normally', function (): void {
     config(['payments.providers.mollie.webhook_secret' => 'whsec_test']);
     $ping = ['id' => 'event_GvJ8WHrp5isUdRub9CJyH', 'type' => 'hook.ping'];
 
@@ -216,7 +217,7 @@ test('a typed mollie event carries its own id and is deduplicated normally', fun
     expect(WebhookEvent::where('provider', 'mollie')->where('event_key', 'event_GvJ8WHrp5isUdRub9CJyH')->count())->toBe(1);
 });
 
-test('a stateless delivery that fails leaves no marker behind', function () {
+test('a stateless delivery that fails leaves no marker behind', function (): void {
     config(['payments.providers.mollie.webhook_secret' => 'whsec_test']);
     Event::fakeExcept([WebhookReceived::class]);
     Event::listen(WebhookReceived::class, fn () => throw new RuntimeException('listener exploded'));

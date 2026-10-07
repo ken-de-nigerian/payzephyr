@@ -5,8 +5,10 @@ use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
 use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 
-test('square driver getIdempotencyHeader returns correct header', function () {
+test('square driver getIdempotencyHeader returns correct header', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -15,14 +17,13 @@ test('square driver getIdempotencyHeader returns correct header', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('getIdempotencyHeader');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, 'test_key');
 
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
-test('square driver getDefaultHeaders includes Square-Version', function () {
+test('square driver getDefaultHeaders includes Square-Version', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -31,7 +32,6 @@ test('square driver getDefaultHeaders includes Square-Version', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('getDefaultHeaders');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver);
 
@@ -40,7 +40,7 @@ test('square driver getDefaultHeaders includes Square-Version', function () {
         ->and($result['Authorization'])->toBe('Bearer EAAAxxx');
 });
 
-test('square driver healthCheck returns true for 2xx responses', function () {
+test('square driver healthCheck returns true for 2xx responses', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -48,7 +48,7 @@ test('square driver healthCheck returns true for 2xx responses', function () {
     ]);
 
     $client = Mockery::mock(Client::class);
-    $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
+    $response = Mockery::mock(ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(200);
 
     $client->shouldReceive('request')
@@ -61,7 +61,7 @@ test('square driver healthCheck returns true for 2xx responses', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('square driver healthCheck returns true for 4xx errors', function () {
+test('square driver healthCheck returns true for 4xx errors', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -69,8 +69,8 @@ test('square driver healthCheck returns true for 4xx errors', function () {
     ]);
 
     $client = Mockery::mock(Client::class);
-    $request = Mockery::mock(\Psr\Http\Message\RequestInterface::class);
-    $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
+    $request = Mockery::mock(RequestInterface::class);
+    $response = Mockery::mock(ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(404);
 
     $client->shouldReceive('request')
@@ -83,7 +83,7 @@ test('square driver healthCheck returns true for 4xx errors', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('square driver healthCheck returns false for network errors', function () {
+test('square driver healthCheck returns false for network errors', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -91,7 +91,7 @@ test('square driver healthCheck returns false for network errors', function () {
     ]);
 
     $client = Mockery::mock(Client::class);
-    $request = Mockery::mock(\Psr\Http\Message\RequestInterface::class);
+    $request = Mockery::mock(RequestInterface::class);
     $client->shouldReceive('request')
         ->once()
         ->with('GET', '/v2/locations', Mockery::any())
@@ -102,21 +102,21 @@ test('square driver healthCheck returns false for network errors', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('square driver validateConfig requires access_token', function () {
+test('square driver validateConfig requires access_token', function (): void {
     new SquareDriver([
         'location_id' => 'location_xxx',
         'currencies' => ['USD'],
     ]);
 })->throws(InvalidConfigurationException::class, 'Square access token is required');
 
-test('square driver validateConfig requires location_id', function () {
+test('square driver validateConfig requires location_id', function (): void {
     new SquareDriver([
         'access_token' => 'EAAAxxx',
         'currencies' => ['USD'],
     ]);
 })->throws(InvalidConfigurationException::class, 'Square location ID is required');
 
-test('square driver extractWebhookReference extracts from payment object', function () {
+test('square driver extractWebhookReference extracts from payment object', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -138,7 +138,7 @@ test('square driver extractWebhookReference extracts from payment object', funct
     expect($result)->toBe('SQUARE_1234567890_abc123');
 });
 
-test('square driver extractWebhookReference falls back to data id', function () {
+test('square driver extractWebhookReference falls back to data id', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -156,7 +156,7 @@ test('square driver extractWebhookReference falls back to data id', function () 
     expect($result)->toBe('payment_123');
 });
 
-test('square driver extractWebhookReference returns null when not found', function () {
+test('square driver extractWebhookReference returns null when not found', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -170,7 +170,7 @@ test('square driver extractWebhookReference returns null when not found', functi
     expect($result)->toBeNull();
 });
 
-test('square driver extractWebhookStatus extracts from payment object', function () {
+test('square driver extractWebhookStatus extracts from payment object', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -192,7 +192,7 @@ test('square driver extractWebhookStatus extracts from payment object', function
     expect($result)->toBe('COMPLETED');
 });
 
-test('square driver extractWebhookStatus falls back to type', function () {
+test('square driver extractWebhookStatus falls back to type', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -208,7 +208,7 @@ test('square driver extractWebhookStatus falls back to type', function () {
     expect($result)->toBe('payment.created');
 });
 
-test('square driver extractWebhookStatus returns unknown when not found', function () {
+test('square driver extractWebhookStatus returns unknown when not found', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -222,7 +222,7 @@ test('square driver extractWebhookStatus returns unknown when not found', functi
     expect($result)->toBe('unknown');
 });
 
-test('square driver extractWebhookChannel extracts source_type', function () {
+test('square driver extractWebhookChannel extracts source_type', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -244,7 +244,7 @@ test('square driver extractWebhookChannel extracts source_type', function () {
     expect($result)->toBe('CARD');
 });
 
-test('square driver extractWebhookChannel returns null when source_type is absent', function () {
+test('square driver extractWebhookChannel returns null when source_type is absent', function (): void {
     // Previously defaulted to 'card', which recorded a card payment for
     // instruments that were never cards (wallet, bank transfer, gift card).
     // An absent source_type is an unknown channel, not a card one.
@@ -257,7 +257,7 @@ test('square driver extractWebhookChannel returns null when source_type is absen
     expect($driver->extractWebhookChannel(['data' => ['object' => []]]))->toBeNull();
 });
 
-test('square driver extractWebhookChannel returns the reported source_type', function () {
+test('square driver extractWebhookChannel returns the reported source_type', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -269,7 +269,7 @@ test('square driver extractWebhookChannel returns the reported source_type', fun
     expect($driver->extractWebhookChannel($payload))->toBe('BANK_ACCOUNT');
 });
 
-test('square driver extractWebhookChannel treats an empty source_type as unknown', function () {
+test('square driver extractWebhookChannel treats an empty source_type as unknown', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -281,7 +281,7 @@ test('square driver extractWebhookChannel treats an empty source_type as unknown
     expect($driver->extractWebhookChannel($payload))->toBeNull();
 });
 
-test('square driver resolveVerificationId returns providerId', function () {
+test('square driver resolveVerificationId returns providerId', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -293,7 +293,7 @@ test('square driver resolveVerificationId returns providerId', function () {
     expect($result)->toBe('payment_abc123');
 });
 
-test('square driver validateWebhook returns false when signature missing', function () {
+test('square driver validateWebhook returns false when signature missing', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -306,7 +306,7 @@ test('square driver validateWebhook returns false when signature missing', funct
     expect($result)->toBeFalse();
 });
 
-test('square driver validateWebhook returns false when signature key missing', function () {
+test('square driver validateWebhook returns false when signature key missing', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -318,7 +318,7 @@ test('square driver validateWebhook returns false when signature key missing', f
     expect($result)->toBeFalse();
 });
 
-test('square driver validateWebhook validates correct signature', function () {
+test('square driver validateWebhook validates correct signature', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -335,7 +335,7 @@ test('square driver validateWebhook validates correct signature', function () {
     expect($result)->toBeTrue();
 });
 
-test('square driver validateWebhook rejects invalid signature', function () {
+test('square driver validateWebhook rejects invalid signature', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -351,7 +351,7 @@ test('square driver validateWebhook rejects invalid signature', function () {
     expect($result)->toBeFalse();
 });
 
-test('square driver validateWebhook handles case-insensitive header', function () {
+test('square driver validateWebhook handles case-insensitive header', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -367,7 +367,7 @@ test('square driver validateWebhook handles case-insensitive header', function (
     expect($result)->toBeTrue();
 });
 
-test('square driver mapFromPayment maps COMPLETED to success', function () {
+test('square driver mapFromPayment maps COMPLETED to success', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -376,7 +376,6 @@ test('square driver mapFromPayment maps COMPLETED to success', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',
@@ -397,7 +396,7 @@ test('square driver mapFromPayment maps COMPLETED to success', function () {
         ->and($result->paidAt)->not->toBeNull();
 });
 
-test('square driver mapFromPayment maps APPROVED to success', function () {
+test('square driver mapFromPayment maps APPROVED to success', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -406,7 +405,6 @@ test('square driver mapFromPayment maps APPROVED to success', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',
@@ -425,7 +423,7 @@ test('square driver mapFromPayment maps APPROVED to success', function () {
     expect($result->status)->toBe('success');
 });
 
-test('square driver mapFromPayment maps FAILED to failed', function () {
+test('square driver mapFromPayment maps FAILED to failed', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -434,7 +432,6 @@ test('square driver mapFromPayment maps FAILED to failed', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',
@@ -453,7 +450,7 @@ test('square driver mapFromPayment maps FAILED to failed', function () {
         ->and($result->paidAt)->toBeNull();
 });
 
-test('square driver mapFromPayment maps CANCELED to failed', function () {
+test('square driver mapFromPayment maps CANCELED to failed', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -462,7 +459,6 @@ test('square driver mapFromPayment maps CANCELED to failed', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',
@@ -480,7 +476,7 @@ test('square driver mapFromPayment maps CANCELED to failed', function () {
     expect($result->status)->toBe('failed');
 });
 
-test('square driver mapFromPayment maps unknown status to pending', function () {
+test('square driver mapFromPayment maps unknown status to pending', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -489,7 +485,6 @@ test('square driver mapFromPayment maps unknown status to pending', function () 
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',
@@ -507,7 +502,7 @@ test('square driver mapFromPayment maps unknown status to pending', function () 
     expect($result->status)->toBe('pending');
 });
 
-test('square driver mapFromPayment includes metadata', function () {
+test('square driver mapFromPayment includes metadata', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'EAAAxxx',
         'location_id' => 'location_xxx',
@@ -516,7 +511,6 @@ test('square driver mapFromPayment includes metadata', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPayment');
-    $method->setAccessible(true);
 
     $payment = [
         'id' => 'payment_123',

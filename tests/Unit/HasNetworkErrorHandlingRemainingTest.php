@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 
-test('it handles a generic transfer error that is not a connect/server/request exception', function () {
+test('it handles a generic transfer error that is not a connect/server/request exception', function (): void {
     // GuzzleHttp\Exception\TransferException is the concrete base class of
     // ConnectException/RequestException/ServerException. Throwing it
     // directly (rather than a subclass) is the only way to reach the final

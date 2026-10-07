@@ -32,7 +32,7 @@ function capturingDriver(AbstractDriver $driver, array &$sent, int $responses = 
     ])));
 
     $stack = HandlerStack::create(new MockHandler($queue));
-    $stack->push(function (callable $handler) use (&$sent) {
+    $stack->push(function (callable $handler) use (&$sent): \Closure {
         return function ($request, $options) use ($handler, &$sent) {
             $sent[] = (string) $request->getUri();
 
@@ -48,7 +48,7 @@ function capturingDriver(AbstractDriver $driver, array &$sent, int $responses = 
 test('a traversal attempt in a reference is encoded, not treated as path structure', function (
     AbstractDriver $driver,
     string $expectedFragment,
-) {
+): void {
     $sent = [];
     capturingDriver($driver, $sent);
 
@@ -69,20 +69,20 @@ test('a traversal attempt in a reference is encoded, not treated as path structu
         ->and($url)->not->toContain('../');
 })->with([
     'paystack' => [
-        fn () => new PaystackDriver(['secret_key' => 'sk_test_x', 'base_url' => 'https://api.paystack.co', 'currencies' => ['NGN']]),
+        fn (): PaystackDriver => new PaystackDriver(['secret_key' => 'sk_test_x', 'base_url' => 'https://api.paystack.co', 'currencies' => ['NGN']]),
         '/transaction/verify/',
     ],
     'mollie' => [
-        fn () => new MollieDriver(['api_key' => 'test_x', 'base_url' => 'https://api.mollie.com', 'currencies' => ['EUR']]),
+        fn (): MollieDriver => new MollieDriver(['api_key' => 'test_x', 'base_url' => 'https://api.mollie.com', 'currencies' => ['EUR']]),
         '/v2/payments/',
     ],
     'square' => [
-        fn () => new SquareDriver(['access_token' => 'tok', 'location_id' => 'L1', 'base_url' => 'https://connect.squareup.com', 'currencies' => ['USD']]),
+        fn (): SquareDriver => new SquareDriver(['access_token' => 'tok', 'location_id' => 'L1', 'base_url' => 'https://connect.squareup.com', 'currencies' => ['USD']]),
         '/v2/online-checkout/payment-links/',
     ],
 ]);
 
-test('a reference cannot smuggle an extra query parameter into a lookup', function () {
+test('a reference cannot smuggle an extra query parameter into a lookup', function (): void {
     // Monnify passes the reference as a query value. It strips anything after
     // a `?`, which never stopped `&` - so `X&limit=100` used to arrive as a
     // second parameter rather than as part of the reference.
@@ -106,7 +106,7 @@ test('a reference cannot smuggle an extra query parameter into a lookup', functi
             ],
         ])),
     ]));
-    $stack->push(function (callable $handler) use (&$sent) {
+    $stack->push(function (callable $handler) use (&$sent): \Closure {
         return function ($request, $options) use ($handler, &$sent) {
             $sent[] = (string) $request->getUri();
 
@@ -126,7 +126,7 @@ test('a reference cannot smuggle an extra query parameter into a lookup', functi
         ->and($lookup)->not->toContain('&limit=100');
 });
 
-test('an ordinary reference is not mangled on the way out', function () {
+test('an ordinary reference is not mangled on the way out', function (): void {
     // The guard must not break the common case, and must not double-encode a
     // reference that is already URL-safe.
     $sent = [];
@@ -144,7 +144,7 @@ test('an ordinary reference is not mangled on the way out', function () {
         ->and($sent[0])->not->toContain('%');
 });
 
-test('every interpolated request path in every driver is encoded', function () {
+test('every interpolated request path in every driver is encoded', function (): void {
     // The sweep covered 45 sites across 16 files. This is what stops the
     // forty-sixth from arriving unencoded: a raw "..." URL containing a
     // variable is a build failure, whichever driver adds it.

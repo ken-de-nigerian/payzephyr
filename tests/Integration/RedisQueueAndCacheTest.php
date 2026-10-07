@@ -22,7 +22,7 @@ use KenDeNigerian\PayZephyr\PaymentManager;
  * package takes with Cache::add are atomic on the store production uses.
  */
 
-beforeEach(function () {
+beforeEach(function (): void {
     $host = getenv('REDIS_HOST');
 
     if (! is_string($host) || $host === '') {
@@ -56,7 +56,7 @@ beforeEach(function () {
     Redis::connection('cache')->flushdb();
 });
 
-test('a webhook queued on redis is processed by a worker', function () {
+test('a webhook queued on redis is processed by a worker', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -87,15 +87,15 @@ function redisClaimManager(?Throwable $throws = null): PaymentManager
     $driver = Mockery::mock(DriverInterface::class);
     $driver->shouldReceive('getSupportedCurrencies')->andReturn(['NGN']);
     $driver->shouldReceive('healthCheck')->andReturn(true);
-    $throws === null
-        ? $driver->shouldReceive('charge')->andReturnUsing(fn (ChargeRequestDTO $request) => new ChargeResponseDTO(
+    $throws instanceof \Throwable
+        ? $driver->shouldReceive('charge')->andThrow($throws)
+        : $driver->shouldReceive('charge')->andReturnUsing(fn (ChargeRequestDTO $request): ChargeResponseDTO => new ChargeResponseDTO(
             reference: (string) $request->reference,
             authorizationUrl: 'https://example.test/pay',
             accessCode: 'code',
             status: 'pending',
             provider: 'primary',
-        ))
-        : $driver->shouldReceive('charge')->andThrow($throws);
+        ));
 
     $manager = new PaymentManager;
     $property = new ReflectionProperty($manager, 'drivers');
@@ -109,20 +109,20 @@ function redisClaimRequest(string $reference): ChargeRequestDTO
     return ChargeRequestDTO::fromArray(['amount' => 100.00, 'currency' => 'NGN', 'email' => 'buyer@example.com', 'reference' => $reference]);
 }
 
-test('a second charge for a reference in flight is refused when the claim lives in redis', function () {
+test('a second charge for a reference in flight is refused when the claim lives in redis', function (): void {
     config(['payments.health_check.enabled' => false]);
 
     // What a first request still waiting on the provider leaves behind.
     Cache::store('redis')->add('payzephyr:charge-inflight:REDIS_ORDER', true, 300);
 
-    expect(fn () => redisClaimManager()->chargeWithFallback(redisClaimRequest('REDIS_ORDER'), ['primary']))
+    expect(fn (): ChargeResponseDTO => redisClaimManager()->chargeWithFallback(redisClaimRequest('REDIS_ORDER'), ['primary']))
         ->toThrow(ProviderException::class, 'A charge for reference [REDIS_ORDER] is already in progress');
 });
 
-test('an in-flight claim taken in redis is released when the charge fails outright', function () {
+test('an in-flight claim taken in redis is released when the charge fails outright', function (): void {
     config(['payments.health_check.enabled' => false]);
 
-    expect(fn () => redisClaimManager(new RuntimeException('card declined'))->chargeWithFallback(redisClaimRequest('REDIS_RELEASE'), ['primary']))
+    expect(fn (): ChargeResponseDTO => redisClaimManager(new RuntimeException('card declined'))->chargeWithFallback(redisClaimRequest('REDIS_RELEASE'), ['primary']))
         ->toThrow(ProviderException::class)
         ->and(Cache::store('redis')->has('payzephyr:charge-inflight:REDIS_RELEASE'))->toBeFalse();
 });

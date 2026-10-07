@@ -6,7 +6,7 @@ use KenDeNigerian\PayZephyr\Events\RefundCompleted;
 use KenDeNigerian\PayZephyr\Events\RefundCreated;
 use KenDeNigerian\PayZephyr\Events\RefundFailed;
 
-test('RefundCreated exposes its constructor arguments as readonly properties', function () {
+test('RefundCreated exposes its constructor arguments as readonly properties', function (): void {
     $event = new RefundCreated('RE_1', 'TXN_1', 'paystack', ['amount' => 5000]);
 
     expect($event->refundReference)->toBe('RE_1')
@@ -15,7 +15,7 @@ test('RefundCreated exposes its constructor arguments as readonly properties', f
         ->and($event->data)->toBe(['amount' => 5000]);
 });
 
-test('RefundCompleted exposes its constructor arguments as readonly properties', function () {
+test('RefundCompleted exposes its constructor arguments as readonly properties', function (): void {
     $event = new RefundCompleted('RE_1', 'TXN_1', 'stripe', ['amount' => 5000]);
 
     expect($event->refundReference)->toBe('RE_1')
@@ -24,7 +24,7 @@ test('RefundCompleted exposes its constructor arguments as readonly properties',
         ->and($event->data)->toBe(['amount' => 5000]);
 });
 
-test('RefundFailed exposes its constructor arguments as readonly properties', function () {
+test('RefundFailed exposes its constructor arguments as readonly properties', function (): void {
     $event = new RefundFailed('RE_1', 'TXN_1', 'square', 'insufficient_funds', ['amount' => 5000]);
 
     expect($event->refundReference)->toBe('RE_1')

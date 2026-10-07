@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
@@ -37,7 +38,6 @@ function installWebhookDriver(DriverInterface $driver): PaymentManager
 {
     $manager = app(PaymentManager::class);
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, ['paystack' => $driver]);
 
     return $manager;
@@ -63,7 +63,7 @@ function webhookTraceEvents(): array
         ->map(fn (TraceEvent $event): string => $event->value)->all();
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -83,7 +83,7 @@ beforeEach(function () {
 // A delivery that lands
 // ---------------------------------------------------------------------------
 
-test('a processed webhook is recorded under the reference it concerns', function () {
+test('a processed webhook is recorded under the reference it concerns', function (): void {
     installWebhookDriver(webhookTracingDriver());
 
     app()->call([webhookJob(), 'handle']);
@@ -96,7 +96,7 @@ test('a processed webhook is recorded under the reference it concerns', function
         ->and($received->metadata['event_key'])->not->toBeEmpty();
 });
 
-test('the webhook body is kept, which webhook_events never did', function () {
+test('the webhook body is kept, which webhook_events never did', function (): void {
     installWebhookDriver(webhookTracingDriver());
 
     app()->call([webhookJob(), 'handle']);
@@ -107,7 +107,7 @@ test('the webhook body is kept, which webhook_events never did', function () {
         ->and($received->payload['data']['amount'])->toBe(5000);
 });
 
-test('the body is dropped when provider bodies are switched off', function () {
+test('the body is dropped when provider bodies are switched off', function (): void {
     config(['payments.trace.record_http_bodies' => false]);
     app()->forgetInstance('payments.config');
 
@@ -121,7 +121,7 @@ test('the body is dropped when provider bodies are switched off', function () {
         ->and($received->reference)->toBe('PZ_1755000000_abcdef01');
 });
 
-test('a webhook PayZephyr cannot attribute to a payment records nothing', function () {
+test('a webhook PayZephyr cannot attribute to a payment records nothing', function (): void {
     // There is no timeline to hang it off, and inventing a key would file it
     // under the wrong payment.
     installWebhookDriver(webhookTracingDriver(reference: null));
@@ -135,7 +135,7 @@ test('a webhook PayZephyr cannot attribute to a payment records nothing', functi
 // A duplicate delivery
 // ---------------------------------------------------------------------------
 
-test('a duplicate delivery is recorded along with what it said', function () {
+test('a duplicate delivery is recorded along with what it said', function (): void {
     // The gap this closes: webhook_events stores provider + event_key and
     // nothing else, so before this you knew a duplicate had arrived but had
     // no way to see whether it agreed with the first one.
@@ -158,7 +158,7 @@ test('a duplicate delivery is recorded along with what it said', function () {
 // A delivery that fails
 // ---------------------------------------------------------------------------
 
-test('a failed delivery records the failure with the attempt it was on', function () {
+test('a failed delivery records the failure with the attempt it was on', function (): void {
     installWebhookDriver(webhookTracingDriver());
 
     $repository = Mockery::mock(WebhookEventRepositoryInterface::class);
@@ -176,7 +176,7 @@ test('a failed delivery records the failure with the attempt it was on', functio
         ->and($failed->direction)->toBe(TraceDirection::INBOUND);
 });
 
-test('no retry is promised when the job is not running on a queue', function () {
+test('no retry is promised when the job is not running on a queue', function (): void {
     // attempts() reports 0 off a queue, so an unguarded check would record a
     // retry.scheduled for a retry that is never coming.
     installWebhookDriver(webhookTracingDriver());
@@ -191,7 +191,7 @@ test('no retry is promised when the job is not running on a queue', function () 
     expect(PaymentTraceEvent::where('event', TraceEvent::RETRY_SCHEDULED->value)->exists())->toBeFalse();
 });
 
-test('a retry is recorded when one is genuinely coming', function () {
+test('a retry is recorded when one is genuinely coming', function (): void {
     installWebhookDriver(webhookTracingDriver());
 
     $repository = Mockery::mock(WebhookEventRepositoryInterface::class);
@@ -204,7 +204,7 @@ test('a retry is recorded when one is genuinely coming', function () {
     $queueJob->shouldReceive('attempts')->andReturn(1);
     $job->setJob($queueJob);
 
-    expect(fn () => app()->call([$job, 'handle']))->toThrow(RuntimeException::class);
+    expect(fn () => app()->call($job->handle(...)))->toThrow(RuntimeException::class);
 
     $scheduled = PaymentTraceEvent::where('event', TraceEvent::RETRY_SCHEDULED->value)->sole();
 
@@ -213,7 +213,7 @@ test('a retry is recorded when one is genuinely coming', function () {
         ->and($scheduled->direction)->toBe(TraceDirection::INTERNAL);
 });
 
-test('the last attempt is recorded as abandoned rather than retried', function () {
+test('the last attempt is recorded as abandoned rather than retried', function (): void {
     // failed() is the only point at which "abandoned" is a fact rather than a
     // guess, which is why the catch block does not try to infer it.
     installWebhookDriver(webhookTracingDriver());
@@ -233,7 +233,7 @@ test('the last attempt is recorded as abandoned rather than retried', function (
 // Tracing never matters to the webhook
 // ---------------------------------------------------------------------------
 
-test('with tracing off a webhook is processed exactly as before and records nothing', function () {
+test('with tracing off a webhook is processed exactly as before and records nothing', function (): void {
     config(['payments.features.trace' => false]);
     app()->forgetInstance('payments.config');
 
@@ -244,21 +244,21 @@ test('with tracing off a webhook is processed exactly as before and records noth
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a webhook is still processed when the trace table was never migrated', function () {
-    Illuminate\Support\Facades\Schema::drop('payment_trace_events');
+test('a webhook is still processed when the trace table was never migrated', function (): void {
+    Schema::drop('payment_trace_events');
 
     installWebhookDriver(webhookTracingDriver());
 
     app()->call([webhookJob(), 'handle']);
 
-    expect(Illuminate\Support\Facades\Schema::hasTable('payment_trace_events'))->toBeFalse();
+    expect(Schema::hasTable('payment_trace_events'))->toBeFalse();
 });
 
 // ---------------------------------------------------------------------------
 // The two failures the job cannot see for itself
 // ---------------------------------------------------------------------------
 
-test('a deferred signature failure is recorded against the payment it claimed', function () {
+test('a deferred signature failure is recorded against the payment it claimed', function (): void {
     // Only reachable for drivers that defer verification (Mollie, PayPal).
     // Every other driver is rejected with a 403 in WebhookRequest::authorize()
     // before the controller or this job ever runs, so those failures leave no
@@ -284,7 +284,7 @@ test('a deferred signature failure is recorded against the payment it claimed', 
         ->and(PaymentTraceEvent::where('event', TraceEvent::WEBHOOK_RECEIVED->value)->exists())->toBeFalse();
 });
 
-test('a webhook that could not be queued is recorded, because nothing else will', function () {
+test('a webhook that could not be queued is recorded, because nothing else will', function (): void {
     // The job records everything else, but a delivery that never reached the
     // queue has no job to record it - and no retry is coming either.
     installWebhookDriver(webhookTracingDriver());
@@ -315,7 +315,7 @@ test('a webhook that could not be queued is recorded, because nothing else will'
         ->and($failed->event->isTerminal())->toBeFalse();
 });
 
-test('a queue failure for an unknown provider is dropped rather than raised', function () {
+test('a queue failure for an unknown provider is dropped rather than raised', function (): void {
     // referenceFor() runs inside an already-failing request. A provider that
     // cannot be resolved must not turn a 500 into an unhandled exception on
     // the way out.
@@ -331,7 +331,7 @@ test('a queue failure for an unknown provider is dropped rather than raised', fu
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a driver that cannot read its own payload does not break the abandoned record', function () {
+test('a driver that cannot read its own payload does not break the abandoned record', function (): void {
     // failed() runs after the delivery has already been given up on. Anything
     // thrown while looking up the reference is worth less than a clean exit.
     $driver = Mockery::mock(DriverInterface::class);

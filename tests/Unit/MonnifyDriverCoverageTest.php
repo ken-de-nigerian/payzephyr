@@ -8,7 +8,7 @@ use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
-test('monnify driver getIdempotencyHeader returns correct header', function () {
+test('monnify driver getIdempotencyHeader returns correct header', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -24,7 +24,7 @@ test('monnify driver getIdempotencyHeader returns correct header', function () {
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
-test('monnify driver healthCheck returns true for successful authentication', function () {
+test('monnify driver healthCheck returns true for successful authentication', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -53,7 +53,7 @@ test('monnify driver healthCheck returns true for successful authentication', fu
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('monnify driver healthCheck returns true for 4xx errors', function () {
+test('monnify driver healthCheck returns true for 4xx errors', function (): void {
     // A 4xx means Monnify's API answered (just rejected these credentials),
     // matching the same "reachable but misconfigured" contract every other
     // driver's healthCheck() follows (see e.g. SquareDriver/PaystackDriver/
@@ -87,7 +87,7 @@ test('monnify driver healthCheck returns true for 4xx errors', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('monnify driver healthCheck returns false for network errors', function () {
+test('monnify driver healthCheck returns false for network errors', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -105,7 +105,7 @@ test('monnify driver healthCheck returns false for network errors', function () 
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('monnify driver verify handles currencyCode field', function () {
+test('monnify driver verify handles currencyCode field', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -151,10 +151,8 @@ test('monnify driver verify handles currencyCode field', function () {
         ->andReturn($authResponse);
 
     $client->shouldReceive('request')
-        ->with('GET', Mockery::on(function ($uri) {
-            return str_contains($uri, '/api/v2/merchant/transactions/query')
-                && str_contains($uri, 'paymentReference=ref_123');
-        }), Mockery::any())
+        ->with('GET', Mockery::on(fn ($uri): bool => str_contains($uri, '/api/v2/merchant/transactions/query')
+            && str_contains($uri, 'paymentReference=ref_123')), Mockery::any())
         ->andReturn($verifyResponse);
 
     $driver->setClient($client);

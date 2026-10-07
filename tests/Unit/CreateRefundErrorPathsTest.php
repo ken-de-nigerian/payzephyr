@@ -9,6 +9,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
@@ -48,45 +49,45 @@ function refundRequest(array $overrides = []): RefundRequestDTO
     ], $overrides));
 }
 
-test('paystack refund wraps a network failure in a RefundException', function () {
+test('paystack refund wraps a network failure in a RefundException', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(refundRequest()))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest()))->toThrow(RefundException::class);
 });
 
-test('flutterwave refund wraps a network failure in a RefundException', function () {
+test('flutterwave refund wraps a network failure in a RefundException', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'test_secret', 'currencies' => ['NGN']]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(refundRequest()))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest()))->toThrow(RefundException::class);
 });
 
-test('flutterwave refund rejects a response carrying no refund reference', function () {
+test('flutterwave refund rejects a response carrying no refund reference', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'test_secret', 'currencies' => ['NGN']]);
     $driver->setClient(refundClient([
         new Response(200, [], (string) json_encode(['status' => 'success', 'data' => []])),
     ]));
 
-    expect(fn () => $driver->refund(refundRequest()))
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest()))
         ->toThrow(RefundException::class, 'Refund reference not found');
 });
 
-test('mollie refund wraps a network failure in a RefundException', function () {
+test('mollie refund wraps a network failure in a RefundException', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_test_key', 'currencies' => ['EUR']]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(refundRequest(['currency' => 'EUR'])))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest(['currency' => 'EUR'])))->toThrow(RefundException::class);
 });
 
-test('mollie refund rejects a response carrying no refund id', function () {
+test('mollie refund rejects a response carrying no refund id', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_test_key', 'currencies' => ['EUR']]);
     $driver->setClient(refundClient([new Response(200, [], (string) json_encode([]))]));
 
-    expect(fn () => $driver->refund(refundRequest(['currency' => 'EUR'])))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest(['currency' => 'EUR'])))->toThrow(RefundException::class);
 });
 
-test('opay refund wraps a network failure in a RefundException', function () {
+test('opay refund wraps a network failure in a RefundException', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'MERCHANT123',
         'public_key' => 'PUBLIC_KEY_123',
@@ -96,10 +97,10 @@ test('opay refund wraps a network failure in a RefundException', function () {
     ]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(refundRequest()))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest()))->toThrow(RefundException::class);
 });
 
-test('square refund wraps a network failure in a RefundException', function () {
+test('square refund wraps a network failure in a RefundException', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'test_token',
         'location_id' => 'L123',
@@ -107,10 +108,10 @@ test('square refund wraps a network failure in a RefundException', function () {
     ]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
 });
 
-test('square explains itself when a full refund cannot look up the original amount', function () {
+test('square explains itself when a full refund cannot look up the original amount', function (): void {
     // Square's refund API requires an explicit amount, so a full refund has to
     // read the original payment first. If that read fails the error must name
     // the payment and tell the caller to pass amount() - not surface a bare
@@ -122,13 +123,13 @@ test('square explains itself when a full refund cannot look up the original amou
     ]);
     $driver->setClient(refundClient([lostConnection()]));
 
-    expect(fn () => $driver->refund(RefundRequestDTO::fromArray([
+    expect(fn (): RefundResponseDTO => $driver->refund(RefundRequestDTO::fromArray([
         'transaction_reference' => 'pay_123',
         'currency' => 'USD',
     ])))->toThrow(RefundException::class, 'Pass an explicit amount()');
 });
 
-test('square fetchRefund rejects a response with no refund object', function () {
+test('square fetchRefund rejects a response with no refund object', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'test_token',
         'location_id' => 'L123',
@@ -138,11 +139,11 @@ test('square fetchRefund rejects a response with no refund object', function () 
         new Response(200, [], (string) json_encode(['errors' => [['detail' => 'Refund not found']]])),
     ]));
 
-    expect(fn () => $driver->fetchRefund('rf_missing'))
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_missing'))
         ->toThrow(RefundException::class, 'Refund not found');
 });
 
-test('monnify refund wraps a network failure in a RefundException', function () {
+test('monnify refund wraps a network failure in a RefundException', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'MK_TEST_xxx',
         'secret_key' => 'SK_TEST_xxx',
@@ -158,10 +159,10 @@ test('monnify refund wraps a network failure in a RefundException', function () 
         lostConnection(),
     ]));
 
-    expect(fn () => $driver->refund(refundRequest()))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest()))->toThrow(RefundException::class);
 });
 
-test('paypal refund wraps a network failure in a RefundException', function () {
+test('paypal refund wraps a network failure in a RefundException', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',
@@ -173,10 +174,10 @@ test('paypal refund wraps a network failure in a RefundException', function () {
         lostConnection(),
     ]));
 
-    expect(fn () => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
 });
 
-test('paypal refund rejects a response carrying no refund id', function () {
+test('paypal refund rejects a response carrying no refund id', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',
@@ -188,10 +189,10 @@ test('paypal refund rejects a response carrying no refund id', function () {
         new Response(200, [], (string) json_encode([])),
     ]));
 
-    expect(fn () => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->refund(refundRequest(['currency' => 'USD'])))->toThrow(RefundException::class);
 });
 
-test('paystack refund rejects a success response that carries no refund id', function () {
+test('paystack refund rejects a success response that carries no refund id', function (): void {
     // Without an id the refund cannot be fetched or reconciled later, so a
     // "successful" body missing it must not be reported as a created refund.
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);

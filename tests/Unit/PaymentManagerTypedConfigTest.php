@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
@@ -39,16 +40,16 @@ function seedTypedConfigTransaction(string $reference, string $provider, array $
     ]);
 }
 
-test('with no default and no provider configured, the manager says so', function () {
+test('with no default and no provider configured, the manager says so', function (): void {
     $manager = typedConfigManager(['payments.default' => null, 'payments.providers' => []]);
 
-    expect(fn () => $manager->getDefaultDriver())->toThrow(
+    expect(fn (): string => $manager->getDefaultDriver())->toThrow(
         DriverNotFoundException::class,
         'No payment provider is configured: set payments.default, or add a provider under payments.providers'
     );
 });
 
-test('the first configured provider is the default when none is named', function () {
+test('the first configured provider is the default when none is named', function (): void {
     $manager = typedConfigManager([
         'payments.default' => null,
         'payments.providers' => ['stripe' => ['driver' => 'stripe', 'secret_key' => 'sk_test_x']],
@@ -57,7 +58,7 @@ test('the first configured provider is the default when none is named', function
     expect($manager->getDefaultDriver())->toBe('stripe');
 });
 
-test('a provider switched off with the string an env file produces is off', function (mixed $off) {
+test('a provider switched off with the string an env file produces is off', function (mixed $off): void {
     $manager = typedConfigManager([
         'payments.providers' => [
             'paystack' => ['driver' => 'paystack', 'secret_key' => 'sk_test_x', 'enabled' => true],
@@ -66,11 +67,11 @@ test('a provider switched off with the string an env file produces is off', func
     ]);
 
     expect(array_keys($manager->getEnabledProviders()))->toBe(['paystack'])
-        ->and(fn () => $manager->driver('stripe'))
+        ->and(fn (): DriverInterface => $manager->driver('stripe'))
         ->toThrow(DriverNotFoundException::class, 'Payment driver [stripe] not found or disabled');
 })->with(['false', 'off', '0', 0]);
 
-test('a provider entry that is not an array is not an enabled provider', function () {
+test('a provider entry that is not an array is not an enabled provider', function (): void {
     $manager = typedConfigManager([
         'payments.providers' => [
             'paystack' => ['driver' => 'paystack', 'secret_key' => 'sk_test_x'],
@@ -79,10 +80,10 @@ test('a provider entry that is not an array is not an enabled provider', functio
     ]);
 
     expect(array_keys($manager->getEnabledProviders()))->toBe(['paystack'])
-        ->and(fn () => $manager->driver('stripe'))->toThrow(DriverNotFoundException::class);
+        ->and(fn (): DriverInterface => $manager->driver('stripe'))->toThrow(DriverNotFoundException::class);
 });
 
-test('a numeric provider id in stored metadata is the verification id', function () {
+test('a numeric provider id in stored metadata is the verification id', function (): void {
     $manager = typedConfigManager([
         'payments.logging.enabled' => true,
         'payments.providers.stripe' => ['driver' => 'stripe', 'secret_key' => 'sk_test_x', 'enabled' => true],
@@ -93,7 +94,7 @@ test('a numeric provider id in stored metadata is the verification id', function
         ->toBe(['provider' => 'stripe', 'id' => '987654']);
 });
 
-test('a numeric provider id survives when the transaction names a provider that is no longer configured', function () {
+test('a numeric provider id survives when the transaction names a provider that is no longer configured', function (): void {
     $manager = typedConfigManager(['payments.logging.enabled' => true]);
     seedTypedConfigTransaction('ORDER_GONE', 'retired', ['session_id' => 4242]);
 
@@ -101,7 +102,7 @@ test('a numeric provider id survives when the transaction names a provider that 
         ->toBe(['provider' => 'retired', 'id' => '4242']);
 });
 
-test('a provider id that is not a string or a number falls back to the reference', function () {
+test('a provider id that is not a string or a number falls back to the reference', function (): void {
     $manager = typedConfigManager(['payments.logging.enabled' => true]);
     seedTypedConfigTransaction('ORDER_ODD', 'retired', ['_provider_id' => ['nested' => 'value']]);
 
@@ -109,7 +110,7 @@ test('a provider id that is not a string or a number falls back to the reference
         ->toBe(['provider' => 'retired', 'id' => 'ORDER_ODD']);
 });
 
-test('a session cache entry of the wrong shape is ignored, not fatal', function (mixed $cached) {
+test('a session cache entry of the wrong shape is ignored, not fatal', function (mixed $cached): void {
     $manager = typedConfigManager(['payments.logging.enabled' => false]);
     Cache::put('payzephyr:session:ORDER_CACHED', $cached, 60);
 

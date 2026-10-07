@@ -3,12 +3,16 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\PlanException;
+use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use Tests\Helpers\SubscriptionTestHelper;
 
 // ==================== Boundary Value Tests ====================
 
-test('subscription handles maximum quantity value', function () {
+test('subscription handles maximum quantity value', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -29,10 +33,10 @@ test('subscription handles maximum quantity value', function () {
         ->quantity(PHP_INT_MAX)
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles minimum quantity value', function () {
+test('subscription handles minimum quantity value', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -53,10 +57,10 @@ test('subscription handles minimum quantity value', function () {
         ->quantity(1)
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles maximum trial days', function () {
+test('subscription handles maximum trial days', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -77,10 +81,10 @@ test('subscription handles maximum trial days', function () {
         ->trialDays(365)
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles zero trial days', function () {
+test('subscription handles zero trial days', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -101,12 +105,12 @@ test('subscription handles zero trial days', function () {
         ->trialDays(0)
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
 // ==================== Date Handling Edge Cases ====================
 
-test('subscription handles past start date', function () {
+test('subscription handles past start date', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -119,9 +123,9 @@ test('subscription handles past start date', function () {
         ->plan('PLN_123')
         ->startDate('2020-01-01')
         ->create();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\SubscriptionException::class);
+})->throws(SubscriptionException::class);
 
-test('subscription handles far future start date', function () {
+test('subscription handles far future start date', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -144,10 +148,10 @@ test('subscription handles far future start date', function () {
         ->startDate($futureDate)
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles invalid date format', function () {
+test('subscription handles invalid date format', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -160,11 +164,11 @@ test('subscription handles invalid date format', function () {
         ->plan('PLN_123')
         ->startDate('invalid-date')
         ->create();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\SubscriptionException::class);
+})->throws(SubscriptionException::class);
 
 // ==================== Currency Edge Cases ====================
 
-test('subscription handles unsupported currency', function () {
+test('subscription handles unsupported currency', function (): void {
     $planDTO = new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 1000.00,
@@ -180,9 +184,9 @@ test('subscription handles unsupported currency', function () {
     ]);
 
     $subscription->planData($planDTO)->createPlan();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\PlanException::class);
+})->throws(PlanException::class);
 
-test('subscription handles currency case variations', function () {
+test('subscription handles currency case variations', function (): void {
     $planDTO = new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 1000.00,
@@ -199,12 +203,12 @@ test('subscription handles currency case variations', function () {
 
     $result = $subscription->planData($planDTO)->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
 // ==================== Interval Edge Cases ====================
 
-test('subscription handles all valid intervals', function () {
+test('subscription handles all valid intervals', function (): void {
     $intervals = ['daily', 'weekly', 'monthly', 'annually'];
 
     foreach ($intervals as $interval) {
@@ -223,14 +227,14 @@ test('subscription handles all valid intervals', function () {
 
         $result = $subscription->planData($planDTO)->createPlan();
 
-        expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class)
+        expect($result)->toBeInstanceOf(PlanResponseDTO::class)
             ->and($result->planCode)->toBe("PLN_$interval");
     }
 });
 
 // ==================== Pagination Edge Cases ====================
 
-test('subscription list handles last page with fewer results', function () {
+test('subscription list handles last page with fewer results', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -245,7 +249,7 @@ test('subscription list handles last page with fewer results', function () {
     expect($result['data'])->toHaveCount(1);
 });
 
-test('subscription list handles first page correctly', function () {
+test('subscription list handles first page correctly', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -261,7 +265,7 @@ test('subscription list handles first page correctly', function () {
     expect($result)->toBeArray()->toHaveCount(2);
 });
 
-test('subscription listPlans handles empty result set', function () {
+test('subscription listPlans handles empty result set', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -276,7 +280,7 @@ test('subscription listPlans handles empty result set', function () {
 
 // ==================== Response Structure Edge Cases ====================
 
-test('subscription handles nested customer object in response', function () {
+test('subscription handles nested customer object in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -301,7 +305,7 @@ test('subscription handles nested customer object in response', function () {
     expect($result->customer)->toBe('test@example.com');
 });
 
-test('subscription handles nested plan object in response', function () {
+test('subscription handles nested plan object in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -327,7 +331,7 @@ test('subscription handles nested plan object in response', function () {
         ->and($result->planName)->toBe('Test Plan');
 });
 
-test('subscription handles missing nested objects gracefully', function () {
+test('subscription handles missing nested objects gracefully', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -350,7 +354,7 @@ test('subscription handles missing nested objects gracefully', function () {
 
 // ==================== Metadata Edge Cases ====================
 
-test('subscription handles empty metadata array', function () {
+test('subscription handles empty metadata array', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -376,7 +380,7 @@ test('subscription handles empty metadata array', function () {
         ->and($result->plan)->toBe('PLN_123');
 });
 
-test('subscription handles null metadata in response', function () {
+test('subscription handles null metadata in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -397,7 +401,7 @@ test('subscription handles null metadata in response', function () {
     expect($result->metadata)->toBeArray();
 });
 
-test('subscription handles deeply nested metadata', function () {
+test('subscription handles deeply nested metadata', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -424,12 +428,12 @@ test('subscription handles deeply nested metadata', function () {
         ])
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
 // ==================== Concurrent Operations Edge Cases ====================
 
-test('subscription handles rapid sequential creates', function () {
+test('subscription handles rapid sequential creates', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         // Plan fetch for validation (first create)
         new Response(200, [], json_encode([
@@ -495,7 +499,7 @@ test('subscription handles rapid sequential creates', function () {
 
 // ==================== State Transition Edge Cases ====================
 
-test('subscription handles status transitions correctly', function () {
+test('subscription handles status transitions correctly', function (): void {
     // Active -> Cancelled
     $subscription1 = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
@@ -542,7 +546,7 @@ test('subscription handles status transitions correctly', function () {
 
 // ==================== Error Recovery Edge Cases ====================
 
-test('subscription handles partial response data', function () {
+test('subscription handles partial response data', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -560,7 +564,7 @@ test('subscription handles partial response data', function () {
         ->and($result->customer)->toBe('');
 });
 
-test('subscription handles malformed status values', function () {
+test('subscription handles malformed status values', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -585,7 +589,7 @@ test('subscription handles malformed status values', function () {
 
 // ==================== Provider-Specific Edge Cases ====================
 
-test('subscription handles provider-specific response formats', function () {
+test('subscription handles provider-specific response formats', function (): void {
     // Some providers might return different structures
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
@@ -612,7 +616,7 @@ test('subscription handles provider-specific response formats', function () {
 
     $result = $subscription->code('SUB_123')->fetch();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class)
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class)
         ->and($result->subscriptionCode)->toBe('SUB_123')
         ->and($result->customer)->toBe('test@example.com')
         ->and($result->plan)->toBe('PLN_123')
@@ -621,7 +625,7 @@ test('subscription handles provider-specific response formats', function () {
 
 // ==================== Memory and Performance Edge Cases ====================
 
-test('subscription handles large response payloads', function () {
+test('subscription handles large response payloads', function (): void {
     $largeMetadata = [];
     for ($i = 0; $i < 100; $i++) {
         $largeMetadata["key_$i"] = str_repeat('x', 100);
@@ -647,7 +651,7 @@ test('subscription handles large response payloads', function () {
     expect($result->metadata)->toBeArray()->toHaveCount(100);
 });
 
-test('subscription handles multiple rapid status checks', function () {
+test('subscription handles multiple rapid status checks', function (): void {
     $responses = [];
     for ($i = 0; $i < 10; $i++) {
         $responses[] = new Response(200, [], json_encode([

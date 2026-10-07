@@ -1,8 +1,18 @@
 <?php
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
+use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 
-test('paypal driver rejects webhook with missing transmission id', function () {
+test('paypal driver rejects webhook with missing transmission id', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -28,7 +38,7 @@ test('paypal driver rejects webhook with missing transmission id', function () {
     expect($result)->toBeFalse();
 });
 
-test('paypal driver rejects webhook with missing transmission time', function () {
+test('paypal driver rejects webhook with missing transmission time', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -54,7 +64,7 @@ test('paypal driver rejects webhook with missing transmission time', function ()
     expect($result)->toBeFalse();
 });
 
-test('paypal driver rejects webhook with missing cert url', function () {
+test('paypal driver rejects webhook with missing cert url', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -80,7 +90,7 @@ test('paypal driver rejects webhook with missing cert url', function () {
     expect($result)->toBeFalse();
 });
 
-test('paypal driver rejects webhook with missing auth algo', function () {
+test('paypal driver rejects webhook with missing auth algo', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -106,7 +116,7 @@ test('paypal driver rejects webhook with missing auth algo', function () {
     expect($result)->toBeFalse();
 });
 
-test('paypal driver rejects webhook with missing transmission sig', function () {
+test('paypal driver rejects webhook with missing transmission sig', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -132,7 +142,7 @@ test('paypal driver rejects webhook with missing transmission sig', function () 
     expect($result)->toBeFalse();
 });
 
-test('paypal driver rejects webhook with missing webhook id in config', function () {
+test('paypal driver rejects webhook with missing webhook id in config', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -158,7 +168,7 @@ test('paypal driver rejects webhook with missing webhook id in config', function
     expect($result)->toBeFalse();
 });
 
-test('paypal driver accepts webhook with valid create_time within tolerance (ADR-0001)', function () {
+test('paypal driver accepts webhook with valid create_time within tolerance (ADR-0001)', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -177,18 +187,18 @@ test('paypal driver accepts webhook with valid create_time within tolerance (ADR
     // single unconditional mock (as other tests in this file use to test the
     // *failure* path) would make the OAuth step itself fail first and never
     // reach the verification-status check - so this needs an ordered queue.
-    $mock = new \GuzzleHttp\Handler\MockHandler([
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+    $mock = new MockHandler([
+        new Response(200, [], json_encode([
             'access_token' => 'A21AA_test_token',
             'token_type' => 'Bearer',
             'expires_in' => 32400,
         ])),
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+        new Response(200, [], json_encode([
             'verification_status' => 'SUCCESS',
         ])),
     ]);
-    $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => $handlerStack]));
+    $handlerStack = HandlerStack::create($mock);
+    $driver->setClient(new Client(['handler' => $handlerStack]));
 
     $headers = [
         'paypal-transmission-id' => ['transmission_123'],
@@ -211,7 +221,7 @@ test('paypal driver accepts webhook with valid create_time within tolerance (ADR
     expect($result)->toBeTrue();
 });
 
-test('paypal driver rejects webhook with no recognizable create_time despite valid signature (ADR-0001)', function () {
+test('paypal driver rejects webhook with no recognizable create_time despite valid signature (ADR-0001)', function (): void {
     config([
         'payments.providers.paypal' => [
             'driver' => 'paypal',
@@ -227,18 +237,18 @@ test('paypal driver rejects webhook with no recognizable create_time despite val
 
     // Verification itself succeeds (see the ordered-mock note in the test
     // above) - the false result must come solely from the missing create_time.
-    $mock = new \GuzzleHttp\Handler\MockHandler([
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+    $mock = new MockHandler([
+        new Response(200, [], json_encode([
             'access_token' => 'A21AA_test_token',
             'token_type' => 'Bearer',
             'expires_in' => 32400,
         ])),
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+        new Response(200, [], json_encode([
             'verification_status' => 'SUCCESS',
         ])),
     ]);
-    $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => $handlerStack]));
+    $handlerStack = HandlerStack::create($mock);
+    $driver->setClient(new Client(['handler' => $handlerStack]));
 
     $headers = [
         'paypal-transmission-id' => ['transmission_123'],
@@ -255,7 +265,7 @@ test('paypal driver rejects webhook with no recognizable create_time despite val
     expect($result)->toBeFalse();
 });
 
-test('paypal extractWebhookChannel reports the instrument the payer actually used', function () {
+test('paypal extractWebhookChannel reports the instrument the payer actually used', function (): void {
     // Regression: this returned a hardcoded 'paypal' without reading the
     // payload, so a card-funded and a Venmo-funded payment were recorded
     // identically - and redundantly with provider='paypal'.
@@ -266,14 +276,14 @@ test('paypal extractWebhookChannel reports the instrument the payer actually use
     expect($driver->extractWebhookChannel($payload))->toBe('card');
 });
 
-test('paypal extractWebhookChannel distinguishes a paypal-balance payment from a card one', function () {
+test('paypal extractWebhookChannel distinguishes a paypal-balance payment from a card one', function (): void {
     $driver = new PayPalDriver(config('payments.providers.paypal'));
 
     expect($driver->extractWebhookChannel(['resource' => ['payment_source' => ['paypal' => []]]]))->toBe('paypal')
         ->and($driver->extractWebhookChannel(['resource' => ['payment_source' => ['venmo' => []]]]))->toBe('venmo');
 });
 
-test('paypal extractWebhookChannel returns null when the payload reports no payment source', function () {
+test('paypal extractWebhookChannel returns null when the payload reports no payment source', function (): void {
     // Null, not an invented 'paypal': the funding instrument is genuinely
     // unknown when PayPal omits the field.
     $driver = new PayPalDriver(config('payments.providers.paypal'));
@@ -283,7 +293,7 @@ test('paypal extractWebhookChannel returns null when the payload reports no paym
         ->and($driver->extractWebhookChannel(['resource' => ['payment_source' => []]]))->toBeNull();
 });
 
-test('paypal extractWebhookChannel ignores a non-array payment_source', function () {
+test('paypal extractWebhookChannel ignores a non-array payment_source', function (): void {
     $driver = new PayPalDriver(config('payments.providers.paypal'));
 
     expect($driver->extractWebhookChannel(['resource' => ['payment_source' => 'card']]))->toBeNull();
@@ -311,12 +321,12 @@ function paypalWebhookDriver(mixed $verifyOutcome, array &$history): PayPalDrive
         'currencies' => ['USD'],
     ]);
 
-    $stack = \GuzzleHttp\HandlerStack::create(new \GuzzleHttp\Handler\MockHandler([
-        new \GuzzleHttp\Psr7\Response(200, [], (string) json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
+    $stack = HandlerStack::create(new MockHandler([
+        new Response(200, [], (string) json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         $verifyOutcome,
     ]));
-    $stack->push(\GuzzleHttp\Middleware::history($history));
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => $stack]));
+    $stack->push(Middleware::history($history));
+    $driver->setClient(new Client(['handler' => $stack]));
 
     return $driver;
 }
@@ -347,25 +357,25 @@ function paypalVerifyCallWasSent(array $history): bool
         && str_ends_with($history[1]['request']->getUri()->getPath(), '/v1/notifications/verify-webhook-signature');
 }
 
-test('paypal rejects a webhook whose signature PayPal reports as FAILURE', function () {
+test('paypal rejects a webhook whose signature PayPal reports as FAILURE', function (): void {
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"FAILURE"}'), $history);
+    $driver = paypalWebhookDriver(new Response(200, [], '{"verification_status":"FAILURE"}'), $history);
 
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))->toBeFalse()
         ->and(paypalVerifyCallWasSent($history))->toBeTrue();
 });
 
-test('paypal rejects a webhook when PayPal returns no verification status', function () {
+test('paypal rejects a webhook when PayPal returns no verification status', function (): void {
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":""}'), $history);
+    $driver = paypalWebhookDriver(new Response(200, [], '{"verification_status":""}'), $history);
 
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))->toBeFalse()
         ->and(paypalVerifyCallWasSent($history))->toBeTrue();
 });
 
-test('paypal sends the transmission headers and the configured webhook id for verification', function () {
+test('paypal sends the transmission headers and the configured webhook id for verification', function (): void {
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
+    $driver = paypalWebhookDriver(new Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
 
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))->toBeTrue();
 
@@ -379,47 +389,47 @@ test('paypal sends the transmission headers and the configured webhook id for ve
     ])->and($sent['webhook_event']['id'])->toBe('WH-123');
 });
 
-test('paypal treats a 4xx from the verification API as a rejection', function () {
+test('paypal treats a 4xx from the verification API as a rejection', function (): void {
     // PayPal answered, and the answer was about the request we sent it - a
     // malformed cert url, say. Retrying would get the same answer.
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Exception\ClientException(
+    $driver = paypalWebhookDriver(new ClientException(
         'Bad Request',
-        new \GuzzleHttp\Psr7\Request('POST', '/v1/notifications/verify-webhook-signature'),
-        new \GuzzleHttp\Psr7\Response(400, [], '{"name":"VALIDATION_ERROR"}'),
+        new Request('POST', '/v1/notifications/verify-webhook-signature'),
+        new Response(400, [], '{"name":"VALIDATION_ERROR"}'),
     ), $history);
 
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))->toBeFalse()
         ->and(paypalVerifyCallWasSent($history))->toBeTrue();
 });
 
-test('paypal throws rather than rejecting when the verification API cannot be reached', function () {
+test('paypal throws rather than rejecting when the verification API cannot be reached', function (): void {
     // This runs in the queued job after PayPal has been told 202. Returning
     // false would discard a genuine delivery PayPal will never resend;
     // throwing hands it to the job's retries.
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Exception\ConnectException(
+    $driver = paypalWebhookDriver(new ConnectException(
         'Connection timed out',
-        new \GuzzleHttp\Psr7\Request('POST', '/v1/notifications/verify-webhook-signature'),
+        new Request('POST', '/v1/notifications/verify-webhook-signature'),
     ), $history);
 
-    expect(fn () => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
+        ->toThrow(WebhookException::class);
 });
 
-test('paypal throws rather than rejecting on a verification failure that is not the sender\'s doing', function (int $status) {
+test('paypal throws rather than rejecting on a verification failure that is not the sender\'s doing', function (int $status): void {
     $history = [];
-    $request = new \GuzzleHttp\Psr7\Request('POST', '/v1/notifications/verify-webhook-signature');
-    $response = new \GuzzleHttp\Psr7\Response($status);
+    $request = new Request('POST', '/v1/notifications/verify-webhook-signature');
+    $response = new Response($status);
     $driver = paypalWebhookDriver(
         $status >= 500
-            ? new \GuzzleHttp\Exception\ServerException('Server error', $request, $response)
-            : new \GuzzleHttp\Exception\ClientException('Client error', $request, $response),
+            ? new ServerException('Server error', $request, $response)
+            : new ClientException('Client error', $request, $response),
         $history,
     );
 
-    expect(fn () => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
+        ->toThrow(WebhookException::class);
 })->with([
     'unauthorized: our credentials' => [401],
     'forbidden: our credentials' => [403],
@@ -429,7 +439,7 @@ test('paypal throws rather than rejecting on a verification failure that is not 
     'service unavailable' => [503],
 ]);
 
-test('paypal throws rather than rejecting when the OAuth token cannot be obtained', function () {
+test('paypal throws rather than rejecting when the OAuth token cannot be obtained', function (): void {
     // No token means PayPal was never asked about this webhook at all.
     $driver = new PayPalDriver([
         'client_id' => 'test_client_id',
@@ -438,19 +448,19 @@ test('paypal throws rather than rejecting when the OAuth token cannot be obtaine
         'mode' => 'sandbox',
         'currencies' => ['USD'],
     ]);
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create(new \GuzzleHttp\Handler\MockHandler([
-        new \GuzzleHttp\Exception\ServerException(
+    $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
+        new ServerException(
             'Server error',
-            new \GuzzleHttp\Psr7\Request('POST', '/v1/oauth2/token'),
-            new \GuzzleHttp\Psr7\Response(503),
+            new Request('POST', '/v1/oauth2/token'),
+            new Response(503),
         ),
     ]))]));
 
-    expect(fn () => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody()))
+        ->toThrow(WebhookException::class);
 });
 
-test('paypal measures the replay window from the receipt time it is given, then from now once cleared', function () {
+test('paypal measures the replay window from the receipt time it is given, then from now once cleared', function (): void {
     // The queued job hands the driver the moment the delivery arrived. A
     // create_time ten minutes before "now" but moments before receipt is a
     // delivery that waited in the queue, not a replay. A five-minute window
@@ -460,12 +470,12 @@ test('paypal measures the replay window from the receipt time it is given, then 
     $receivedAt = time() - 600;
 
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
+    $driver = paypalWebhookDriver(new Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
     $driver->setWebhookReceivedAt($receivedAt);
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody($receivedAt - 5)))->toBeTrue();
 
     $history = [];
-    $driver = paypalWebhookDriver(new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
+    $driver = paypalWebhookDriver(new Response(200, [], '{"verification_status":"SUCCESS"}'), $history);
     $driver->setWebhookReceivedAt($receivedAt);
     $driver->setWebhookReceivedAt(null);
     expect($driver->validateWebhook(paypalWebhookHeaders(), paypalWebhookBody($receivedAt - 5)))->toBeFalse();

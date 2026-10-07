@@ -28,7 +28,6 @@ function redactionManager(array $drivers): PaymentManager
 {
     $manager = new PaymentManager;
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
@@ -56,7 +55,7 @@ function storedTraceJson(): string
     );
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -78,7 +77,7 @@ beforeEach(function () {
 // Provider traffic
 // ---------------------------------------------------------------------------
 
-test('a card number in an outbound provider request never reaches the table', function () {
+test('a card number in an outbound provider request never reaches the table', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], (string) json_encode([
             'status' => true,
@@ -101,7 +100,7 @@ test('a card number in an outbound provider request never reaches the table', fu
         ->and($sent->payload['metadata']['order'])->toBe('A1');
 });
 
-test('a token in a provider response never reaches the table', function () {
+test('a token in a provider response never reaches the table', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], (string) json_encode([
             'status' => true,
@@ -132,12 +131,11 @@ test('a token in a provider response never reaches the table', function () {
 // Webhook bodies
 // ---------------------------------------------------------------------------
 
-test('a CVV in a webhook body never reaches the table', function () {
+test('a CVV in a webhook body never reaches the table', function (): void {
     // Phase 6 started keeping webhook bodies, which webhook_events never did.
     // That is only acceptable because they arrive scrubbed.
     $manager = app(PaymentManager::class);
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, ['paystack' => redactionWebhookDriver()]);
 
     $job = new ProcessWebhook('paystack', [
@@ -145,7 +143,7 @@ test('a CVV in a webhook body never reaches the table', function () {
         'data' => ['reference' => 'PZ_1755000000_abcdef01', 'cvv' => '123', 'amount' => 5000],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     $received = PaymentTraceEvent::where('event', TraceEvent::WEBHOOK_RECEIVED->value)->sole();
 
@@ -158,7 +156,7 @@ test('a CVV in a webhook body never reaches the table', function () {
 // Metadata, not just payload
 // ---------------------------------------------------------------------------
 
-test('metadata is scrubbed on the same terms as payload', function () {
+test('metadata is scrubbed on the same terms as payload', function (): void {
     // PayZephyr's own call sites only put an event key and an IP in metadata,
     // but the DTO takes whatever it is given and the Trace facade is public.
     // Without this, the same key would be scrubbed in one column and stored in
@@ -183,7 +181,7 @@ test('metadata is scrubbed on the same terms as payload', function () {
 // Async
 // ---------------------------------------------------------------------------
 
-test('nothing sensitive is handed to the queue in async mode', function () {
+test('nothing sensitive is handed to the queue in async mode', function (): void {
     // Redaction happens before dispatch, so a secret never sits serialized in
     // the queue backend waiting to be written.
     config(['payments.trace.async' => true]);
@@ -207,7 +205,7 @@ test('nothing sensitive is handed to the queue in async mode', function () {
 // Configurability
 // ---------------------------------------------------------------------------
 
-test('the redacted field list governs provider traffic too, not only direct calls', function () {
+test('the redacted field list governs provider traffic too, not only direct calls', function (): void {
     config(['payments.trace.redact_fields' => ['order_notes']]);
     app()->forgetInstance('payments.config');
 
@@ -234,7 +232,7 @@ test('the redacted field list governs provider traffic too, not only direct call
         ->and($sent->payload['metadata']['cvv'])->toBe('123');
 });
 
-test('with bodies switched off there is nothing to redact in the first place', function () {
+test('with bodies switched off there is nothing to redact in the first place', function (): void {
     config(['payments.trace.record_http_bodies' => false]);
     app()->forgetInstance('payments.config');
 

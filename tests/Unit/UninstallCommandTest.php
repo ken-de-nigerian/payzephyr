@@ -46,30 +46,30 @@ function uninstallTestMigrationFiles(): array
     ];
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     uninstallTestCleanState();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     uninstallTestCleanState();
 });
 
-test('uninstall command is registered', function () {
+test('uninstall command is registered', function (): void {
     expect(Artisan::all())->toHaveKey('payzephyr:uninstall');
 });
 
-test('uninstall command has correct signature', function () {
+test('uninstall command has correct signature', function (): void {
     expect((new UninstallCommand)->getName())->toBe('payzephyr:uninstall');
 });
 
-test('uninstall reports nothing to do when PayZephyr is not installed', function () {
+test('uninstall reports nothing to do when PayZephyr is not installed', function (): void {
     $exitCode = Artisan::call('payzephyr:uninstall', ['--force' => true]);
 
     expect($exitCode)->toBe(UninstallCommand::SUCCESS)
         ->and(Artisan::output())->toContain('does not appear to be installed');
 });
 
-test('uninstall refuses to run in a non-interactive environment without --force', function () {
+test('uninstall refuses to run in a non-interactive environment without --force', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $exitCode = Artisan::call('payzephyr:uninstall', ['--no-interaction' => true]);
@@ -83,7 +83,7 @@ test('uninstall refuses to run in a non-interactive environment without --force'
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('--force removes every PayZephyr-owned table and migration file', function () {
+test('--force removes every PayZephyr-owned table and migration file', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
     $this->artisan('migrate', ['--force' => true])->run();
 
@@ -108,7 +108,7 @@ test('--force removes every PayZephyr-owned table and migration file', function 
         ->and(Schema::hasTable('refund_transactions'))->toBeFalse();
 });
 
-test('--features= removes only the named optional feature, leaving core and other features intact', function () {
+test('--features= removes only the named optional feature, leaving core and other features intact', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
     $this->artisan('migrate', ['--force' => true])->run();
 
@@ -125,7 +125,7 @@ test('--features= removes only the named optional feature, leaving core and othe
         ->and(Schema::hasTable('subscription_transactions'))->toBeTrue();
 });
 
-test('--features= with an unknown feature name fails clearly and removes nothing', function () {
+test('--features= with an unknown feature name fails clearly and removes nothing', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $exitCode = Artisan::call('payzephyr:uninstall', ['--force' => true, '--features' => 'payouts']);
@@ -137,7 +137,7 @@ test('--features= with an unknown feature name fails clearly and removes nothing
     expect($files['refunds'])->not->toBeEmpty();
 });
 
-test('--features= cannot be used to remove core resources', function () {
+test('--features= cannot be used to remove core resources', function (): void {
     // "payments"/"webhooks" are core, not entries in the optional Features
     // registry --features= validates against - core can only be removed via
     // a full, no-flag uninstall.
@@ -151,7 +151,7 @@ test('--features= cannot be used to remove core resources', function () {
     expect($files['payments'])->not->toBeEmpty();
 });
 
-test('repeated uninstall is safe: the second run reports nothing to do', function () {
+test('repeated uninstall is safe: the second run reports nothing to do', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $first = Artisan::call('payzephyr:uninstall', ['--force' => true]);
@@ -162,8 +162,8 @@ test('repeated uninstall is safe: the second run reports nothing to do', functio
         ->and(Artisan::output())->toContain('does not appear to be installed');
 });
 
-test('uninstall never touches unrelated application tables', function () {
-    Schema::create('unrelated_app_table', function ($table) {
+test('uninstall never touches unrelated application tables', function (): void {
+    Schema::create('unrelated_app_table', function ($table): void {
         $table->id();
         $table->string('name');
     });
@@ -176,7 +176,7 @@ test('uninstall never touches unrelated application tables', function () {
     Schema::dropIfExists('unrelated_app_table');
 });
 
-test('uninstall never touches config/payments.php', function () {
+test('uninstall never touches config/payments.php', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--force' => true, '--all' => true]);
     expect(config_path('payments.php'))->toBeFile();
 
@@ -185,7 +185,7 @@ test('uninstall never touches config/payments.php', function () {
     expect(config_path('payments.php'))->toBeFile();
 });
 
-test('uninstall clears the .env feature flag for a removed feature', function () {
+test('uninstall clears the .env feature flag for a removed feature', function (): void {
     File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
@@ -196,7 +196,7 @@ test('uninstall clears the .env feature flag for a removed feature', function ()
     expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_REFUNDS=false');
 });
 
-test('cancelling the interactive confirmation removes nothing', function () {
+test('cancelling the interactive confirmation removes nothing', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $this->artisan('payzephyr:uninstall')
@@ -207,7 +207,7 @@ test('cancelling the interactive confirmation removes nothing', function () {
     expect($files['refunds'])->not->toBeEmpty();
 });
 
-test('typing the wrong confirmation phrase cancels the uninstall', function () {
+test('typing the wrong confirmation phrase cancels the uninstall', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $this->artisan('payzephyr:uninstall')
@@ -219,7 +219,7 @@ test('typing the wrong confirmation phrase cancels the uninstall', function () {
     expect($files['refunds'])->not->toBeEmpty();
 });
 
-test('confirming and typing UNINSTALL proceeds with the uninstall', function () {
+test('confirming and typing UNINSTALL proceeds with the uninstall', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $this->artisan('payzephyr:uninstall')
@@ -232,7 +232,7 @@ test('confirming and typing UNINSTALL proceeds with the uninstall', function () 
         ->and($files['refunds'])->toBeEmpty();
 });
 
-test('install -> uninstall -> reinstall -> migrate round trip recreates the table cleanly', function () {
+test('install -> uninstall -> reinstall -> migrate round trip recreates the table cleanly', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
     $this->artisan('migrate', ['--force' => true])->run();
     expect(Schema::hasTable('refund_transactions'))->toBeTrue();
@@ -252,7 +252,7 @@ test('install -> uninstall -> reinstall -> migrate round trip recreates the tabl
     expect(Schema::hasTable('refund_transactions'))->toBeTrue();
 });
 
-test('the migrations tracking table row is removed so a republished migration is not silently skipped', function () {
+test('the migrations tracking table row is removed so a republished migration is not silently skipped', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
     $this->artisan('migrate', ['--force' => true])->run();
 
@@ -263,7 +263,7 @@ test('the migrations tracking table row is removed so a republished migration is
     expect(DB::table('migrations')->where('migration', 'like', '%create_refund_transactions_table')->exists())->toBeFalse();
 });
 
-test('uninstall runs non-interactively without prompting', function () {
+test('uninstall runs non-interactively without prompting', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $this->artisan('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true])
@@ -274,7 +274,7 @@ test('uninstall runs non-interactively without prompting', function () {
         ->and($files['refunds'])->toBeEmpty();
 });
 
-test('the non-interactive warning still states what will be removed', function () {
+test('the non-interactive warning still states what will be removed', function (): void {
     // Non-interactive skips the confirmation prompts, so the warning is the
     // only notice a a destructive action is happening - it must still be shown.
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
@@ -284,7 +284,7 @@ test('the non-interactive warning still states what will be removed', function (
         ->assertExitCode(UninstallCommand::SUCCESS);
 });
 
-test('uninstall succeeds when no .env file exists', function () {
+test('uninstall succeeds when no .env file exists', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $envPath = app()->environmentFilePath();
@@ -303,7 +303,7 @@ test('uninstall succeeds when no .env file exists', function () {
     }
 });
 
-test('a resource that fails to drop is reported, the rest are still removed, and the command fails', function () {
+test('a resource that fails to drop is reported, the rest are still removed, and the command fails', function (): void {
     // One failure must not abort the others half-way, and must not be
     // reported as a clean uninstall either: the caller needs a non-zero
     // exit code to know the database was left partly in place.
@@ -336,7 +336,7 @@ test('a resource that fails to drop is reported, the rest are still removed, and
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('uninstall removes published migrations even when migrate was never run', function () {
+test('uninstall removes published migrations even when migrate was never run', function (): void {
     // Without a migrations table there is no tracking row to forget, and
     // that must not stop the migration file itself from being removed.
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);

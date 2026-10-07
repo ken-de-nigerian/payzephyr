@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Services\PayloadRedactor;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 });
 
@@ -13,7 +13,7 @@ function redactor(): PayloadRedactor
     return new PayloadRedactor;
 }
 
-test('configured sensitive fields are replaced, not removed', function () {
+test('configured sensitive fields are replaced, not removed', function (): void {
     $redacted = redactor()->redact([
         'amount' => 5000,
         'card_number' => '4111111111111111',
@@ -27,7 +27,7 @@ test('configured sensitive fields are replaced, not removed', function () {
     ]);
 });
 
-test('redaction reaches sensitive fields nested inside the payload', function () {
+test('redaction reaches sensitive fields nested inside the payload', function (): void {
     $redacted = redactor()->redact([
         'customer' => [
             'name' => 'Ada',
@@ -39,7 +39,7 @@ test('redaction reaches sensitive fields nested inside the payload', function ()
         ->and($redacted['customer']['card']['card_number'])->toBe(PayloadRedactor::REDACTED);
 });
 
-test('matching is case-insensitive, because providers are not consistent', function () {
+test('matching is case-insensitive, because providers are not consistent', function (): void {
     $redacted = redactor()->redact([
         'CVV' => '123',
         'Api_Key' => 'sk_live_x',
@@ -51,7 +51,7 @@ test('matching is case-insensitive, because providers are not consistent', funct
         ->and($redacted['AUTHORIZATION'])->toBe(PayloadRedactor::REDACTED);
 });
 
-test('matching is on substrings, so provider-prefixed secret names are still caught', function () {
+test('matching is on substrings, so provider-prefixed secret names are still caught', function (): void {
     $redacted = redactor()->redact([
         'stripe_secret_key' => 'sk_live_x',
         'customer_access_token' => 'tok_x',
@@ -61,7 +61,7 @@ test('matching is on substrings, so provider-prefixed secret names are still cau
         ->and($redacted['customer_access_token'])->toBe(PayloadRedactor::REDACTED);
 });
 
-test('substring matching also redacts benign keys that merely contain a secret word', function () {
+test('substring matching also redacts benign keys that merely contain a secret word', function (): void {
     // Asserted rather than glossed over: this is the documented cost of
     // substring matching, and a change in this behaviour should break a test
     // rather than quietly alter what ends up stored.
@@ -74,23 +74,23 @@ test('substring matching also redacts benign keys that merely contain a secret w
         ->and($redacted['secret_santa'])->toBe(PayloadRedactor::REDACTED);
 });
 
-test('a payload with nothing sensitive in it survives untouched', function () {
+test('a payload with nothing sensitive in it survives untouched', function (): void {
     $payload = ['amount' => 5000, 'currency' => 'NGN', 'items' => ['a', 'b']];
 
     expect(redactor()->redact($payload))->toBe($payload);
 });
 
-test('an empty payload stays empty', function () {
+test('an empty payload stays empty', function (): void {
     expect(redactor()->redact([]))->toBe([]);
 });
 
-test('non-string keys are left alone rather than crashing the redactor', function () {
+test('non-string keys are left alone rather than crashing the redactor', function (): void {
     $redacted = redactor()->redact([0 => 'first', 1 => 'second']);
 
     expect($redacted)->toBe([0 => 'first', 1 => 'second']);
 });
 
-test('recursion stops at the configured depth instead of following hostile nesting', function () {
+test('recursion stops at the configured depth instead of following hostile nesting', function (): void {
     config(['payments.trace.redaction_max_depth' => 3]);
 
     $redacted = redactor()->redact([
@@ -100,13 +100,13 @@ test('recursion stops at the configured depth instead of following hostile nesti
     expect($redacted['l1']['l2']['l3'])->toBe(['_truncated' => PayloadRedactor::REDACTED.' max depth reached']);
 });
 
-test('the depth limit can be overridden per call', function () {
+test('the depth limit can be overridden per call', function (): void {
     $redacted = redactor()->redact(['l1' => ['l2' => 'value']], maxDepth: 1);
 
     expect($redacted['l1'])->toBe(['_truncated' => PayloadRedactor::REDACTED.' max depth reached']);
 });
 
-test('the redacted field list is driven by config, not hardcoded', function () {
+test('the redacted field list is driven by config, not hardcoded', function (): void {
     config(['payments.trace.redact_fields' => ['email']]);
 
     $redacted = redactor()->redact([
@@ -118,13 +118,13 @@ test('the redacted field list is driven by config, not hardcoded', function () {
         ->and($redacted['card_number'])->toBe('4111111111111111');
 });
 
-test('an empty field list redacts nothing', function () {
+test('an empty field list redacts nothing', function (): void {
     config(['payments.trace.redact_fields' => []]);
 
     expect(redactor()->redact(['cvv' => '123']))->toBe(['cvv' => '123']);
 });
 
-test('a redact_fields entry that is not a string is skipped, and the rest still redact', function () {
+test('a redact_fields entry that is not a string is skipped, and the rest still redact', function (): void {
     config(['payments.trace.redact_fields' => [['cvv'], 'cvv', 7]]);
 
     expect(redactor()->redact(['cvv' => '123', 'amount' => 5000]))

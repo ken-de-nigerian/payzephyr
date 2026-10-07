@@ -137,7 +137,6 @@ function injectFakeDriverForRefund(PaymentManager $manager, string $name, Driver
 {
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, [$name => $driver]);
 }
 function makeCapturingRefundDriver(&$captured): DriverInterface&SupportsRefundsInterface
@@ -380,6 +379,5 @@ function injectFakeDrivers(PaymentManager $manager, array $drivers): void
 {
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 }

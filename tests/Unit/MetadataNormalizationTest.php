@@ -17,6 +17,7 @@ use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Drivers\OPayDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
+use Stripe\Util\Util;
 
 /**
  * Regression: a provider returning metadata as an empty string.
@@ -36,7 +37,7 @@ function jsonClient(array $body): Client
     ]))]);
 }
 
-test('paystack verify survives metadata returned as an empty string', function () {
+test('paystack verify survives metadata returned as an empty string', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(jsonClient([
         'status' => true,
@@ -56,7 +57,7 @@ test('paystack verify survives metadata returned as an empty string', function (
         ->and($result->amount)->toBe(5000.0);
 });
 
-test('paystack verify still returns real metadata when present', function () {
+test('paystack verify still returns real metadata when present', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(jsonClient([
         'status' => true,
@@ -72,7 +73,7 @@ test('paystack verify still returns real metadata when present', function () {
     expect($driver->verify('ref_2')->metadata)->toBe(['order_id' => 991]);
 });
 
-test('paystack verify decodes metadata sent as a JSON string rather than discarding it', function () {
+test('paystack verify decodes metadata sent as a JSON string rather than discarding it', function (): void {
     // Paystack encodes metadata as a JSON string in some responses. Treating
     // every non-array as empty would silently lose the caller's own values.
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
@@ -90,7 +91,7 @@ test('paystack verify decodes metadata sent as a JSON string rather than discard
     expect($driver->verify('ref_3')->metadata)->toBe(['order_id' => 991]);
 });
 
-test('flutterwave verify survives meta returned as an empty string', function () {
+test('flutterwave verify survives meta returned as an empty string', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(jsonClient([
         'status' => 'success',
@@ -106,7 +107,7 @@ test('flutterwave verify survives meta returned as an empty string', function ()
     expect($driver->verify('ref_1')->metadata)->toBe([]);
 });
 
-test('monnify verify survives metaData returned as an empty string', function () {
+test('monnify verify survives metaData returned as an empty string', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'MK_TEST', 'secret_key' => 'SK_TEST',
         'contract_code' => 'C1', 'base_url' => 'https://sandbox.monnify.com',
@@ -132,7 +133,7 @@ test('monnify verify survives metaData returned as an empty string', function ()
     expect($driver->verify('ref_1')->metadata)->toBe([]);
 });
 
-test('opay verify survives metadata returned as an empty string', function () {
+test('opay verify survives metadata returned as an empty string', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'M1', 'public_key' => 'PK', 'secret_key' => 'SK',
         'base_url' => 'https://liveapi.opaycheckout.com', 'currencies' => ['NGN'],
@@ -150,7 +151,7 @@ test('opay verify survives metadata returned as an empty string', function () {
     expect($driver->verify('ref_1')->metadata)->toBe([]);
 });
 
-test('mollie verify survives metadata returned as an empty string', function () {
+test('mollie verify survives metadata returned as an empty string', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_key', 'currencies' => ['EUR']]);
     $driver->setClient(jsonClient([
         'id' => 'tr_1',
@@ -162,7 +163,7 @@ test('mollie verify survives metadata returned as an empty string', function () 
     expect($driver->verify('tr_1')->metadata)->toBe([]);
 });
 
-test('every DTO factory accepts a non-array metadata value without fataling', function () {
+test('every DTO factory accepts a non-array metadata value without fataling', function (): void {
     // fromArray() is public API. Anyone rebuilding a DTO from a provider
     // payload or from stored JSON hits the same crash.
     expect(VerificationResponseDTO::fromArray(['metadata' => ''])->metadata)->toBe([])
@@ -177,17 +178,17 @@ test('every DTO factory accepts a non-array metadata value without fataling', fu
         ])->metadata)->toBe([]);
 });
 
-test('DTO factories decode a JSON-string metadata value', function () {
+test('DTO factories decode a JSON-string metadata value', function (): void {
     expect(VerificationResponseDTO::fromArray(['metadata' => '{"a":1}'])->metadata)->toBe(['a' => 1])
         ->and(ChargeResponseDTO::fromArray(['metadata' => '{"a":1}'])->metadata)->toBe(['a' => 1]);
 });
 
-test('a DTO factory reads a StripeObject via toArray, not a broken array cast', function () {
+test('a DTO factory reads a StripeObject via toArray, not a broken array cast', function (): void {
     // Regression: StripeObject keeps its values in protected internals, so
     // (array) returned mangled property names like "\0*\0_values" instead of
     // the customer's metadata. It never crashed, it just silently returned the
     // wrong thing, which is why it went unnoticed for so long.
-    $stripeMetadata = Stripe\Util\Util::convertToStripeObject(
+    $stripeMetadata = Util::convertToStripeObject(
         ['reference' => 'ref_stripe_1', 'order_id' => 991],
         []
     );
@@ -197,15 +198,15 @@ test('a DTO factory reads a StripeObject via toArray, not a broken array cast', 
     expect($dto->metadata)->toBe(['reference' => 'ref_stripe_1', 'order_id' => 991]);
 });
 
-test('a plain array cast on a StripeObject really does produce mangled keys', function () {
+test('a plain array cast on a StripeObject really does produce mangled keys', function (): void {
     // Pins the reason the fix exists, so nobody "simplifies" it back.
-    $stripeMetadata = Stripe\Util\Util::convertToStripeObject(['order_id' => 991], []);
+    $stripeMetadata = Util::convertToStripeObject(['order_id' => 991], []);
 
     expect(array_keys((array) $stripeMetadata))->toContain("\0*\0_values")
         ->and((array) $stripeMetadata)->not->toHaveKey('order_id');
 });
 
-test('a DTO factory reads a JsonSerializable object through jsonSerialize', function () {
+test('a DTO factory reads a JsonSerializable object through jsonSerialize', function (): void {
     $metadata = new class implements JsonSerializable
     {
         public function jsonSerialize(): array
@@ -217,7 +218,7 @@ test('a DTO factory reads a JsonSerializable object through jsonSerialize', func
     expect(VerificationResponseDTO::fromArray(['metadata' => $metadata])->metadata)->toBe(['order_id' => 991]);
 });
 
-test('a JsonSerializable object that serializes to a scalar normalizes to an empty array', function () {
+test('a JsonSerializable object that serializes to a scalar normalizes to an empty array', function (): void {
     // jsonSerialize() may return any JSON value; only an array can become
     // metadata, and anything else must not reach a typed array parameter.
     $metadata = new class implements JsonSerializable

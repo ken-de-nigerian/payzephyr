@@ -3,7 +3,7 @@
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
-test('verification response getNormalizedStatus uses container when available', function () {
+test('verification response getNormalizedStatus uses container when available', function (): void {
     $normalizer = new StatusNormalizer;
     app()->instance(StatusNormalizer::class, $normalizer);
 
@@ -18,7 +18,7 @@ test('verification response getNormalizedStatus uses container when available', 
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response getNormalizedStatus falls back to static when container unavailable', function () {
+test('verification response getNormalizedStatus falls back to static when container unavailable', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'COMPLETED',
@@ -29,7 +29,7 @@ test('verification response getNormalizedStatus falls back to static when contai
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response getNormalizedStatus handles provider-specific normalization', function () {
+test('verification response getNormalizedStatus handles provider-specific normalization', function (): void {
     $normalizer = new StatusNormalizer;
     $normalizer->registerProviderMappings('custom', [
         'failed' => ['CUSTOM_FAILED'],

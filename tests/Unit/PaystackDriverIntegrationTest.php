@@ -17,7 +17,7 @@ function createPaystackDriverWithMock(array $responses): PaystackDriver
     return PaystackDriverTestHelper::createWithMock($responses);
 }
 
-test('paystack charge succeeds with valid response', function () {
+test('paystack charge succeeds with valid response', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -37,7 +37,7 @@ test('paystack charge succeeds with valid response', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('paystack charge handles metadata', function () {
+test('paystack charge handles metadata', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -55,7 +55,7 @@ test('paystack charge handles metadata', function () {
     expect($response->metadata)->toBe(['order_id' => 12345]);
 });
 
-test('paystack charge throws exception on api error', function () {
+test('paystack charge throws exception on api error', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(400, [], json_encode(['status' => false, 'message' => 'Invalid amount'])),
     ]);
@@ -63,7 +63,7 @@ test('paystack charge throws exception on api error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
-test('paystack charge handles network error', function () {
+test('paystack charge handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/transaction/initialize')),
     ]);
@@ -75,7 +75,7 @@ test('paystack charge handles network error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
-test('paystack verify returns success', function () {
+test('paystack verify returns success', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -98,7 +98,7 @@ test('paystack verify returns success', function () {
         ->and($result->isSuccessful())->toBeTrue();
 });
 
-test('paystack verify returns failed', function () {
+test('paystack verify returns failed', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -116,7 +116,7 @@ test('paystack verify returns failed', function () {
     expect($result->isFailed())->toBeTrue();
 });
 
-test('paystack verify handles not found', function () {
+test('paystack verify handles not found', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(404, [], json_encode(['status' => false, 'message' => 'Not found'])),
     ]);
@@ -124,7 +124,7 @@ test('paystack verify handles not found', function () {
     $driver->verify('ref_nonexistent');
 })->throws(VerificationException::class);
 
-test('paystack verify converts kobo to naira', function () {
+test('paystack verify converts kobo to naira', function (): void {
     $driver = createPaystackDriverWithMock([
         new Response(200, [], json_encode([
             'status' => true,

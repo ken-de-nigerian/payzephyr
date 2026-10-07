@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 
-test('stripe driver mapFromPaymentIntent handles succeeded status', function () {
+test('stripe driver mapFromPaymentIntent handles succeeded status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -21,7 +23,6 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
@@ -31,7 +32,7 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
         ->and($result->paidAt)->not->toBeNull();
 });
 
-test('stripe driver mapFromPaymentIntent handles requires_payment_method status', function () {
+test('stripe driver mapFromPaymentIntent handles requires_payment_method status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -50,7 +51,6 @@ test('stripe driver mapFromPaymentIntent handles requires_payment_method status'
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
@@ -58,7 +58,7 @@ test('stripe driver mapFromPaymentIntent handles requires_payment_method status'
         ->and($result->paidAt)->toBeNull();
 });
 
-test('stripe driver mapFromPaymentIntent handles canceled status', function () {
+test('stripe driver mapFromPaymentIntent handles canceled status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -77,7 +77,6 @@ test('stripe driver mapFromPaymentIntent handles canceled status', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
@@ -85,7 +84,7 @@ test('stripe driver mapFromPaymentIntent handles canceled status', function () {
         ->and($result->paidAt)->toBeNull();
 });
 
-test('stripe driver mapFromPaymentIntent handles default status', function () {
+test('stripe driver mapFromPaymentIntent handles default status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -104,7 +103,6 @@ test('stripe driver mapFromPaymentIntent handles default status', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
@@ -112,7 +110,7 @@ test('stripe driver mapFromPaymentIntent handles default status', function () {
         ->and($result->paidAt)->toBeNull();
 });
 
-test('stripe driver mapFromPaymentIntent extracts customer email', function () {
+test('stripe driver mapFromPaymentIntent extracts customer email', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -131,7 +129,6 @@ test('stripe driver mapFromPaymentIntent extracts customer email', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 

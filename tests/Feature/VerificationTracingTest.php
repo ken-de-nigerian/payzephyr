@@ -43,7 +43,7 @@ function verifyingDriver(string $name, string $status = 'success', ?Throwable $t
         {
             $this->verifyCalls++;
 
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -52,8 +52,8 @@ function verifyingDriver(string $name, string $status = 'success', ?Throwable $t
                 status: $this->status,
                 amount: 100.0,
                 currency: 'NGN',
-                channel: 'card',
                 provider: $this->driverName,
+                channel: 'card',
             );
         }
 
@@ -117,7 +117,6 @@ function verifyingManager(array $drivers): PaymentManager
 {
     $manager = new PaymentManager;
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
@@ -132,7 +131,7 @@ function verifyTraceEvents(string $reference): array
         ->pluck('event')->map(fn (TraceEvent $e): string => $e->value)->all();
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -152,7 +151,7 @@ beforeEach(function () {
 // Asking, and getting an answer
 // ---------------------------------------------------------------------------
 
-test('a verification records that it started and how it ended', function () {
+test('a verification records that it started and how it ended', function (): void {
     verifyingManager(['primary' => verifyingDriver('primary')])
         ->verify('PZ_1755000000_abcdef01', 'primary');
 
@@ -166,7 +165,7 @@ test('a verification records that it started and how it ended', function () {
         ->and($completed->payload['channel'])->toBe('card');
 });
 
-test('completed means a definitive answer, not necessarily a successful payment', function () {
+test('completed means a definitive answer, not necessarily a successful payment', function (): void {
     // A provider saying "this payment failed" is a verification that worked.
     // Recording it as verification.failed would conflate the two.
     verifyingManager(['primary' => verifyingDriver('primary', status: 'failed')])
@@ -178,7 +177,7 @@ test('completed means a definitive answer, not necessarily a successful payment'
         ->and($completed->event->isError())->toBeFalse();
 });
 
-test('the providers about to be tried are recorded, including the slow fallthrough', function () {
+test('the providers about to be tried are recorded, including the slow fallthrough', function (): void {
     // With no cached session, no transaction row and no explicit provider,
     // verify() asks every enabled provider in turn. That is the cost of a
     // provider-neutral reference, and it is worth being able to see it.
@@ -193,7 +192,7 @@ test('the providers about to be tried are recorded, including the slow fallthrou
         ->and($started->payload['provider_was_explicit'])->toBeFalse();
 });
 
-test('an explicit provider is recorded as such', function () {
+test('an explicit provider is recorded as such', function (): void {
     verifyingManager(['primary' => verifyingDriver('primary')])
         ->verify('PZ_1755000000_abcdef01', 'primary');
 
@@ -207,7 +206,7 @@ test('an explicit provider is recorded as such', function () {
 // Not getting an answer
 // ---------------------------------------------------------------------------
 
-test('one provider failing to answer is not the verification failing', function () {
+test('one provider failing to answer is not the verification failing', function (): void {
     // Same split the charge chain uses: PROVIDER_ERROR per provider,
     // VERIFICATION_FAILED only once nobody could answer.
     verifyingManager([
@@ -227,13 +226,13 @@ test('one provider failing to answer is not the verification failing', function 
         ->and($errored->payload['during'])->toBe('verification');
 });
 
-test('a verification nobody could answer is recorded once, with every reason', function () {
+test('a verification nobody could answer is recorded once, with every reason', function (): void {
     $manager = verifyingManager([
         'primary' => verifyingDriver('primary', throws: new RuntimeException('primary down')),
         'secondary' => verifyingDriver('secondary', throws: new RuntimeException('secondary down')),
     ]);
 
-    expect(fn () => $manager->verify('PZ_1755000000_abcdef01'))->toThrow(ProviderException::class);
+    expect(fn (): VerificationResponseDTO => $manager->verify('PZ_1755000000_abcdef01'))->toThrow(ProviderException::class);
 
     expect(verifyTraceEvents('PZ_1755000000_abcdef01'))->toBe([
         'verification.started',
@@ -251,13 +250,13 @@ test('a verification nobody could answer is recorded once, with every reason', f
         ]);
 });
 
-test('a failed verification does not mark the payment terminal', function () {
+test('a failed verification does not mark the payment terminal', function (): void {
     // The payment may still be fine; PayZephyr just could not ask about it.
     $manager = verifyingManager([
         'primary' => verifyingDriver('primary', throws: new RuntimeException('down')),
     ]);
 
-    expect(fn () => $manager->verify('PZ_1755000000_abcdef01', 'primary'))->toThrow(ProviderException::class);
+    expect(fn (): VerificationResponseDTO => $manager->verify('PZ_1755000000_abcdef01', 'primary'))->toThrow(ProviderException::class);
 
     $timeline = app(TraceTimelineBuilder::class)->build('PZ_1755000000_abcdef01');
 
@@ -271,7 +270,7 @@ test('a failed verification does not mark the payment terminal', function () {
 // The quiet failure
 // ---------------------------------------------------------------------------
 
-test('a verification the provider confirmed but the database refused is recorded', function () {
+test('a verification the provider confirmed but the database refused is recorded', function (): void {
     // The caller is about to be told this payment succeeded while
     // payment_transactions still says otherwise. Without this the divergence
     // surfaces weeks later as a reconciliation mismatch with no explanation.
@@ -299,7 +298,7 @@ test('a verification the provider confirmed but the database refused is recorded
 // The provider round trip during a verify
 // ---------------------------------------------------------------------------
 
-test('the provider call made during a verification is on the timeline', function () {
+test('the provider call made during a verification is on the timeline', function (): void {
     // A verification has no ChargeRequestDTO, so AbstractDriver cannot recover
     // the reference from $currentRequest the way it does during a charge.
     // Without the explicit trace context these round trips went unrecorded.
@@ -326,7 +325,7 @@ test('the provider call made during a verification is on the timeline', function
         ->and($received->correlation_id)->toBe($sent->correlation_id);
 });
 
-test('the verify trace context does not leak into the next operation', function () {
+test('the verify trace context does not leak into the next operation', function (): void {
     config(['payments.health_check.enabled' => false]);
     app()->forgetInstance('payments.config');
 
@@ -359,7 +358,7 @@ test('the verify trace context does not leak into the next operation', function 
 // One payment, one timeline
 // ---------------------------------------------------------------------------
 
-test('a charge and its later verification share one timeline', function () {
+test('a charge and its later verification share one timeline', function (): void {
     // The point of keying everything by reference: the redirect path and the
     // charge that preceded it are readable together, in order.
     $manager = verifyingManager(['primary' => verifyingDriver('primary')]);
@@ -385,7 +384,7 @@ test('a charge and its later verification share one timeline', function () {
 // Tracing never matters to the verification
 // ---------------------------------------------------------------------------
 
-test('with tracing off a verification behaves as before and records nothing', function () {
+test('with tracing off a verification behaves as before and records nothing', function (): void {
     config(['payments.features.trace' => false]);
     app()->forgetInstance('payments.config');
 
@@ -396,7 +395,7 @@ test('with tracing off a verification behaves as before and records nothing', fu
         ->and(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a verification still succeeds when the trace table was never migrated', function () {
+test('a verification still succeeds when the trace table was never migrated', function (): void {
     Schema::drop('payment_trace_events');
 
     $response = verifyingManager(['primary' => verifyingDriver('primary')])

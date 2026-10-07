@@ -1,5 +1,6 @@
 <?php
 
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
@@ -8,7 +9,7 @@ use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 
-test('driver factory creates all default drivers', function () {
+test('driver factory creates all default drivers', function (): void {
     $factory = new DriverFactory;
 
     $paystackConfig = ['secret_key' => 'sk_test', 'public_key' => 'pk_test', 'currencies' => ['NGN']];
@@ -24,7 +25,7 @@ test('driver factory creates all default drivers', function () {
         ->and($factory->create('paypal', $paypalConfig))->toBeInstanceOf(PayPalDriver::class);
 });
 
-test('driver factory register adds custom driver', function () {
+test('driver factory register adds custom driver', function (): void {
     $factory = new DriverFactory;
 
     $factory->register('custom', PaystackDriver::class);
@@ -38,27 +39,27 @@ test('driver factory register adds custom driver', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('driver factory register throws exception for non-existent class', function () {
+test('driver factory register throws exception for non-existent class', function (): void {
     $factory = new DriverFactory;
 
-    expect(fn () => $factory->register('custom', 'NonExistentClass'))
+    expect(fn (): DriverFactory => $factory->register('custom', 'NonExistentClass'))
         ->toThrow(DriverNotFoundException::class, 'does not exist');
 });
 
-test('driver factory register throws exception for non-interface class', function () {
+test('driver factory register throws exception for non-interface class', function (): void {
     $factory = new DriverFactory;
 
-    expect(fn () => $factory->register('custom', stdClass::class))
+    expect(fn (): DriverFactory => $factory->register('custom', stdClass::class))
         ->toThrow(DriverNotFoundException::class, 'must implement DriverInterface');
 });
 
-test('driver factory getRegisteredDrivers returns empty array initially', function () {
+test('driver factory getRegisteredDrivers returns empty array initially', function (): void {
     $factory = new DriverFactory;
 
     expect($factory->getRegisteredDrivers())->toBe([]);
 });
 
-test('driver factory getRegisteredDrivers returns all registered driver names', function () {
+test('driver factory getRegisteredDrivers returns all registered driver names', function (): void {
     $factory = new DriverFactory;
 
     $factory->register('custom1', PaystackDriver::class);
@@ -71,7 +72,7 @@ test('driver factory getRegisteredDrivers returns all registered driver names', 
         ->and($drivers)->toHaveCount(3);
 });
 
-test('driver factory isRegistered checks if driver is registered', function () {
+test('driver factory isRegistered checks if driver is registered', function (): void {
     $factory = new DriverFactory;
 
     expect($factory->isRegistered('custom'))->toBeFalse();
@@ -82,7 +83,7 @@ test('driver factory isRegistered checks if driver is registered', function () {
         ->and($factory->isRegistered('not_registered'))->toBeFalse();
 });
 
-test('driver factory uses config driver class if available', function () {
+test('driver factory uses config driver class if available', function (): void {
     $factory = new DriverFactory;
 
     app()->forgetInstance('payments.config');
@@ -98,7 +99,7 @@ test('driver factory uses config driver class if available', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('driver factory uses registered driver over config driver class', function () {
+test('driver factory uses registered driver over config driver class', function (): void {
     $factory = new DriverFactory;
 
     $factory->register('paystack', FlutterwaveDriver::class);
@@ -113,7 +114,7 @@ test('driver factory uses registered driver over config driver class', function 
     expect($driver)->toBeInstanceOf(FlutterwaveDriver::class);
 });
 
-test('driver factory uses registered driver over default driver', function () {
+test('driver factory uses registered driver over default driver', function (): void {
     $factory = new DriverFactory;
 
     $factory->register('paystack', FlutterwaveDriver::class);
@@ -126,7 +127,7 @@ test('driver factory uses registered driver over default driver', function () {
     expect($driver)->toBeInstanceOf(FlutterwaveDriver::class);
 });
 
-test('driver factory uses fully qualified class name as fallback', function () {
+test('driver factory uses fully qualified class name as fallback', function (): void {
     $factory = new DriverFactory;
 
     $driver = $factory->create(PaystackDriver::class, [
@@ -138,21 +139,21 @@ test('driver factory uses fully qualified class name as fallback', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('driver factory create throws exception if class does not exist', function () {
+test('driver factory create throws exception if class does not exist', function (): void {
     $factory = new DriverFactory;
 
-    expect(fn () => $factory->create('nonexistent', []))
+    expect(fn (): DriverInterface => $factory->create('nonexistent', []))
         ->toThrow(DriverNotFoundException::class, 'Driver class');
 });
 
-test('driver factory register throws exception if class does not implement DriverInterface', function () {
+test('driver factory register throws exception if class does not implement DriverInterface', function (): void {
     $factory = new DriverFactory;
 
-    expect(fn () => $factory->register('test', stdClass::class))
+    expect(fn (): DriverFactory => $factory->register('test', stdClass::class))
         ->toThrow(DriverNotFoundException::class, 'must implement DriverInterface');
 });
 
-test('driver factory register allows chaining', function () {
+test('driver factory register allows chaining', function (): void {
     $factory = new DriverFactory;
 
     $result = $factory->register('custom1', PaystackDriver::class)

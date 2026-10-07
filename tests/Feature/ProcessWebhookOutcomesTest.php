@@ -6,6 +6,8 @@ use Illuminate\Contracts\Queue\Job as JobContract;
 use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
+use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Contracts\SendsStatelessWebhooks;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
@@ -31,7 +33,7 @@ use KenDeNigerian\PayZephyr\PaymentManager;
  * a reference and a status are needed.
  */
 
-beforeEach(function () {
+beforeEach(function (): void {
     config(['payments.features.trace' => true, 'payments.trace.async' => false]);
     app()->forgetInstance('payments.config');
 });
@@ -48,7 +50,7 @@ function processWebhookOnAttempt(array $payload, int $attempt, string $provider 
     $queueJob->shouldReceive('attempts')->andReturn($attempt);
     $job->setJob($queueJob);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 }
 
 function traceFor(string $reference, TraceEvent $event): PaymentTraceEvent
@@ -86,7 +88,7 @@ function acmeTransaction(string $reference, string $status = 'pending'): Payment
 // Delivery claims
 // ---------------------------------------------------------------------------
 
-test('a duplicate delivery is skipped and logged with its key', function () {
+test('a duplicate delivery is skipped and logged with its key', function (): void {
     $logs = captureLogs();
     $payload = ['event' => 'charge.success', 'data' => ['id' => 'dup-1']];
 
@@ -99,7 +101,7 @@ test('a duplicate delivery is skipped and logged with its key', function () {
         ->and($context['event_key'])->toBe(hash('sha256', 'acme|'.json_encode($payload)));
 });
 
-test('a delivery for a provider with no driver is still claimed, so its duplicate is skipped', function () {
+test('a delivery for a provider with no driver is still claimed, so its duplicate is skipped', function (): void {
     Event::fake([WebhookReceived::class]);
     $payload = ['event' => 'charge.success', 'data' => ['id' => 'nodriver-1']];
 
@@ -109,7 +111,7 @@ test('a delivery for a provider with no driver is still claimed, so its duplicat
     Event::assertDispatchedTimes(WebhookReceived::class, 1);
 });
 
-test('a retry that finds its own marker reclaims it, and says so', function () {
+test('a retry that finds its own marker reclaims it, and says so', function (): void {
     $logs = captureLogs();
     $payload = ['event' => 'charge.success', 'data' => ['id' => 'reclaim-1']];
     $key = hash('sha256', 'acme|'.json_encode($payload));
@@ -121,7 +123,7 @@ test('a retry that finds its own marker reclaims it, and says so', function () {
         ->toBe(['provider' => 'acme', 'event_key' => $key, 'attempt' => 3]);
 });
 
-test('a marker that cannot be released after a failure is logged, and the failure still raised', function () {
+test('a marker that cannot be released after a failure is logged, and the failure still raised', function (): void {
     $logs = captureLogs();
     $events = Mockery::mock(WebhookEventRepositoryInterface::class);
     $events->shouldReceive('recordIfNew')->andReturnTrue();
@@ -139,7 +141,7 @@ test('a marker that cannot be released after a failure is logged, and the failur
     ]);
 });
 
-test('an abandoned delivery is recorded with the class of what stopped it', function () {
+test('an abandoned delivery is recorded with the class of what stopped it', function (): void {
     acmeDriver('PZ_ABANDONED', 'success');
 
     (new ProcessWebhook('acme', ['event' => 'charge.success']))->failed(new DomainException('gave up'));
@@ -152,7 +154,7 @@ test('an abandoned delivery is recorded with the class of what stopped it', func
 // The payment a webhook names
 // ---------------------------------------------------------------------------
 
-test('a webhook with no recognisable status leaves the payment alone, and says so', function () {
+test('a webhook with no recognisable status leaves the payment alone, and says so', function (): void {
     acmeDriver('PZ_UNKNOWN', 'unknown');
     acmeTransaction('PZ_UNKNOWN');
     $logs = captureLogs();
@@ -163,7 +165,7 @@ test('a webhook with no recognisable status leaves the payment alone, and says s
         ->and(loggedEntry($logs, 'no recognisable payment status')['context'])->toBe(['provider' => 'acme', 'reference' => 'PZ_UNKNOWN']);
 });
 
-test('a status PayZephyr has no enum case for is stored as reported, and not marked paid', function () {
+test('a status PayZephyr has no enum case for is stored as reported, and not marked paid', function (): void {
     acmeDriver('PZ_ON_HOLD', 'on_hold');
     acmeTransaction('PZ_ON_HOLD');
 
@@ -174,7 +176,7 @@ test('a status PayZephyr has no enum case for is stored as reported, and not mar
         ->and($transaction->paid_at)->toBeNull();
 });
 
-test('an updated payment is logged', function () {
+test('an updated payment is logged', function (): void {
     acmeDriver('PZ_UPDATED', 'success', 'card');
     acmeTransaction('PZ_UPDATED');
     $logs = captureLogs();
@@ -185,7 +187,7 @@ test('an updated payment is logged', function () {
         ->toBe(['reference' => 'PZ_UPDATED', 'status' => 'success', 'provider' => 'acme']);
 });
 
-test('a payment already successful is not updated, or logged as if it were', function () {
+test('a payment already successful is not updated, or logged as if it were', function (): void {
     acmeDriver('PZ_ALREADY', 'failed');
     acmeTransaction('PZ_ALREADY', 'success');
     $logs = captureLogs();
@@ -196,7 +198,7 @@ test('a payment already successful is not updated, or logged as if it were', fun
         ->and(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'Transaction updated from webhook')))->toBe([]);
 });
 
-test('a payment that cannot be updated is logged, and the webhook still processed', function () {
+test('a payment that cannot be updated is logged, and the webhook still processed', function (): void {
     acmeDriver('PZ_BROKEN', 'success');
     $transactions = Mockery::mock(TransactionRepositoryInterface::class);
     $transactions->shouldReceive('updateIfNotSuccessful')->andThrow(new RuntimeException('write failed'));
@@ -215,7 +217,7 @@ test('a payment that cannot be updated is logged, and the webhook still processe
 // Subscriptions
 // ---------------------------------------------------------------------------
 
-test('a subscription named by subscriptionCode is recognised', function () {
+test('a subscription named by subscriptionCode is recognised', function (): void {
     Event::fake([SubscriptionCreated::class]);
 
     processWebhook(['event' => 'subscription.create', 'data' => ['subscriptionCode' => 'SUB_CAMEL']]);
@@ -223,7 +225,7 @@ test('a subscription named by subscriptionCode is recognised', function () {
     Event::assertDispatched(SubscriptionCreated::class, fn (SubscriptionCreated $e): bool => $e->subscriptionCode === 'SUB_CAMEL');
 });
 
-test('a subscription event with no subscription is dropped, and says why', function () {
+test('a subscription event with no subscription is dropped, and says why', function (): void {
     Event::fake([SubscriptionCreated::class]);
     $logs = captureLogs();
 
@@ -234,7 +236,7 @@ test('a subscription event with no subscription is dropped, and says why', funct
         ->toBe(['provider' => 'acme', 'event' => 'subscription.create']);
 });
 
-test('each subscription event is recorded with the event that reported it, and logged', function () {
+test('each subscription event is recorded with the event that reported it, and logged', function (): void {
     Event::fake([SubscriptionCreated::class, SubscriptionCancelled::class]);
     $logs = captureLogs();
 
@@ -251,7 +253,7 @@ test('each subscription event is recorded with the event that reported it, and l
     ]);
 });
 
-test('a renewal reads its invoice reference from whichever field the provider uses', function (array $data, string $expected) {
+test('a renewal reads its invoice reference from whichever field the provider uses', function (array $data, string $expected): void {
     Event::fake([SubscriptionRenewed::class]);
 
     processWebhook(['event' => 'subscription.renewed', 'data' => ['subscription_code' => 'SUB_R'] + $data]);
@@ -266,7 +268,7 @@ test('a renewal reads its invoice reference from whichever field the provider us
     'none' => [[], ''],
 ]);
 
-test('a failed subscription payment carries the provider\'s message as its reason', function () {
+test('a failed subscription payment carries the provider\'s message as its reason', function (): void {
     Event::fake([SubscriptionPaymentFailed::class]);
 
     processWebhook(['event' => 'invoice.payment_failed', 'data' => ['subscription_code' => 'SUB_F', 'message' => 'Card declined']]);
@@ -276,7 +278,7 @@ test('a failed subscription payment carries the provider\'s message as its reaso
         ->toEqual(['event' => 'invoice.payment_failed', 'reason' => 'Card declined']);
 });
 
-test('a subscription update cancels it whatever the case of its status, and not without one', function (?string $status, bool $cancelled) {
+test('a subscription update cancels it whatever the case of its status, and not without one', function (?string $status, bool $cancelled): void {
     Event::fake([SubscriptionCancelled::class]);
     $subscription = array_filter(['id' => 'SUB_SQ', 'status' => $status]);
 
@@ -297,7 +299,7 @@ test('a subscription update cancels it whatever the case of its status, and not 
 // Refunds
 // ---------------------------------------------------------------------------
 
-test('a refund event carrying the charge is left to the refund\'s own event, and says so', function () {
+test('a refund event carrying the charge is left to the refund\'s own event, and says so', function (): void {
     Event::fake([RefundCreated::class, RefundCompleted::class]);
     $logs = captureLogs();
 
@@ -307,7 +309,7 @@ test('a refund event carrying the charge is left to the refund\'s own event, and
     expect(loggedEntry($logs, 'carries the charge, not a refund')['context'])->toBe(['provider' => 'acme', 'event' => 'charge.refunded']);
 });
 
-test('a refund event with no refund is dropped, and says why', function () {
+test('a refund event with no refund is dropped, and says why', function (): void {
     Event::fake([RefundCreated::class]);
     $logs = captureLogs();
 
@@ -317,7 +319,7 @@ test('a refund event with no refund is dropped, and says why', function () {
     expect(loggedEntry($logs, 'Refund webhook missing refund reference')['context'])->toBe(['provider' => 'acme', 'event' => 'refund.pending']);
 });
 
-test('a refund is found wherever the provider nests it', function (array $payload) {
+test('a refund is found wherever the provider nests it', function (array $payload): void {
     Event::fake([RefundCreated::class]);
 
     processWebhook($payload);
@@ -331,7 +333,7 @@ test('a refund is found wherever the provider nests it', function (array $payloa
     'eventData' => [['eventType' => 'refund.pending', 'eventData' => ['refund_reference' => 'RF_NESTED', 'transaction_reference' => 'PZ_NESTED']]],
 ]);
 
-test('a refund pending without a payment it names is announced with an empty reference', function () {
+test('a refund pending without a payment it names is announced with an empty reference', function (): void {
     Event::fake([RefundCreated::class]);
     $logs = captureLogs();
 
@@ -342,7 +344,7 @@ test('a refund pending without a payment it names is announced with an empty ref
         ->toBe(['provider' => 'acme', 'event' => 'refund.pending', 'refund_reference' => 'RF_ALONE']);
 });
 
-test('a refund reported failed by its status fails, whatever word the provider uses', function (string $status, string $reason) {
+test('a refund reported failed by its status fails, whatever word the provider uses', function (string $status, string $reason): void {
     Event::fake([RefundFailed::class]);
 
     processWebhook(['event' => 'refund.updated', 'data' => ['id' => "RF_$status", 'status' => strtoupper($status)]]);
@@ -357,7 +359,7 @@ test('a refund reported failed by its status fails, whatever word the provider u
     ['canceled', 'Refund cancelled'],
 ]);
 
-test('a refund status the body gives only beside the refund is read', function () {
+test('a refund status the body gives only beside the refund is read', function (): void {
     Event::fake([RefundFailed::class]);
 
     processWebhook(['event' => 'refund.updated', 'data' => ['object' => ['id' => 'RF_DETAIL'], 'status' => 'failed']]);
@@ -365,7 +367,7 @@ test('a refund status the body gives only beside the refund is read', function (
     Event::assertDispatched(RefundFailed::class, fn (RefundFailed $e): bool => $e->refundReference === 'RF_DETAIL');
 });
 
-test('a failed refund carries the provider\'s reason from whichever field it uses', function (array $fields, string $reason) {
+test('a failed refund carries the provider\'s reason from whichever field it uses', function (array $fields, string $reason): void {
     Event::fake([RefundFailed::class]);
 
     processWebhook(['event' => 'refund.failed', 'data' => ['id' => 'RF_REASON', 'transaction_reference' => 'PZ_REASON'] + $fields]);
@@ -380,7 +382,7 @@ test('a failed refund carries the provider\'s reason from whichever field it use
     'message' => [['message' => 'Bank rejected'], 'Bank rejected'],
 ]);
 
-test('a failed refund reads the reason the body gives beside the refund', function () {
+test('a failed refund reads the reason the body gives beside the refund', function (): void {
     Event::fake([RefundFailed::class]);
 
     processWebhook(['event' => 'refund.failed', 'data' => ['refund_reference' => 'RF_OUTER', 'reason' => 'Outer reason', 'object' => ['id' => 'RF_OUTER']]]);
@@ -388,7 +390,7 @@ test('a failed refund reads the reason the body gives beside the refund', functi
     Event::assertDispatched(RefundFailed::class, fn (RefundFailed $e): bool => $e->reason === 'Outer reason');
 });
 
-test('a refund is completed by its event name, or by any status meaning done', function (string $event, ?string $status) {
+test('a refund is completed by its event name, or by any status meaning done', function (string $event, ?string $status): void {
     Event::fake([RefundCompleted::class]);
 
     processWebhook(['event' => $event, 'data' => array_filter(['id' => "RF_{$event}_$status", 'status' => $status])]);
@@ -406,7 +408,7 @@ test('a refund is completed by its event name, or by any status meaning done', f
     'status approved' => ['refund.updated', 'approved'],
 ]);
 
-test('a completed refund is recorded on the payment with the refund that settled it', function () {
+test('a completed refund is recorded on the payment with the refund that settled it', function (): void {
     Event::fake([RefundCompleted::class]);
 
     processWebhook(['event' => 'refund.processed', 'data' => ['id' => 'RF_DONE', 'transaction_reference' => 'PZ_DONE']]);
@@ -414,7 +416,7 @@ test('a completed refund is recorded on the payment with the refund that settled
     expect(traceFor('PZ_DONE', TraceEvent::PAYMENT_REFUNDED)->payload)->toEqual(['refund_reference' => 'RF_DONE']);
 });
 
-test('a refund outcome already announced is not announced again, and says so', function () {
+test('a refund outcome already announced is not announced again, and says so', function (): void {
     Event::fake([RefundCompleted::class]);
     $logs = captureLogs();
 
@@ -426,7 +428,7 @@ test('a refund outcome already announced is not announced again, and says so', f
         ->toBe(['provider' => 'acme', 'refund_reference' => 'RF_TWICE', 'outcome' => 'completed']);
 });
 
-test('a refund outcome is written to the refund log when logging is not configured either way', function () {
+test('a refund outcome is written to the refund log when logging is not configured either way', function (): void {
     config(['payments.logging' => [], 'payments.refunds.logging' => []]);
     app()->forgetInstance('payments.config');
     Event::fake([RefundCompleted::class]);
@@ -440,7 +442,7 @@ test('a refund outcome is written to the refund log when logging is not configur
     expect(RefundTransaction::first()->status)->toBe('completed');
 });
 
-test('a refund outcome that cannot be written to the refund log is logged, and still announced', function () {
+test('a refund outcome that cannot be written to the refund log is logged, and still announced', function (): void {
     Event::fake([RefundCompleted::class]);
     $refunds = Mockery::mock(RefundRepositoryInterface::class);
     $refunds->shouldReceive('updateStatusIfExists')->andThrow(new RuntimeException('log table locked'));
@@ -463,7 +465,7 @@ test('a refund outcome that cannot be written to the refund log is logged, and s
  */
 function acmeDriverRefusingSignatures(): DriverInterface
 {
-    $driver = Mockery::mock(DriverInterface::class, \KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification::class)->shouldIgnoreMissing();
+    $driver = Mockery::mock(DriverInterface::class, RequiresAsyncWebhookVerification::class)->shouldIgnoreMissing();
     $driver->shouldReceive('requiresAsyncVerification')->andReturnTrue();
     $driver->shouldReceive('validateWebhook')->with(Mockery::type('array'), Mockery::type('string'))->andReturnFalse();
 
@@ -474,7 +476,7 @@ function acmeDriverRefusingSignatures(): DriverInterface
     return $driver;
 }
 
-test('a delivery whose deferred signature check fails is discarded, and says so', function () {
+test('a delivery whose deferred signature check fails is discarded, and says so', function (): void {
     acmeDriverRefusingSignatures();
     Event::fake([WebhookReceived::class]);
     $logs = captureLogs();
@@ -485,7 +487,7 @@ test('a delivery whose deferred signature check fails is discarded, and says so'
     expect(loggedEntry($logs, 'Deferred webhook signature verification failed')['context'])->toBe(['provider' => 'acme']);
 });
 
-test('the deferred signature check runs when verification is not configured either way', function () {
+test('the deferred signature check runs when verification is not configured either way', function (): void {
     config(['payments.webhook' => ['max_retries' => 3]]);
     app()->forgetInstance('payments.config');
     acmeDriverRefusingSignatures();
@@ -496,7 +498,7 @@ test('the deferred signature check runs when verification is not configured eith
     Event::assertNotDispatched(WebhookReceived::class);
 });
 
-test('a body that cannot be re-encoded is checked as empty rather than failing the job', function () {
+test('a body that cannot be re-encoded is checked as empty rather than failing the job', function (): void {
     acmeDriverRefusingSignatures();
     $logs = captureLogs();
 
@@ -505,7 +507,7 @@ test('a body that cannot be re-encoded is checked as empty rather than failing t
     expect(loggedEntry($logs, 'Deferred webhook signature verification failed')['level'])->toBe('warning');
 });
 
-test('a payment is updated from a webhook when logging is not configured either way', function () {
+test('a payment is updated from a webhook when logging is not configured either way', function (): void {
     config(['payments.logging' => []]);
     app()->forgetInstance('payments.config');
     acmeDriver('PZ_DEFAULT_LOGGING', 'success');
@@ -516,7 +518,7 @@ test('a payment is updated from a webhook when logging is not configured either 
     expect(PaymentTransaction::first()->status)->toBe('success');
 });
 
-test('a processed webhook is logged with its reference and event, or "unknown" without one', function () {
+test('a processed webhook is logged with its reference and event, or "unknown" without one', function (): void {
     acmeDriver('PZ_PROCESSED', 'unknown');
     $logs = captureLogs();
 
@@ -530,7 +532,7 @@ test('a processed webhook is logged with its reference and event, or "unknown" w
     ]);
 });
 
-test('a webhook that fails is logged and recorded with what went wrong and on which attempt', function () {
+test('a webhook that fails is logged and recorded with what went wrong and on which attempt', function (): void {
     acmeDriver('PZ_FAILING', 'unknown');
     Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
     $logs = captureLogs();
@@ -546,7 +548,7 @@ test('a webhook that fails is logged and recorded with what went wrong and on wh
         ]);
 });
 
-test('a retry is recorded as scheduled only when one is coming', function (int $attempt, bool $scheduled) {
+test('a retry is recorded as scheduled only when one is coming', function (int $attempt, bool $scheduled): void {
     acmeDriver("PZ_RETRY_$attempt", 'unknown');
     Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
 
@@ -558,8 +560,8 @@ test('a retry is recorded as scheduled only when one is coming', function (int $
     'attempt 3 of 3' => [3, false],
 ]);
 
-test('a stateless delivery that fails releases no marker, because it never claimed one', function () {
-    $driver = Mockery::mock(DriverInterface::class, \KenDeNigerian\PayZephyr\Contracts\SendsStatelessWebhooks::class)->shouldIgnoreMissing();
+test('a stateless delivery that fails releases no marker, because it never claimed one', function (): void {
+    $driver = Mockery::mock(DriverInterface::class, SendsStatelessWebhooks::class)->shouldIgnoreMissing();
     $driver->shouldReceive('isStatelessWebhook')->andReturnTrue();
     $manager = app(PaymentManager::class);
     (new ReflectionClass($manager))->getProperty('drivers')->setValue($manager, ['acme' => $driver]);
@@ -577,7 +579,7 @@ test('a stateless delivery that fails releases no marker, because it never claim
     expect(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'Failed to clear')))->toBe([]);
 });
 
-test('a delivery is tried three times, a minute apart, when retries are not configured', function () {
+test('a delivery is tried three times, a minute apart, when retries are not configured', function (): void {
     config(['payments.webhook' => ['verify_signature' => true]]);
     app()->forgetInstance('payments.config');
 
@@ -587,7 +589,7 @@ test('a delivery is tried three times, a minute apart, when retries are not conf
         ->and($job->backoff)->toBe(60);
 });
 
-test('a payment event is not read as a subscription event', function (array $payload) {
+test('a payment event is not read as a subscription event', function (array $payload): void {
     Event::fake([SubscriptionCreated::class, SubscriptionRenewed::class]);
     $logs = captureLogs();
 
@@ -599,7 +601,7 @@ test('a payment event is not read as a subscription event', function (array $pay
     'sale without an agreement' => [['event_type' => 'PAYMENT.SALE.COMPLETED', 'resource' => ['id' => 'SALE_1']]],
 ]);
 
-test('a delivery is tried as often, and as far apart, as configured', function () {
+test('a delivery is tried as often, and as far apart, as configured', function (): void {
     config(['payments.webhook.max_retries' => 5, 'payments.webhook.retry_backoff' => 30]);
     app()->forgetInstance('payments.config');
 

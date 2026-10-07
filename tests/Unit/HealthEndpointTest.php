@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use KenDeNigerian\PayZephyr\Http\Middleware\HealthEndpointMiddleware;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * These exercise HealthEndpointMiddleware directly rather than through the
@@ -13,15 +14,15 @@ use KenDeNigerian\PayZephyr\PaymentManager;
  * same 'payments' channel, which would make a Log expectation scoped to the
  * middleware's own warning both noisy and order-dependent.
  */
-function makeUnauthenticatedHealthRequest(): \Symfony\Component\HttpFoundation\Response
+function makeUnauthenticatedHealthRequest(): Response
 {
     $middleware = new HealthEndpointMiddleware;
 
     return $middleware->handle(Request::create('/payments/health', 'GET'), fn ($request) => response()->json(['status' => 'operational']));
 }
 
-test('unauthenticated health endpoint warns once per interval outside local/testing (ADR-0002)', function () {
-    app()->detectEnvironment(fn () => 'production');
+test('unauthenticated health endpoint warns once per interval outside local/testing (ADR-0002)', function (): void {
+    app()->detectEnvironment(fn (): string => 'production');
     Cache::forget('payzephyr:health_check:unauthenticated_warning');
 
     Log::shouldReceive('channel')->once()->with('payments')->andReturnSelf();
@@ -34,11 +35,11 @@ test('unauthenticated health endpoint warns once per interval outside local/test
     makeUnauthenticatedHealthRequest();
     makeUnauthenticatedHealthRequest();
 
-    app()->detectEnvironment(fn () => 'testing');
+    app()->detectEnvironment(fn (): string => 'testing');
     Cache::forget('payzephyr:health_check:unauthenticated_warning');
 });
 
-test('unauthenticated health endpoint does not warn in local/testing environments', function () {
+test('unauthenticated health endpoint does not warn in local/testing environments', function (): void {
     Cache::forget('payzephyr:health_check:unauthenticated_warning');
 
     Log::shouldReceive('channel')->never();
@@ -48,8 +49,8 @@ test('unauthenticated health endpoint does not warn in local/testing environment
     expect($response->getStatusCode())->toBe(200);
 });
 
-test('authenticated health endpoint configuration does not trigger the exposure warning', function () {
-    app()->detectEnvironment(fn () => 'production');
+test('authenticated health endpoint configuration does not trigger the exposure warning', function (): void {
+    app()->detectEnvironment(fn (): string => 'production');
     Cache::forget('payzephyr:health_check:unauthenticated_warning');
 
     config([
@@ -70,10 +71,10 @@ test('authenticated health endpoint configuration does not trigger the exposure 
 
     expect($response->getStatusCode())->toBe(200);
 
-    app()->detectEnvironment(fn () => 'testing');
+    app()->detectEnvironment(fn (): string => 'testing');
 });
 
-test('health endpoint returns operational status', function () {
+test('health endpoint returns operational status', function (): void {
     $response = $this->getJson('/payments/health');
 
     $response->assertStatus(200)
@@ -86,7 +87,7 @@ test('health endpoint returns operational status', function () {
         ]);
 });
 
-test('health endpoint includes enabled providers', function () {
+test('health endpoint includes enabled providers', function (): void {
     // Clear config cache
     app()->forgetInstance('payments.config');
 
@@ -115,7 +116,7 @@ test('health endpoint includes enabled providers', function () {
         ->and($data['providers'])->not->toHaveKey('flutterwave');
 });
 
-test('health endpoint handles provider errors gracefully', function () {
+test('health endpoint handles provider errors gracefully', function (): void {
     config(['payments.providers.invalid.enabled' => true]);
     config(['payments.providers.invalid.driver' => 'nonexistent']);
 
@@ -135,7 +136,7 @@ test('health endpoint handles provider errors gracefully', function () {
     }
 });
 
-test('health endpoint returns provider currencies', function () {
+test('health endpoint returns provider currencies', function (): void {
     config(['payments.providers.paystack.enabled' => true]);
     config(['payments.providers.paystack.currencies' => ['NGN', 'USD', 'GHS']]);
 
@@ -148,7 +149,7 @@ test('health endpoint returns provider currencies', function () {
         ->and($data['providers']['paystack']['currencies'])->toBeArray();
 });
 
-test('health endpoint uses cached health check', function () {
+test('health endpoint uses cached health check', function (): void {
     // Clear config cache
     app()->forgetInstance('payments.config');
 
@@ -164,7 +165,7 @@ test('health endpoint uses cached health check', function () {
     $manager = app(PaymentManager::class);
     $driver = $manager->driver('paystack');
 
-    \Illuminate\Support\Facades\Cache::shouldReceive('remember')
+    Cache::shouldReceive('remember')
         ->with(\Mockery::type('string'), \Mockery::type('int'), \Mockery::type('Closure'))
         ->andReturn(true);
 
@@ -173,7 +174,7 @@ test('health endpoint uses cached health check', function () {
     $response->assertStatus(200);
 });
 
-test('health endpoint handles empty providers config', function () {
+test('health endpoint handles empty providers config', function (): void {
     config(['payments.providers' => []]);
 
     $response = $this->getJson('/payments/health');
@@ -185,7 +186,7 @@ test('health endpoint handles empty providers config', function () {
         ]);
 });
 
-test('health endpoint only includes enabled providers', function () {
+test('health endpoint only includes enabled providers', function (): void {
     // Clear config cache
     app()->forgetInstance('payments.config');
 

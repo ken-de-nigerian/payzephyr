@@ -4,22 +4,24 @@ declare(strict_types=1);
 
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use KenDeNigerian\PayZephyr\PaymentServiceProvider;
 
 /**
  * Set up the database schema for the model tests.
  * This ensures we don't rely on external migrations.
  */
-beforeEach(function () {
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
+beforeEach(function (): void {
+    DB::setDefaultConnection('testing');
 
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+    } catch (\Exception) {
     }
 
-    Schema::connection('testing')->create('payment_transactions', function (Blueprint $table) {
+    Schema::connection('testing')->create('payment_transactions', function (Blueprint $table): void {
         $table->id();
         $table->string('reference');
         $table->string('provider');
@@ -35,15 +37,14 @@ beforeEach(function () {
     });
 });
 
-test('it uses the configured table name', function () {
+test('it uses the configured table name', function (): void {
     app()->forgetInstance('payments.config');
 
     config(['payments.logging.table' => 'custom_transactions_table']);
 
-    $provider = new \KenDeNigerian\PayZephyr\PaymentServiceProvider(app());
+    $provider = new PaymentServiceProvider(app());
     $reflection = new \ReflectionClass($provider);
     $method = $reflection->getMethod('configureModel');
-    $method->setAccessible(true);
     $method->invoke($provider);
 
     $model = new PaymentTransaction;
@@ -51,7 +52,7 @@ test('it uses the configured table name', function () {
     expect($model->getTable())->toBe('custom_transactions_table');
 });
 
-test('it defaults to payment_transactions table if config is missing', function () {
+test('it defaults to payment_transactions table if config is missing', function (): void {
     config(['payments.logging.table' => null]);
 
     $model = new PaymentTransaction;
@@ -59,7 +60,7 @@ test('it defaults to payment_transactions table if config is missing', function 
     expect($model->getTable())->toBe('payment_transactions');
 });
 
-test('it casts attributes correctly', function () {
+test('it casts attributes correctly', function (): void {
     $now = Carbon::now();
     $laravelVersion = (float) app()->version();
 
@@ -76,7 +77,7 @@ test('it casts attributes correctly', function () {
     ]);
 
     $amount = $transaction->amount;
-    expect(is_string($amount) ? $amount : (string) number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
+    expect(is_string($amount) ? $amount : number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
         ->and($transaction->paid_at)->toBeInstanceOf(Carbon::class);
 
     if ($laravelVersion >= 11.0) {
@@ -91,7 +92,7 @@ test('it casts attributes correctly', function () {
     }
 });
 
-test('it determines successful status correctly', function () {
+test('it determines successful status correctly', function (): void {
     $successStatuses = ['success', 'succeeded', 'completed', 'successful'];
     $failedStatuses = ['failed', 'pending', 'cancelled'];
 
@@ -106,7 +107,7 @@ test('it determines successful status correctly', function () {
     }
 });
 
-test('it determines failed status correctly', function () {
+test('it determines failed status correctly', function (): void {
     $failedStatuses = ['failed', 'cancelled', 'declined'];
     $otherStatuses = ['success', 'pending', 'completed'];
 
@@ -121,7 +122,7 @@ test('it determines failed status correctly', function () {
     }
 });
 
-test('it determines pending status correctly', function () {
+test('it determines pending status correctly', function (): void {
     $model = new PaymentTransaction(['status' => 'pending']);
     expect($model->isPending())->toBeTrue();
 
@@ -132,7 +133,7 @@ test('it determines pending status correctly', function () {
     expect($model->isPending())->toBeFalse();
 });
 
-test('scope successful filters correctly', function () {
+test('scope successful filters correctly', function (): void {
     PaymentTransaction::create(factoryData(['status' => 'success']));
     PaymentTransaction::create(factoryData(['status' => 'completed']));
     PaymentTransaction::create(factoryData(['status' => 'failed']));
@@ -144,7 +145,7 @@ test('scope successful filters correctly', function () {
         ->and($successful->pluck('status')->toArray())->toContain('success', 'completed');
 });
 
-test('scope failed filters correctly', function () {
+test('scope failed filters correctly', function (): void {
     PaymentTransaction::create(factoryData(['status' => 'failed']));
     PaymentTransaction::create(factoryData(['status' => 'declined']));
     PaymentTransaction::create(factoryData(['status' => 'success']));
@@ -155,7 +156,7 @@ test('scope failed filters correctly', function () {
         ->and($failed->pluck('status')->toArray())->toContain('failed', 'declined');
 });
 
-test('scope pending filters correctly', function () {
+test('scope pending filters correctly', function (): void {
     PaymentTransaction::create(factoryData(['status' => 'pending']));
     PaymentTransaction::create(factoryData(['status' => 'success']));
 

@@ -3,18 +3,20 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Facades\Payment;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 
-beforeEach(function () {
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
+beforeEach(function (): void {
+    DB::setDefaultConnection('testing');
 
     try {
-        \Illuminate\Support\Facades\Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+        Schema::connection('testing')->dropIfExists('payment_transactions');
+    } catch (\Exception) {
     }
 
-    \Illuminate\Support\Facades\Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference')->unique();
         $table->string('provider');
@@ -30,7 +32,7 @@ beforeEach(function () {
     });
 });
 
-test('it handles high volume payment initializations', function () {
+test('it handles high volume payment initializations', function (): void {
 
     $references = [];
 
@@ -42,14 +44,14 @@ test('it handles high volume payment initializations', function () {
                 ->charge();
 
             $references[] = $response->reference;
-        } catch (\Exception $e) {
+        } catch (\Exception) {
         }
     }
 
     expect(array_unique($references))->toHaveCount(count($references));
 });
 
-test('it handles large number of transactions in database', function () {
+test('it handles large number of transactions in database', function (): void {
     for ($i = 0; $i < 100; $i++) {
         PaymentTransaction::create([
             'reference' => "TEST_REF_{$i}",
@@ -76,7 +78,7 @@ test('it handles large number of transactions in database', function () {
     expect($total)->toBeGreaterThanOrEqual(100);
 });
 
-test('it handles concurrent cache operations', function () {
+test('it handles concurrent cache operations', function (): void {
     $references = [];
 
     for ($i = 0; $i < 20; $i++) {
@@ -94,7 +96,7 @@ test('it handles concurrent cache operations', function () {
     }
 });
 
-test('it handles bulk transaction queries efficiently', function () {
+test('it handles bulk transaction queries efficiently', function (): void {
     $statuses = ['success', 'failed', 'pending'];
 
     for ($i = 0; $i < 50; $i++) {

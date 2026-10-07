@@ -33,7 +33,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
  * instead, with an identical observable result (false). This was left
  * untouched per instructions: src/ is not to be modified for this task.
  */
-test('mollie charge names the field when a response carries no status', function () {
+test('mollie charge names the field when a response carries no status', function (): void {
     // The response has a checkout URL but no status. That used to reach
     // normalizeStatus() as a null and come back as a TypeError wrapped in
     // "Payment initialization failed"; it now says which field is missing.
@@ -64,7 +64,7 @@ test('mollie charge names the field when a response carries no status', function
     $driver->charge($request);
 })->throws(ChargeException::class, '[mollie] omitted the required field [status] from its charge response');
 
-test('mollie charge wraps a failure that is not an http error in a charge exception', function () {
+test('mollie charge wraps a failure that is not an http error in a charge exception', function (): void {
     // makeRequest() converts Guzzle's exceptions. Anything else thrown beneath
     // the call - a handler, a middleware, a stream - is not one of those, and
     // must still reach the caller as the driver's own exception type.

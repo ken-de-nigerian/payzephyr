@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Repositories\EloquentTransactionRepository;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->repository = new EloquentTransactionRepository;
 });
 
-test('create persists a payment transaction', function () {
+test('create persists a payment transaction', function (): void {
     $transaction = $this->repository->create([
         'reference' => 'REPO_TEST_1',
         'provider' => 'paystack',
@@ -22,7 +22,7 @@ test('create persists a payment transaction', function () {
         ->and($transaction->exists)->toBeTrue();
 });
 
-test('findByReference returns the matching transaction', function () {
+test('findByReference returns the matching transaction', function (): void {
     $this->repository->create([
         'reference' => 'REPO_TEST_2',
         'provider' => 'paystack',
@@ -38,11 +38,11 @@ test('findByReference returns the matching transaction', function () {
         ->and($found->reference)->toBe('REPO_TEST_2');
 });
 
-test('findByReference returns null for an unknown reference', function () {
+test('findByReference returns null for an unknown reference', function (): void {
     expect($this->repository->findByReference('DOES_NOT_EXIST'))->toBeNull();
 });
 
-test('updateIfNotSuccessful applies the update and returns true when pending', function () {
+test('updateIfNotSuccessful applies the update and returns true when pending', function (): void {
     $this->repository->create([
         'reference' => 'REPO_TEST_3',
         'provider' => 'paystack',
@@ -58,7 +58,7 @@ test('updateIfNotSuccessful applies the update and returns true when pending', f
     expect($this->repository->findByReference('REPO_TEST_3')->status)->toBe('success');
 });
 
-test('updateIfNotSuccessful is a no-op once the transaction is already successful', function () {
+test('updateIfNotSuccessful is a no-op once the transaction is already successful', function (): void {
     $this->repository->create([
         'reference' => 'REPO_TEST_4',
         'provider' => 'paystack',
@@ -75,11 +75,11 @@ test('updateIfNotSuccessful is a no-op once the transaction is already successfu
     expect($this->repository->findByReference('REPO_TEST_4')->status)->toBe('success');
 });
 
-test('updateIfNotSuccessful returns false for a reference that does not exist', function () {
+test('updateIfNotSuccessful returns false for a reference that does not exist', function (): void {
     expect($this->repository->updateIfNotSuccessful('NOPE', ['status' => 'success']))->toBeFalse();
 });
 
-test('updateIfNotSuccessful is idempotent under repeated duplicate-webhook-style calls', function () {
+test('updateIfNotSuccessful is idempotent under repeated duplicate-webhook-style calls', function (): void {
     $this->repository->create([
         'reference' => 'REPO_TEST_5',
         'provider' => 'paystack',

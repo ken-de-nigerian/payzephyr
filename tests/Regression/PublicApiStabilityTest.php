@@ -5,7 +5,13 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Tests\Regression;
 
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Http\RedirectResponse;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Facades\Payment;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 use Tests\Helpers\SubscriptionTestHelper;
@@ -43,7 +49,7 @@ class PublicApiStabilityTest extends TestCase
             ->callback('https://example.com/callback')
             ->redirect();
 
-        $this->assertInstanceOf(\Illuminate\Http\RedirectResponse::class, $response);
+        $this->assertInstanceOf(RedirectResponse::class, $response);
     }
 
     /**
@@ -82,7 +88,7 @@ class PublicApiStabilityTest extends TestCase
         // Original verify API - should still work
         $verification = Payment::verify($chargeResponse->reference);
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO::class, $verification);
+        $this->assertInstanceOf(VerificationResponseDTO::class, $verification);
     }
 
     /**
@@ -113,7 +119,7 @@ class PublicApiStabilityTest extends TestCase
             ->with('paystack')
             ->create();
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class, $subscription);
+        $this->assertInstanceOf(SubscriptionResponseDTO::class, $subscription);
     }
 
     /**
@@ -141,7 +147,7 @@ class PublicApiStabilityTest extends TestCase
             ->with('paystack')
             ->fetch();
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class, $subscription);
+        $this->assertInstanceOf(SubscriptionResponseDTO::class, $subscription);
     }
 
     /**
@@ -199,7 +205,7 @@ class PublicApiStabilityTest extends TestCase
         $serialized = serialize($chargeResponse);
         $unserialized = unserialize($serialized);
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $unserialized);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $unserialized);
         $this->assertEquals($chargeResponse->reference, $unserialized->reference);
     }
 
@@ -225,9 +231,9 @@ class PublicApiStabilityTest extends TestCase
     protected function providerSupportsSubscriptions(string $provider): bool
     {
         try {
-            $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
+            $driver = app(PaymentManager::class)->driver($provider);
 
-            return $driver instanceof \KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+            return $driver instanceof SupportsSubscriptionsInterface;
         } catch (\Exception) {
             return false;
         }

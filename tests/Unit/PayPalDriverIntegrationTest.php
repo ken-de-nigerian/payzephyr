@@ -31,7 +31,7 @@ function createPayPalDriverWithMock(array $responses): PayPalDriver
     return $driver;
 }
 
-test('paypal authenticates and charges successfully', function () {
+test('paypal authenticates and charges successfully', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(200, [], json_encode([
             'access_token' => 'A21AAxx',
@@ -55,7 +55,7 @@ test('paypal authenticates and charges successfully', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('paypal charge handles authentication failure', function () {
+test('paypal charge handles authentication failure', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(401, [], json_encode([
             'error' => 'invalid_client',
@@ -66,7 +66,7 @@ test('paypal charge handles authentication failure', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class);
 
-test('paypal charge handles api error', function () {
+test('paypal charge handles api error', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(200, [], json_encode([
             'access_token' => 'token',
@@ -81,7 +81,7 @@ test('paypal charge handles api error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(InvalidArgumentException::class);
 
-test('paypal verify returns success', function () {
+test('paypal verify returns success', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(200, [], json_encode([
             'access_token' => 'token',
@@ -110,7 +110,7 @@ test('paypal verify returns success', function () {
         ->and($result->isSuccessful())->toBeTrue();
 });
 
-test('paypal verify returns pending', function () {
+test('paypal verify returns pending', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(200, [], json_encode(['access_token' => 'token', 'expires_in' => 32400])),
         new Response(200, [], json_encode([
@@ -139,7 +139,7 @@ test('paypal verify returns pending', function () {
     expect($result->isPending())->toBeTrue();
 });
 
-test('paypal verify handles not found', function () {
+test('paypal verify handles not found', function (): void {
     $driver = createPayPalDriverWithMock([
         new Response(200, [], json_encode(['access_token' => 'token', 'expires_in' => 32400])),
         new Response(404, [], json_encode([
@@ -151,7 +151,7 @@ test('paypal verify handles not found', function () {
     $driver->verify('pp_nonexistent');
 })->throws(VerificationException::class);
 
-test('paypal handles network error', function () {
+test('paypal handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/v1/oauth2/token')),
     ]);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 
-test('it can be constructed directly with all properties', function () {
+test('it can be constructed directly with all properties', function (): void {
     $dto = new SubscriptionPlanDTO(
         name: 'Gold Plan',
         amount: 50.0,
@@ -28,7 +28,7 @@ test('it can be constructed directly with all properties', function () {
         ->and($dto->metadata)->toBe(['tier' => 'gold']);
 });
 
-test('it applies default currency and flags', function () {
+test('it applies default currency and flags', function (): void {
     $dto = new SubscriptionPlanDTO(name: 'Basic', amount: 10.0, interval: 'weekly');
 
     expect($dto->currency)->toBe('NGN')
@@ -37,41 +37,41 @@ test('it applies default currency and flags', function () {
         ->and($dto->metadata)->toBe([]);
 });
 
-test('it rejects an empty name', function () {
+test('it rejects an empty name', function (): void {
     new SubscriptionPlanDTO(name: '', amount: 10.0, interval: 'monthly');
 })->throws(InvalidArgumentException::class, 'Plan name is required');
 
-test('it rejects a zero or negative amount', function () {
+test('it rejects a zero or negative amount', function (): void {
     new SubscriptionPlanDTO(name: 'Plan', amount: 0.0, interval: 'monthly');
 })->throws(InvalidArgumentException::class, 'Amount must be greater than zero');
 
-test('it rejects a negative amount', function () {
+test('it rejects a negative amount', function (): void {
     new SubscriptionPlanDTO(name: 'Plan', amount: -5.0, interval: 'monthly');
 })->throws(InvalidArgumentException::class, 'Amount must be greater than zero');
 
-test('it rejects an invalid interval', function () {
+test('it rejects an invalid interval', function (): void {
     new SubscriptionPlanDTO(name: 'Plan', amount: 10.0, interval: 'yearly');
 })->throws(InvalidArgumentException::class);
 
-test('it accepts every valid interval', function (string $interval) {
+test('it accepts every valid interval', function (string $interval): void {
     $dto = new SubscriptionPlanDTO(name: 'Plan', amount: 10.0, interval: $interval);
 
     expect($dto->interval)->toBe($interval);
 })->with(['daily', 'weekly', 'monthly', 'annually']);
 
-test('getAmountInMinorUnits converts and rounds the amount', function () {
+test('getAmountInMinorUnits converts and rounds the amount', function (): void {
     $dto = new SubscriptionPlanDTO(name: 'Plan', amount: 10.005, interval: 'monthly');
 
     expect($dto->getAmountInMinorUnits())->toBe(1001);
 });
 
-test('getAmountInMinorUnits handles whole numbers cleanly', function () {
+test('getAmountInMinorUnits handles whole numbers cleanly', function (): void {
     $dto = new SubscriptionPlanDTO(name: 'Plan', amount: 25.0, interval: 'monthly');
 
     expect($dto->getAmountInMinorUnits())->toBe(2500);
 });
 
-test('fromArray builds a DTO from a full data array', function () {
+test('fromArray builds a DTO from a full data array', function (): void {
     $dto = SubscriptionPlanDTO::fromArray([
         'name' => 'Enterprise',
         'amount' => '99.99',
@@ -95,7 +95,7 @@ test('fromArray builds a DTO from a full data array', function () {
         ->and($dto->metadata)->toBe(['level' => 'enterprise']);
 });
 
-test('fromArray applies defaults for missing optional keys', function () {
+test('fromArray applies defaults for missing optional keys', function (): void {
     $dto = SubscriptionPlanDTO::fromArray(['name' => 'Default Plan', 'amount' => 15]);
 
     expect($dto->name)->toBe('Default Plan')
@@ -109,18 +109,16 @@ test('fromArray applies defaults for missing optional keys', function () {
         ->and($dto->metadata)->toBe([]);
 });
 
-test('fromArray still enforces validation rules', function () {
+test('fromArray still enforces validation rules', function (): void {
     SubscriptionPlanDTO::fromArray(['name' => '', 'amount' => 10]);
 })->throws(InvalidArgumentException::class, 'Plan name is required');
 
-test('toArray filters out null values but keeps false and empty array values', function () {
+test('toArray filters out null values but keeps false and empty array values', function (): void {
     $dto = new SubscriptionPlanDTO(
         name: 'Plan X',
         amount: 20.0,
         interval: 'monthly',
         currency: 'NGN',
-        description: null,
-        invoiceLimit: null,
         sendInvoices: false,
         sendSms: false,
         metadata: [],
@@ -138,7 +136,7 @@ test('toArray filters out null values but keeps false and empty array values', f
         ->and($array)->toHaveKey('send_sms', false);
 });
 
-test('toArray includes all fields when everything is populated', function () {
+test('toArray includes all fields when everything is populated', function (): void {
     $dto = new SubscriptionPlanDTO(
         name: 'Plan Y',
         amount: 30.5,

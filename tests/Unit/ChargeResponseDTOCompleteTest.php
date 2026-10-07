@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 
-test('charge response getNormalizedStatus uses container when available', function () {
+test('charge response getNormalizedStatus uses container when available', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -14,7 +16,7 @@ test('charge response getNormalizedStatus uses container when available', functi
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response getNormalizedStatus falls back to static when container unavailable', function () {
+test('charge response getNormalizedStatus falls back to static when container unavailable', function (): void {
     $response = ChargeResponseDTO::fromArray([
         'reference' => 'ref_123',
         'authorization_url' => 'https://example.com',
@@ -26,7 +28,7 @@ test('charge response getNormalizedStatus falls back to static when container un
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response handles all status variations with normalization', function () {
+test('charge response handles all status variations with normalization', function (): void {
     $statuses = ['success', 'succeeded', 'completed', 'successful', 'paid'];
 
     foreach ($statuses as $status) {

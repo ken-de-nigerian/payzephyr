@@ -11,8 +11,8 @@ use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
  * Throwable. Force the container to throw when resolving StatusNormalizer
  * to exercise the catch block and the static fallback return.
  */
-test('getNormalizedStatus falls back to StatusNormalizer::normalizeStatic when container resolution throws', function () {
-    app()->bind(StatusNormalizer::class, function () {
+test('getNormalizedStatus falls back to StatusNormalizer::normalizeStatic when container resolution throws', function (): void {
+    app()->bind(StatusNormalizer::class, function (): void {
         throw new RuntimeException('container blew up');
     });
 
@@ -26,8 +26,8 @@ test('getNormalizedStatus falls back to StatusNormalizer::normalizeStatic when c
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('isPending falls back to StatusNormalizer::normalizeStatic when container resolution throws', function () {
-    app()->bind(StatusNormalizer::class, function () {
+test('isPending falls back to StatusNormalizer::normalizeStatic when container resolution throws', function (): void {
+    app()->bind(StatusNormalizer::class, function (): void {
         throw new RuntimeException('container blew up');
     });
 
@@ -41,8 +41,8 @@ test('isPending falls back to StatusNormalizer::normalizeStatic when container r
     expect($response->isPending())->toBeTrue();
 });
 
-test('isSuccessful returns false for an unrecognized status even when the container throws', function () {
-    app()->bind(StatusNormalizer::class, function () {
+test('isSuccessful returns false for an unrecognized status even when the container throws', function (): void {
+    app()->bind(StatusNormalizer::class, function (): void {
         throw new RuntimeException('container blew up');
     });
 

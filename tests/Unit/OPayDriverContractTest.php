@@ -10,6 +10,8 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\OPayDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -53,7 +55,7 @@ function opayStatus(array $data): Response
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends OPay its full payload with the merchant\'s headers', function () {
+test('a charge sends OPay its full payload with the merchant\'s headers', function (): void {
     $history = [];
     opayContractDriver([opayCashier()], $history)->charge(opayCharge([
         'metadata' => ['name' => 'Ada', 'description' => 'Order 9'], 'channels' => ['card'], 'idempotencyKey' => 'idem-1',
@@ -81,7 +83,7 @@ test('a charge sends OPay its full payload with the merchant\'s headers', functi
         ->and($request->getHeaderLine('Idempotency-Key'))->toBe('idem-1');
 });
 
-test('a charge without a name, description or callback falls back, and leaves the callbacks out', function () {
+test('a charge without a name, description or callback falls back, and leaves the callbacks out', function (): void {
     $history = [];
     opayContractDriver([opayCashier()], $history)->charge(opayCharge(['callbackUrl' => null]));
 
@@ -92,7 +94,7 @@ test('a charge without a name, description or callback falls back, and leaves th
         ->and($sent)->not->toHaveKeys(['callbackUrl', 'returnUrl', 'cancelUrl', 'payMethod']);
 });
 
-test('a charge without a reference gets one of its own', function () {
+test('a charge without a reference gets one of its own', function (): void {
     $history = [];
     $result = opayContractDriver([opayCashier()], $history)->charge(opayCharge(['reference' => null]));
 
@@ -100,7 +102,7 @@ test('a charge without a reference gets one of its own', function () {
         ->and(json_decode((string) $history[0]['request']->getBody(), true)['reference'])->toBe($result->reference);
 });
 
-test('the checkout link and order are read from whichever field OPay used', function (array $data, string $url, string $order) {
+test('the checkout link and order are read from whichever field OPay used', function (array $data, string $url, string $order): void {
     $result = opayContractDriver([opayCashier($data)])->charge(opayCharge());
 
     expect($result->authorizationUrl)->toBe($url)
@@ -111,15 +113,15 @@ test('the checkout link and order are read from whichever field OPay used', func
     'checkoutUrl, no order' => [['checkoutUrl' => 'https://c/3'], 'https://c/3', 'OPAY_1'],
 ]);
 
-test('an initialized charge is logged with its reference', function () {
+test('an initialized charge is logged with its reference', function (): void {
     $logs = captureLogs();
     opayContractDriver([opayCashier()])->charge(opayCharge());
 
     expect(loggedEntry($logs, 'Charge initialized successfully')['context'])->toBe(['reference' => 'OPAY_1']);
 });
 
-test('a charge OPay does not accept is refused with whichever message it gave', function (string $body, string $message) {
-    expect(fn () => opayContractDriver([new Response(200, [], $body)])->charge(opayCharge()))->toThrow(ChargeException::class, $message);
+test('a charge OPay does not accept is refused with whichever message it gave', function (string $body, string $message): void {
+    expect(fn (): ChargeResponseDTO => opayContractDriver([new Response(200, [], $body)])->charge(opayCharge()))->toThrow(ChargeException::class, $message);
 })->with([
     'message' => ['{"code":"02000","message":"Invalid merchant"}', 'Invalid merchant'],
     'msg' => ['{"code":"02000","msg":"Invalid amount"}', 'Invalid amount'],
@@ -127,7 +129,7 @@ test('a charge OPay does not accept is refused with whichever message it gave', 
     'neither' => ['{"code":"02000"}', 'Failed to initialize OPay payment'],
 ]);
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = opayContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
@@ -152,7 +154,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0, and 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a status request is signed with the secret key and sent for the reference', function () {
+test('a status request is signed with the secret key and sent for the reference', function (): void {
     $history = [];
     opayContractDriver([opayStatus(['status' => 'SUCCESS'])], $history)->verify('OPAY V/1');
 
@@ -165,15 +167,15 @@ test('a status request is signed with the secret key and sent for the reference'
         ->and($request->getHeaderLine('MerchantId'))->toBe('M_1');
 });
 
-test('a status request without a secret key is refused before it is sent', function () {
+test('a status request without a secret key is refused before it is sent', function (): void {
     $history = [];
 
-    expect(fn () => opayContractDriver([], $history, ['secret_key' => ''])->verify('OPAY_X'))
+    expect(fn (): VerificationResponseDTO => opayContractDriver([], $history, ['secret_key' => ''])->verify('OPAY_X'))
         ->toThrow(VerificationException::class, 'OPay secret key (private key) is required for status API authentication')
         ->and($history)->toBe([]);
 });
 
-test('a verified payment is read from whichever field OPay used, and logged', function () {
+test('a verified payment is read from whichever field OPay used, and logged', function (): void {
     $logs = captureLogs();
     $result = opayContractDriver([opayStatus([
         'orderStatus' => 'success', 'orderNo' => 'ORD_V', 'createTime' => 1_759_312_800, 'metadata' => ['order' => 1],
@@ -189,7 +191,7 @@ test('a verified payment is read from whichever field OPay used, and logged', fu
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'OPAY_V', 'status' => 'success']);
 });
 
-test('a verified payment prefers OPay\'s own names when it gives them', function () {
+test('a verified payment prefers OPay\'s own names when it gives them', function (): void {
     $result = opayContractDriver([opayStatus([
         'status' => 'PENDING', 'reference' => 'REF_V', 'orderNo' => 'ORD_V', 'customerEmail' => 'c@d.com', 'customerName' => 'Bo', 'email' => 'x', 'name' => 'y',
     ])])->verify('OPAY_V');
@@ -200,21 +202,21 @@ test('a verified payment prefers OPay\'s own names when it gives them', function
         ->and($result->customer)->toBe(['email' => 'c@d.com', 'name' => 'Bo']);
 });
 
-test('a payment OPay reports no status for, or no reference, is read as unknown and by the one asked for', function () {
+test('a payment OPay reports no status for, or no reference, is read as unknown and by the one asked for', function (): void {
     expect(opayContractDriver([opayStatus([])])->verify('OPAY_ASKED'))
         ->reference->toBe('OPAY_ASKED')
         ->status->toBe('unknown');
 });
 
-test('a verification OPay does not accept is refused with whichever message it gave', function (string $body, string $message) {
-    expect(fn () => opayContractDriver([new Response(200, [], $body)])->verify('OPAY_X'))->toThrow(VerificationException::class, $message);
+test('a verification OPay does not accept is refused with whichever message it gave', function (string $body, string $message): void {
+    expect(fn (): VerificationResponseDTO => opayContractDriver([new Response(200, [], $body)])->verify('OPAY_X'))->toThrow(VerificationException::class, $message);
 })->with([
     'message' => ['{"code":"02001","message":"Order not found"}', 'Order not found'],
     'msg' => ['{"code":"02001","msg":"Bad signature"}', 'Bad signature'],
     'no code' => ['{"message":"No code"}', 'No code'],
 ]);
 
-test('a verification that fails on the way is logged and wrapped, coded 0', function () {
+test('a verification that fails on the way is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -232,13 +234,13 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
 // Webhooks and health
 // ---------------------------------------------------------------------------
 
-test('the signature is read from every header OPay has used', function (string $header) {
+test('the signature is read from every header OPay has used', function (string $header): void {
     $body = '{"payload":{"reference":"OPAY_1"}}';
 
     expect(opayContractDriver([])->validateWebhook([$header => [hash_hmac('sha256', $body, 'OPAYPRV_1')]], $body))->toBeTrue();
 })->with(['x-opay-signature', 'X-OPay-Signature', 'signature', 'Signature']);
 
-test('each webhook outcome is logged, and each refusal is final', function () {
+test('each webhook outcome is logged, and each refusal is final', function (): void {
     $logs = captureLogs();
     $driver = opayContractDriver([]);
     $body = '{"payload":{"reference":"OPAY_1"}}';
@@ -257,7 +259,7 @@ test('each webhook outcome is logged, and each refusal is final', function () {
     ])->and(loggedEntry($logs, 'Webhook validation failed')['context'])->toBe(['valid' => false]);
 });
 
-test('the health check counts OPay\'s 400 and 404 as healthy, and logs anything else', function (int $status, bool $healthy) {
+test('the health check counts OPay\'s 400 and 404 as healthy, and logs anything else', function (int $status, bool $healthy): void {
     $logs = captureLogs();
     $driver = opayContractDriver([new ClientException('Client error', new Request('POST', '/x'), new Response($status))]);
 
@@ -273,7 +275,7 @@ test('the health check counts OPay\'s 400 and 404 as healthy, and logs anything 
     'unauthorized' => [401, false],
 ]);
 
-test('a request without a JSON body still says it is JSON', function () {
+test('a request without a JSON body still says it is JSON', function (): void {
     $history = [];
     opayContractDriver([new Response(200, [], '{}')], $history)->healthCheck();
 

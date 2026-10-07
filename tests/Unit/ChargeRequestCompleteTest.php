@@ -1,24 +1,26 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 
-test('charge request validates amount', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request validates amount', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => -100,
         'currency' => 'NGN',
         'email' => 'test@example.com',
     ]))->toThrow(InvalidArgumentException::class, 'Amount must be greater than zero');
 });
 
-test('charge request rejects zero amount', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request rejects zero amount', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 0,
         'currency' => 'NGN',
         'email' => 'test@example.com',
     ]))->toThrow(InvalidArgumentException::class);
 });
 
-test('charge request accepts decimal amounts', function () {
+test('charge request accepts decimal amounts', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100.50,
         'currency' => 'NGN',
@@ -28,7 +30,7 @@ test('charge request accepts decimal amounts', function () {
     expect($request->amount)->toBe(100.50);
 });
 
-test('charge request accepts large amounts', function () {
+test('charge request accepts large amounts', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 1000000.99,
         'currency' => 'NGN',
@@ -38,23 +40,23 @@ test('charge request accepts large amounts', function () {
     expect($request->amount)->toBe(1000000.99);
 });
 
-test('charge request validates email', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request validates email', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
         'email' => 'invalid-email',
     ]))->toThrow(InvalidArgumentException::class, 'Invalid email address');
 });
 
-test('charge request rejects empty email', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request rejects empty email', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
         'email' => '',
     ]))->toThrow(InvalidArgumentException::class);
 });
 
-test('charge request accepts valid email formats', function () {
+test('charge request accepts valid email formats', function (): void {
     $emails = [
         'simple@example.com',
         'user+tag@example.com',
@@ -74,23 +76,23 @@ test('charge request accepts valid email formats', function () {
     }
 });
 
-test('charge request validates currency format', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request validates currency format', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'INVALID',
         'email' => 'test@example.com',
     ]))->toThrow(InvalidArgumentException::class);
 });
 
-test('charge request rejects empty currency', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('charge request rejects empty currency', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => '',
         'email' => 'test@example.com',
     ]))->toThrow(InvalidArgumentException::class);
 });
 
-test('charge request normalizes currency to uppercase', function () {
+test('charge request normalizes currency to uppercase', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'ngn',
@@ -100,7 +102,7 @@ test('charge request normalizes currency to uppercase', function () {
     expect($request->currency)->toBe('NGN');
 });
 
-test('charge request accepts standard currency codes', function () {
+test('charge request accepts standard currency codes', function (): void {
     $currencies = ['NGN', 'USD', 'EUR', 'GBP', 'KES'];
 
     foreach ($currencies as $currency) {
@@ -114,7 +116,7 @@ test('charge request accepts standard currency codes', function () {
     }
 });
 
-test('charge request converts amount to minor units', function () {
+test('charge request converts amount to minor units', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100.50,
         'currency' => 'NGN',
@@ -124,7 +126,7 @@ test('charge request converts amount to minor units', function () {
     expect($request->getAmountInMinorUnits())->toBe(10050);
 });
 
-test('charge request converts whole numbers to minor units', function () {
+test('charge request converts whole numbers to minor units', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 1000,
         'currency' => 'NGN',
@@ -134,7 +136,7 @@ test('charge request converts whole numbers to minor units', function () {
     expect($request->getAmountInMinorUnits())->toBe(100000);
 });
 
-test('charge request rounds minor units correctly', function () {
+test('charge request rounds minor units correctly', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100.555,
         'currency' => 'NGN',
@@ -144,7 +146,7 @@ test('charge request rounds minor units correctly', function () {
     expect($request->getAmountInMinorUnits())->toBe(10056); // Rounded
 });
 
-test('charge request creates from array', function () {
+test('charge request creates from array', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 5000,
         'currency' => 'NGN',
@@ -160,7 +162,7 @@ test('charge request creates from array', function () {
         ->and($request->metadata)->toBe(['order_id' => 123]);
 });
 
-test('charge request converts to array', function () {
+test('charge request converts to array', function (): void {
     $data = [
         'amount' => 5000,
         'currency' => 'USD',
@@ -181,7 +183,7 @@ test('charge request converts to array', function () {
         ->and($array['callback_url'])->toBe('https://example.com/callback');
 });
 
-test('charge request handles null reference', function () {
+test('charge request handles null reference', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
@@ -191,7 +193,7 @@ test('charge request handles null reference', function () {
     expect($request->reference)->toBeNull();
 });
 
-test('charge request handles null callback url', function () {
+test('charge request handles null callback url', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
@@ -201,7 +203,7 @@ test('charge request handles null callback url', function () {
     expect($request->callbackUrl)->toBeNull();
 });
 
-test('charge request handles empty metadata', function () {
+test('charge request handles empty metadata', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
@@ -211,7 +213,7 @@ test('charge request handles empty metadata', function () {
     expect($request->metadata)->toBe([]);
 });
 
-test('charge request handles complex metadata', function () {
+test('charge request handles complex metadata', function (): void {
     $metadata = [
         'order_id' => 12345,
         'customer_id' => 'cust_123',
@@ -236,7 +238,7 @@ test('charge request handles complex metadata', function () {
     expect($request->metadata)->toBe($metadata);
 });
 
-test('charge request handles customer data', function () {
+test('charge request handles customer data', function (): void {
     $customer = [
         'name' => 'John Doe',
         'phone' => '+2348012345678',
@@ -253,7 +255,7 @@ test('charge request handles customer data', function () {
     expect($request->customer)->toBe($customer);
 });
 
-test('charge request handles description', function () {
+test('charge request handles description', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100,
         'currency' => 'NGN',
@@ -264,7 +266,7 @@ test('charge request handles description', function () {
     expect($request->description)->toBe('Premium subscription payment');
 });
 
-test('charge request handles custom fields', function () {
+test('charge request handles custom fields', function (): void {
     $customFields = [
         ['display_name' => 'Invoice ID', 'variable_name' => 'invoice_id', 'value' => 'INV_123'],
     ];
@@ -279,7 +281,7 @@ test('charge request handles custom fields', function () {
     expect($request->customFields)->toBe($customFields);
 });
 
-test('charge request handles split payment config', function () {
+test('charge request handles split payment config', function (): void {
     $split = [
         'type' => 'percentage',
         'bearer_type' => 'account',
@@ -298,7 +300,7 @@ test('charge request handles split payment config', function () {
     expect($request->split)->toBe($split);
 });
 
-test('charge request is readonly/immutable', function () {
+test('charge request is readonly/immutable', function (): void {
     $request = new ChargeRequestDTO(
         amount: 100,
         currency: 'NGN',

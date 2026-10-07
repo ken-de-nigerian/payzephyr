@@ -6,6 +6,7 @@ use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 use Tests\Helpers\RazorpayDriverTestHelper;
@@ -46,7 +47,7 @@ function razorpayPaymentResponse(array $overrides = []): Response
     ], $overrides)));
 }
 
-test('razorpay refunds the captured payment behind a package reference', function () {
+test('razorpay refunds the captured payment behind a package reference', function (): void {
     // Razorpay's list endpoint returns payments: [] even for a paid link, so
     // the match is re-fetched by id before the captured payment is picked.
     $driver = RazorpayDriverTestHelper::driver([
@@ -83,7 +84,7 @@ test('razorpay refunds the captured payment behind a package reference', functio
         ->and(RefundTransaction::where('refund_reference', 'rfnd_Abc123')->value('transaction_reference'))->toBe('ORDER_1001');
 });
 
-test('razorpay partial refund uses the currency razorpay reports, not config', function () {
+test('razorpay partial refund uses the currency razorpay reports, not config', function (): void {
     $link = RazorpayDriverTestHelper::paymentLink(['currency' => 'KWD', 'amount' => 12340]);
 
     $driver = RazorpayDriverTestHelper::driver([
@@ -106,7 +107,7 @@ test('razorpay partial refund uses the currency razorpay reports, not config', f
         ->and($result->currency)->toBe('KWD');
 });
 
-test('razorpay refunds a pay_ id directly, reading its currency first', function () {
+test('razorpay refunds a pay_ id directly, reading its currency first', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         razorpayPaymentResponse(['id' => 'pay_Jpy123', 'amount' => 1000, 'currency' => 'JPY']),
         razorpayRefundResponse(['amount' => 300, 'currency' => 'JPY', 'payment_id' => 'pay_Jpy123']),
@@ -122,7 +123,7 @@ test('razorpay refunds a pay_ id directly, reading its currency first', function
         ->and($result->amount)->toBe(300.0);
 });
 
-test('razorpay refund refuses an idempotency key razorpay would reject', function () {
+test('razorpay refund refuses an idempotency key razorpay would reject', function (): void {
     // Changed in review: this used to drop the key and send the refund anyway.
     // The caller asked for protection against double-refunding, and a refund
     // sent without it looks identical on the way out - so the request fails
@@ -133,15 +134,15 @@ test('razorpay refund refuses an idempotency key razorpay would reject', functio
         razorpayRefundResponse(),
     ], $history);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(
         transactionReference: 'plink_Abc123', idempotencyKey: 'short'
     )))->toThrow(RefundException::class, 'at least 10 characters');
 
     // Nothing was sent: the payment lookups happened, the refund did not.
-    expect(collect($history)->filter(fn ($h) => $h['request']->getMethod() === 'POST'))->toHaveCount(0);
+    expect(collect($history)->filter(fn ($h): bool => $h['request']->getMethod() === 'POST'))->toHaveCount(0);
 });
 
-test('razorpay refund uses the configured refund speed', function () {
+test('razorpay refund uses the configured refund speed', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(),
@@ -153,18 +154,18 @@ test('razorpay refund uses the configured refund speed', function () {
     expect(json_decode((string) $history[2]['request']->getBody(), true)['speed'])->toBe('optimum');
 });
 
-test('razorpay refund refuses a link with no captured payment', function () {
+test('razorpay refund refuses a link with no captured payment', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink(['status' => 'created', 'payments' => []]))),
     ], $history);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123')))
         ->toThrow(RefundException::class, 'expected exactly one captured Razorpay payment, found 0');
 
     expect($history)->toHaveCount(1);
 });
 
-test('a razorpay lookup that times out before refunding is not an ambiguous refund', function () {
+test('a razorpay lookup that times out before refunding is not an ambiguous refund', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new RequestException('Operation timed out', new Request('GET', '/v1/payment_links')),
     ]);
@@ -181,7 +182,7 @@ test('a razorpay lookup that times out before refunding is not an ambiguous refu
         ->and($exception->isAmbiguousProviderOutcome())->toBeFalse();
 });
 
-test('a razorpay refund request that loses its response is ambiguous', function () {
+test('a razorpay refund request that loses its response is ambiguous', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(),
@@ -199,7 +200,7 @@ test('a razorpay refund request that loses its response is ambiguous', function 
         ->and($exception->isAmbiguousProviderOutcome())->toBeTrue();
 });
 
-test('razorpay refund throws when razorpay rejects it', function () {
+test('razorpay refund throws when razorpay rejects it', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(),
@@ -212,7 +213,7 @@ test('razorpay refund throws when razorpay rejects it', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123', amount: 1000));
 })->throws(RefundException::class, 'Razorpay: The refund amount provided is greater than amount captured');
 
-test('razorpay refund throws when the response has no refund id', function () {
+test('razorpay refund throws when the response has no refund id', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(),
@@ -222,7 +223,7 @@ test('razorpay refund throws when the response has no refund id', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123'));
 })->throws(RefundException::class, 'Razorpay did not return a refund id');
 
-test('a razorpay full refund after a partial one sends only the unrefunded remainder', function () {
+test('a razorpay full refund after a partial one sends only the unrefunded remainder', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
         razorpayPaymentResponse(['amount_refunded' => 20000, 'refund_status' => 'partial']),
@@ -235,7 +236,7 @@ test('a razorpay full refund after a partial one sends only the unrefunded remai
         ->and($result->amount)->toBe(299.5);
 });
 
-test('razorpay refund refuses a fully refunded payment without calling the refund endpoint', function () {
+test('razorpay refund refuses a fully refunded payment without calling the refund endpoint', function (): void {
     // Observed in test mode: after a full refund the link still lists its
     // payment as "captured"; only the payment entity itself says "refunded".
     $driver = RazorpayDriverTestHelper::driver([
@@ -243,13 +244,13 @@ test('razorpay refund refuses a fully refunded payment without calling the refun
         razorpayPaymentResponse(['status' => 'refunded', 'amount_refunded' => 49950]),
     ], $history);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'plink_Abc123')))
         ->toThrow(RefundException::class, 'it is refunded with 0 of 49950 minor units left to refund');
 
     expect($history)->toHaveCount(2);
 });
 
-test('razorpay fetchRefund keeps the package reference on the logged refund', function () {
+test('razorpay fetchRefund keeps the package reference on the logged refund', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'rfnd_Abc123',
         'transaction_reference' => 'ORDER_1001',
@@ -277,7 +278,7 @@ test('razorpay fetchRefund keeps the package reference on the logged refund', fu
         ->and($row->status)->toBe('completed');
 });
 
-test('razorpay fetchRefund falls back to the payment id for refunds made outside PayZephyr', function () {
+test('razorpay fetchRefund falls back to the payment id for refunds made outside PayZephyr', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         razorpayRefundResponse(['notes' => []]),
     ]);
@@ -285,7 +286,7 @@ test('razorpay fetchRefund falls back to the payment id for refunds made outside
     expect($driver->fetchRefund('rfnd_Abc123')->transactionReference)->toBe('pay_Abc123');
 });
 
-test('razorpay fetchRefund throws when the refund does not exist', function () {
+test('razorpay fetchRefund throws when the refund does not exist', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(400, [], json_encode(['error' => ['code' => 'BAD_REQUEST_ERROR', 'description' => 'The id provided does not exist']])),
     ]);

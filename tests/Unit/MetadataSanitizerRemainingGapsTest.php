@@ -2,13 +2,13 @@
 
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 
-test('sanitize returns null once the max recursion depth is exceeded', function () {
+test('sanitize returns null once the max recursion depth is exceeded', function (): void {
     $sanitizer = new MetadataSanitizer;
 
     expect($sanitizer->sanitize('anything', 11))->toBeNull();
 });
 
-test('sanitize preserves boolean values as-is', function () {
+test('sanitize preserves boolean values as-is', function (): void {
     $sanitizer = new MetadataSanitizer;
 
     $sanitized = $sanitizer->sanitize([
@@ -20,7 +20,7 @@ test('sanitize preserves boolean values as-is', function () {
         ->and($sanitized['is_deleted'])->toBeFalse();
 });
 
-test('sanitizeKey rejects keys longer than the max key length', function () {
+test('sanitizeKey rejects keys longer than the max key length', function (): void {
     $sanitizer = new MetadataSanitizer;
     $longKey = str_repeat('a', 256);
 

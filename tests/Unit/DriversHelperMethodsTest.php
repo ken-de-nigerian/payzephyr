@@ -7,7 +7,7 @@ use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 
-test('paystack driver generates unique references', function () {
+test('paystack driver generates unique references', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'test']);
 
     $reflection = new ReflectionClass($driver);
@@ -21,7 +21,7 @@ test('paystack driver generates unique references', function () {
         ->and($ref1)->not->toBe($ref2);
 });
 
-test('flutterwave driver generates unique references', function () {
+test('flutterwave driver generates unique references', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'test']);
 
     $reflection = new ReflectionClass($driver);
@@ -33,7 +33,7 @@ test('flutterwave driver generates unique references', function () {
         ->and($ref)->toContain('FLW_');
 });
 
-test('monnify driver generates unique references', function () {
+test('monnify driver generates unique references', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test',
         'secret_key' => 'test',
@@ -49,7 +49,7 @@ test('monnify driver generates unique references', function () {
         ->and($ref)->toContain('MON_');
 });
 
-test('references contain timestamp and random component', function () {
+test('references contain timestamp and random component', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'test']);
 
     $reflection = new ReflectionClass($driver);
@@ -64,7 +64,7 @@ test('references contain timestamp and random component', function () {
         ->and($parts[1])->toBeNumeric(); // timestamp
 });
 
-test('driver checks currency support correctly', function () {
+test('driver checks currency support correctly', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => ['NGN', 'USD', 'GHS'],
@@ -76,7 +76,7 @@ test('driver checks currency support correctly', function () {
         ->and($driver->isCurrencySupported('JPY'))->toBeFalse();
 });
 
-test('driver currency check is case insensitive', function () {
+test('driver currency check is case insensitive', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => ['NGN', 'USD'],
@@ -88,7 +88,7 @@ test('driver currency check is case insensitive', function () {
         ->and($driver->isCurrencySupported('UsD'))->toBeTrue();
 });
 
-test('driver returns correct supported currencies list', function () {
+test('driver returns correct supported currencies list', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => ['NGN', 'USD', 'GHS', 'ZAR'],
@@ -100,7 +100,7 @@ test('driver returns correct supported currencies list', function () {
         ->and($currencies)->toHaveCount(4);
 });
 
-test('all drivers have currency support method', function () {
+test('all drivers have currency support method', function (): void {
     $drivers = [
         new PaystackDriver(['secret_key' => 'test']),
         new FlutterwaveDriver(['secret_key' => 'test']),
@@ -114,7 +114,7 @@ test('all drivers have currency support method', function () {
     }
 });
 
-test('driver logs info when logging enabled', function () {
+test('driver logs info when logging enabled', function (): void {
     config(['payments.logging.enabled' => true]);
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -127,7 +127,7 @@ test('driver logs info when logging enabled', function () {
     expect(true)->toBeTrue();
 });
 
-test('driver respects logging disabled config', function () {
+test('driver respects logging disabled config', function (): void {
     config(['payments.logging.enabled' => false]);
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -140,7 +140,7 @@ test('driver respects logging disabled config', function () {
     expect(true)->toBeTrue();
 });
 
-test('driver logs with different levels', function () {
+test('driver logs with different levels', function (): void {
     config(['payments.logging.enabled' => true]);
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -157,7 +157,7 @@ test('driver logs with different levels', function () {
     expect(true)->toBeTrue();
 });
 
-test('driver logs with context data', function () {
+test('driver logs with context data', function (): void {
     config(['payments.logging.enabled' => true]);
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -176,7 +176,7 @@ test('driver logs with context data', function () {
     expect(true)->toBeTrue();
 });
 
-test('driver caches health check results', function () {
+test('driver caches health check results', function (): void {
     config(['payments.health_check.cache_ttl' => 300]);
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -189,7 +189,7 @@ test('driver caches health check results', function () {
         ->and($result1)->toBe($result2); // Should be cached
 });
 
-test('driver health check cache respects ttl', function () {
+test('driver health check cache respects ttl', function (): void {
     config(['payments.health_check.cache_ttl' => 1]); // 1 second
 
     $driver = new PaystackDriver(['secret_key' => 'test']);
@@ -199,7 +199,7 @@ test('driver health check cache respects ttl', function () {
     expect($result1)->toBeBool();
 });
 
-test('all drivers have health check method', function () {
+test('all drivers have health check method', function (): void {
     $drivers = [
         new PaystackDriver(['secret_key' => 'test']),
         new FlutterwaveDriver(['secret_key' => 'test']),
@@ -213,7 +213,7 @@ test('all drivers have health check method', function () {
     }
 });
 
-test('driver returns correct name', function () {
+test('driver returns correct name', function (): void {
     $drivers = [
         ['driver' => new PaystackDriver(['secret_key' => 'test']), 'name' => 'paystack'],
         ['driver' => new FlutterwaveDriver(['secret_key' => 'test']), 'name' => 'flutterwave'],
@@ -227,7 +227,7 @@ test('driver returns correct name', function () {
     }
 });
 
-test('driver initializes http client', function () {
+test('driver initializes http client', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'base_url' => 'https://api.paystack.co',
@@ -241,7 +241,7 @@ test('driver initializes http client', function () {
     expect($client)->toBeInstanceOf(Client::class);
 });
 
-test('driver http client has correct base url', function () {
+test('driver http client has correct base url', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'test',
         'base_url' => 'https://api.flutterwave.com/v3',
@@ -255,7 +255,7 @@ test('driver http client has correct base url', function () {
     expect($client)->toBeInstanceOf(Client::class);
 });
 
-test('driver http client has default timeout', function () {
+test('driver http client has default timeout', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'timeout' => 30,
@@ -269,7 +269,7 @@ test('driver http client has default timeout', function () {
     expect($client)->toBeInstanceOf(Client::class);
 });
 
-test('driver http client always verifies TLS certificates, regardless of config (ADR-0002)', function () {
+test('driver http client always verifies TLS certificates, regardless of config (ADR-0002)', function (): void {
     // testing_mode used to be able to disable Guzzle's cert verification via
     // config, which was a production MITM risk if ever misconfigured. It was
     // removed entirely - 'verify' is now hardcoded true. Passing the old key
@@ -289,7 +289,7 @@ test('driver http client always verifies TLS certificates, regardless of config 
         ->and($client->getConfig('verify'))->toBeTrue();
 });
 
-test('driver stores configuration', function () {
+test('driver stores configuration', function (): void {
     $config = [
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -304,11 +304,11 @@ test('driver stores configuration', function () {
     expect($property->getValue($driver))->toBe($config);
 });
 
-test('driver validates required configuration on construction', function () {
+test('driver validates required configuration on construction', function (): void {
     expect(true)->toBeTrue(); // Already tested in DriversTest
 });
 
-test('driver handles empty currency list', function () {
+test('driver handles empty currency list', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => [],
@@ -318,7 +318,7 @@ test('driver handles empty currency list', function () {
         ->and($driver->isCurrencySupported('NGN'))->toBeFalse();
 });
 
-test('driver handles null currency check', function () {
+test('driver handles null currency check', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => ['NGN'],
@@ -327,7 +327,7 @@ test('driver handles null currency check', function () {
     expect($driver->isCurrencySupported(''))->toBeFalse();
 });
 
-test('reference generation handles custom prefix', function () {
+test('reference generation handles custom prefix', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'test']);
 
     $reflection = new ReflectionClass($driver);
@@ -338,7 +338,7 @@ test('reference generation handles custom prefix', function () {
     expect($ref)->toContain('CUSTOM_');
 });
 
-test('driver handles missing base url gracefully', function () {
+test('driver handles missing base url gracefully', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'test',
     ]);

@@ -3,13 +3,20 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Support\Facades\Cache;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use Tests\Helpers\RefundTestHelper;
 use Tests\Helpers\SubscriptionTestHelper;
 
@@ -33,7 +40,7 @@ function tracedPayload(string $reference, TraceEvent $event): array
     return (array) PaymentTraceEvent::where('reference', $reference)->where('event', $event->value)->firstOrFail()->payload;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.features.trace' => true,
         'payments.trace.async' => false,
@@ -46,7 +53,7 @@ beforeEach(function () {
 // Refunds
 // ---------------------------------------------------------------------------
 
-test('a refund is recorded on the payment it refunds, with its provider round trip', function () {
+test('a refund is recorded on the payment it refunds, with its provider round trip', function (): void {
     config(['payments.refunds.validation.enabled' => false]);
     $refund = RefundTestHelper::createWithMock([RefundTestHelper::refundMock(9001, ['status' => 'pending'])]);
 
@@ -63,7 +70,7 @@ test('a refund is recorded on the payment it refunds, with its provider round tr
     ]);
 });
 
-test('an instant refund also records the payment as refunded', function () {
+test('an instant refund also records the payment as refunded', function (): void {
     config(['payments.refunds.validation.enabled' => false]);
     $refund = RefundTestHelper::createWithMock([RefundTestHelper::refundMock(9002, ['status' => 'processed'])]);
 
@@ -73,56 +80,56 @@ test('an instant refund also records the payment as refunded', function () {
         ->and(tracedEvents('PAY_REF_2'))->toContain('payment.refunded');
 });
 
-test('a refund the provider rejects is recorded as failed, and not as ambiguous', function () {
+test('a refund the provider rejects is recorded as failed, and not as ambiguous', function (): void {
     config(['payments.refunds.validation.enabled' => false]);
     $refund = RefundTestHelper::createWithMock([
         new Response(200, [], (string) json_encode(['status' => false, 'message' => 'Transaction has been fully reversed'])),
     ]);
 
-    expect(fn () => $refund->with('paystack')->transaction('PAY_REF_3')->amount(50)->refund())->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $refund->with('paystack')->transaction('PAY_REF_3')->amount(50)->refund())->toThrow(RefundException::class);
 
     expect(tracedEvents('PAY_REF_3'))->toContain('refund.failed')
         ->and(tracedPayload('PAY_REF_3', TraceEvent::REFUND_FAILED))->toMatchArray(['stage' => 'provider', 'ambiguous' => false]);
 });
 
-test('a refund whose response was lost is recorded as ambiguous', function () {
+test('a refund whose response was lost is recorded as ambiguous', function (): void {
     // The provider may have refunded anyway. A timeline that says "failed"
     // would send someone to refund the customer a second time.
     config(['payments.refunds.validation.enabled' => false]);
     $refund = RefundTestHelper::createWithMock([
-        new \GuzzleHttp\Exception\RequestException('connection reset', new Request('POST', '/refund')),
+        new RequestException('connection reset', new Request('POST', '/refund')),
     ]);
 
-    expect(fn () => $refund->with('paystack')->transaction('PAY_REF_4')->amount(50)->refund())->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $refund->with('paystack')->transaction('PAY_REF_4')->amount(50)->refund())->toThrow(RefundException::class);
 
     expect(tracedPayload('PAY_REF_4', TraceEvent::REFUND_FAILED)['ambiguous'])->toBeTrue();
 });
 
-test('a refund that fails validation is recorded at the validation stage', function () {
+test('a refund that fails validation is recorded at the validation stage', function (): void {
     config(['payments.refunds.validation.enabled' => true]);
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'PAY_REF_5', 'provider' => 'paystack', 'status' => 'success',
         'amount' => 10, 'currency' => 'NGN', 'email' => 'a@b.test',
     ]);
     $refund = RefundTestHelper::createWithMock([]);
 
-    expect(fn () => $refund->with('paystack')->transaction('PAY_REF_5')->amount(500)->refund())->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
+    expect(fn (): RefundResponseDTO => $refund->with('paystack')->transaction('PAY_REF_5')->amount(500)->refund())->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
 
     expect(tracedEvents('PAY_REF_5'))->toBe(['refund.requested', 'refund.failed'])
         ->and(tracedPayload('PAY_REF_5', TraceEvent::REFUND_FAILED)['stage'])->toBe('validation');
 });
 
-test('a second refund while the first is in flight is recorded as rejected', function () {
+test('a second refund while the first is in flight is recorded as rejected', function (): void {
     config(['payments.refunds.validation.enabled' => false]);
-    Illuminate\Support\Facades\Cache::add('payzephyr:refund:inflight:PAY_REF_6', true, 60);
+    Cache::add('payzephyr:refund:inflight:PAY_REF_6', true, 60);
     $refund = RefundTestHelper::createWithMock([]);
 
-    expect(fn () => $refund->with('paystack')->transaction('PAY_REF_6')->amount(50)->refund())->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $refund->with('paystack')->transaction('PAY_REF_6')->amount(50)->refund())->toThrow(RefundException::class);
 
     expect(tracedEvents('PAY_REF_6'))->toBe(['refund.requested', 'refund.duplicate_rejected']);
 });
 
-test('a refund completed by webhook is recorded on the payment, once', function () {
+test('a refund completed by webhook is recorded on the payment, once', function (): void {
     $payload = ['event' => 'refund.processed', 'data' => ['id' => 9007, 'status' => 'processed', 'transaction' => ['reference' => 'PAY_REF_7']]];
 
     app()->call([new ProcessWebhook('paystack', $payload), 'handle']);
@@ -131,7 +138,7 @@ test('a refund completed by webhook is recorded on the payment, once', function 
     expect(array_count_values(tracedEvents('PAY_REF_7'))['payment.refunded'] ?? 0)->toBe(1);
 });
 
-test('a refund failure reported by webhook is recorded on the payment at the settlement stage', function () {
+test('a refund failure reported by webhook is recorded on the payment at the settlement stage', function (): void {
     app()->call([new ProcessWebhook('paystack', ['event' => 'refund.failed', 'data' => [
         'id' => 9008, 'status' => 'failed', 'transaction' => ['reference' => 'PAY_REF_8'], 'reason' => 'Bank rejected',
     ]]), 'handle']);
@@ -143,7 +150,7 @@ test('a refund failure reported by webhook is recorded on the payment at the set
 // Subscriptions
 // ---------------------------------------------------------------------------
 
-test('a subscription cancellation is recorded on the subscription with its provider round trips', function () {
+test('a subscription cancellation is recorded on the subscription with its provider round trips', function (): void {
     config(['payments.subscriptions.validation.enabled' => false]);
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], (string) json_encode(['status' => true, 'message' => 'Subscription disabled successfully'])),
@@ -158,7 +165,7 @@ test('a subscription cancellation is recorded on the subscription with its provi
         ->and(tracedPayload('SUB_TRACE_1', TraceEvent::SUBSCRIPTION_CANCELLED)['status'])->toBe('cancelled');
 });
 
-test('a subscription re-enable is recorded, and a failed one names the operation', function () {
+test('a subscription re-enable is recorded, and a failed one names the operation', function (): void {
     config(['payments.subscriptions.validation.enabled' => false]);
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], (string) json_encode(['status' => true, 'message' => 'Subscription enabled successfully'])),
@@ -169,11 +176,11 @@ test('a subscription re-enable is recorded, and a failed one names the operation
     $subscription->with('paystack')->code('SUB_TRACE_2')->token('tok_email_confirm_2')->enable();
     expect(tracedEvents('SUB_TRACE_2'))->toContain('subscription.enabled');
 
-    expect(fn () => $subscription->with('paystack')->code('SUB_TRACE_2')->token('tok_email_confirm_2')->enable())->toThrow(SubscriptionException::class);
+    expect(fn (): SubscriptionResponseDTO => $subscription->with('paystack')->code('SUB_TRACE_2')->token('tok_email_confirm_2')->enable())->toThrow(SubscriptionException::class);
     expect(tracedPayload('SUB_TRACE_2', TraceEvent::SUBSCRIPTION_OPERATION_FAILED)['operation'])->toBe('enable');
 });
 
-test('a subscription creation is recorded under the code the provider returned', function () {
+test('a subscription creation is recorded under the code the provider returned', function (): void {
     config(['payments.subscriptions.validation.enabled' => false]);
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], (string) json_encode(['status' => true, 'data' => [
@@ -187,7 +194,7 @@ test('a subscription creation is recorded under the code the provider returned',
     expect(tracedEvents('SUB_TRACE_3'))->toBe(['subscription.created']);
 });
 
-test('subscription lifecycle webhooks are recorded on the subscription', function (string $event, string $expected) {
+test('subscription lifecycle webhooks are recorded on the subscription', function (string $event, string $expected): void {
     app()->call([new ProcessWebhook('paystack', ['event' => $event, 'data' => [
         'subscription_code' => 'SUB_TRACE_WEBHOOK', 'status' => 'active', 'reference' => 'INV_1',
     ]]), 'handle']);
@@ -204,7 +211,7 @@ test('subscription lifecycle webhooks are recorded on the subscription', functio
 // Synchronous signature rejections
 // ---------------------------------------------------------------------------
 
-test('a webhook rejected for its signature is recorded on the payment it names, without its body', function () {
+test('a webhook rejected for its signature is recorded on the payment it names, without its body', function (): void {
     config(['payments.webhook.verify_signature' => true]);
     app()->forgetInstance('payments.config');
     $body = (string) json_encode(['event' => 'charge.success', 'data' => ['reference' => 'PAY_FORGED', 'amount' => 999999]]);
@@ -221,7 +228,7 @@ test('a webhook rejected for its signature is recorded on the payment it names, 
         ->and(json_encode($payload))->not->toContain('999999');
 });
 
-test('a rejected webhook whose body is not JSON is still rejected, with nothing to record against', function () {
+test('a rejected webhook whose body is not JSON is still rejected, with nothing to record against', function (): void {
     config(['payments.webhook.verify_signature' => true]);
     app()->forgetInstance('payments.config');
 
@@ -231,16 +238,16 @@ test('a rejected webhook whose body is not JSON is still rejected, with nothing 
         ->and(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a rejected webhook whose body breaks the driver\'s reference extraction is still just rejected', function () {
+test('a rejected webhook whose body breaks the driver\'s reference extraction is still just rejected', function (): void {
     // The body is whatever a forger sent. A custom driver's extraction
     // throwing on a hostile shape must not turn a clean 403 into a 500.
     config(['payments.webhook.verify_signature' => true]);
     app()->forgetInstance('payments.config');
 
-    $driver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $driver = Mockery::mock(DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturnFalse();
     $driver->shouldReceive('extractWebhookReference')->andThrow(new TypeError('Cannot access offset of type string on string'));
-    injectFakeDrivers(app(\KenDeNigerian\PayZephyr\PaymentManager::class), ['acmepay' => $driver]);
+    injectFakeDrivers(app(PaymentManager::class), ['acmepay' => $driver]);
 
     $request = makeWebhookRequestFor('acmepay', '{"data":"not-an-object"}');
 

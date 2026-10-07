@@ -30,11 +30,11 @@ function paystackRemainingGapsDriver(array $responses): PaystackDriver
     return $driver;
 }
 
-test('paystack driver throws invalid configuration exception when secret key is missing', function () {
+test('paystack driver throws invalid configuration exception when secret key is missing', function (): void {
     new PaystackDriver(['currencies' => ['NGN']]);
 })->throws(InvalidConfigurationException::class, 'Paystack secret key is required');
 
-test('paystack driver charge throws when body reports status false with a 200 response', function () {
+test('paystack driver charge throws when body reports status false with a 200 response', function (): void {
     // A non-2xx HTTP status is converted into a ChargeException by
     // AbstractDriver::makeRequest() before parseResponse() ever runs, so the
     // explicit `if (! ($data['status'] ?? false))` body check in charge()
@@ -50,7 +50,7 @@ test('paystack driver charge throws when body reports status false with a 200 re
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'Duplicate transaction reference');
 
-test('paystack driver names the field Paystack omitted rather than blaming PHP', function () {
+test('paystack driver names the field Paystack omitted rather than blaming PHP', function (): void {
     // status: true, but the 'data' object is missing 'access_code'. This used
     // to pass null into ChargeResponseDTO's non-nullable `string $accessCode`,
     // raising a TypeError that the generic catch rewrapped as "Payment
@@ -69,7 +69,7 @@ test('paystack driver names the field Paystack omitted rather than blaming PHP',
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'omitted the required field [access_code]');
 
-test('a charge that failed on an unreadable response still warns that it may have landed', function () {
+test('a charge that failed on an unreadable response still warns that it may have landed', function (): void {
     // The important half of that message. A malformed response says nothing
     // about whether Paystack accepted the request - so the exception must not
     // read as "this did not happen".
@@ -83,7 +83,7 @@ test('a charge that failed on an unreadable response still warns that it may hav
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'verify before retrying');
 
-test('paystack driver verify throws when body reports status false with a 200 response', function () {
+test('paystack driver verify throws when body reports status false with a 200 response', function (): void {
     $driver = paystackRemainingGapsDriver([
         new Response(200, [], json_encode([
             'status' => false,
@@ -94,7 +94,7 @@ test('paystack driver verify throws when body reports status false with a 200 re
     $driver->verify('ref_not_found');
 })->throws(VerificationException::class, 'Transaction reference not found');
 
-test('paystack driver healthCheck returns true when a ClientException carries a 400/404 response', function () {
+test('paystack driver healthCheck returns true when a ClientException carries a 400/404 response', function (): void {
     // Unlike the Mockery-based ClientException test in
     // PaystackDriverCoverageTest (which throws directly from the mocked
     // client), this drives the exception through the real Guzzle client so

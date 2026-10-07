@@ -1,14 +1,15 @@
 <?php
 
 /** @noinspection ALL */
-
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
+use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.logging.enabled' => false,
 
@@ -27,7 +28,7 @@ beforeEach(function () {
     ]);
 });
 
-test('webhook controller queues webhook processing', function () {
+test('webhook controller queues webhook processing', function (): void {
     Queue::fake();
 
     $controller = app(WebhookController::class);
@@ -41,7 +42,7 @@ test('webhook controller queues webhook processing', function () {
         ],
     ];
 
-    $baseRequest = \Illuminate\Http\Request::create('/payments/webhook/paystack', 'POST', $payload);
+    $baseRequest = Request::create('/payments/webhook/paystack', 'POST', $payload);
     $request = $baseRequest;
     $request->headers->set('Content-Type', 'application/json');
 
@@ -49,9 +50,9 @@ test('webhook controller queues webhook processing', function () {
     $signature = hash_hmac('sha512', $body, 'test_secret_key');
     $request->headers->set('x-paystack-signature', $signature);
 
-    $request = new class($request, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($request, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -82,23 +83,21 @@ test('webhook controller queues webhook processing', function () {
     $response = $controller->handle($request, 'paystack');
 
     expect($response->getStatusCode())->toBe(202); // 202 Accepted for queued
-    Queue::assertPushed(ProcessWebhook::class, function ($job) {
-        return $job->provider === 'paystack'
-            && isset($job->payload['event']);
-    });
+    Queue::assertPushed(ProcessWebhook::class, fn ($job): bool => $job->provider === 'paystack'
+        && isset($job->payload['event']));
 });
 
-test('webhook controller rejects invalid signature via form request', function () {
+test('webhook controller rejects invalid signature via form request', function (): void {
     config(['payments.webhook.verify_signature' => true]);
 
     $payload = ['event' => 'charge.success', 'data' => ['reference' => 'ref_123']];
-    $baseRequest = \Illuminate\Http\Request::create('/payments/webhook/paystack', 'POST', $payload);
+    $baseRequest = Request::create('/payments/webhook/paystack', 'POST', $payload);
     $baseRequest->headers->set('x-paystack-signature', 'invalid_signature_here');
 
     $body = json_encode(['event' => 'charge.success']);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -129,20 +128,18 @@ test('webhook controller rejects invalid signature via form request', function (
     expect($request->authorize())->toBeFalse();
 });
 
-test('webhook controller bypasses signature verification when disabled', function () {
+test('webhook controller bypasses signature verification when disabled', function (): void {
     Queue::fake();
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
 
     $payload = ['event' => 'charge.success', 'data' => ['reference' => 'ref_123']];
-    $baseRequest = \Illuminate\Http\Request::create('/payments/webhook/paystack', 'POST', $payload);
+    $baseRequest = Request::create('/payments/webhook/paystack', 'POST', $payload);
 
     $body = json_encode($payload);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -155,7 +152,6 @@ test('webhook controller bypasses signature verification when disabled', functio
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -175,16 +171,14 @@ test('webhook controller bypasses signature verification when disabled', functio
     Queue::assertPushed(ProcessWebhook::class);
 });
 
-test('webhook controller handles invalid provider gracefully', function () {
+test('webhook controller handles invalid provider gracefully', function (): void {
     Queue::fake();
     $controller = app(WebhookController::class);
 
     $baseRequest = Request::create('/payments/webhook/invalid_provider', 'POST', []);
     $body = json_encode([]);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -197,7 +191,6 @@ test('webhook controller handles invalid provider gracefully', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -218,7 +211,7 @@ test('webhook controller handles invalid provider gracefully', function () {
     Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job): bool => $job->headers === []);
 });
 
-test('webhook controller handles exceptions during processing', function () {
+test('webhook controller handles exceptions during processing', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
@@ -228,10 +221,8 @@ test('webhook controller handles exceptions during processing', function () {
     ]);
 
     $body = json_encode(['malformed' => 'data']);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -244,7 +235,6 @@ test('webhook controller handles exceptions during processing', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -265,7 +255,7 @@ test('webhook controller handles exceptions during processing', function () {
     expect($response->getStatusCode())->toBeIn([202, 500]);
 });
 
-test('webhook controller dispatches both provider-specific and general events', function () {
+test('webhook controller dispatches both provider-specific and general events', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
@@ -277,10 +267,8 @@ test('webhook controller dispatches both provider-specific and general events', 
     $baseRequest = Request::create('/payments/webhook/flutterwave', 'POST', $payload);
 
     $body = json_encode($payload);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -293,7 +281,6 @@ test('webhook controller dispatches both provider-specific and general events', 
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -312,10 +299,10 @@ test('webhook controller dispatches both provider-specific and general events', 
     $response = $controller->handle($request, 'flutterwave');
 
     expect($response->getStatusCode())->toBe(202);
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class);
+    Event::assertDispatched(WebhookReceived::class);
 });
 
-test('webhook controller handles flutterwave webhook with valid signature', function () {
+test('webhook controller handles flutterwave webhook with valid signature', function (): void {
     $controller = app(WebhookController::class);
 
     $payload = [
@@ -330,9 +317,9 @@ test('webhook controller handles flutterwave webhook with valid signature', func
     $baseRequest->headers->set('verif-hash', 'webhook_secret');
 
     $body = json_encode($payload);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -370,10 +357,10 @@ test('webhook controller handles flutterwave webhook with valid signature', func
     $response = $controller->handle($request, 'flutterwave');
 
     expect($response->getStatusCode())->toBe(202);
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class);
+    Event::assertDispatched(WebhookReceived::class);
 });
 
-test('webhook controller logs webhook processing', function () {
+test('webhook controller logs webhook processing', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
@@ -383,10 +370,8 @@ test('webhook controller logs webhook processing', function () {
     ]);
 
     $body = json_encode(['event' => 'charge.success']);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -399,7 +384,6 @@ test('webhook controller logs webhook processing', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -420,17 +404,15 @@ test('webhook controller logs webhook processing', function () {
     expect($response->getStatusCode())->toBe(202);
 });
 
-test('webhook controller handles empty payload', function () {
+test('webhook controller handles empty payload', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
 
     $baseRequest = Request::create('/payments/webhook/paystack', 'POST', []);
     $body = json_encode([]);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -443,7 +425,6 @@ test('webhook controller handles empty payload', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -464,7 +445,7 @@ test('webhook controller handles empty payload', function () {
     expect($response->getStatusCode())->toBeIn([202, 500]);
 });
 
-test('webhook controller handles complex nested payload', function () {
+test('webhook controller handles complex nested payload', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $controller = app(WebhookController::class);
@@ -495,10 +476,8 @@ test('webhook controller handles complex nested payload', function () {
     $baseRequest = Request::create('/payments/webhook/paystack', 'POST', $payload);
 
     $body = json_encode($payload);
-    $request = new class($baseRequest, $body) extends \KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest
+    $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -511,7 +490,6 @@ test('webhook controller handles complex nested payload', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -531,7 +509,5 @@ test('webhook controller handles complex nested payload', function () {
 
     expect($response->getStatusCode())->toBe(202);
 
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class, function ($event) {
-        return $event->provider === 'paystack';
-    });
+    Event::assertDispatched(WebhookReceived::class, fn ($event): bool => $event->provider === 'paystack');
 });

@@ -15,7 +15,7 @@ use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 use KenDeNigerian\PayZephyr\Services\PayloadRedactor;
 use KenDeNigerian\PayZephyr\Services\TraceRecorder;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -48,7 +48,7 @@ function recordableEvent(array $overrides = []): TraceEventDTO
 // Writing
 // ---------------------------------------------------------------------------
 
-test('recording persists the event and returns the row', function () {
+test('recording persists the event and returns the row', function (): void {
     $model = recorder()->record(recordableEvent([
         'provider' => 'stripe',
         'payload' => ['amount' => 5000],
@@ -65,7 +65,7 @@ test('recording persists the event and returns the row', function () {
         ->and(PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->count())->toBe(1);
 });
 
-test('the stored event and direction come back as enums', function () {
+test('the stored event and direction come back as enums', function (): void {
     $model = recorder()->record(recordableEvent([
         'event' => TraceEvent::PROVIDER_REQUEST_SENT,
         'direction' => TraceDirection::OUTBOUND,
@@ -78,7 +78,7 @@ test('the stored event and direction come back as enums', function () {
         ->and($fresh->direction)->toBe(TraceDirection::OUTBOUND);
 });
 
-test('sensitive payload fields are redacted before they reach the database', function () {
+test('sensitive payload fields are redacted before they reach the database', function (): void {
     recorder()->record(recordableEvent([
         'payload' => ['amount' => 5000, 'cvv' => '123'],
     ]));
@@ -92,7 +92,7 @@ test('sensitive payload fields are redacted before they reach the database', fun
         ->and($stored->payload['amount'])->toBe(5000);
 });
 
-test('trace rows are append-only, so recording twice keeps both steps', function () {
+test('trace rows are append-only, so recording twice keeps both steps', function (): void {
     recorder()->record(recordableEvent(['event' => TraceEvent::PAYMENT_INITIATED]));
     recorder()->record(recordableEvent(['event' => TraceEvent::PAYMENT_COMPLETED]));
 
@@ -103,7 +103,7 @@ test('trace rows are append-only, so recording twice keeps both steps', function
 // The master switch
 // ---------------------------------------------------------------------------
 
-test('nothing is written while tracing is disabled', function () {
+test('nothing is written while tracing is disabled', function (): void {
     config(['payments.features.trace' => false]);
 
     $result = recorder()->record(recordableEvent());
@@ -112,7 +112,7 @@ test('nothing is written while tracing is disabled', function () {
         ->and(PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->count())->toBe(0);
 });
 
-test('tracing is off unless it has been switched on', function () {
+test('tracing is off unless it has been switched on', function (): void {
     config(['payments.features' => []]);
 
     expect(recorder()->record(recordableEvent()))->toBeNull();
@@ -122,7 +122,7 @@ test('tracing is off unless it has been switched on', function () {
 // Asynchronous recording
 // ---------------------------------------------------------------------------
 
-test('in async mode the write is queued rather than performed inline', function () {
+test('in async mode the write is queued rather than performed inline', function (): void {
     Queue::fake();
     config(['payments.trace.async' => true]);
 
@@ -134,7 +134,7 @@ test('in async mode the write is queued rather than performed inline', function 
     Queue::assertPushed(RecordTraceEvent::class);
 });
 
-test('the queued job writes the row when it runs', function () {
+test('the queued job writes the row when it runs', function (): void {
     config(['payments.trace.async' => true]);
 
     recorder()->record(recordableEvent(['payload' => ['amount' => 5000]]));
@@ -142,7 +142,7 @@ test('the queued job writes the row when it runs', function () {
     expect(PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->count())->toBe(1);
 });
 
-test('the payload is already redacted by the time it reaches the queue', function () {
+test('the payload is already redacted by the time it reaches the queue', function (): void {
     config(['payments.trace.async' => true]);
 
     recorder()->record(recordableEvent(['payload' => ['cvv' => '123']]));
@@ -152,7 +152,7 @@ test('the payload is already redacted by the time it reaches the queue', functio
     expect($stored->payload)->toBe(['cvv' => PayloadRedactor::REDACTED]);
 });
 
-test('the job honours the configured queue connection and name', function () {
+test('the job honours the configured queue connection and name', function (): void {
     Queue::fake();
     config([
         'payments.trace.async' => true,
@@ -162,25 +162,21 @@ test('the job honours the configured queue connection and name', function () {
 
     recorder()->record(recordableEvent());
 
-    Queue::assertPushed(RecordTraceEvent::class, function (RecordTraceEvent $job): bool {
-        return $job->connection === 'redis' && $job->queue === 'traces';
-    });
+    Queue::assertPushed(RecordTraceEvent::class, fn (RecordTraceEvent $job): bool => $job->connection === 'redis' && $job->queue === 'traces');
 });
 
-test('with no queue configured the job goes to the default queue', function () {
+test('with no queue configured the job goes to the default queue', function (): void {
     Queue::fake();
     config(['payments.trace.async' => true]);
 
     recorder()->record(recordableEvent());
 
-    Queue::assertPushed(RecordTraceEvent::class, function (RecordTraceEvent $job): bool {
-        return $job->connection === null && $job->queue === 'default';
-    });
+    Queue::assertPushed(RecordTraceEvent::class, fn (RecordTraceEvent $job): bool => $job->connection === null && $job->queue === 'default');
 });
 
-test('a failed recording job reports the event it could not write', function () {
+test('a failed recording job reports the event it could not write', function (): void {
     $logged = [];
-    Log::listen(function (MessageLogged $message) use (&$logged) {
+    Log::listen(function (MessageLogged $message) use (&$logged): void {
         $logged[] = $message;
     });
 
@@ -199,7 +195,7 @@ test('a failed recording job reports the event it could not write', function () 
 // Correlation
 // ---------------------------------------------------------------------------
 
-test('each correlation group gets its own identifier', function () {
+test('each correlation group gets its own identifier', function (): void {
     $first = recorder()->startCorrelation();
     $second = recorder()->startCorrelation();
 
@@ -207,7 +203,7 @@ test('each correlation group gets its own identifier', function () {
         ->and($first)->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/');
 });
 
-test('a correlation id survives the round trip to the database', function () {
+test('a correlation id survives the round trip to the database', function (): void {
     $correlationId = recorder()->startCorrelation();
 
     recorder()->record(recordableEvent(['correlationId' => $correlationId]));
@@ -221,17 +217,17 @@ test('a correlation id survives the round trip to the database', function () {
 // Wiring
 // ---------------------------------------------------------------------------
 
-test('the container resolves the recorder contract to the real recorder', function () {
+test('the container resolves the recorder contract to the real recorder', function (): void {
     expect(app(TraceRecorderInterface::class))->toBeInstanceOf(TraceRecorder::class);
 });
 
-test('the Trace facade records through the container binding', function () {
+test('the Trace facade records through the container binding', function (): void {
     Trace::record(recordableEvent());
 
     expect(PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->count())->toBe(1);
 });
 
-test('the trace table name is configurable', function () {
+test('the trace table name is configurable', function (): void {
     expect((new PaymentTraceEvent)->getTable())->toBe('payment_trace_events');
 
     config(['payments.trace.table' => 'custom_trace_events']);
@@ -240,7 +236,7 @@ test('the trace table name is configurable', function () {
     expect((new PaymentTraceEvent)->getTable())->toBe('custom_trace_events');
 });
 
-test('the trace connection is configurable so the table can live elsewhere', function () {
+test('the trace connection is configurable so the table can live elsewhere', function (): void {
     expect((new PaymentTraceEvent)->getConnectionName())->toBe('testing');
 
     config([

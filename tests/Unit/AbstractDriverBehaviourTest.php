@@ -18,6 +18,7 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
@@ -29,7 +30,7 @@ use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
  * PaystackDriver stands in for "a driver"; nothing here is Paystack's own.
  */
 
-beforeEach(function () {
+beforeEach(function (): void {
     config(['payments.features.trace' => true, 'payments.trace.async' => false, 'payments.trace.record_http_bodies' => true]);
     app()->forgetInstance('payments.config');
 });
@@ -64,7 +65,7 @@ function driverTrace(TraceEvent $event): PaymentTraceEvent
 // Sending a request
 // ---------------------------------------------------------------------------
 
-test('a request carries the idempotency key unless the caller set the header itself', function (array $headers, string $expected) {
+test('a request carries the idempotency key unless the caller set the header itself', function (array $headers, string $expected): void {
     $history = [];
     $driver = driverWith([new Response(200, [], '{}')], history: $history);
     (new ReflectionClass($driver))->getProperty('currentRequest')->setValue($driver, new ChargeRequestDTO(
@@ -79,9 +80,9 @@ test('a request carries the idempotency key unless the caller set the header its
     'set by the caller' => [['Idempotency-Key' => 'idem-from-caller'], 'idem-from-caller'],
 ]);
 
-test('a request and its response are recorded with their bodies, address and timing', function () {
+test('a request and its response are recorded with their bodies, address and timing', function (): void {
     Carbon::setTestNow('2026-10-01 12:00:00.000');
-    $driver = driverWith([function () {
+    $driver = driverWith([function (): Response {
         Carbon::setTestNow(now()->addMilliseconds(250));
 
         return new Response(201, [], '{"status":true,"data":{"id":7}}');
@@ -103,7 +104,7 @@ test('a request and its response are recorded with their bodies, address and tim
     Carbon::setTestNow();
 });
 
-test('the recorded address is the base URL joined to the path, or the path when it is already absolute', function (?string $base, string $uri, string $expected) {
+test('the recorded address is the base URL joined to the path, or the path when it is already absolute', function (?string $base, string $uri, string $expected): void {
     $driver = driverWith([new Response(200, [], '{}')], ['base_url' => $base]);
 
     callDriver($driver, 'makeRequest', 'GET', $uri);
@@ -117,10 +118,10 @@ test('the recorded address is the base URL joined to the path, or the path when 
     'no base URL' => [null, 'charges', 'charges'],
 ]);
 
-test('a failed request is recorded and logged by what failed, and raised with where it was going', function (Throwable $failure, TraceEvent $event, string $errorType) {
+test('a failed request is recorded and logged by what failed, and raised with where it was going', function (Throwable $failure, TraceEvent $event, string $errorType): void {
     Carbon::setTestNow('2026-10-01 12:00:00.000');
     $logs = captureLogs();
-    $driver = driverWith([function () use ($failure) {
+    $driver = driverWith([function () use ($failure): void {
         Carbon::setTestNow(now()->addMilliseconds(40));
 
         throw $failure;
@@ -153,16 +154,16 @@ test('a failed request is recorded and logged by what failed, and raised with wh
 // Reading a response
 // ---------------------------------------------------------------------------
 
-test('a response missing a required field says which, and that the request may have gone through', function () {
+test('a response missing a required field says which, and that the request may have gone through', function (): void {
     $driver = driverWith([]);
 
-    expect(fn () => callDriver($driver, 'requireField', [], 'reference', 'verify'))->toThrow(
+    expect(fn (): mixed => callDriver($driver, 'requireField', [], 'reference', 'verify'))->toThrow(
         ChargeException::class,
         '[paystack] omitted the required field [reference] from its verify response. The request may still have been accepted by the provider - verify before retrying.'
     );
 });
 
-test('a response missing an amount says it will not report zero', function () {
+test('a response missing an amount says it will not report zero', function (): void {
     $driver = driverWith([]);
 
     try {
@@ -177,7 +178,7 @@ test('a response missing an amount says it will not report zero', function () {
     test()->fail('Expected a ChargeException.');
 });
 
-test('a response field of the wrong type is reported with the field and operation', function (string $method, array $data, string $message) {
+test('a response field of the wrong type is reported with the field and operation', function (string $method, array $data, string $message): void {
     $driver = driverWith([]);
 
     try {
@@ -196,7 +197,7 @@ test('a response field of the wrong type is reported with the field and operatio
     'array' => ['requireArray', ['field' => 'x'], '[paystack] returned a non-array value for [field] in its charge response.'],
 ]);
 
-test('a response body is decoded to the array it holds, and anything else to an empty one', function (string $body, array $expected) {
+test('a response body is decoded to the array it holds, and anything else to an empty one', function (string $body, array $expected): void {
     expect(callDriver(driverWith([]), 'parseResponse', new Response(200, [], $body)))->toBe($expected);
 })->with([
     'object' => ['{"status":true,"data":{"id":1}}', ['status' => true, 'data' => ['id' => 1]]],
@@ -209,13 +210,13 @@ test('a response body is decoded to the array it holds, and anything else to an 
 // Small services
 // ---------------------------------------------------------------------------
 
-test('only the configured currencies that are strings are supported, as a list', function () {
+test('only the configured currencies that are strings are supported, as a list', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN', 5, null, 'USD']]);
 
     expect($driver->getSupportedCurrencies())->toBe(['NGN', 'USD']);
 });
 
-test('a generated reference is the prefix, the time and sixteen random hex digits', function () {
+test('a generated reference is the prefix, the time and sixteen random hex digits', function (): void {
     Carbon::setTestNow('2026-10-01 12:00:00');
 
     expect(callDriver(driverWith([]), 'generateReference', 'PZ'))->toMatch('/^PZ_\d{10}_[0-9a-f]{16}$/');
@@ -223,7 +224,7 @@ test('a generated reference is the prefix, the time and sixteen random hex digit
     Carbon::setTestNow();
 });
 
-test('the health check is cached per provider, for as long as configured', function (?int $ttl, int $expectedTtl, bool $healthy) {
+test('the health check is cached per provider, for as long as configured', function (?int $ttl, int $expectedTtl, bool $healthy): void {
     config(['payments.health_check.cache_ttl' => $ttl]);
     app()->forgetInstance('payments.config');
 
@@ -238,7 +239,7 @@ test('the health check is cached per provider, for as long as configured', funct
     'default' => [null, PaymentConstants::HEALTH_CHECK_CACHE_TTL_SECONDS, true],
 ]);
 
-test('a status normalizer or channel mapper set on the driver is the one it uses', function () {
+test('a status normalizer or channel mapper set on the driver is the one it uses', function (): void {
     $driver = driverWith([]);
     $normalizer = (new StatusNormalizer)->registerProviderMappings('paystack', ['from-custom-normalizer' => ['PAID']]);
     $mapper = new ChannelMapper;
@@ -250,17 +251,17 @@ test('a status normalizer or channel mapper set on the driver is the one it uses
         ->and(callDriver($driver, 'getChannelMapper'))->toBe($mapper);
 });
 
-test('channels are not mapped for a provider that does not take them', function () {
+test('channels are not mapped for a provider that does not take them', function (): void {
     $driver = driverWith([]);
     (new ReflectionClass($driver))->getProperty('name')->setValue($driver, 'acme');
 
     expect(callDriver($driver, 'mapChannels', new ChargeRequestDTO(amount: 10, currency: 'NGN', email: 'a@b.com', channels: ['card'])))->toBeNull();
 });
 
-test('a required credential that is missing fails rather than reading as an empty string', function () {
+test('a required credential that is missing fails rather than reading as an empty string', function (): void {
     $driver = driverWith([]);
     (new ReflectionClass($driver))->getProperty('config')->setValue($driver, ['secret_key' => '']);
 
-    expect(fn () => callDriver($driver, 'requiredCredential', 'secret_key'))
-        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class, '[paystack] secret_key is not configured.');
+    expect(fn (): mixed => callDriver($driver, 'requiredCredential', 'secret_key'))
+        ->toThrow(InvalidConfigurationException::class, '[paystack] secret_key is not configured.');
 });

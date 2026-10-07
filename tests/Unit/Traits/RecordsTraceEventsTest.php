@@ -38,12 +38,12 @@ function tracingSubject(): object
     };
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.features.trace' => true, 'payments.trace.async' => false]);
 });
 
-test('a step with no reference to hang off is dropped silently', function () {
+test('a step with no reference to hang off is dropped silently', function (): void {
     // A webhook whose body PayZephyr could not parse has nothing to key a
     // timeline with. That is a normal outcome, not a fault worth reporting.
     tracingSubject()->record(null);
@@ -52,7 +52,7 @@ test('a step with no reference to hang off is dropped silently', function () {
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a reference that could never key a timeline is dropped, not thrown', function () {
+test('a reference that could never key a timeline is dropped, not thrown', function (): void {
     // On the webhook path this value comes out of a provider payload. If the
     // DTO's refusal escaped here, a malformed body would take down webhook
     // handling through the tracing code.
@@ -61,8 +61,8 @@ test('a reference that could never key a timeline is dropped, not thrown', funct
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a container that cannot produce a recorder does not take the payment with it', function () {
-    app()->bind(TraceRecorderInterface::class, function () {
+test('a container that cannot produce a recorder does not take the payment with it', function (): void {
+    app()->bind(TraceRecorderInterface::class, function (): void {
         throw new RuntimeException('container is broken');
     });
 
@@ -71,28 +71,28 @@ test('a container that cannot produce a recorder does not take the payment with 
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a correlation id falls back to none rather than failing', function () {
-    app()->bind(TraceRecorderInterface::class, function () {
+test('a correlation id falls back to none rather than failing', function (): void {
+    app()->bind(TraceRecorderInterface::class, function (): void {
         throw new RuntimeException('container is broken');
     });
 
     expect(tracingSubject()->correlation())->toBe('');
 });
 
-test('a correlation id is minted when the recorder is available', function () {
+test('a correlation id is minted when the recorder is available', function (): void {
     expect(tracingSubject()->correlation())
         ->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/');
 });
 
-test('body capture is refused when the config cannot be read', function () {
-    app()->bind('payments.config', function () {
+test('body capture is refused when the config cannot be read', function (): void {
+    app()->bind('payments.config', function (): void {
         throw new RuntimeException('config is broken');
     });
 
     expect(tracingSubject()->bodiesAllowed())->toBeFalse();
 });
 
-test('body capture is refused whenever tracing itself is off', function () {
+test('body capture is refused whenever tracing itself is off', function (): void {
     // Callers use this to decide whether to read a response body at all, so
     // with tracing off it has to say no regardless of the body setting.
     config(['payments.features.trace' => false, 'payments.trace.record_http_bodies' => true]);
@@ -101,18 +101,18 @@ test('body capture is refused whenever tracing itself is off', function () {
     expect(tracingSubject()->bodiesAllowed())->toBeFalse();
 });
 
-test('body capture is on by default once tracing is on', function () {
+test('body capture is on by default once tracing is on', function (): void {
     expect(tracingSubject()->bodiesAllowed())->toBeTrue();
 });
 
-test('body capture can be switched off on its own', function () {
+test('body capture can be switched off on its own', function (): void {
     config(['payments.trace.record_http_bodies' => false]);
     app()->forgetInstance('payments.config');
 
     expect(tracingSubject()->bodiesAllowed())->toBeFalse();
 });
 
-test('body capture switched off with the string an env file produces is off', function (string $off) {
+test('body capture switched off with the string an env file produces is off', function (string $off): void {
     // "false" is a truthy string; it used to leave provider request and
     // response bodies being recorded after the operator had turned that off.
     config(['payments.trace.record_http_bodies' => $off]);
@@ -121,7 +121,7 @@ test('body capture switched off with the string an env file produces is off', fu
     expect(tracingSubject()->bodiesAllowed())->toBeFalse();
 })->with(['false', 'off', '0']);
 
-test('a well-formed step is recorded through the container binding', function () {
+test('a well-formed step is recorded through the container binding', function (): void {
     tracingSubject()->record('PZ_1755000000_abcdef01', TraceEvent::PAYMENT_COMPLETED);
 
     expect(PaymentTraceEvent::where('reference', 'PZ_1755000000_abcdef01')->sole()->event)

@@ -3,8 +3,11 @@
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
 /**
@@ -46,7 +49,7 @@ function createSquareDriverForRemainingGaps(array $responses, array $config = []
     return $driver;
 }
 
-test('square driver verify falls through to payment link lookup and returns its result', function () {
+test('square driver verify falls through to payment link lookup and returns its result', function (): void {
     // 24 chars, does not start with "payment_" and length !== 32, so
     // verifyByPaymentId() short-circuits to null without any HTTP call.
     $reference = 'JE6RV44VZEML32Z2ABCDEFG';
@@ -89,7 +92,7 @@ test('square driver verify falls through to payment link lookup and returns its 
         ->and($result->amount)->toBe(150.0);
 });
 
-test('square driver verify surfaces a detailed message for non-404 client errors', function () {
+test('square driver verify surfaces a detailed message for non-404 client errors', function (): void {
     // Starts with "payment_" so verifyByPaymentId() attempts the direct lookup.
     $reference = 'payment_abc123';
 
@@ -101,62 +104,59 @@ test('square driver verify surfaces a detailed message for non-404 client errors
         ])),
     ]);
 
-    expect(fn () => $driver->verify($reference))
+    expect(fn (): VerificationResponseDTO => $driver->verify($reference))
         ->toThrow(VerificationException::class, 'Payment verification failed: Malformed payment id');
 });
 
-test('square driver verify wraps unexpected non-Guzzle throwables', function () {
+test('square driver verify wraps unexpected non-Guzzle throwables', function (): void {
     $reference = 'payment_abc123';
 
     $driver = createSquareDriverForRemainingGaps([
         new \RuntimeException('unexpected boom'),
     ]);
 
-    expect(fn () => $driver->verify($reference))
+    expect(fn (): VerificationResponseDTO => $driver->verify($reference))
         ->toThrow(VerificationException::class, 'Payment verification failed: unexpected boom');
 });
 
-test('square driver verifyByPaymentId returns null when response has no payment key', function () {
+test('square driver verifyByPaymentId returns null when response has no payment key', function (): void {
     $driver = createSquareDriverForRemainingGaps([
         new Response(200, [], json_encode(['foo' => 'bar'])),
     ]);
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('verifyByPaymentId');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, 'payment_abc123');
 
     expect($result)->toBeNull();
 });
 
-test('square driver getOrderById throws VerificationException when order is missing', function () {
+test('square driver getOrderById throws VerificationException when order is missing', function (): void {
     $driver = createSquareDriverForRemainingGaps([
         new Response(200, [], json_encode(['foo' => 'bar'])),
     ]);
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('getOrderById');
-    $method->setAccessible(true);
 
-    expect(fn () => $method->invoke($driver, 'order_missing'))
+    expect(fn (): mixed => $method->invoke($driver, 'order_missing'))
         ->toThrow(VerificationException::class, 'Order not found for ID [order_missing]');
 });
 
-test('square driver getPaymentFromOrder throws VerificationException when payment_id is missing', function () {
+test('square driver getPaymentFromOrder throws VerificationException when payment_id is missing', function (): void {
     $driver = createSquareDriverForRemainingGaps([]);
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('getPaymentFromOrder');
-    $method->setAccessible(true);
 
     $order = ['tenders' => [['amount' => 1000]]];
 
-    expect(fn () => $method->invoke($driver, $order, 'order_456'))
+    expect(fn (): mixed => $method->invoke($driver, $order, 'order_456'))
         ->toThrow(VerificationException::class, 'Payment ID not found for order [order_456]');
 });
 
-test('square driver validateWebhook rejects a valid signature with an unrecognized timestamp (replay protection)', function () {
+test('square driver validateWebhook rejects a valid signature with an unrecognized timestamp (replay protection)', function (): void {
     $driver = createSquareDriverForRemainingGaps([]);
 
     // Valid signature, but no recognizable timestamp field in the body.
@@ -168,7 +168,7 @@ test('square driver validateWebhook rejects a valid signature with an unrecogniz
     expect($result)->toBeFalse();
 });
 
-test('square verify reports payment not found when the order search itself is not found', function () {
+test('square verify reports payment not found when the order search itself is not found', function (): void {
     // Neither a payment id nor a payment link: the reference falls through
     // to the order search, and a 404 there is a clean "not found" rather
     // than a generic verification failure.
@@ -186,7 +186,7 @@ test('square verify reports payment not found when the order search itself is no
     }
 });
 
-test('square verify reports a server error from the order search as a verification failure', function () {
+test('square verify reports a server error from the order search as a verification failure', function (): void {
     $driver = createSquareDriverForRemainingGaps([
         new Response(404, [], (string) json_encode(['errors' => [['code' => 'NOT_FOUND']]])),
         new Response(503, [], '{}'),
@@ -198,7 +198,7 @@ test('square verify reports a server error from the order search as a verificati
     } catch (VerificationException $e) {
         expect($e->getMessage())->toStartWith('Payment verification failed: ')
             ->and($e->getMessage())->not->toBe('Payment not found')
-            ->and($e->getPrevious())->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+            ->and($e->getPrevious())->toBeInstanceOf(ChargeException::class);
     }
 });
 
@@ -232,21 +232,21 @@ function squareSignedBody(): string
     ]);
 }
 
-test('square accepts a signature over the configured notification url and the body', function () {
+test('square accepts a signature over the configured notification url and the body', function (): void {
     $body = squareSignedBody();
     $signature = base64_encode(hash_hmac('sha256', 'https://shop.example.com/payments/webhook/square'.$body, 'sq_sig_key', true));
 
     expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeTrue();
 });
 
-test('square rejects a signature over the body alone', function () {
+test('square rejects a signature over the body alone', function (): void {
     $body = squareSignedBody();
     $bodyOnly = base64_encode(hash_hmac('sha256', $body, 'sq_sig_key', true));
 
     expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$bodyOnly]], $body))->toBeFalse();
 });
 
-test('square rejects a signature made for a different notification url', function () {
+test('square rejects a signature made for a different notification url', function (): void {
     // Square signs the URL registered in its dashboard. A trailing slash, a
     // different host or http instead of https is a different signature.
     $body = squareSignedBody();
@@ -255,14 +255,14 @@ test('square rejects a signature made for a different notification url', functio
     expect(squareSignatureDriver()->validateWebhook(['x-square-hmacsha256-signature' => [$signature]], $body))->toBeFalse();
 });
 
-test('square does not accept the legacy x-square-signature header in place of the sha256 one', function () {
+test('square does not accept the legacy x-square-signature header in place of the sha256 one', function (): void {
     $body = squareSignedBody();
     $signature = base64_encode(hash_hmac('sha256', 'https://shop.example.com/payments/webhook/square'.$body, 'sq_sig_key', true));
 
     expect(squareSignatureDriver()->validateWebhook(['x-square-signature' => [$signature]], $body))->toBeFalse();
 });
 
-test('square signs against the package webhook route when no notification url is configured', function () {
+test('square signs against the package webhook route when no notification url is configured', function (): void {
     $body = squareSignedBody();
     $signature = base64_encode(hash_hmac('sha256', route('payments.webhook', ['provider' => 'square']).$body, 'sq_sig_key', true));
 
@@ -279,7 +279,7 @@ test('square signs against the package webhook route when no notification url is
 function squareSearchDriver(array $responses, array &$history, array $config = []): SquareDriver
 {
     $stack = HandlerStack::create(new MockHandler($responses));
-    $stack->push(GuzzleHttp\Middleware::history($history));
+    $stack->push(Middleware::history($history));
 
     $driver = new SquareDriver(array_merge([
         'access_token' => 'test_token',
@@ -299,20 +299,20 @@ function squareNotFound(): Response
 function squareOrdersPage(array $referenceIds, ?string $cursor): Response
 {
     return new Response(200, [], (string) json_encode(array_filter([
-        'orders' => array_map(fn (string $ref) => ['id' => 'order_'.$ref, 'reference_id' => $ref], $referenceIds),
+        'orders' => array_map(fn (string $ref): array => ['id' => 'order_'.$ref, 'reference_id' => $ref], $referenceIds),
         'cursor' => $cursor,
-    ], fn ($value) => $value !== null)));
+    ], fn ($value): bool => $value !== null)));
 }
 
 function squareSearchBodies(array $history): array
 {
     return array_values(array_map(
-        fn (array $entry) => json_decode((string) $entry['request']->getBody(), true),
-        array_filter($history, fn (array $entry) => str_ends_with($entry['request']->getUri()->getPath(), '/v2/orders/search'))
+        fn (array $entry): mixed => json_decode((string) $entry['request']->getBody(), true),
+        array_filter($history, fn (array $entry): bool => str_ends_with($entry['request']->getUri()->getPath(), '/v2/orders/search'))
     ));
 }
 
-test('square finds an order on a later page of the search by following the cursor', function () {
+test('square finds an order on a later page of the search by following the cursor', function (): void {
     $history = [];
     $driver = squareSearchDriver([
         squareNotFound(), // payment link lookup
@@ -334,7 +334,7 @@ test('square finds an order on a later page of the search by following the curso
         ->and($searches[1]['cursor'])->toBe('cursor_page_2');
 });
 
-test('square reports not found once the search runs out of orders', function () {
+test('square reports not found once the search runs out of orders', function (): void {
     $history = [];
     $driver = squareSearchDriver([
         squareNotFound(),
@@ -342,11 +342,11 @@ test('square reports not found once the search runs out of orders', function () 
         squareOrdersPage([], null),
     ], $history);
 
-    expect(fn () => $driver->verify('SQ_MISSING'))
+    expect(fn (): VerificationResponseDTO => $driver->verify('SQ_MISSING'))
         ->toThrow(VerificationException::class, 'Payment not found for reference [SQ_MISSING]');
 });
 
-test('square stops after the configured number of pages and says how far back it looked', function () {
+test('square stops after the configured number of pages and says how far back it looked', function (): void {
     $history = [];
     $driver = squareSearchDriver([
         squareNotFound(),
@@ -355,24 +355,24 @@ test('square stops after the configured number of pages and says how far back it
         squareOrdersPage(['E'], 'c4'), // never requested
     ], $history, ['verify_search_pages' => 2]);
 
-    expect(fn () => $driver->verify('SQ_OLD'))
+    expect(fn (): VerificationResponseDTO => $driver->verify('SQ_OLD'))
         ->toThrow(VerificationException::class, 'in the 4 most recent Square orders');
 
     expect(squareSearchBodies($history))->toHaveCount(2);
 });
 
-test('a page limit that is not a positive number still searches one page', function () {
+test('a page limit that is not a positive number still searches one page', function (): void {
     $history = [];
     $driver = squareSearchDriver([
         squareNotFound(),
         squareOrdersPage(['A'], 'c2'),
     ], $history, ['verify_search_pages' => 0]);
 
-    expect(fn () => $driver->verify('SQ_X'))->toThrow(VerificationException::class, 'in the 1 most recent Square orders');
+    expect(fn (): VerificationResponseDTO => $driver->verify('SQ_X'))->toThrow(VerificationException::class, 'in the 1 most recent Square orders');
     expect(squareSearchBodies($history))->toHaveCount(1);
 });
 
-test('square searches ten pages of five hundred orders by default', function () {
+test('square searches ten pages of five hundred orders by default', function (): void {
     $history = [];
     $pages = [squareNotFound()];
     foreach (range(1, 11) as $page) {
@@ -381,7 +381,7 @@ test('square searches ten pages of five hundred orders by default', function () 
 
     $driver = squareSearchDriver($pages, $history);
 
-    expect(fn () => $driver->verify('SQ_OLD'))
+    expect(fn (): VerificationResponseDTO => $driver->verify('SQ_OLD'))
         ->toThrow(VerificationException::class, 'in the 10 most recent Square orders');
 
     $searches = squareSearchBodies($history);

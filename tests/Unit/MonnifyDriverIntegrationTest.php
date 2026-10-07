@@ -31,7 +31,7 @@ function createMonnifyDriverWithMock(array $responses): MonnifyDriver
     return $driver;
 }
 
-test('monnify authenticates and charges successfully', function () {
+test('monnify authenticates and charges successfully', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -57,7 +57,7 @@ test('monnify authenticates and charges successfully', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('monnify charge handles authentication failure', function () {
+test('monnify charge handles authentication failure', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(401, [], json_encode([
             'requestSuccessful' => false,
@@ -68,7 +68,7 @@ test('monnify charge handles authentication failure', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
-test('monnify charge handles api error', function () {
+test('monnify charge handles api error', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -83,7 +83,7 @@ test('monnify charge handles api error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
-test('monnify verify returns success', function () {
+test('monnify verify returns success', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -109,7 +109,7 @@ test('monnify verify returns success', function () {
         ->and($result->isSuccessful())->toBeTrue();
 });
 
-test('monnify verify returns pending', function () {
+test('monnify verify returns pending', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -131,7 +131,7 @@ test('monnify verify returns pending', function () {
     expect($result->isPending())->toBeTrue();
 });
 
-test('monnify verify handles not found', function () {
+test('monnify verify handles not found', function (): void {
     $driver = createMonnifyDriverWithMock([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -146,7 +146,7 @@ test('monnify verify handles not found', function () {
     $driver->verify('mn_nonexistent');
 })->throws(VerificationException::class);
 
-test('monnify handles network error during charge', function () {
+test('monnify handles network error during charge', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/api/v1/auth/login')),
     ]);

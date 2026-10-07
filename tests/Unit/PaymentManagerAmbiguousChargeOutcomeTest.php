@@ -34,7 +34,7 @@ function makeGuzzleThrowingPaystackDriver(Throwable $throwOnRequest): PaystackDr
     return $driver;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -58,7 +58,7 @@ function makeStandardChargeRequest(): ChargeRequestDTO
     ]);
 }
 
-test('a connection failure (request never transmitted) safely falls back to the next provider', function () {
+test('a connection failure (request never transmitted) safely falls back to the next provider', function (): void {
     $request = new Request('POST', 'https://api.paystack.co/transaction/initialize');
     $primary = makeGuzzleThrowingPaystackDriver(
         new ConnectException('Could not resolve host', $request)
@@ -74,14 +74,14 @@ test('a connection failure (request never transmitted) safely falls back to the 
         ->and($secondary->chargeCalls)->toBe(1);
 });
 
-test('a lost response after the request was sent does not fall back to another provider', function () {
+test('a lost response after the request was sent does not fall back to another provider', function (): void {
     // Regression: RequestException with no response (e.g. a read timeout
     // after the connection succeeded) means the provider may have already
     // received and processed the charge. Falling back to a different
     // provider here risks a duplicate charge.
     $request = new Request('POST', 'https://api.paystack.co/transaction/initialize');
     $primary = makeGuzzleThrowingPaystackDriver(
-        new RequestException('cURL error 28: Operation timed out', $request, null)
+        new RequestException('cURL error 28: Operation timed out', $request)
     );
     $secondary = makeCountingSuccessDriver('stripe');
 
@@ -101,7 +101,7 @@ test('a lost response after the request was sent does not fall back to another p
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a definitive error response from the provider safely falls back to the next provider', function () {
+test('a definitive error response from the provider safely falls back to the next provider', function (): void {
     // A real HTTP response (even an error one) means the provider actively
     // participated in the exchange and gave a definitive answer - safe to
     // try elsewhere, matching existing behaviour.
@@ -121,13 +121,13 @@ test('a definitive error response from the provider safely falls back to the nex
         ->and($secondary->chargeCalls)->toBe(1);
 });
 
-test('ChargeException::isAmbiguousProviderOutcome is false when there is no underlying network exception', function () {
+test('ChargeException::isAmbiguousProviderOutcome is false when there is no underlying network exception', function (): void {
     $exception = new ChargeException('Invalid API key');
 
     expect($exception->isAmbiguousProviderOutcome())->toBeFalse();
 });
 
-test('ChargeException::isAmbiguousProviderOutcome is true for a Stripe SDK connection failure', function () {
+test('ChargeException::isAmbiguousProviderOutcome is true for a Stripe SDK connection failure', function (): void {
     $stripeException = new ApiConnectionException('Could not connect to Stripe');
     $exception = new ChargeException('Stripe charge failed', 0, $stripeException);
 

@@ -19,7 +19,7 @@ function makeMollieRefundDriver(array $responses): MollieDriver
     return $driver;
 }
 
-test('mollie refund succeeds with valid response', function () {
+test('mollie refund succeeds with valid response', function (): void {
     $driver = makeMollieRefundDriver([
         new Response(200, [], json_encode([
             'id' => 're_123',
@@ -38,7 +38,7 @@ test('mollie refund succeeds with valid response', function () {
         ->and($result->provider)->toBe('mollie');
 });
 
-test('mollie refund throws exception on api error', function () {
+test('mollie refund throws exception on api error', function (): void {
     $driver = makeMollieRefundDriver([
         new Response(422, [], json_encode(['status' => 422, 'title' => 'Unprocessable Entity', 'detail' => 'Refund amount exceeds remaining balance'])),
     ]);
@@ -46,7 +46,7 @@ test('mollie refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'tr_abc', amount: 999.00));
 })->throws(RefundException::class);
 
-test('mollie fetchRefund succeeds with a composite reference', function () {
+test('mollie fetchRefund succeeds with a composite reference', function (): void {
     $driver = makeMollieRefundDriver([
         new Response(200, [], json_encode([
             'id' => 're_123',
@@ -62,7 +62,7 @@ test('mollie fetchRefund succeeds with a composite reference', function () {
         ->and($result->status)->toBe('refunded');
 });
 
-test('mollie fetchRefund rejects a malformed reference', function () {
+test('mollie fetchRefund rejects a malformed reference', function (): void {
     $driver = makeMollieRefundDriver([]);
 
     $driver->fetchRefund('not-a-composite-reference');

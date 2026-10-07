@@ -23,13 +23,13 @@ function activePlan(string $planCode = 'PLN_1'): PlanResponseDTO
     );
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     config(['payments.subscriptions.prevent_duplicates' => false]);
     app()->forgetInstance('payments.config');
     $this->validator = new SubscriptionValidator;
 });
 
-test('validateCreation passes when the plan is active and duplicate prevention is disabled', function () {
+test('validateCreation passes when the plan is active and duplicate prevention is disabled', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
 
     $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
@@ -38,7 +38,7 @@ test('validateCreation passes when the plan is active and duplicate prevention i
     $this->validator->validateCreation($request, $driver);
 })->throwsNoExceptions();
 
-test('validateCreation throws when the plan is inactive', function () {
+test('validateCreation throws when the plan is inactive', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
 
     $inactivePlan = new PlanResponseDTO(
@@ -56,7 +56,7 @@ test('validateCreation throws when the plan is inactive', function () {
     $this->validator->validateCreation($request, $driver);
 })->throws(SubscriptionException::class, 'is not active');
 
-test('validateCreation wraps a fetchPlan failure in a SubscriptionException', function () {
+test('validateCreation wraps a fetchPlan failure in a SubscriptionException', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
 
     $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
@@ -65,7 +65,7 @@ test('validateCreation wraps a fetchPlan failure in a SubscriptionException', fu
     $this->validator->validateCreation($request, $driver);
 })->throws(SubscriptionException::class, 'Failed to verify plan');
 
-test('validateCreation throws when the authorization code is shorter than 10 characters', function () {
+test('validateCreation throws when the authorization code is shorter than 10 characters', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1', authorization: 'short');
 
     $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
@@ -74,7 +74,7 @@ test('validateCreation throws when the authorization code is shorter than 10 cha
     $this->validator->validateCreation($request, $driver);
 })->throws(SubscriptionException::class, 'Invalid authorization code format');
 
-test('validateCreation passes when the authorization code is at least 10 characters', function () {
+test('validateCreation passes when the authorization code is at least 10 characters', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1', authorization: 'AUTH_1234567890');
 
     $driver = Mockery::mock(SupportsSubscriptionsInterface::class);
@@ -83,7 +83,7 @@ test('validateCreation passes when the authorization code is at least 10 charact
     $this->validator->validateCreation($request, $driver);
 })->throwsNoExceptions();
 
-test('validateCreation throws when duplicate prevention is enabled and an active subscription to the same plan exists', function () {
+test('validateCreation throws when duplicate prevention is enabled and an active subscription to the same plan exists', function (): void {
     config(['payments.subscriptions.prevent_duplicates' => true]);
     app()->forgetInstance('payments.config');
 
@@ -98,7 +98,7 @@ test('validateCreation throws when duplicate prevention is enabled and an active
     $this->validator->validateCreation($request, $driver);
 })->throws(SubscriptionException::class, 'already has an active subscription');
 
-test('validateCreation passes when duplicate prevention is enabled but no existing subscription matches the plan', function () {
+test('validateCreation passes when duplicate prevention is enabled but no existing subscription matches the plan', function (): void {
     config(['payments.subscriptions.prevent_duplicates' => true]);
     app()->forgetInstance('payments.config');
 
@@ -116,7 +116,7 @@ test('validateCreation passes when duplicate prevention is enabled but no existi
     $this->validator->validateCreation($request, $driver);
 })->throwsNoExceptions();
 
-test('validateCreation swallows a non-fatal failure while checking for duplicate subscriptions', function () {
+test('validateCreation swallows a non-fatal failure while checking for duplicate subscriptions', function (): void {
     config(['payments.subscriptions.prevent_duplicates' => true]);
     app()->forgetInstance('payments.config');
 
@@ -129,7 +129,7 @@ test('validateCreation swallows a non-fatal failure while checking for duplicate
     $this->validator->validateCreation($request, $driver);
 })->throwsNoExceptions();
 
-test('validateCancellation throws when the subscription is already in a terminal state', function () {
+test('validateCancellation throws when the subscription is already in a terminal state', function (): void {
     $subscription = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'cancelled',
@@ -145,7 +145,7 @@ test('validateCancellation throws when the subscription is already in a terminal
     $this->validator->validateCancellation('SUB_1', $driver);
 })->throws(SubscriptionException::class, 'already in terminal state');
 
-test('validateCancellation passes when the subscription is still active', function () {
+test('validateCancellation passes when the subscription is still active', function (): void {
     $subscription = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'active',
@@ -192,7 +192,7 @@ function duplicateCheckingDriver(array $listing): SupportsSubscriptionsInterface
     return $driver;
 }
 
-test('an active subscription listed as a DTO blocks a duplicate', function (array $listing) {
+test('an active subscription listed as a DTO blocks a duplicate', function (array $listing): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
 
     expect(fn () => $this->validator->validateCreation($request, duplicateCheckingDriver($listing)))
@@ -203,7 +203,7 @@ test('an active subscription listed as a DTO blocks a duplicate', function (arra
     'with a status in capitals' => [['data' => [listedSubscription('PLN_1', 'Active')]]],
 ]);
 
-test('a listed DTO for another plan, or one that has ended, does not block', function () {
+test('a listed DTO for another plan, or one that has ended, does not block', function (): void {
     $request = new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1');
     $driver = duplicateCheckingDriver(['data' => [
         listedSubscription('PLN_2', 'active'),
@@ -216,7 +216,7 @@ test('a listed DTO for another plan, or one that has ended, does not block', fun
     $this->validator->validateCreation($request, $driver);
 })->throwsNoExceptions();
 
-test('duplicate prevention switched off with the string an env file produces is off', function () {
+test('duplicate prevention switched off with the string an env file produces is off', function (): void {
     config(['payments.subscriptions.prevent_duplicates' => 'false']);
     app()->forgetInstance('payments.config');
 
@@ -227,7 +227,7 @@ test('duplicate prevention switched off with the string an env file produces is 
     $this->validator->validateCreation(new SubscriptionRequestDTO(customer: 'a@b.com', plan: 'PLN_1'), $driver);
 });
 
-test('a provider that cannot list subscriptions stops the subscribe, and the error names the setting', function () {
+test('a provider that cannot list subscriptions stops the subscribe, and the error names the setting', function (): void {
     config(['payments.subscriptions.prevent_duplicates' => true]);
     app()->forgetInstance('payments.config');
 
@@ -278,7 +278,7 @@ function loggedCodes(array $codes): SubscriptionRepositoryInterface
     return $repository;
 }
 
-test('a logged subscription the provider reports active blocks a duplicate on a provider that cannot list', function (string $status) {
+test('a logged subscription the provider reports active blocks a duplicate on a provider that cannot list', function (string $status): void {
     $validator = new SubscriptionValidator(loggedCodes(['I-PENDING', 'I-LIVE']));
     $driver = unlistableDriver(['I-PENDING' => 'attention', 'I-LIVE' => $status]);
 
@@ -286,7 +286,7 @@ test('a logged subscription the provider reports active blocks a duplicate on a 
         ->toThrow(SubscriptionException::class, 'Customer already has an active subscription to plan P-1');
 })->with(['active', 'non-renewing', 'Active']);
 
-test('the check stops at the first active subscription it fetches', function () {
+test('the check stops at the first active subscription it fetches', function (): void {
     $validator = new SubscriptionValidator(loggedCodes(['I-LIVE', 'I-NEVER-FETCHED']));
     $driver = unlistableDriver(['I-LIVE' => 'active']);
     $driver->shouldNotReceive('fetchSubscription')->with('I-NEVER-FETCHED');
@@ -295,7 +295,7 @@ test('the check stops at the first active subscription it fetches', function () 
         ->toThrow(SubscriptionException::class, 'already has an active subscription');
 });
 
-test('logged subscriptions the provider reports pending or ended do not block', function () {
+test('logged subscriptions the provider reports pending or ended do not block', function (): void {
     $validator = new SubscriptionValidator(loggedCodes(['I-PENDING', 'I-GONE']));
 
     $driver = unlistableDriver(['I-PENDING' => 'attention', 'I-GONE' => 'cancelled']);
@@ -304,7 +304,7 @@ test('logged subscriptions the provider reports pending or ended do not block', 
         ->not->toThrow(Throwable::class);
 });
 
-test('the duplicate check reads the log through the bound repository when none is given', function () {
+test('the duplicate check reads the log through the bound repository when none is given', function (): void {
     app(SubscriptionRepositoryInterface::class)->updateOrCreateAtomic('I-LOGGED', [
         'provider' => 'paypal', 'status' => 'attention', 'plan_code' => 'P-1', 'customer_email' => 'a@b.com', 'currency' => 'USD',
     ]);
@@ -315,7 +315,7 @@ test('the duplicate check reads the log through the bound repository when none i
     ))->toThrow(SubscriptionException::class, 'already has an active subscription');
 });
 
-test('a provider that cannot list stops the subscribe when its subscription cannot be fetched', function () {
+test('a provider that cannot list stops the subscribe when its subscription cannot be fetched', function (): void {
     $validator = new SubscriptionValidator(loggedCodes(['I-BROKEN']));
     $driver = unlistableDriver([]);
     $driver->shouldReceive('fetchSubscription')->with('I-BROKEN')->andThrow(new SubscriptionException('PayPal is down'));
@@ -326,7 +326,7 @@ test('a provider that cannot list stops the subscribe when its subscription cann
     );
 });
 
-test('a provider that cannot list stops the subscribe when the subscription log is off', function (array $logging) {
+test('a provider that cannot list stops the subscribe when the subscription log is off', function (array $logging): void {
     $repository = Mockery::mock(SubscriptionRepositoryInterface::class);
     $repository->shouldNotReceive('openSubscriptionCodes');
     $driver = unlistableDriver([]);
@@ -343,6 +343,6 @@ test('a provider that cannot list stops the subscribe when the subscription log 
     'all logging off, subscription logging unset' => [['payments.logging.enabled' => false, 'payments.subscriptions.logging' => ['table' => 'subscription_transactions']]],
 ]);
 
-test('paypal is a provider that cannot list subscriptions', function () {
+test('paypal is a provider that cannot list subscriptions', function (): void {
     expect(new PayPalDriver(['client_id' => 'id', 'client_secret' => 'secret', 'currencies' => ['USD']]))->toBeInstanceOf(HasNoSubscriptionListing::class);
 });

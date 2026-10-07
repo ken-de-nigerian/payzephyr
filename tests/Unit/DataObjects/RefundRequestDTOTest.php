@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 
-test('it accepts a minimal request with only a transaction reference', function () {
+test('it accepts a minimal request with only a transaction reference', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123');
 
     expect($request->transactionReference)->toBe('txn_123')
@@ -14,61 +14,61 @@ test('it accepts a minimal request with only a transaction reference', function 
         ->and($request->metadata)->toBe([]);
 });
 
-test('it rejects an empty transaction reference', function () {
+test('it rejects an empty transaction reference', function (): void {
     new RefundRequestDTO(transactionReference: '');
 })->throws(InvalidArgumentException::class, 'Transaction reference is required');
 
-test('it rejects a zero amount', function () {
+test('it rejects a zero amount', function (): void {
     new RefundRequestDTO(transactionReference: 'txn_123', amount: 0.0);
 })->throws(InvalidArgumentException::class, 'Refund amount must be greater than zero');
 
-test('it rejects a negative amount', function () {
+test('it rejects a negative amount', function (): void {
     new RefundRequestDTO(transactionReference: 'txn_123', amount: -50.0);
 })->throws(InvalidArgumentException::class, 'Refund amount must be greater than zero');
 
-test('it rejects an amount exceeding the maximum allowed value', function () {
+test('it rejects an amount exceeding the maximum allowed value', function (): void {
     new RefundRequestDTO(transactionReference: 'txn_123', amount: 1_000_000_000.00);
 })->throws(InvalidArgumentException::class, 'Refund amount exceeds maximum allowed value');
 
-test('it accepts the maximum allowed amount', function () {
+test('it accepts the maximum allowed amount', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123', amount: 999999999.99);
 
     expect($request->amount)->toBe(999999999.99);
 });
 
-test('it accepts the smallest possible positive amount', function () {
+test('it accepts the smallest possible positive amount', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123', amount: 0.01);
 
     expect($request->amount)->toBe(0.01);
 });
 
-test('it rejects a currency code that is not 3 letters', function () {
+test('it rejects a currency code that is not 3 letters', function (): void {
     new RefundRequestDTO(transactionReference: 'txn_123', currency: 'US');
 })->throws(InvalidArgumentException::class, 'Currency must be a 3-letter ISO code');
 
-test('it rejects a currency code containing non-letter characters', function () {
+test('it rejects a currency code containing non-letter characters', function (): void {
     new RefundRequestDTO(transactionReference: 'txn_123', currency: 'U5D');
 })->throws(InvalidArgumentException::class, 'Currency must be a 3-letter ISO code');
 
-test('it accepts a valid 3-letter currency code', function () {
+test('it accepts a valid 3-letter currency code', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123', currency: 'CAD');
 
     expect($request->currency)->toBe('CAD');
 });
 
-test('getAmountInMinorUnits converts a major-unit amount to minor units', function () {
+test('getAmountInMinorUnits converts a major-unit amount to minor units', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123', amount: 19.99);
 
     expect($request->getAmountInMinorUnits())->toBe(1999);
 });
 
-test('getAmountInMinorUnits returns null when no amount was specified (full refund)', function () {
+test('getAmountInMinorUnits returns null when no amount was specified (full refund)', function (): void {
     $request = new RefundRequestDTO(transactionReference: 'txn_123');
 
     expect($request->getAmountInMinorUnits())->toBeNull();
 });
 
-test('fromArray builds a request from snake_case keys and auto-generates an idempotency key', function () {
+test('fromArray builds a request from snake_case keys and auto-generates an idempotency key', function (): void {
     $request = RefundRequestDTO::fromArray([
         'transaction_reference' => 'txn_123',
         'amount' => 50.005,
@@ -86,7 +86,7 @@ test('fromArray builds a request from snake_case keys and auto-generates an idem
         ->and($request->idempotencyKey)->toBeString();
 });
 
-test('fromArray preserves an explicitly provided idempotency key', function () {
+test('fromArray preserves an explicitly provided idempotency key', function (): void {
     $request = RefundRequestDTO::fromArray([
         'transaction_reference' => 'txn_123',
         'idempotency_key' => 'my-custom-key-123',
@@ -95,18 +95,18 @@ test('fromArray preserves an explicitly provided idempotency key', function () {
     expect($request->idempotencyKey)->toBe('my-custom-key-123');
 });
 
-test('fromArray rejects an idempotency key with invalid characters', function () {
+test('fromArray rejects an idempotency key with invalid characters', function (): void {
     RefundRequestDTO::fromArray([
         'transaction_reference' => 'txn_123',
         'idempotency_key' => 'has spaces and $ymbols!',
     ]);
 })->throws(InvalidArgumentException::class, 'Invalid idempotency key format');
 
-test('fromArray defaults a missing transaction_reference to an empty string, which then fails validation', function () {
+test('fromArray defaults a missing transaction_reference to an empty string, which then fails validation', function (): void {
     RefundRequestDTO::fromArray(['amount' => 50.0]);
 })->throws(InvalidArgumentException::class, 'Transaction reference is required');
 
-test('toArray round-trips the snake_case shape used by fromArray', function () {
+test('toArray round-trips the snake_case shape used by fromArray', function (): void {
     $request = new RefundRequestDTO(
         transactionReference: 'txn_123',
         amount: 50.0,
@@ -124,7 +124,7 @@ test('toArray round-trips the snake_case shape used by fromArray', function () {
     ]);
 });
 
-test('it rejects a whitespace-only transaction reference by treating it as opaque, non-empty input', function () {
+test('it rejects a whitespace-only transaction reference by treating it as opaque, non-empty input', function (): void {
     // PayZephyr does not trim() the reference (correctly - a provider's
     // real reference format is opaque to this package), so a
     // whitespace-only string is NOT rejected here. This documents that

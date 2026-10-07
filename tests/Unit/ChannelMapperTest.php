@@ -3,7 +3,7 @@
 use KenDeNigerian\PayZephyr\Enums\PaymentChannel;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 
-test('channel mapper maps channels to paystack format', function () {
+test('channel mapper maps channels to paystack format', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'ussd'], 'paystack');
@@ -11,7 +11,7 @@ test('channel mapper maps channels to paystack format', function () {
     expect($result)->toBe(['card', 'bank_transfer', 'ussd']);
 });
 
-test('channel mapper maps channels to monnify format', function () {
+test('channel mapper maps channels to monnify format', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'ussd'], 'monnify');
@@ -19,7 +19,7 @@ test('channel mapper maps channels to monnify format', function () {
     expect($result)->toBe(['CARD', 'ACCOUNT_TRANSFER', 'USSD']);
 });
 
-test('channel mapper maps channels to flutterwave format', function () {
+test('channel mapper maps channels to flutterwave format', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'ussd'], 'flutterwave');
@@ -27,7 +27,7 @@ test('channel mapper maps channels to flutterwave format', function () {
     expect($result)->toBe(['card', 'banktransfer', 'ussd']);
 });
 
-test('channel mapper maps channels to stripe format', function () {
+test('channel mapper maps channels to stripe format', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer'], 'stripe');
@@ -35,7 +35,7 @@ test('channel mapper maps channels to stripe format', function () {
     expect($result)->toBe(['card', 'us_bank_account']);
 });
 
-test('channel mapper returns null for paypal', function () {
+test('channel mapper returns null for paypal', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card'], 'paypal');
@@ -43,14 +43,14 @@ test('channel mapper returns null for paypal', function () {
     expect($result)->toBeNull();
 });
 
-test('channel mapper returns null for empty channels', function () {
+test('channel mapper returns null for empty channels', function (): void {
     $mapper = new ChannelMapper;
 
     expect($mapper->mapChannels([], 'paystack'))->toBeNull()
         ->and($mapper->mapChannels(null, 'paystack'))->toBeNull();
 });
 
-test('channel mapper returns channels as-is for unknown provider', function () {
+test('channel mapper returns channels as-is for unknown provider', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank'], 'unknown');
@@ -58,7 +58,7 @@ test('channel mapper returns channels as-is for unknown provider', function () {
     expect($result)->toBe(['card', 'bank']);
 });
 
-test('channel mapper filters invalid channels for monnify', function () {
+test('channel mapper filters invalid channels for monnify', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_channel'], 'monnify');
@@ -66,7 +66,7 @@ test('channel mapper filters invalid channels for monnify', function () {
     expect($result)->toBe(['CARD']);
 });
 
-test('channel mapper filters invalid channels for flutterwave', function () {
+test('channel mapper filters invalid channels for flutterwave', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_channel'], 'flutterwave');
@@ -74,7 +74,7 @@ test('channel mapper filters invalid channels for flutterwave', function () {
     expect($result)->toBe(['card']);
 });
 
-test('channel mapper filters invalid channels for stripe', function () {
+test('channel mapper filters invalid channels for stripe', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_channel'], 'stripe');
@@ -82,7 +82,7 @@ test('channel mapper filters invalid channels for stripe', function () {
     expect($result)->toBe(['card']);
 });
 
-test('channel mapper supportsChannels returns correct values', function () {
+test('channel mapper supportsChannels returns correct values', function (): void {
     $mapper = new ChannelMapper;
 
     expect($mapper->supportsChannels('paystack'))->toBeTrue()
@@ -93,7 +93,7 @@ test('channel mapper supportsChannels returns correct values', function () {
         ->and($mapper->supportsChannels('unknown'))->toBeFalse();
 });
 
-test('channel mapper shouldIncludeChannels returns correct values', function () {
+test('channel mapper shouldIncludeChannels returns correct values', function (): void {
     $mapper = new ChannelMapper;
 
     expect($mapper->shouldIncludeChannels('paystack', ['card']))->toBeTrue()
@@ -102,7 +102,7 @@ test('channel mapper shouldIncludeChannels returns correct values', function () 
         ->and($mapper->shouldIncludeChannels('paypal', ['card']))->toBeFalse();
 });
 
-test('channel mapper getUnifiedChannels returns all unified channels', function () {
+test('channel mapper getUnifiedChannels returns all unified channels', function (): void {
     $channels = ChannelMapper::getUnifiedChannels();
 
     expect($channels)->toContain(
@@ -117,7 +117,7 @@ test('channel mapper getUnifiedChannels returns all unified channels', function 
     )->and($channels)->toHaveCount(8);
 });
 
-test('channel mapper handles mobile money channel', function () {
+test('channel mapper handles mobile money channel', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['mobile_money'], 'monnify');
@@ -125,7 +125,7 @@ test('channel mapper handles mobile money channel', function () {
     expect($result)->toBe(['PHONE_NUMBER']);
 });
 
-test('channel mapper handles qr code channel', function () {
+test('channel mapper handles qr code channel', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['qr_code'], 'paystack');
@@ -133,7 +133,7 @@ test('channel mapper handles qr code channel', function () {
     expect($result)->toBe(['qr']);
 });
 
-test('channel mapper handles case insensitive channel names', function () {
+test('channel mapper handles case insensitive channel names', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['CARD', 'Bank_Transfer'], 'paystack');
@@ -141,7 +141,7 @@ test('channel mapper handles case insensitive channel names', function () {
     expect($result)->toBe(['card', 'bank_transfer']);
 });
 
-test('channel mapper mapToPaystack filters out invalid channels', function () {
+test('channel mapper mapToPaystack filters out invalid channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_channel', 'ussd'], 'paystack');
@@ -149,7 +149,7 @@ test('channel mapper mapToPaystack filters out invalid channels', function () {
     expect($result)->toContain('card', 'ussd', 'invalid_channel');
 });
 
-test('channel mapper mapToMonnify handles all valid channels', function () {
+test('channel mapper mapToMonnify handles all valid channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'ussd', 'mobile_money'], 'monnify');
@@ -157,7 +157,7 @@ test('channel mapper mapToMonnify handles all valid channels', function () {
     expect($result)->toContain('CARD', 'ACCOUNT_TRANSFER', 'USSD', 'PHONE_NUMBER');
 });
 
-test('channel mapper mapToFlutterwave handles all valid channels', function () {
+test('channel mapper mapToFlutterwave handles all valid channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'ussd', 'qr_code'], 'flutterwave');
@@ -165,7 +165,7 @@ test('channel mapper mapToFlutterwave handles all valid channels', function () {
     expect($result)->toContain('card', 'banktransfer', 'ussd', 'nqr');
 });
 
-test('channel mapper mapToStripe handles valid payment method types', function () {
+test('channel mapper mapToStripe handles valid payment method types', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'bank_transfer', 'link'], 'stripe');
@@ -173,7 +173,7 @@ test('channel mapper mapToStripe handles valid payment method types', function (
     expect($result)->toContain('card', 'us_bank_account', 'link');
 });
 
-test('channel mapper mapToStripe filters invalid types', function () {
+test('channel mapper mapToStripe filters invalid types', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_type'], 'stripe');
@@ -182,7 +182,7 @@ test('channel mapper mapToStripe filters invalid types', function () {
         ->and($result)->not->toContain('invalid_type');
 });
 
-test('channel mapper handles mixed case channel names', function () {
+test('channel mapper handles mixed case channel names', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['Card', 'BANK_TRANSFER', 'Ussd'], 'monnify');
@@ -190,13 +190,13 @@ test('channel mapper handles mixed case channel names', function () {
     expect($result)->toContain('CARD', 'ACCOUNT_TRANSFER', 'USSD');
 });
 
-test('channel mapper returns null for empty array', function () {
+test('channel mapper returns null for empty array', function (): void {
     $mapper = new ChannelMapper;
 
     expect($mapper->mapChannels([], 'paystack'))->toBeNull();
 });
 
-test('channel mapper returns null for null input', function () {
+test('channel mapper returns null for null input', function (): void {
     $mapper = new ChannelMapper;
 
     expect($mapper->mapChannels(null, 'paystack'))->toBeNull();

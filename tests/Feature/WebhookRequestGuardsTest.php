@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
@@ -30,19 +32,19 @@ function useWebhookDriver(DriverInterface $driver): void
     $property->setValue($manager, ['fake' => $driver]);
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     config(['payments.webhook.verify_signature' => true, 'payments.webhook.max_payload_size' => 64]);
     app()->forgetInstance('payments.config');
 });
 
-test('the payload is the decoded JSON body, whatever content type it came with', function () {
+test('the payload is the decoded JSON body, whatever content type it came with', function (): void {
     // Sent as text/plain, Laravel parses no input from it: only the body has it.
     $request = makeWebhookRequestFor('paystack', '{"event":"charge.success","data":{"reference":"R1"}}', ['Content-Type' => 'text/plain']);
 
     expect($request->payload())->toBe(['event' => 'charge.success', 'data' => ['reference' => 'R1']]);
 });
 
-test('a delivery declaring a length over the limit is refused, even with a valid signature', function () {
+test('a delivery declaring a length over the limit is refused, even with a valid signature', function (): void {
     $logs = captureLogs();
     $body = '{"event":"charge.success"}';
 
@@ -52,7 +54,7 @@ test('a delivery declaring a length over the limit is refused, even with a valid
         ->and(loggedEntry($logs, 'Webhook payload size exceeds limit')['context'])->toBe(['size' => '65', 'max' => 64, 'ip' => '127.0.0.1']);
 });
 
-test('a body over the limit is refused, even with a valid signature and no declared length', function () {
+test('a body over the limit is refused, even with a valid signature and no declared length', function (): void {
     $logs = captureLogs();
     $body = (string) json_encode(['event' => 'charge.success', 'data' => ['reference' => str_repeat('x', 60)]]);
 
@@ -63,7 +65,7 @@ test('a body over the limit is refused, even with a valid signature and no decla
         ->and(loggedEntry($logs, 'Webhook payload size exceeds limit')['context'])->toBe(['size' => strlen($body), 'max' => 64, 'ip' => '127.0.0.1']);
 });
 
-test('the signature check gets every header that has a value, as a list, and none that do not', function () {
+test('the signature check gets every header that has a value, as a list, and none that do not', function (): void {
     $received = null;
     $driver = Mockery::mock(DriverInterface::class);
     $driver->shouldReceive('validateWebhook')->andReturnUsing(function (array $headers) use (&$received): bool {
@@ -82,7 +84,7 @@ test('the signature check gets every header that has a value, as a list, and non
         ->and($received['x-empty'])->toBe([]);
 });
 
-test('a provider that cannot be resolved refuses the delivery and says why', function () {
+test('a provider that cannot be resolved refuses the delivery and says why', function (): void {
     $logs = captureLogs();
 
     expect(makeWebhookRequestFor('nosuchprovider', '{}')->authorize())->toBeFalse();
@@ -94,7 +96,7 @@ test('a provider that cannot be resolved refuses the delivery and says why', fun
         ->and($entry['context']['ip'])->toBe('127.0.0.1');
 });
 
-test('switching verification off is logged as an error outside local and testing, once an hour', function () {
+test('switching verification off is logged as an error outside local and testing, once an hour', function (): void {
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
     app()->detectEnvironment(fn (): string => 'production');
@@ -116,7 +118,7 @@ test('switching verification off is logged as an error outside local and testing
         ->and($entry['context']['ip'])->toBe('127.0.0.1');
 });
 
-test('switching verification off is not logged in local development', function (string $environment) {
+test('switching verification off is not logged in local development', function (string $environment): void {
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
     app()->detectEnvironment(fn (): string => $environment);
@@ -131,7 +133,7 @@ test('switching verification off is not logged in local development', function (
         ->and($logs->getArrayCopy())->toBe([]);
 })->with(['local', 'testing']);
 
-test('each field the request validates must have its type', function (string $field, mixed $wrong) {
+test('each field the request validates must have its type', function (string $field, mixed $wrong): void {
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
 
@@ -149,11 +151,11 @@ test('each field the request validates must have its type', function (string $fi
     ['payment_status', ['x']],
 ]);
 
-test('the validation rules are all optional', function () {
+test('the validation rules are all optional', function (): void {
     expect((new WebhookRequest)->rules())->each->toStartWith('sometimes|');
 });
 
-test('a delivery exactly at the size limit is accepted, by its declared length and by its body', function () {
+test('a delivery exactly at the size limit is accepted, by its declared length and by its body', function (): void {
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
 
@@ -165,7 +167,7 @@ test('a delivery exactly at the size limit is accepted, by its declared length a
         ->and($body->authorize())->toBeTrue();
 });
 
-test('a declared length is read as a number, so trailing junk does not hide its size', function () {
+test('a declared length is read as a number, so trailing junk does not hide its size', function (): void {
     // "100x" compared as a string sorts below "64"; as a number it is 100.
     // Verification is off, so only the size check can refuse it.
     config(['payments.webhook.verify_signature' => false]);
@@ -174,7 +176,7 @@ test('a declared length is read as a number, so trailing junk does not hide its 
     expect(makeWebhookRequestFor('paystack', '{}', ['Content-Length' => '100x'])->authorize())->toBeFalse();
 });
 
-test('the size limit is a megabyte when not configured', function (string $length, bool $accepted) {
+test('the size limit is a megabyte when not configured', function (string $length, bool $accepted): void {
     config(['payments.webhook' => ['verify_signature' => false]]);
     app()->forgetInstance('payments.config');
 
@@ -184,17 +186,17 @@ test('the size limit is a megabyte when not configured', function (string $lengt
     'a byte more' => ['1048577', false],
 ]);
 
-test('signatures are checked when verification is not configured either way', function () {
+test('signatures are checked when verification is not configured either way', function (): void {
     config(['payments.webhook' => ['max_payload_size' => 1048576]]);
     app()->forgetInstance('payments.config');
 
     expect(makeWebhookRequestFor('paystack', '{}', ['x-paystack-signature' => 'forged'])->authorize())->toBeFalse();
 });
 
-test('a request with no provider in its route names none when it is refused', function () {
+test('a request with no provider in its route names none when it is refused', function (): void {
     $logs = captureLogs();
-    $request = WebhookRequest::createFrom(Illuminate\Http\Request::create('/payments/webhook', 'POST', [], [], [], [], '{}'));
-    $request->setRouteResolver(fn () => (new Illuminate\Routing\Route('POST', 'payments/webhook', []))->bind($request));
+    $request = WebhookRequest::createFrom(Request::create('/payments/webhook', 'POST', [], [], [], [], '{}'));
+    $request->setRouteResolver(fn () => (new Route('POST', 'payments/webhook', []))->bind($request));
 
     expect($request->authorize())->toBeFalse()
         ->and(loggedEntry($logs, 'Webhook authorization failed')['message'])->toContain('for provider []');

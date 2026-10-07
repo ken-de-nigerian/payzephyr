@@ -5,7 +5,7 @@ use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment manager returns enabled providers', function () {
+test('payment manager returns enabled providers', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -24,7 +24,7 @@ test('payment manager returns enabled providers', function () {
         ->and($providers)->not->toHaveKey('stripe');
 });
 
-test('payment manager throws exception for disabled driver', function () {
+test('payment manager throws exception for disabled driver', function (): void {
     config([
         'payments.providers.invalid' => ['enabled' => false],
     ]);
@@ -33,12 +33,12 @@ test('payment manager throws exception for disabled driver', function () {
     $manager->driver('invalid');
 })->throws(DriverNotFoundException::class);
 
-test('payment manager throws exception for non-existent driver', function () {
+test('payment manager throws exception for non-existent driver', function (): void {
     $manager = new PaymentManager;
     $manager->driver('nonexistent');
 })->throws(DriverNotFoundException::class);
 
-test('payment manager gets default driver', function () {
+test('payment manager gets default driver', function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.providers.paystack' => [
@@ -53,7 +53,7 @@ test('payment manager gets default driver', function () {
     expect($manager->getDefaultDriver())->toBe('paystack');
 });
 
-test('payment manager gets fallback chain', function () {
+test('payment manager gets fallback chain', function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.fallback' => 'stripe',
@@ -66,7 +66,7 @@ test('payment manager gets fallback chain', function () {
         ->and($manager->getFallbackChain())->toHaveCount(2);
 });
 
-test('payment manager fallback chain removes duplicates', function () {
+test('payment manager fallback chain removes duplicates', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -81,7 +81,7 @@ test('payment manager fallback chain removes duplicates', function () {
         ->and($manager->getFallbackChain())->toHaveCount(1);
 });
 
-test('payment manager fallback chain works without fallback', function () {
+test('payment manager fallback chain works without fallback', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -96,7 +96,7 @@ test('payment manager fallback chain works without fallback', function () {
         ->and($manager->getFallbackChain())->toHaveCount(1);
 });
 
-test('payment manager caches driver instances', function () {
+test('payment manager caches driver instances', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -113,7 +113,7 @@ test('payment manager caches driver instances', function () {
     expect($driver1)->toBe($driver2); // Same instance
 });
 
-test('payment manager resolves driver classes correctly', function () {
+test('payment manager resolves driver classes correctly', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -140,7 +140,7 @@ test('payment manager resolves driver classes correctly', function () {
         ->and($stripeDriver->getName())->toBe('stripe');
 });
 
-test('payment manager uses default driver when none specified', function () {
+test('payment manager uses default driver when none specified', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -158,7 +158,7 @@ test('payment manager uses default driver when none specified', function () {
     expect($driver->getName())->toBe('stripe');
 });
 
-test('payment manager throws when all providers fail charge', function () {
+test('payment manager throws when all providers fail charge', function (): void {
     config([
         'payments.providers' => [
             'paystack' => ['enabled' => false],
@@ -177,7 +177,7 @@ test('payment manager throws when all providers fail charge', function () {
     $manager->chargeWithFallback($request);
 })->throws(ProviderException::class);
 
-test('payment manager gets enabled providers count', function () {
+test('payment manager gets enabled providers count', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -194,7 +194,7 @@ test('payment manager gets enabled providers count', function () {
     expect($enabled)->toHaveCount(2);
 });
 
-test('payment manager handles empty providers config', function () {
+test('payment manager handles empty providers config', function (): void {
     app()->forgetInstance('payments.config');
 
     config(['payments.providers' => []]);
@@ -204,7 +204,7 @@ test('payment manager handles empty providers config', function () {
     expect($manager->getEnabledProviders())->toBe([]);
 });
 
-test('payment manager handles missing enabled flag as true', function () {
+test('payment manager handles missing enabled flag as true', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -218,7 +218,7 @@ test('payment manager handles missing enabled flag as true', function () {
     expect($providers)->toHaveKey('paystack');
 });
 
-test('payment manager throws when driver class does not exist', function () {
+test('payment manager throws when driver class does not exist', function (): void {
     config([
         'payments.providers.custom' => [
             'driver' => 'NonExistentDriver',

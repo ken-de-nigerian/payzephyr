@@ -8,7 +8,7 @@ use KenDeNigerian\PayZephyr\Refund;
 use KenDeNigerian\PayZephyr\Tests\Fixtures\CustomTestDriver;
 use Tests\Helpers\RefundTestHelper;
 
-test('refund() builds a request and issues a full refund through the driver', function () {
+test('refund() builds a request and issues a full refund through the driver', function (): void {
     $refund = RefundTestHelper::createWithMock([
         RefundTestHelper::refundMock(12345, ['status' => 'pending', 'amount' => 500000]),
     ]);
@@ -21,7 +21,7 @@ test('refund() builds a request and issues a full refund through the driver', fu
         ->and($result->amount)->toBe(5000.0);
 });
 
-test('refund() sends a partial amount and reason through the chain', function () {
+test('refund() sends a partial amount and reason through the chain', function (): void {
     $refund = RefundTestHelper::createWithMock([
         RefundTestHelper::refundMock(12346, ['status' => 'pending', 'amount' => 200000]),
     ]);
@@ -35,7 +35,7 @@ test('refund() sends a partial amount and reason through the chain', function ()
         ->and($result->reason)->toBe('customer requested');
 });
 
-test('fetch() retrieves refund details through the driver', function () {
+test('fetch() retrieves refund details through the driver', function (): void {
     $refund = RefundTestHelper::createWithMock([
         RefundTestHelper::refundMock(12345, [
             'status' => 'processed',
@@ -50,20 +50,18 @@ test('fetch() retrieves refund details through the driver', function () {
         ->and($result->status)->toBe('processed');
 });
 
-test('refund() throws PaymentException for a provider that does not support refunds', function () {
+test('refund() throws PaymentException for a provider that does not support refunds', function (): void {
     $driver = new CustomTestDriver(['api_key' => 'test_api_key', 'currencies' => ['NGN']]);
 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
 
     $configProperty = $reflection->getProperty('config');
-    $configProperty->setAccessible(true);
     $config = $configProperty->getValue($manager);
     $config['providers']['custom_test'] = ['enabled' => true];
     $configProperty->setValue($manager, $config);
 
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['custom_test'] = $driver;
     $driversProperty->setValue($manager, $drivers);

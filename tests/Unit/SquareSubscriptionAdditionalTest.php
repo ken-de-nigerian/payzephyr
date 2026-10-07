@@ -30,7 +30,7 @@ function makeSquareSubscriptionDriver2(array $responses): SquareDriver
 // createPlan
 // ---------------------------------------------------------------------
 
-test('square createPlan throws PlanException when the response has no objects', function () {
+test('square createPlan throws PlanException when the response has no objects', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['errors' => [['detail' => 'invalid catalog object']]])),
     ]);
@@ -40,7 +40,7 @@ test('square createPlan throws PlanException when the response has no objects', 
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'invalid catalog object');
 
-test('square createPlan throws PlanException on a network/API error', function () {
+test('square createPlan throws PlanException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -50,7 +50,7 @@ test('square createPlan throws PlanException on a network/API error', function (
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Failed to create plan');
 
-test('square createPlan maps daily, weekly and annually intervals', function (string $interval, string $cadence) {
+test('square createPlan maps daily, weekly and annually intervals', function (string $interval, string $cadence): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'objects' => [
@@ -90,7 +90,7 @@ test('square createPlan maps daily, weekly and annually intervals', function (st
 // updatePlan
 // ---------------------------------------------------------------------
 
-test('square updatePlan updates the plan name and variation amount/interval', function () {
+test('square updatePlan updates the plan name and variation amount/interval', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         // fetchSquareCatalogObjects()
         new Response(200, [], json_encode([
@@ -147,7 +147,7 @@ test('square updatePlan updates the plan name and variation amount/interval', fu
         ->and($result->interval)->toBe('annually');
 });
 
-test('square updatePlan rethrows PlanException when the plan is not found', function () {
+test('square updatePlan rethrows PlanException when the plan is not found', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['object' => null])),
     ]);
@@ -155,7 +155,7 @@ test('square updatePlan rethrows PlanException when the plan is not found', func
     $driver->updatePlan('VAR-missing', ['name' => 'New Name']);
 })->throws(PlanException::class, 'Subscription plan not found');
 
-test('square updatePlan throws PlanException on a network/API error', function () {
+test('square updatePlan throws PlanException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -167,7 +167,7 @@ test('square updatePlan throws PlanException on a network/API error', function (
 // fetchPlan
 // ---------------------------------------------------------------------
 
-test('square fetchPlan retrieves and maps a catalog plan/variation', function () {
+test('square fetchPlan retrieves and maps a catalog plan/variation', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'object' => [
@@ -194,7 +194,7 @@ test('square fetchPlan retrieves and maps a catalog plan/variation', function ()
         ->and($result->name)->toBe('Plan');
 });
 
-test('square fetchPlan throws PlanException when the plan is not found', function () {
+test('square fetchPlan throws PlanException when the plan is not found', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['object' => null])),
     ]);
@@ -202,7 +202,7 @@ test('square fetchPlan throws PlanException when the plan is not found', functio
     $driver->fetchPlan('VAR-missing');
 })->throws(PlanException::class, 'Subscription plan not found');
 
-test('square fetchPlan throws PlanException on a network/API error', function () {
+test('square fetchPlan throws PlanException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -210,7 +210,7 @@ test('square fetchPlan throws PlanException on a network/API error', function ()
     $driver->fetchPlan('VAR123');
 })->throws(PlanException::class, 'Failed to get plan');
 
-test('square fetchPlan maps week and every_two_weeks cadences back to weekly', function (string $cadence) {
+test('square fetchPlan maps week and every_two_weeks cadences back to weekly', function (string $cadence): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'object' => [
@@ -243,7 +243,7 @@ test('square fetchPlan maps week and every_two_weeks cadences back to weekly', f
 // listPlans
 // ---------------------------------------------------------------------
 
-test('square listPlans returns a mapped list of plans', function () {
+test('square listPlans returns a mapped list of plans', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'objects' => [
@@ -273,7 +273,7 @@ test('square listPlans returns a mapped list of plans', function () {
         ->and($result['has_more'])->toBeTrue();
 });
 
-test('square listPlans logs a warning when page greater than one is requested', function () {
+test('square listPlans logs a warning when page greater than one is requested', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['objects' => []])),
     ]);
@@ -283,7 +283,7 @@ test('square listPlans logs a warning when page greater than one is requested', 
     expect($result['data'])->toBe([]);
 });
 
-test('square listPlans throws PlanException on a network/API error', function () {
+test('square listPlans throws PlanException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -295,7 +295,7 @@ test('square listPlans throws PlanException on a network/API error', function ()
 // createSubscription
 // ---------------------------------------------------------------------
 
-test('square createSubscription throws SubscriptionException when the response has no subscription', function () {
+test('square createSubscription throws SubscriptionException when the response has no subscription', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['customers' => []])),
         new Response(200, [], json_encode(['customer' => ['id' => 'CUST1', 'email_address' => 'test@example.com']])),
@@ -307,7 +307,7 @@ test('square createSubscription throws SubscriptionException when the response h
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'card declined');
 
-test('square createSubscription throws SubscriptionException on a network/API error', function () {
+test('square createSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -321,7 +321,7 @@ test('square createSubscription throws SubscriptionException on a network/API er
 // fetchSubscription
 // ---------------------------------------------------------------------
 
-test('square fetchSubscription retrieves and maps a subscription', function () {
+test('square fetchSubscription retrieves and maps a subscription', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'subscription' => [
@@ -341,7 +341,7 @@ test('square fetchSubscription retrieves and maps a subscription', function () {
         ->and($result->createdAt)->toBe('2024-12-01T00:00:00Z');
 });
 
-test('square fetchSubscription throws SubscriptionException when no subscription is returned', function () {
+test('square fetchSubscription throws SubscriptionException when no subscription is returned', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['errors' => [['detail' => 'not found']]])),
     ]);
@@ -349,7 +349,7 @@ test('square fetchSubscription throws SubscriptionException when no subscription
     $driver->fetchSubscription('SUB-missing');
 })->throws(SubscriptionException::class, 'not found');
 
-test('square fetchSubscription throws SubscriptionException on a network/API error', function () {
+test('square fetchSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -357,7 +357,7 @@ test('square fetchSubscription throws SubscriptionException on a network/API err
     $driver->fetchSubscription('SUB1');
 })->throws(SubscriptionException::class, 'Failed to fetch subscription');
 
-test('square fetchSubscription swallows customer lookup failures and treats the customer as unknown', function () {
+test('square fetchSubscription swallows customer lookup failures and treats the customer as unknown', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'subscription' => [
@@ -375,7 +375,7 @@ test('square fetchSubscription swallows customer lookup failures and treats the 
     expect($result->customer)->toBe('');
 });
 
-test('square fetchSubscription maps CANCELED, DEACTIVATED and PENDING statuses', function (string $status, string $expected) {
+test('square fetchSubscription maps CANCELED, DEACTIVATED and PENDING statuses', function (string $status, string $expected): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'subscription' => [
@@ -400,7 +400,7 @@ test('square fetchSubscription maps CANCELED, DEACTIVATED and PENDING statuses',
 // cancelSubscription
 // ---------------------------------------------------------------------
 
-test('square cancelSubscription falls back to fetchSubscription when pause response has no subscription', function () {
+test('square cancelSubscription falls back to fetchSubscription when pause response has no subscription', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['nothing' => 'here'])),
         new Response(200, [], json_encode([
@@ -421,7 +421,7 @@ test('square cancelSubscription falls back to fetchSubscription when pause respo
     expect($result->status)->toBe('non-renewing');
 });
 
-test('square cancelSubscription throws SubscriptionException on a network/API error', function () {
+test('square cancelSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -433,7 +433,7 @@ test('square cancelSubscription throws SubscriptionException on a network/API er
 // enableSubscription
 // ---------------------------------------------------------------------
 
-test('square enableSubscription falls back to fetchSubscription when resume response has no subscription', function () {
+test('square enableSubscription falls back to fetchSubscription when resume response has no subscription', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['nothing' => 'here'])),
         new Response(200, [], json_encode([
@@ -454,7 +454,7 @@ test('square enableSubscription falls back to fetchSubscription when resume resp
     expect($result->status)->toBe('active');
 });
 
-test('square enableSubscription throws SubscriptionException on a network/API error', function () {
+test('square enableSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);
@@ -466,7 +466,7 @@ test('square enableSubscription throws SubscriptionException on a network/API er
 // listSubscriptions
 // ---------------------------------------------------------------------
 
-test('square listSubscriptions returns a mapped list without a customer filter', function () {
+test('square listSubscriptions returns a mapped list without a customer filter', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode([
             'subscriptions' => [
@@ -480,7 +480,7 @@ test('square listSubscriptions returns a mapped list without a customer filter',
     expect($result['data'])->toHaveCount(1);
 });
 
-test('square listSubscriptions logs a warning when page greater than one is requested', function () {
+test('square listSubscriptions logs a warning when page greater than one is requested', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['subscriptions' => []])),
     ]);
@@ -490,7 +490,7 @@ test('square listSubscriptions logs a warning when page greater than one is requ
     expect($result['data'])->toBe([]);
 });
 
-test('square listSubscriptions returns an empty list when the customer is not found', function () {
+test('square listSubscriptions returns an empty list when the customer is not found', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(200, [], json_encode(['customers' => []])),
     ]);
@@ -500,7 +500,7 @@ test('square listSubscriptions returns an empty list when the customer is not fo
     expect($result)->toBe(['data' => [], 'has_more' => false]);
 });
 
-test('square listSubscriptions throws SubscriptionException on a network/API error', function () {
+test('square listSubscriptions throws SubscriptionException on a network/API error', function (): void {
     $driver = makeSquareSubscriptionDriver2([
         new Response(500, [], json_encode(['errors' => [['detail' => 'server error']]])),
     ]);

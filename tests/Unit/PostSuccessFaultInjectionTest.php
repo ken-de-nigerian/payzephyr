@@ -30,7 +30,7 @@ function faultChargeRequest(string $reference): ChargeRequestDTO
     ]);
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -44,7 +44,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a cache backend that cannot be reached does not block the charge', function () {
+test('a cache backend that cannot be reached does not block the charge', function (): void {
     // Claiming the in-flight lock is best-effort: if the cache is down we lose
     // double-submission protection, but refusing to charge at all would be a
     // worse outcome than proceeding without it.
@@ -66,7 +66,7 @@ test('a cache backend that cannot be reached does not block the charge', functio
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a cache failure while releasing the in-flight claim does not fail the charge', function () {
+test('a cache failure while releasing the in-flight claim does not fail the charge', function (): void {
     Cache::shouldReceive('add')->andReturnTrue();
     Cache::shouldReceive('put')->andReturnTrue();
     Cache::shouldReceive('get')->andReturnNull();
@@ -85,7 +85,7 @@ test('a cache failure while releasing the in-flight claim does not fail the char
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a transaction-logging failure after a successful charge never reaches the fallback provider', function () {
+test('a transaction-logging failure after a successful charge never reaches the fallback provider', function (): void {
     // The provider has already charged the customer by this point, so a
     // failing transaction-log write must be absorbed - never turned into a
     // second charge against the fallback provider.
@@ -106,8 +106,8 @@ test('a transaction-logging failure after a successful charge never reaches the 
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a PaymentInitiated listener that throws never reaches the fallback provider', function () {
-    Event::listen(PaymentInitiated::class, function () {
+test('a PaymentInitiated listener that throws never reaches the fallback provider', function (): void {
+    Event::listen(PaymentInitiated::class, function (): void {
         throw new RuntimeException('listener exploded');
     });
 
@@ -124,7 +124,7 @@ test('a PaymentInitiated listener that throws never reaches the fallback provide
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('updateOrCreateAtomic recovers when another writer wins the create race', function () {
+test('updateOrCreateAtomic recovers when another writer wins the create race', function (): void {
     // Reproduces the lost create race: the row does not exist when we look,
     // but does by the time we insert, so create() hits the unique constraint
     // exactly as a concurrent writer would cause - and the repository must
@@ -153,16 +153,16 @@ test('updateOrCreateAtomic recovers when another writer wins the create race', f
         ->and(RefundTransaction::where('refund_reference', 'rf_raced')->count())->toBe(1);
 });
 
-test('updateOrCreateAtomic rethrows a query error that is not a unique-constraint violation', function () {
+test('updateOrCreateAtomic rethrows a query error that is not a unique-constraint violation', function (): void {
     // A genuine DB fault must surface, not be mistaken for a lost race and
     // silently retried.
     $repo = new EloquentRefundRepository;
 
-    RefundTransaction::creating(function () {
+    RefundTransaction::creating(function (): void {
         throw new QueryException('sqlite', 'insert into refund_transactions', [], new RuntimeException('disk I/O error'));
     });
 
-    expect(fn () => $repo->updateOrCreateAtomic('rf_db_broken', [
+    expect(fn (): RefundTransaction => $repo->updateOrCreateAtomic('rf_db_broken', [
         'transaction_reference' => 'txn_x',
         'provider' => 'primary',
         'status' => 'pending',
@@ -173,7 +173,7 @@ test('updateOrCreateAtomic rethrows a query error that is not a unique-constrain
     RefundTransaction::flushEventListeners();
 });
 
-test('a cache failure while clearing session data after verification does not fail the verify', function () {
+test('a cache failure while clearing session data after verification does not fail the verify', function (): void {
     // Verification already succeeded against the provider; a stale cache entry
     // is a cleanup concern, not a reason to report the payment unverified.
     Cache::shouldReceive('get')->andReturnNull();
@@ -194,7 +194,7 @@ test('a cache failure while clearing session data after verification does not fa
         ->and($secondary->verifyCalls)->toBe(0);
 });
 
-test('transaction logging is skipped entirely when logging is disabled', function () {
+test('transaction logging is skipped entirely when logging is disabled', function (): void {
     config(['payments.logging.enabled' => false]);
     app()->forgetInstance('payments.config');
 

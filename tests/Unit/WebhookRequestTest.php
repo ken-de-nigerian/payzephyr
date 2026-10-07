@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Validator;
 use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
 
 uses(RefreshDatabase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -20,7 +21,7 @@ beforeEach(function () {
     ]);
 });
 
-test('webhook request validates payload structure', function () {
+test('webhook request validates payload structure', function (): void {
     $request = \Illuminate\Http\Request::create('/payments/webhook/paystack', 'POST', [
         'event' => 'charge.success',
         'data' => ['reference' => 'ref_123'],
@@ -29,8 +30,6 @@ test('webhook request validates payload structure', function () {
     $body = json_encode($request->all());
     $formRequest = new class($request, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -43,21 +42,15 @@ test('webhook request validates payload structure', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
-        }
-
-        public function rules(): array
-        {
-            return parent::rules();
         }
     };
 
-    $validator = \Illuminate\Support\Facades\Validator::make($request->all(), $formRequest->rules());
+    $validator = Validator::make($request->all(), $formRequest->rules());
 
     expect($validator->passes())->toBeTrue();
 });
 
-test('webhook request authorizes valid signature', function () {
+test('webhook request authorizes valid signature', function (): void {
     // Real Paystack payloads carry the timestamp under data.paid_at - see ADR-0001.
     $payload = [
         'event' => 'charge.success',
@@ -73,7 +66,7 @@ test('webhook request authorizes valid signature', function () {
 
     $request = new class($request, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -104,7 +97,7 @@ test('webhook request authorizes valid signature', function () {
     expect($request->authorize())->toBeTrue();
 });
 
-test('webhook request rejects invalid signature', function () {
+test('webhook request rejects invalid signature', function (): void {
     $payload = ['event' => 'charge.success'];
 
     $baseRequest = \Illuminate\Http\Request::create('/payments/webhook/paystack', 'POST', $payload);
@@ -113,7 +106,7 @@ test('webhook request rejects invalid signature', function () {
     $body = json_encode(['event' => 'charge.success']);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
+        private readonly string $body;
 
         public function __construct($request, string $body)
         {
@@ -144,15 +137,13 @@ test('webhook request rejects invalid signature', function () {
     expect($request->authorize())->toBeFalse();
 });
 
-test('webhook request bypasses signature when verification disabled', function () {
+test('webhook request bypasses signature when verification disabled', function (): void {
     config(['payments.webhook.verify_signature' => false]);
 
     $baseRequest = Request::create('/payments/webhook/paystack', 'POST', []);
     $body = json_encode([]);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -165,7 +156,6 @@ test('webhook request bypasses signature when verification disabled', function (
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -177,7 +167,7 @@ test('webhook request bypasses signature when verification disabled', function (
     expect($request->authorize())->toBeTrue();
 });
 
-test('webhook request validation rules accept optional fields', function () {
+test('webhook request validation rules accept optional fields', function (): void {
     $payload = [
         'event' => 'charge.success',
         'eventType' => 'charge.success',
@@ -190,8 +180,6 @@ test('webhook request validation rules accept optional fields', function () {
 
     $formRequest = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -204,26 +192,18 @@ test('webhook request validation rules accept optional fields', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
-        }
-
-        public function rules(): array
-        {
-            return parent::rules();
         }
     };
-    $validator = \Illuminate\Support\Facades\Validator::make($baseRequest->all(), $formRequest->rules());
+    $validator = Validator::make($baseRequest->all(), $formRequest->rules());
 
     expect($validator->passes())->toBeTrue();
 });
 
-test('webhook request handles missing provider gracefully', function () {
+test('webhook request handles missing provider gracefully', function (): void {
     $baseRequest = Request::create('/payments/webhook/invalid', 'POST', []);
     $body = json_encode([]);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -236,7 +216,6 @@ test('webhook request handles missing provider gracefully', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)

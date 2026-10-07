@@ -6,6 +6,7 @@ use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 use KenDeNigerian\PayZephyr\Models\WebhookEvent;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Repositories\EloquentRefundRepository;
 use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
 use KenDeNigerian\PayZephyr\Repositories\EloquentTransactionRepository;
@@ -24,7 +25,7 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentTransactionRepository;
  * payloads - this test proves the model-level allow-list holds regardless,
  * as defense in depth.
  */
-test('PaymentTransaction ignores attributes outside its fillable list', function () {
+test('PaymentTransaction ignores attributes outside its fillable list', function (): void {
     $repository = new EloquentTransactionRepository;
 
     $transaction = $repository->create([
@@ -42,7 +43,7 @@ test('PaymentTransaction ignores attributes outside its fillable list', function
         ->and(PaymentTransaction::where('reference', 'txn_mass_assign')->first()->id)->not->toBe(999999);
 });
 
-test('amount and reference are fillable (required for create()), so verification can only ever change status/channel/paid_at through the real call site', function () {
+test('amount and reference are fillable (required for create()), so verification can only ever change status/channel/paid_at through the real call site', function (): void {
     // Important distinction: unlike WebhookEvent's tightly-scoped fillable,
     // PaymentTransaction's $fillable includes 'amount' and 'reference'
     // because create() legitimately needs to set them. $fillable alone does
@@ -62,7 +63,7 @@ test('amount and reference are fillable (required for create()), so verification
         'email' => 'test@example.com',
     ]);
 
-    $manager = new KenDeNigerian\PayZephyr\PaymentManager;
+    $manager = new PaymentManager;
     $driver = makeCountingSuccessDriver('paystack');
     injectFakeDrivers($manager, ['paystack' => $driver]);
 
@@ -78,7 +79,7 @@ test('amount and reference are fillable (required for create()), so verification
         ->and($transaction->reference)->toBe('txn_amount_guard');
 });
 
-test('RefundTransaction ignores attributes outside its fillable list', function () {
+test('RefundTransaction ignores attributes outside its fillable list', function (): void {
     $repository = new EloquentRefundRepository;
 
     $refund = $repository->updateOrCreateAtomic('ref_mass_assign', [
@@ -94,7 +95,7 @@ test('RefundTransaction ignores attributes outside its fillable list', function 
         ->and(RefundTransaction::where('refund_reference', 'ref_mass_assign')->first()->id)->not->toBe(999999);
 });
 
-test('SubscriptionTransaction ignores attributes outside its fillable list', function () {
+test('SubscriptionTransaction ignores attributes outside its fillable list', function (): void {
     $repository = new EloquentSubscriptionRepository;
 
     $subscription = $repository->updateOrCreateAtomic('sub_mass_assign', [
@@ -111,11 +112,11 @@ test('SubscriptionTransaction ignores attributes outside its fillable list', fun
         ->and(SubscriptionTransaction::where('subscription_code', 'sub_mass_assign')->first()->id)->not->toBe(999999);
 });
 
-test('WebhookEvent only ever accepts provider and event_key, nothing else', function () {
+test('WebhookEvent only ever accepts provider and event_key, nothing else', function (): void {
     expect((new WebhookEvent)->getFillable())->toBe(['provider', 'event_key']);
 });
 
-test('no PayZephyr model uses an unguarded ($guarded = []) mass-assignment policy', function () {
+test('no PayZephyr model uses an unguarded ($guarded = []) mass-assignment policy', function (): void {
     foreach ([PaymentTransaction::class, RefundTransaction::class, SubscriptionTransaction::class, WebhookEvent::class] as $modelClass) {
         $model = new $modelClass;
 

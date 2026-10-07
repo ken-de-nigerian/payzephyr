@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Contracts\Auth\Guard;
+use Illuminate\Support\Facades\Auth;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 
 uses(TestCase::class)->in('Feature', 'Unit', 'Integration');
@@ -28,9 +30,9 @@ require_once __DIR__.'/Helpers/log_capture.php';
  */
 function mockAuthGuard(bool $check, int|string|null $id = null): void
 {
-    $guard = Mockery::mock(Illuminate\Contracts\Auth\Guard::class);
+    $guard = Mockery::mock(Guard::class);
     $guard->shouldReceive('check')->andReturn($check);
     $guard->shouldReceive('id')->andReturn($id);
 
-    Illuminate\Support\Facades\Auth::shouldReceive('guard')->andReturn($guard);
+    Auth::shouldReceive('guard')->andReturn($guard);
 }

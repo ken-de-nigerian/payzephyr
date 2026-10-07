@@ -12,6 +12,8 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -41,7 +43,7 @@ function paypalContractDriver(array $responses = [], array &$history = [], array
 
 function paypalToken(?int $expiresIn = 3600, string $token = 'A21_1'): Response
 {
-    return new Response(200, [], (string) json_encode(array_filter(['access_token' => $token, 'expires_in' => $expiresIn], fn ($v) => $v !== null)));
+    return new Response(200, [], (string) json_encode(array_filter(['access_token' => $token, 'expires_in' => $expiresIn], fn ($v): bool => $v !== null)));
 }
 
 function paypalOrder(array $data = []): Response
@@ -63,14 +65,14 @@ afterEach(fn () => Carbon::setTestNow());
 // Configuration and the access token
 // ---------------------------------------------------------------------------
 
-test('a PayPal driver needs both its client id and secret', function (array $config) {
-    expect(fn () => new PayPalDriver($config + ['currencies' => ['USD']]))->toThrow(InvalidConfigurationException::class);
+test('a PayPal driver needs both its client id and secret', function (array $config): void {
+    expect(fn (): PayPalDriver => new PayPalDriver($config + ['currencies' => ['USD']]))->toThrow(InvalidConfigurationException::class);
 })->with([
     'no id' => [['client_secret' => 'S']],
     'no secret' => [['client_id' => 'I']],
 ]);
 
-test('a token is asked for with the client credentials, and requests then carry it as JSON', function () {
+test('a token is asked for with the client credentials, and requests then carry it as JSON', function (): void {
     $history = [];
     paypalContractDriver([paypalToken(), paypalOrder()], $history)->charge(paypalCharge());
 
@@ -83,14 +85,14 @@ test('a token is asked for with the client credentials, and requests then carry 
         ->and($history[1]['request']->getHeaderLine('Accept'))->toBe('application/json');
 });
 
-test('a request without a JSON body still says it is JSON', function () {
+test('a request without a JSON body still says it is JSON', function (): void {
     $history = [];
     paypalContractDriver([paypalToken(), new Response(200, [], '{"id":"O","status":"CREATED","purchase_units":[{"amount":{"value":"1","currency_code":"USD"}}]}')], $history)->verify('O');
 
     expect($history[1]['request']->getHeaderLine('Content-Type'))->toBe('application/json');
 });
 
-test('the token is reused until a minute before it expires, then fetched again', function (?int $expiresIn, int $lifetime) {
+test('the token is reused until a minute before it expires, then fetched again', function (?int $expiresIn, int $lifetime): void {
     Carbon::setTestNow('2026-10-01 12:00:00');
     $history = [];
     $driver = paypalContractDriver([paypalToken($expiresIn), paypalOrder(), paypalOrder(), paypalToken($expiresIn, 'A21_2'), paypalOrder()], $history);
@@ -109,7 +111,7 @@ test('the token is reused until a minute before it expires, then fetched again',
     'an hour when it does not say' => [null, 3540],
 ]);
 
-test('a token PayPal does not give fails the charge, coded 0, and is logged', function (string $body) {
+test('a token PayPal does not give fails the charge, coded 0, and is logged', function (string $body): void {
     $logs = captureLogs();
 
     try {
@@ -130,7 +132,7 @@ test('a token PayPal does not give fails the charge, coded 0, and is logged', fu
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends PayPal its full order', function () {
+test('a charge sends PayPal its full order', function (): void {
     $history = [];
     $result = paypalContractDriver([paypalToken(), paypalOrder()], $history)->charge(paypalCharge(['description' => 'Order 9']));
 
@@ -159,7 +161,7 @@ test('a charge sends PayPal its full order', function () {
         ]]);
 });
 
-test('a charge without a description or brand falls back, and a zero-decimal currency is sent whole', function () {
+test('a charge without a description or brand falls back, and a zero-decimal currency is sent whole', function (): void {
     $history = [];
     paypalContractDriver([paypalToken(), paypalOrder()], $history, ['brand_name' => null])->charge(paypalCharge(['amount' => 1500, 'currency' => 'jpy']));
 
@@ -169,29 +171,29 @@ test('a charge without a description or brand falls back, and a zero-decimal cur
         ->and($sent['payment_source']['paypal']['experience_context']['brand_name'])->toBe('Your Store');
 });
 
-test('every zero-decimal currency is sent whole', function (string $currency) {
+test('every zero-decimal currency is sent whole', function (string $currency): void {
     $history = [];
     paypalContractDriver([paypalToken(), paypalOrder()], $history)->charge(paypalCharge(['amount' => 1500, 'currency' => $currency]));
 
     expect(json_decode((string) $history[1]['request']->getBody(), true)['purchase_units'][0]['amount']['value'])->toBe('1500');
 })->with(['BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
 
-test('an order without links or an id is refused, and the approve link wins over payer-action', function () {
+test('an order without links or an id is refused, and the approve link wins over payer-action', function (): void {
     $approve = paypalOrder(['links' => [['rel' => 'payer-action', 'href' => 'https://paypal.test/action'], ['rel' => 'approve', 'href' => 'https://paypal.test/approve-old']]]);
 
     expect(paypalContractDriver([paypalToken(), $approve])->charge(paypalCharge())->authorizationUrl)->toBe('https://paypal.test/approve-old')
-        ->and(fn () => paypalContractDriver([paypalToken(), paypalOrder(['links' => []])])->charge(paypalCharge()))->toThrow(ChargeException::class, 'No approval link found in PayPal response')
-        ->and(fn () => paypalContractDriver([paypalToken(), new Response(201, [], '{}')])->charge(paypalCharge()))->toThrow(ChargeException::class, 'Failed to create PayPal order');
+        ->and(fn (): ChargeResponseDTO => paypalContractDriver([paypalToken(), paypalOrder(['links' => []])])->charge(paypalCharge()))->toThrow(ChargeException::class, 'No approval link found in PayPal response')
+        ->and(fn (): ChargeResponseDTO => paypalContractDriver([paypalToken(), new Response(201, [], '{}')])->charge(paypalCharge()))->toThrow(ChargeException::class, 'Failed to create PayPal order');
 });
 
-test('a charge without a callback URL is refused, saying how to set one', function () {
-    expect(fn () => paypalContractDriver()->charge(paypalCharge(['callbackUrl' => null])))->toThrow(
+test('a charge without a callback URL is refused, saying how to set one', function (): void {
+    expect(fn (): ChargeResponseDTO => paypalContractDriver()->charge(paypalCharge(['callbackUrl' => null])))->toThrow(
         InvalidConfigurationException::class,
         'PayPal requires a callback URL for its redirect flow. Please use ->callback() in your payment chain to set the callback URL.'
     );
 });
 
-test('an initialized charge is logged with both references, and a failed one is logged and wrapped, coded 0', function () {
+test('an initialized charge is logged with both references, and a failed one is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
     paypalContractDriver([paypalToken(), paypalOrder()])->charge(paypalCharge());
 
@@ -206,7 +208,7 @@ test('an initialized charge is logged with both references, and a failed one is 
         ->and(loggedEntry($logs, 'Charge failed')['context'])->toBe(['error' => 'handler blew up', 'error_class' => LogicException::class]);
 });
 
-test('a charge leaves its key behind for no other request', function () {
+test('a charge leaves its key behind for no other request', function (): void {
     $history = [];
     $driver = paypalContractDriver([paypalToken(), paypalOrder(), new Response(200, [], '{}')], $history);
 
@@ -237,7 +239,7 @@ function paypalVerifiedOrder(array $data = []): Response
     ]));
 }
 
-test('an order is looked up by its id and read in full', function () {
+test('an order is looked up by its id and read in full', function (): void {
     $history = [];
     $result = paypalContractDriver([paypalToken(), paypalVerifiedOrder()], $history)->verify('ORDER 1');
 
@@ -253,7 +255,7 @@ test('an order is looked up by its id and read in full', function () {
         ->and($result->customer)->toBe(['email' => 'a@b.com', 'name' => 'Ada']);
 });
 
-test('an order\'s capture decides its status, in any case', function (string $orderStatus, string $captureStatus, string $expected) {
+test('an order\'s capture decides its status, in any case', function (string $orderStatus, string $captureStatus, string $expected): void {
     $order = paypalVerifiedOrder(['status' => $orderStatus, 'purchase_units' => [[
         'amount' => ['value' => '1', 'currency_code' => 'USD'], 'payments' => ['captures' => [['status' => $captureStatus]]],
     ]]]);
@@ -267,7 +269,7 @@ test('an order\'s capture decides its status, in any case', function (string $or
     'capture declined' => ['created', 'declined', 'pending'],
 ]);
 
-test('an approved order with no capture yet is captured, and logged when that fails', function () {
+test('an approved order with no capture yet is captured, and logged when that fails', function (): void {
     $logs = captureLogs();
     $history = [];
     $approved = paypalVerifiedOrder(['status' => 'approved', 'purchase_units' => [['amount' => ['value' => '1', 'currency_code' => 'USD']]]]);
@@ -290,7 +292,7 @@ test('an approved order with no capture yet is captured, and logged when that fa
     expect(loggedEntry($logs, 'PayPal capture failed')['context'])->toBe(['error' => 'capture blew up', 'error_class' => LogicException::class]);
 });
 
-test('a verification that fails is logged and wrapped, coded 0, and a missing order is not found', function () {
+test('a verification that fails is logged and wrapped, coded 0, and a missing order is not found', function (): void {
     $logs = captureLogs();
 
     try {
@@ -301,7 +303,7 @@ test('a verification that fails is logged and wrapped, coded 0, and a missing or
     }
 
     expect(loggedEntry($logs, 'Verification failed')['context'])->toBe(['error' => 'handler blew up', 'error_class' => LogicException::class])
-        ->and(fn () => paypalContractDriver([paypalToken(), new Response(200, [], '{}')])->verify('ORDER_X'))->toThrow(VerificationException::class, 'PayPal order not found: ORDER_X');
+        ->and(fn (): VerificationResponseDTO => paypalContractDriver([paypalToken(), new Response(200, [], '{}')])->verify('ORDER_X'))->toThrow(VerificationException::class, 'PayPal order not found: ORDER_X');
 });
 
 // ---------------------------------------------------------------------------
@@ -316,7 +318,7 @@ function paypalContractWebhookHeaders(): array
     ];
 }
 
-test('a webhook missing any of what PayPal needs to verify it is refused, saying which', function () {
+test('a webhook missing any of what PayPal needs to verify it is refused, saying which', function (): void {
     $logs = captureLogs();
     $headers = paypalContractWebhookHeaders();
     unset($headers['paypal-cert-url']);
@@ -328,7 +330,7 @@ test('a webhook missing any of what PayPal needs to verify it is refused, saying
         ]);
 });
 
-test('a webhook is sent back to PayPal exactly as it came, and accepted only on SUCCESS', function (string $status, bool $valid) {
+test('a webhook is sent back to PayPal exactly as it came, and accepted only on SUCCESS', function (string $status, bool $valid): void {
     $logs = captureLogs();
     $history = [];
     $createdAt = gmdate('Y-m-d\TH:i:s\Z');
@@ -354,14 +356,14 @@ test('a webhook is sent back to PayPal exactly as it came, and accepted only on 
     'refused' => ['FAILURE', false],
 ]);
 
-test('a verification answer without a status is refused and logged as unknown', function () {
+test('a verification answer without a status is refused and logged as unknown', function (): void {
     $logs = captureLogs();
 
     expect(paypalContractDriver([paypalToken(), new Response(200, [], '{}')])->validateWebhook(paypalContractWebhookHeaders(), '{}'))->toBeFalse()
         ->and(loggedEntry($logs, 'PayPal webhook validation result')['context'])->toBe(['valid' => false, 'status' => 'unknown']);
 });
 
-test('a verified webhook outside the replay window is refused, and logged', function () {
+test('a verified webhook outside the replay window is refused, and logged', function (): void {
     $logs = captureLogs();
     $body = '{"create_time":"'.gmdate('Y-m-d\TH:i:s\Z', time() - 10 * 86400).'"}';
 
@@ -369,7 +371,7 @@ test('a verified webhook outside the replay window is refused, and logged', func
         ->and(loggedEntry($logs, 'Webhook timestamp validation failed')['level'])->toBe('warning');
 });
 
-test('a verification PayPal refuses is refused and logged; one that cannot reach PayPal is raised for retry, coded 0', function () {
+test('a verification PayPal refuses is refused and logged; one that cannot reach PayPal is raised for retry, coded 0', function (): void {
     $logs = captureLogs();
     $request = new Request('POST', '/v1/notifications/verify-webhook-signature');
 
@@ -390,7 +392,7 @@ test('a verification PayPal refuses is refused and logged; one that cannot reach
         ->and($context['error'])->toBeString()->not->toBeEmpty();
 });
 
-test('a webhook\'s reference, status and channel are read from its resource', function () {
+test('a webhook\'s reference, status and channel are read from its resource', function (): void {
     $driver = paypalContractDriver();
 
     expect($driver->extractWebhookReference(['resource' => ['custom_id' => 'R1', 'purchase_units' => [['custom_id' => 'R2']]]]))->toBe('R1')

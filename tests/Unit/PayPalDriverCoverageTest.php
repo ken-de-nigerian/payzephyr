@@ -1,9 +1,14 @@
 <?php
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\StreamInterface;
 
-test('paypal driver getCurrencyDecimals returns 0 for zero-decimal currencies', function () {
+test('paypal driver getCurrencyDecimals returns 0 for zero-decimal currencies', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -13,7 +18,6 @@ test('paypal driver getCurrencyDecimals returns 0 for zero-decimal currencies', 
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('getCurrencyDecimals');
-    $method->setAccessible(true);
 
     expect($method->invoke($driver, 'JPY'))->toBe(0)
         ->and($method->invoke($driver, 'KRW'))->toBe(0)
@@ -21,7 +25,7 @@ test('paypal driver getCurrencyDecimals returns 0 for zero-decimal currencies', 
         ->and($method->invoke($driver, 'BIF'))->toBe(0);
 });
 
-test('paypal driver getCurrencyDecimals returns 2 for standard currencies', function () {
+test('paypal driver getCurrencyDecimals returns 2 for standard currencies', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -31,7 +35,6 @@ test('paypal driver getCurrencyDecimals returns 2 for standard currencies', func
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('getCurrencyDecimals');
-    $method->setAccessible(true);
 
     expect($method->invoke($driver, 'USD'))->toBe(2)
         ->and($method->invoke($driver, 'EUR'))->toBe(2)
@@ -39,7 +42,7 @@ test('paypal driver getCurrencyDecimals returns 2 for standard currencies', func
         ->and($method->invoke($driver, 'GBP'))->toBe(2);
 });
 
-test('paypal driver captureOrder throws verification exception on error', function () {
+test('paypal driver captureOrder throws verification exception on error', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -47,13 +50,13 @@ test('paypal driver captureOrder throws verification exception on error', functi
         'currencies' => ['USD'],
     ]);
 
-    $client = Mockery::mock(\GuzzleHttp\Client::class);
-    $request = Mockery::mock(\Psr\Http\Message\RequestInterface::class);
-    $response = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
+    $client = Mockery::mock(Client::class);
+    $request = Mockery::mock(RequestInterface::class);
+    $response = Mockery::mock(ResponseInterface::class);
     $response->shouldReceive('getStatusCode')->andReturn(400);
 
-    $tokenResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $tokenStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $tokenResponse = Mockery::mock(ResponseInterface::class);
+    $tokenStream = Mockery::mock(StreamInterface::class);
     $tokenStream->shouldReceive('__toString')->andReturn(json_encode([
         'access_token' => 'token',
         'expires_in' => 3600,
@@ -66,16 +69,15 @@ test('paypal driver captureOrder throws verification exception on error', functi
 
     $client->shouldReceive('request')
         ->with('POST', '/v2/checkout/orders/ORDER_123/capture', Mockery::any())
-        ->andThrow(new \GuzzleHttp\Exception\ClientException('Error', $request, $response));
+        ->andThrow(new ClientException('Error', $request, $response));
 
     $driver->setClient($client);
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('captureOrder');
-    $method->setAccessible(true);
 
-    $tokenResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $tokenStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $tokenResponse = Mockery::mock(ResponseInterface::class);
+    $tokenStream = Mockery::mock(StreamInterface::class);
     $tokenStream->shouldReceive('__toString')->andReturn(json_encode([
         'access_token' => 'token',
         'expires_in' => 3600,
@@ -88,13 +90,13 @@ test('paypal driver captureOrder throws verification exception on error', functi
 
     $client->shouldReceive('request')
         ->with('POST', '/v2/checkout/orders/ORDER_123/capture', Mockery::any())
-        ->andThrow(new \GuzzleHttp\Exception\ClientException('Error', $request, $response));
+        ->andThrow(new ClientException('Error', $request, $response));
 
-    expect(fn () => $method->invoke($driver, 'ORDER_123'))
+    expect(fn (): mixed => $method->invoke($driver, 'ORDER_123'))
         ->toThrow(VerificationException::class);
 });
 
-test('paypal driver verify handles capture with pending status', function () {
+test('paypal driver verify handles capture with pending status', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -102,18 +104,18 @@ test('paypal driver verify handles capture with pending status', function () {
         'currencies' => ['USD'],
     ]);
 
-    $client = Mockery::mock(\GuzzleHttp\Client::class);
+    $client = Mockery::mock(Client::class);
 
-    $tokenResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $tokenStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $tokenResponse = Mockery::mock(ResponseInterface::class);
+    $tokenStream = Mockery::mock(StreamInterface::class);
     $tokenStream->shouldReceive('__toString')->andReturn(json_encode([
         'access_token' => 'token',
         'expires_in' => 3600,
     ]));
     $tokenResponse->shouldReceive('getBody')->andReturn($tokenStream);
 
-    $orderResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $orderStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $orderResponse = Mockery::mock(ResponseInterface::class);
+    $orderStream = Mockery::mock(StreamInterface::class);
     $orderStream->shouldReceive('__toString')->andReturn(json_encode([
         'id' => 'ORDER_123',
         'status' => 'APPROVED',
@@ -151,7 +153,7 @@ test('paypal driver verify handles capture with pending status', function () {
     expect($result->isPending())->toBeTrue();
 });
 
-test('paypal driver verify handles capture with completed status', function () {
+test('paypal driver verify handles capture with completed status', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -159,18 +161,18 @@ test('paypal driver verify handles capture with completed status', function () {
         'currencies' => ['USD'],
     ]);
 
-    $client = Mockery::mock(\GuzzleHttp\Client::class);
+    $client = Mockery::mock(Client::class);
 
-    $tokenResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $tokenStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $tokenResponse = Mockery::mock(ResponseInterface::class);
+    $tokenStream = Mockery::mock(StreamInterface::class);
     $tokenStream->shouldReceive('__toString')->andReturn(json_encode([
         'access_token' => 'token',
         'expires_in' => 3600,
     ]));
     $tokenResponse->shouldReceive('getBody')->andReturn($tokenStream);
 
-    $orderResponse = Mockery::mock(\Psr\Http\Message\ResponseInterface::class);
-    $orderStream = Mockery::mock(\Psr\Http\Message\StreamInterface::class);
+    $orderResponse = Mockery::mock(ResponseInterface::class);
+    $orderStream = Mockery::mock(StreamInterface::class);
     $orderStream->shouldReceive('__toString')->andReturn(json_encode([
         'id' => 'ORDER_123',
         'status' => 'APPROVED',

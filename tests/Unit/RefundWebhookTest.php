@@ -6,11 +6,14 @@ use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Events\RefundCompleted;
 use KenDeNigerian\PayZephyr\Events\RefundCreated;
 use KenDeNigerian\PayZephyr\Events\RefundFailed;
+use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
+use KenDeNigerian\PayZephyr\Models\WebhookEvent;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use Tests\Helpers\RazorpayDriverTestHelper;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -30,7 +33,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a completed refund webhook dispatches RefundCompleted with the refund and transaction reference', function () {
+test('a completed refund webhook dispatches RefundCompleted with the refund and transaction reference', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $payload = [
@@ -43,18 +46,16 @@ test('a completed refund webhook dispatches RefundCompleted with the refund and 
     ];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundCompleted::class, function (RefundCompleted $event) {
-        return $event->refundReference === '12345'
-            && $event->transactionReference === 'txn_ref_123'
-            && $event->provider === 'paystack';
-    });
+    Event::assertDispatched(RefundCompleted::class, fn (RefundCompleted $event): bool => $event->refundReference === '12345'
+        && $event->transactionReference === 'txn_ref_123'
+        && $event->provider === 'paystack');
     Event::assertNotDispatched(RefundFailed::class);
     Event::assertNotDispatched(RefundCreated::class);
 });
 
-test('a failed refund webhook dispatches RefundFailed with a reason', function () {
+test('a failed refund webhook dispatches RefundFailed with a reason', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $payload = [
@@ -68,16 +69,14 @@ test('a failed refund webhook dispatches RefundFailed with a reason', function (
     ];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundFailed::class, function (RefundFailed $event) {
-        return $event->refundReference === '999'
-            && $event->transactionReference === 'txn_ref_999'
-            && $event->reason === 'insufficient balance';
-    });
+    Event::assertDispatched(RefundFailed::class, fn (RefundFailed $event): bool => $event->refundReference === '999'
+        && $event->transactionReference === 'txn_ref_999'
+        && $event->reason === 'insufficient balance');
 });
 
-test('a stripe refund.created webhook dispatches RefundCreated using the payment_intent as the transaction reference', function () {
+test('a stripe refund.created webhook dispatches RefundCreated using the payment_intent as the transaction reference', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $payload = [
@@ -92,16 +91,14 @@ test('a stripe refund.created webhook dispatches RefundCreated using the payment
     ];
 
     $job = new ProcessWebhook('stripe', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundCreated::class, function (RefundCreated $event) {
-        return $event->refundReference === 're_123'
-            && $event->transactionReference === 'pi_123'
-            && $event->provider === 'stripe';
-    });
+    Event::assertDispatched(RefundCreated::class, fn (RefundCreated $event): bool => $event->refundReference === 're_123'
+        && $event->transactionReference === 'pi_123'
+        && $event->provider === 'stripe');
 });
 
-test('a completed refund webhook updates the locally-persisted refund_transactions row to completed', function () {
+test('a completed refund webhook updates the locally-persisted refund_transactions row to completed', function (): void {
     // Regression: processRefundWebhook() used to only dispatch an in-memory
     // event. The local row (created "pending" when refund() first ran)
     // never transitioned to a terminal state, so RefundValidator's
@@ -128,12 +125,12 @@ test('a completed refund webhook updates the locally-persisted refund_transactio
     ];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     expect(RefundTransaction::where('refund_reference', '55555')->first()->status)->toBe('completed');
 });
 
-test('a failed refund webhook updates the locally-persisted refund_transactions row to failed', function () {
+test('a failed refund webhook updates the locally-persisted refund_transactions row to failed', function (): void {
     RefundTransaction::create([
         'refund_reference' => '66666',
         'transaction_reference' => 'txn_ref_fail_persist',
@@ -154,12 +151,12 @@ test('a failed refund webhook updates the locally-persisted refund_transactions 
     ];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     expect(RefundTransaction::where('refund_reference', '66666')->first()->status)->toBe('failed');
 });
 
-test('a refund webhook for a refund with no locally-persisted row does not throw', function () {
+test('a refund webhook for a refund with no locally-persisted row does not throw', function (): void {
     // Best-effort: the refund may have been initiated outside PayZephyr, or
     // refund logging may have been disabled when it ran.
     $payload = [
@@ -172,25 +169,25 @@ test('a refund webhook for a refund with no locally-persisted row does not throw
     ];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     expect(RefundTransaction::where('refund_reference', '77777')->exists())->toBeFalse();
 });
 
-test('a refund webhook missing a refund reference is skipped without dispatching an event', function () {
+test('a refund webhook missing a refund reference is skipped without dispatching an event', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $payload = ['event' => 'refund.processed', 'data' => ['status' => 'processed']];
 
     $job = new ProcessWebhook('paystack', $payload);
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertNotDispatched(RefundCompleted::class);
     Event::assertNotDispatched(RefundCreated::class);
     Event::assertNotDispatched(RefundFailed::class);
 });
 
-test('a razorpay refund.processed webhook reads the nested refund entity and reports the package reference', function () {
+test('a razorpay refund.processed webhook reads the nested refund entity and reports the package reference', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     RefundTransaction::create([
@@ -203,40 +200,34 @@ test('a razorpay refund.processed webhook reads the nested refund entity and rep
     ]);
 
     $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.processed', 'rfnd_Abc123', 'processed'));
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundCompleted::class, function (RefundCompleted $event) {
-        return $event->refundReference === 'rfnd_Abc123'
-            && $event->transactionReference === 'ORDER_1001'
-            && $event->provider === 'razorpay';
-    });
+    Event::assertDispatched(RefundCompleted::class, fn (RefundCompleted $event): bool => $event->refundReference === 'rfnd_Abc123'
+        && $event->transactionReference === 'ORDER_1001'
+        && $event->provider === 'razorpay');
 
     expect(RefundTransaction::where('refund_reference', 'rfnd_Abc123')->first()->status)->toBe('completed');
 });
 
-test('a razorpay refund.failed webhook dispatches RefundFailed', function () {
+test('a razorpay refund.failed webhook dispatches RefundFailed', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.failed', 'rfnd_Fail123', 'failed'));
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundFailed::class, function (RefundFailed $event) {
-        return $event->refundReference === 'rfnd_Fail123'
-            && $event->transactionReference === 'ORDER_1001';
-    });
+    Event::assertDispatched(RefundFailed::class, fn (RefundFailed $event): bool => $event->refundReference === 'rfnd_Fail123'
+        && $event->transactionReference === 'ORDER_1001');
     Event::assertNotDispatched(RefundCompleted::class);
 });
 
-test('a razorpay refund webhook without a package reference falls back to the payment id', function () {
+test('a razorpay refund webhook without a package reference falls back to the payment id', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     $job = new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.created', 'rfnd_Ext123', 'pending', []));
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(RefundCreated::class, function (RefundCreated $event) {
-        return $event->refundReference === 'rfnd_Ext123'
-            && $event->transactionReference === 'pay_Abc123';
-    });
+    Event::assertDispatched(RefundCreated::class, fn (RefundCreated $event): bool => $event->refundReference === 'rfnd_Ext123'
+        && $event->transactionReference === 'pay_Abc123');
 });
 
 /*
@@ -256,26 +247,26 @@ function enableRazorpayForRefundWebhooks(): void
         'currencies' => ['INR'],
     ]]);
     app()->forgetInstance('payments.config');
-    app()->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+    app()->forgetInstance(PaymentManager::class);
 }
 
-test('an instant razorpay refund reported as created and as processed fires RefundCompleted once', function () {
+test('an instant razorpay refund reported as created and as processed fires RefundCompleted once', function (): void {
     enableRazorpayForRefundWebhooks();
-    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class, \KenDeNigerian\PayZephyr\Events\WebhookReceived::class]);
+    Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class, WebhookReceived::class]);
 
     app()->call([new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.created', 'rfnd_instant', 'processed')), 'handle']);
     app()->call([new ProcessWebhook('razorpay', RazorpayDriverTestHelper::refundWebhook('refund.processed', 'rfnd_instant', 'processed')), 'handle']);
 
     // Two distinct deliveries, both processed...
-    Event::assertDispatchedTimes(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class, 2);
+    Event::assertDispatchedTimes(WebhookReceived::class, 2);
     // ...but one refund, completed once.
     Event::assertDispatchedTimes(RefundCompleted::class, 1);
 });
 
-test('a refund failure reported twice fires RefundFailed once', function () {
+test('a refund failure reported twice fires RefundFailed once', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
-    $failed = fn (string $event) => ['event' => $event, 'data' => ['id' => 777, 'status' => 'failed', 'transaction' => ['reference' => 'txn_777']]];
+    $failed = fn (string $event): array => ['event' => $event, 'data' => ['id' => 777, 'status' => 'failed', 'transaction' => ['reference' => 'txn_777']]];
 
     app()->call([new ProcessWebhook('paystack', $failed('refund.failed')), 'handle']);
     app()->call([new ProcessWebhook('paystack', $failed('refund.processed')), 'handle']);
@@ -283,7 +274,7 @@ test('a refund failure reported twice fires RefundFailed once', function () {
     Event::assertDispatchedTimes(RefundFailed::class, 1);
 });
 
-test('different refunds each announce their own outcome', function () {
+test('different refunds each announce their own outcome', function (): void {
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
     foreach ([101, 102] as $id) {
@@ -293,7 +284,7 @@ test('different refunds each announce their own outcome', function () {
     Event::assertDispatchedTimes(RefundCompleted::class, 2);
 });
 
-test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the retry announces it', function () {
+test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the retry announces it', function (): void {
     // The outcome claim is written before the listener runs. If the listener
     // throws and the claim stayed, the queue's retry would find it and never
     // announce the refund at all.
@@ -301,7 +292,7 @@ test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the
 
     $shouldThrow = true;
     $announced = 0;
-    Event::listen(RefundCompleted::class, function () use (&$shouldThrow, &$announced) {
+    Event::listen(RefundCompleted::class, function () use (&$shouldThrow, &$announced): void {
         if ($shouldThrow) {
             throw new RuntimeException('wallet service down');
         }
@@ -312,7 +303,7 @@ test('a RefundCompleted listener that fails leaves the outcome unclaimed, so the
 
     expect(fn () => app()->call([new ProcessWebhook('paystack', $payload), 'handle']))
         ->toThrow(RuntimeException::class, 'wallet service down');
-    expect(\KenDeNigerian\PayZephyr\Models\WebhookEvent::where('event_key', 'refund.completed:555')->exists())->toBeFalse();
+    expect(WebhookEvent::where('event_key', 'refund.completed:555')->exists())->toBeFalse();
 
     $shouldThrow = false;
     app()->call([new ProcessWebhook('paystack', $payload), 'handle']);
@@ -333,10 +324,10 @@ function enableMonnifyForRefundWebhooks(): void
         'enabled' => true, 'currencies' => ['NGN'],
     ]]);
     app()->forgetInstance('payments.config');
-    app()->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+    app()->forgetInstance(PaymentManager::class);
 }
 
-test('a monnify successful-refund webhook completes the refund', function () {
+test('a monnify successful-refund webhook completes the refund', function (): void {
     enableMonnifyForRefundWebhooks();
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
     RefundTransaction::create([
@@ -348,14 +339,14 @@ test('a monnify successful-refund webhook completes the refund', function () {
         'refundReference' => 'RFND_MNFY_1', 'transactionReference' => 'MNFY|20|1', 'refundStatus' => 'COMPLETED',
     ]]), 'handle']);
 
-    Event::assertDispatched(RefundCompleted::class, fn (RefundCompleted $event) => $event->refundReference === 'RFND_MNFY_1'
+    Event::assertDispatched(RefundCompleted::class, fn (RefundCompleted $event): bool => $event->refundReference === 'RFND_MNFY_1'
         && $event->transactionReference === 'MNFY|20|1'
         && $event->provider === 'monnify');
     Event::assertNotDispatched(RefundCreated::class);
     expect(RefundTransaction::where('refund_reference', 'RFND_MNFY_1')->value('status'))->toBe('completed');
 });
 
-test('a monnify failed-refund webhook fails the refund', function () {
+test('a monnify failed-refund webhook fails the refund', function (): void {
     enableMonnifyForRefundWebhooks();
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);
 
@@ -363,11 +354,11 @@ test('a monnify failed-refund webhook fails the refund', function () {
         'refundReference' => 'RFND_MNFY_2', 'transactionReference' => 'MNFY|20|2', 'refundStatus' => 'FAILED',
     ]]), 'handle']);
 
-    Event::assertDispatched(RefundFailed::class, fn (RefundFailed $event) => $event->refundReference === 'RFND_MNFY_2');
+    Event::assertDispatched(RefundFailed::class, fn (RefundFailed $event): bool => $event->refundReference === 'RFND_MNFY_2');
     Event::assertNotDispatched(RefundCompleted::class);
 });
 
-test('a refund webhook whose reference is not a string or a number is dropped, not fatal', function () {
+test('a refund webhook whose reference is not a string or a number is dropped, not fatal', function (): void {
     // The body is a provider's, or a forger's. An array where the id belongs
     // used to be cast to the string "Array" and carried on as a reference.
     Event::fake([RefundCompleted::class, RefundCreated::class, RefundFailed::class]);

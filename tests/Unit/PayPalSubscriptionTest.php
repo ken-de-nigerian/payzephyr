@@ -33,7 +33,7 @@ function makePayPalSubscriptionDriver(array $responses): PayPalDriver
     return $driver;
 }
 
-test('paypal createPlan creates a catalog product then a billing plan', function () {
+test('paypal createPlan creates a catalog product then a billing plan', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(201, [], json_encode(['id' => 'PROD-123', 'name' => 'Pro Plan'])),
         new Response(201, [], json_encode([
@@ -59,7 +59,7 @@ test('paypal createPlan creates a catalog product then a billing plan', function
         ->and($result->metadata['product_id'])->toBe('PROD-123');
 });
 
-test('paypal fetchPlan retrieves and maps a plan', function () {
+test('paypal fetchPlan retrieves and maps a plan', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(200, [], json_encode([
             'id' => 'P-abc',
@@ -80,7 +80,7 @@ test('paypal fetchPlan retrieves and maps a plan', function () {
         ->and($result->amount)->toBe(100.0);
 });
 
-test('paypal createSubscription requires a callback URL', function () {
+test('paypal createSubscription requires a callback URL', function (): void {
     $driver = makePayPalSubscriptionDriver([]);
 
     $request = new SubscriptionRequestDTO(customer: 'test@example.com', plan: 'P-123');
@@ -88,7 +88,7 @@ test('paypal createSubscription requires a callback URL', function () {
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'PayPal requires a callback URL');
 
-test('paypal createSubscription succeeds and captures the approval url', function () {
+test('paypal createSubscription succeeds and captures the approval url', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(201, [], json_encode([
             'id' => 'I-XYZ',
@@ -115,7 +115,7 @@ test('paypal createSubscription succeeds and captures the approval url', functio
         ->and($result->metadata['approval_url'])->toContain('ba_token=abc');
 });
 
-test('paypal cancelSubscription suspends by default (reversible)', function () {
+test('paypal cancelSubscription suspends by default (reversible)', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(204),
         new Response(200, [], json_encode([
@@ -132,7 +132,7 @@ test('paypal cancelSubscription suspends by default (reversible)', function () {
         ->and($result->canBeResumed())->toBeTrue();
 });
 
-test('paypal enableSubscription throws when the subscription is permanently cancelled', function () {
+test('paypal enableSubscription throws when the subscription is permanently cancelled', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(200, [], json_encode(['id' => 'I-XYZ', 'status' => 'CANCELLED'])),
     ]);
@@ -140,7 +140,7 @@ test('paypal enableSubscription throws when the subscription is permanently canc
     $driver->enableSubscription(new SubscriptionActionDTO('I-XYZ'));
 })->throws(SubscriptionException::class, 'cannot be reactivated');
 
-test('paypal enableSubscription activates a suspended subscription', function () {
+test('paypal enableSubscription activates a suspended subscription', function (): void {
     $driver = makePayPalSubscriptionDriver([
         new Response(200, [], json_encode(['id' => 'I-XYZ', 'status' => 'SUSPENDED'])),
         new Response(204),
@@ -158,7 +158,7 @@ test('paypal enableSubscription activates a suspended subscription', function ()
         ->and($result->isActive())->toBeTrue();
 });
 
-test('paypal listSubscriptions throws - no such endpoint exists', function () {
+test('paypal listSubscriptions throws - no such endpoint exists', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',

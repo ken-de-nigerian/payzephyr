@@ -25,7 +25,7 @@ function makeMollieSubscriptionDriver2(array $responses): MollieDriver
 // updatePlan
 // ---------------------------------------------------------------------
 
-test('mollie updatePlan re-encodes with the given overrides', function () {
+test('mollie updatePlan re-encodes with the given overrides', function (): void {
     $driver = makeMollieSubscriptionDriver2([]);
 
     $plan = $driver->createPlan(new SubscriptionPlanDTO('Pro Plan', 10, 'monthly', 'EUR'));
@@ -43,7 +43,7 @@ test('mollie updatePlan re-encodes with the given overrides', function () {
         ->and($updated->planCode)->not->toBe($plan->planCode);
 });
 
-test('mollie updatePlan falls back to the existing values when no overrides are given', function () {
+test('mollie updatePlan falls back to the existing values when no overrides are given', function (): void {
     $driver = makeMollieSubscriptionDriver2([]);
 
     $plan = $driver->createPlan(new SubscriptionPlanDTO('Pro Plan', 10, 'monthly', 'EUR'));
@@ -59,7 +59,7 @@ test('mollie updatePlan falls back to the existing values when no overrides are 
 // createSubscription - error branch, interval mapping
 // ---------------------------------------------------------------------
 
-test('mollie createSubscription throws SubscriptionException on a network/API error', function () {
+test('mollie createSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode(['_embedded' => ['customers' => []]])),
         new Response(200, [], json_encode(['id' => 'cst_1', 'email' => 'test@example.com'])),
@@ -72,7 +72,7 @@ test('mollie createSubscription throws SubscriptionException on a network/API er
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Failed to create subscription');
 
-test('mollie createSubscription maps daily, weekly and annually intervals when creating', function (string $interval) {
+test('mollie createSubscription maps daily, weekly and annually intervals when creating', function (string $interval): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode(['_embedded' => ['customers' => []]])),
         new Response(200, [], json_encode(['id' => 'cst_1', 'email' => 'test@example.com'])),
@@ -98,7 +98,7 @@ test('mollie createSubscription maps daily, weekly and annually intervals when c
 // fetchSubscription
 // ---------------------------------------------------------------------
 
-test('mollie fetchSubscription decodes the composite code and maps the response', function () {
+test('mollie fetchSubscription decodes the composite code and maps the response', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'sub_1',
@@ -118,13 +118,13 @@ test('mollie fetchSubscription decodes the composite code and maps the response'
         ->and($result->createdAt)->toBe('2024-12-01T00:00:00+00:00');
 });
 
-test('mollie fetchSubscription rejects a malformed subscription code', function () {
+test('mollie fetchSubscription rejects a malformed subscription code', function (): void {
     $driver = makeMollieSubscriptionDriver2([]);
 
     $driver->fetchSubscription('sub_1');
 })->throws(SubscriptionException::class, 'Invalid Mollie subscription code');
 
-test('mollie fetchSubscription throws SubscriptionException on a network/API error', function () {
+test('mollie fetchSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 500, 'title' => 'Server Error'])),
     ]);
@@ -132,7 +132,7 @@ test('mollie fetchSubscription throws SubscriptionException on a network/API err
     $driver->fetchSubscription('cst_1:sub_1');
 })->throws(SubscriptionException::class, 'Failed to fetch subscription');
 
-test('mollie fetchSubscription falls back to monthly when the interval string does not match the expected pattern', function () {
+test('mollie fetchSubscription falls back to monthly when the interval string does not match the expected pattern', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'sub_1',
@@ -149,7 +149,7 @@ test('mollie fetchSubscription falls back to monthly when the interval string do
     expect($decodedPlan->interval)->toBe('monthly');
 });
 
-test('mollie fetchSubscription maps completed, pending and suspended statuses', function (string $status, string $expected) {
+test('mollie fetchSubscription maps completed, pending and suspended statuses', function (string $status, string $expected): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'sub_1',
@@ -173,7 +173,7 @@ test('mollie fetchSubscription maps completed, pending and suspended statuses', 
 // cancelSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('mollie cancelSubscription throws SubscriptionException on a network/API error', function () {
+test('mollie cancelSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 500, 'title' => 'Server Error'])),
     ]);
@@ -185,7 +185,7 @@ test('mollie cancelSubscription throws SubscriptionException on a network/API er
 // listSubscriptions
 // ---------------------------------------------------------------------
 
-test('mollie listSubscriptions logs a warning when page greater than one is requested', function () {
+test('mollie listSubscriptions logs a warning when page greater than one is requested', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode([
             '_embedded' => ['customers' => [['id' => 'cst_1', 'email' => 'test@example.com']]],
@@ -198,7 +198,7 @@ test('mollie listSubscriptions logs a warning when page greater than one is requ
     expect($result['data'])->toBe([]);
 });
 
-test('mollie listSubscriptions returns an empty list when the customer is not found', function () {
+test('mollie listSubscriptions returns an empty list when the customer is not found', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(200, [], json_encode(['_embedded' => ['customers' => []]])),
     ]);
@@ -208,7 +208,7 @@ test('mollie listSubscriptions returns an empty list when the customer is not fo
     expect($result)->toBe(['data' => [], 'has_more' => false]);
 });
 
-test('mollie listSubscriptions throws SubscriptionException on a network/API error', function () {
+test('mollie listSubscriptions throws SubscriptionException on a network/API error', function (): void {
     $driver = makeMollieSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 500, 'title' => 'Server Error'])),
     ]);

@@ -42,7 +42,7 @@ function pruneOutput(array $options = []): string
     return Artisan::output();
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.features.trace' => true, 'payments.trace.retention_days' => 90]);
 });
@@ -51,7 +51,7 @@ beforeEach(function () {
 // What gets deleted
 // ---------------------------------------------------------------------------
 
-test('events past the retention window are deleted and newer ones are not', function () {
+test('events past the retention window are deleted and newer ones are not', function (): void {
     seedTraceEventAged('PZ_old_a', 120);
     seedTraceEventAged('PZ_old_b', 91);
     seedTraceEventAged('PZ_recent', 30);
@@ -63,14 +63,14 @@ test('events past the retention window are deleted and newer ones are not', func
         ->and(PaymentTraceEvent::first()->reference)->toBe('PZ_recent');
 });
 
-test('an empty table is reported rather than treated as a failure', function () {
+test('an empty table is reported rather than treated as a failure', function (): void {
     $exit = Artisan::call('payzephyr:trace:prune', ['--no-interaction' => true]);
 
     expect($exit)->toBe(0)
         ->and(Artisan::output())->toContain('Nothing to prune');
 });
 
-test('the retention window can be overridden for a one-off prune', function () {
+test('the retention window can be overridden for a one-off prune', function (): void {
     seedTraceEventAged('PZ_a', 40);
 
     pruneOutput(['--days' => 30]);
@@ -78,7 +78,7 @@ test('the retention window can be overridden for a one-off prune', function () {
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('deletion happens in chunks without losing rows', function () {
+test('deletion happens in chunks without losing rows', function (): void {
     // The pattern under test: select ids, delete by id, re-run the filter.
     // Chunking a cursor over the same rows being deleted underneath it is the
     // version that silently skips records.
@@ -94,7 +94,7 @@ test('deletion happens in chunks without losing rows', function () {
         ->and(PaymentTraceEvent::first()->reference)->toBe('PZ_keep');
 });
 
-test('a chunk size of zero falls back to a sane default rather than looping forever', function () {
+test('a chunk size of zero falls back to a sane default rather than looping forever', function (): void {
     seedTraceEventAged('PZ_a', 100);
 
     pruneOutput(['--chunk' => 0]);
@@ -106,7 +106,7 @@ test('a chunk size of zero falls back to a sane default rather than looping fore
 // --dry-run
 // ---------------------------------------------------------------------------
 
-test('a dry run reports what would go and deletes nothing', function () {
+test('a dry run reports what would go and deletes nothing', function (): void {
     seedTraceEventAged('PZ_a', 120);
     seedTraceEventAged('PZ_b', 100);
 
@@ -117,7 +117,7 @@ test('a dry run reports what would go and deletes nothing', function () {
         ->and(PaymentTraceEvent::count())->toBe(2);
 });
 
-test('a dry run shows the span of what it would delete', function () {
+test('a dry run shows the span of what it would delete', function (): void {
     seedTraceEventAged('PZ_a', 200);
     seedTraceEventAged('PZ_b', 100);
 
@@ -128,7 +128,7 @@ test('a dry run shows the span of what it would delete', function () {
 // Running unattended
 // ---------------------------------------------------------------------------
 
-test('a non-interactive run proceeds deliberately, not by falling through a prompt', function () {
+test('a non-interactive run proceeds deliberately, not by falling through a prompt', function (): void {
     // The point of the explicit branch: this command exists to run on a
     // schedule, and "it proceeds because confirm() returns its default when
     // there is no TTY" is a behaviour nobody chose.
@@ -140,7 +140,7 @@ test('a non-interactive run proceeds deliberately, not by falling through a prom
         ->and(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('--force deletes without asking', function () {
+test('--force deletes without asking', function (): void {
     seedTraceEventAged('PZ_a', 100);
 
     Artisan::call('payzephyr:trace:prune', ['--force' => true]);
@@ -152,7 +152,7 @@ test('--force deletes without asking', function () {
 // Refusing to do something destructive by accident
 // ---------------------------------------------------------------------------
 
-test('a retention window under a day is refused', function () {
+test('a retention window under a day is refused', function (): void {
     // --days=0 would delete events as fast as they are written, which is never
     // what anyone means.
     seedTraceEventAged('PZ_a', 100);
@@ -164,7 +164,7 @@ test('a retention window under a day is refused', function () {
         ->and(PaymentTraceEvent::count())->toBe(1);
 });
 
-test('no configured retention window is an error, not a silent no-op', function () {
+test('no configured retention window is an error, not a silent no-op', function (): void {
     config(['payments.trace.retention_days' => null]);
     app()->forgetInstance('payments.config');
 
@@ -177,7 +177,7 @@ test('no configured retention window is an error, not a silent no-op', function 
         ->and(PaymentTraceEvent::count())->toBe(1);
 });
 
-test('a missing trace table says how to install it', function () {
+test('a missing trace table says how to install it', function (): void {
     Schema::drop('payment_trace_events');
 
     $exit = Artisan::call('payzephyr:trace:prune', ['--no-interaction' => true]);
@@ -186,7 +186,7 @@ test('a missing trace table says how to install it', function () {
         ->and(Artisan::output())->toContain('payzephyr:install --features=trace');
 });
 
-test('the trace command also explains a missing table instead of throwing', function () {
+test('the trace command also explains a missing table instead of throwing', function (): void {
     Schema::drop('payment_trace_events');
 
     $exit = Artisan::call('payzephyr:trace', ['reference' => 'PZ_a']);
@@ -195,7 +195,7 @@ test('the trace command also explains a missing table instead of throwing', func
         ->and(Artisan::output())->toContain('payzephyr:install --features=trace');
 });
 
-test('a non-numeric retention window is rejected rather than ignored', function () {
+test('a non-numeric retention window is rejected rather than ignored', function (): void {
     // Silently falling back to the configured window would prune against a
     // number the operator did not ask for.
     seedTraceEventAged('PZ_a', 100);
@@ -207,7 +207,7 @@ test('a non-numeric retention window is rejected rather than ignored', function 
         ->and(PaymentTraceEvent::count())->toBe(1);
 });
 
-test('an interactive run deletes only once the operator agrees', function () {
+test('an interactive run deletes only once the operator agrees', function (): void {
     seedTraceEventAged('PZ_a', 100);
 
     $this->artisan('payzephyr:trace:prune')
@@ -217,7 +217,7 @@ test('an interactive run deletes only once the operator agrees', function () {
     expect(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('declining the prompt leaves every row in place', function () {
+test('declining the prompt leaves every row in place', function (): void {
     // The prompt defaults to no. Trace history is not recoverable, so a
     // mistyped command at a terminal should cost nothing.
     seedTraceEventAged('PZ_a', 100);
@@ -230,7 +230,7 @@ test('declining the prompt leaves every row in place', function () {
     expect(PaymentTraceEvent::count())->toBe(1);
 });
 
-test('a total that is an exact multiple of the chunk size still terminates', function () {
+test('a total that is an exact multiple of the chunk size still terminates', function (): void {
     // The loop continues while a full chunk comes back, so an exact multiple
     // means one final pass that finds nothing. Getting that wrong is an
     // infinite loop on a scheduled command.

@@ -9,7 +9,7 @@ use KenDeNigerian\PayZephyr\Events\PaymentInitiated;
 use KenDeNigerian\PayZephyr\Events\PaymentVerificationSuccess;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -23,7 +23,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a cache failure after a successful charge does not trigger a second charge against the fallback provider', function () {
+test('a cache failure after a successful charge does not trigger a second charge against the fallback provider', function (): void {
     // Regression: chargeWithFallback() ran cacheSessionData()/logTransaction()/
     // PaymentInitiated::dispatch() *inside* the same try{} block as
     // $driver->charge(), so an exception from any of them after a
@@ -52,8 +52,8 @@ test('a cache failure after a successful charge does not trigger a second charge
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a PaymentInitiated listener exception after a successful charge does not trigger a second charge', function () {
-    Event::listen(PaymentInitiated::class, function () {
+test('a PaymentInitiated listener exception after a successful charge does not trigger a second charge', function (): void {
+    Event::listen(PaymentInitiated::class, function (): void {
         throw new RuntimeException('listener exploded');
     });
 
@@ -76,8 +76,8 @@ test('a PaymentInitiated listener exception after a successful charge does not t
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a PaymentVerificationSuccess listener exception after a successful verify does not trigger a second verify call against another provider', function () {
-    Event::listen(PaymentVerificationSuccess::class, function () {
+test('a PaymentVerificationSuccess listener exception after a successful verify does not trigger a second verify call against another provider', function (): void {
+    Event::listen(PaymentVerificationSuccess::class, function (): void {
         throw new RuntimeException('listener exploded');
     });
 

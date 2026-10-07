@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
-test('charge response dto falls back to static normalization when app function not available', function () {
+test('charge response dto falls back to static normalization when app function not available', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -15,7 +17,7 @@ test('charge response dto falls back to static normalization when app function n
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response dto handles exception in normalization gracefully', function () {
+test('charge response dto handles exception in normalization gracefully', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -27,7 +29,7 @@ test('charge response dto handles exception in normalization gracefully', functi
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response dto falls back to static normalization when app function not available', function () {
+test('verification response dto falls back to static normalization when app function not available', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'succeeded',
@@ -39,7 +41,7 @@ test('verification response dto falls back to static normalization when app func
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response dto handles exception in normalization gracefully', function () {
+test('verification response dto handles exception in normalization gracefully', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'declined',

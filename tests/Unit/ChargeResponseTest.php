@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 
-test('charge response checks successful status', function () {
+test('charge response checks successful status', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -14,7 +16,7 @@ test('charge response checks successful status', function () {
         ->and($response->isPending())->toBeFalse();
 });
 
-test('charge response checks succeeded status variation', function () {
+test('charge response checks succeeded status variation', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -25,7 +27,7 @@ test('charge response checks succeeded status variation', function () {
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response checks completed status variation', function () {
+test('charge response checks completed status variation', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -36,7 +38,7 @@ test('charge response checks completed status variation', function () {
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response checks pending status', function () {
+test('charge response checks pending status', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -48,7 +50,7 @@ test('charge response checks pending status', function () {
         ->and($response->isSuccessful())->toBeFalse();
 });
 
-test('charge response handles case insensitive status', function () {
+test('charge response handles case insensitive status', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -59,7 +61,7 @@ test('charge response handles case insensitive status', function () {
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('charge response converts to array', function () {
+test('charge response converts to array', function (): void {
     $response = ChargeResponseDTO::fromArray([
         'reference' => 'ref_123',
         'authorization_url' => 'https://example.com',
@@ -79,7 +81,7 @@ test('charge response converts to array', function () {
         ->and($array['provider'])->toBe('paystack');
 });
 
-test('charge response creates from array with defaults', function () {
+test('charge response creates from array with defaults', function (): void {
     $response = ChargeResponseDTO::fromArray([]);
 
     expect($response->reference)->toBe('')
@@ -90,7 +92,7 @@ test('charge response creates from array with defaults', function () {
         ->and($response->provider)->toBeNull();
 });
 
-test('charge response includes metadata', function () {
+test('charge response includes metadata', function (): void {
     $metadata = [
         'order_id' => 12345,
         'customer_id' => 'cust_123',
@@ -108,7 +110,7 @@ test('charge response includes metadata', function () {
     expect($response->metadata)->toBe($metadata);
 });
 
-test('charge response includes provider name', function () {
+test('charge response includes provider name', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -120,7 +122,7 @@ test('charge response includes provider name', function () {
     expect($response->provider)->toBe('paystack');
 });
 
-test('charge response is immutable', function () {
+test('charge response is immutable', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',
@@ -132,7 +134,7 @@ test('charge response is immutable', function () {
         ->and($response->reference)->toBe('ref_123');
 });
 
-test('charge response handles empty metadata', function () {
+test('charge response handles empty metadata', function (): void {
     $response = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://example.com',

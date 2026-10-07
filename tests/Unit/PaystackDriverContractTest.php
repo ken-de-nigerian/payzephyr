@@ -11,8 +11,11 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
 /*
@@ -50,7 +53,7 @@ function sentJson(array $history, int $index = 0): array
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Paystack the amount in kobo, the currency, the reference, the callback and the metadata', function () {
+test('a charge sends Paystack the amount in kobo, the currency, the reference, the callback and the metadata', function (): void {
     $history = [];
     $driver = paystackContractDriver([paystackInitialized()], $history);
 
@@ -70,7 +73,7 @@ test('a charge sends Paystack the amount in kobo, the currency, the reference, t
     ]);
 });
 
-test('a charge leaves out what it was not given', function () {
+test('a charge leaves out what it was not given', function (): void {
     $history = [];
     $driver = paystackContractDriver([paystackInitialized()], $history);
 
@@ -79,7 +82,7 @@ test('a charge leaves out what it was not given', function () {
     expect(sentJson($history))->toBe(['email' => 'a@b.com', 'amount' => 1000, 'currency' => 'NGN', 'reference' => 'PZ_CHARGE_2']);
 });
 
-test('an initialized charge is logged with its reference', function () {
+test('an initialized charge is logged with its reference', function (): void {
     $logs = captureLogs();
 
     paystackContractDriver([paystackInitialized()])->charge(new ChargeRequestDTO(amount: 10, currency: 'NGN', email: 'a@b.com', reference: 'PZ_CHARGE_3'));
@@ -87,14 +90,14 @@ test('an initialized charge is logged with its reference', function () {
     expect(loggedEntry($logs, 'Charge initialized successfully')['context'])->toBe(['reference' => 'PZ_CHARGE_3']);
 });
 
-test('a charge Paystack answers without a status is refused with its message', function () {
+test('a charge Paystack answers without a status is refused with its message', function (): void {
     $driver = paystackContractDriver([new Response(200, [], '{"message":"Invalid key"}')]);
 
-    expect(fn () => $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'NGN', email: 'a@b.com')))
+    expect(fn (): ChargeResponseDTO => $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'NGN', email: 'a@b.com')))
         ->toThrow(ChargeException::class, 'Invalid key');
 });
 
-test('a charge that fails on the way, or comes back incomplete, is raised as a charge failure, coded 0', function () {
+test('a charge that fails on the way, or comes back incomplete, is raised as a charge failure, coded 0', function (): void {
     $driver = paystackContractDriver([new ConnectException('Connection refused', new Request('POST', '/transaction/initialize'))]);
 
     try {
@@ -116,9 +119,9 @@ test('a charge that fails on the way, or comes back incomplete, is raised as a c
     }
 });
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
-    $driver = paystackContractDriver([function () {
+    $driver = paystackContractDriver([function (): void {
         throw new LogicException('handler blew up');
     }]);
 
@@ -134,7 +137,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0', fun
     expect(loggedEntry($logs, 'Charge failed')['context'])->toBe(['error' => 'handler blew up', 'error_class' => LogicException::class]);
 });
 
-test('a charge does not leave its idempotency key on the driver for the next request', function () {
+test('a charge does not leave its idempotency key on the driver for the next request', function (): void {
     $history = [];
     $driver = paystackContractDriver([paystackInitialized(), new Response(200, [], '{"status":true,"data":{}}')], $history);
 
@@ -153,7 +156,7 @@ test('a charge does not leave its idempotency key on the driver for the next req
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a verified payment is read in full and logged with its status', function () {
+test('a verified payment is read in full and logged with its status', function (): void {
     $logs = captureLogs();
     $driver = paystackContractDriver([new Response(200, [], (string) json_encode(['status' => true, 'data' => [
         'reference' => 'PZ_V1', 'status' => 'success', 'amount' => 25000, 'currency' => 'NGN', 'paid_at' => '2026-10-01T10:00:00Z',
@@ -170,15 +173,15 @@ test('a verified payment is read in full and logged with its status', function (
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'PZ_V1', 'status' => 'success']);
 });
 
-test('a verification Paystack answers without a status is refused with its message', function () {
+test('a verification Paystack answers without a status is refused with its message', function (): void {
     $driver = paystackContractDriver([new Response(200, [], '{"message":"Transaction reference not found"}')]);
 
-    expect(fn () => $driver->verify('PZ_MISSING'))->toThrow(VerificationException::class, 'Transaction reference not found');
+    expect(fn (): VerificationResponseDTO => $driver->verify('PZ_MISSING'))->toThrow(VerificationException::class, 'Transaction reference not found');
 });
 
-test('a verification that fails on the way is logged and wrapped, coded 0', function () {
+test('a verification that fails on the way is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
-    $driver = paystackContractDriver([function () {
+    $driver = paystackContractDriver([function (): void {
         throw new LogicException('handler blew up');
     }]);
 
@@ -198,7 +201,7 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
 // Webhooks and health
 // ---------------------------------------------------------------------------
 
-test('each webhook signature outcome is logged', function (array $headers, bool $valid, string $message) {
+test('each webhook signature outcome is logged', function (array $headers, bool $valid, string $message): void {
     $logs = captureLogs();
     $body = '{"event":"charge.success"}';
     $headers = array_map(fn (string $value): array => [$value === 'VALID' ? hash_hmac('sha512', $body, 'sk_test_xxx') : $value], $headers);
@@ -211,7 +214,7 @@ test('each webhook signature outcome is logged', function (array $headers, bool 
     'valid' => [['x-paystack-signature' => 'VALID'], true, 'Webhook validated successfully'],
 ]);
 
-test('the health check counts the 400 and 404 Paystack answers a bogus reference with as healthy, and says so', function (int $status) {
+test('the health check counts the 400 and 404 Paystack answers a bogus reference with as healthy, and says so', function (int $status): void {
     $logs = captureLogs();
     $request = new Request('GET', '/transaction/verify/invalid_ref_test');
     $driver = paystackContractDriver([new ClientException('Client error', $request, new Response($status))]);
@@ -220,7 +223,7 @@ test('the health check counts the 400 and 404 Paystack answers a bogus reference
         ->and(loggedEntry($logs, 'Health check successful')['context'])->toBe(['status_code' => $status]);
 })->with([400, 404]);
 
-test('the health check counts any other failure as down, and logs what it was', function () {
+test('the health check counts any other failure as down, and logs what it was', function (): void {
     $logs = captureLogs();
     $request = new Request('GET', '/transaction/verify/invalid_ref_test');
     $driver = paystackContractDriver([new ClientException('Unauthorized', $request, new Response(401))]);
@@ -233,10 +236,10 @@ test('the health check counts any other failure as down, and logs what it was', 
         ->and($context['error'])->toBeString()->not->toBeEmpty();
 });
 
-test('a health check failure with nothing behind it is logged without a previous class', function () {
+test('a health check failure with nothing behind it is logged without a previous class', function (): void {
     $logs = captureLogs();
     // Not a Guzzle exception, so makeRequest() lets it through unwrapped.
-    $driver = paystackContractDriver([function () {
+    $driver = paystackContractDriver([function (): void {
         throw new RuntimeException('no cause');
     }]);
 
@@ -245,13 +248,13 @@ test('a health check failure with nothing behind it is logged without a previous
         ->toBe(['error' => 'no cause', 'exception_class' => RuntimeException::class, 'previous_class' => null]);
 });
 
-test('a Paystack driver is refused without a secret key, and built with one', function () {
-    expect(fn () => new PaystackDriver(['currencies' => ['NGN']]))
-        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class)
+test('a Paystack driver is refused without a secret key, and built with one', function (): void {
+    expect(fn (): PaystackDriver => new PaystackDriver(['currencies' => ['NGN']]))
+        ->toThrow(InvalidConfigurationException::class)
         ->and(new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]))->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('every request to Paystack is authenticated with the secret key, as JSON', function () {
+test('every request to Paystack is authenticated with the secret key, as JSON', function (): void {
     $history = [];
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
     $client = (new ReflectionClass($driver))->getProperty('client')->getValue($driver);

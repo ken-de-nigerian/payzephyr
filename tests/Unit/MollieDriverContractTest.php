@@ -53,7 +53,7 @@ function mollieCharge(array $overrides = []): ChargeRequestDTO
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Mollie its full payload, authenticated, as JSON', function () {
+test('a charge sends Mollie its full payload, authenticated, as JSON', function (): void {
     $history = [];
     $result = mollieContractDriver([molliePayment()], $history)->charge(mollieCharge([
         'description' => 'Order 9', 'metadata' => ['order' => 9], 'channels' => ['card'], 'idempotencyKey' => 'idem-1',
@@ -75,7 +75,7 @@ test('a charge sends Mollie its full payload, authenticated, as JSON', function 
         ->and($result->metadata)->toBe(['order' => 9, 'mollie_id' => 'tr_1', 'reference' => 'MOLLIE_1']);
 });
 
-test('a charge without a description says "Payment", and sends no method it was not given', function () {
+test('a charge without a description says "Payment", and sends no method it was not given', function (): void {
     $history = [];
     mollieContractDriver([molliePayment()], $history)->charge(mollieCharge());
 
@@ -84,7 +84,7 @@ test('a charge without a description says "Payment", and sends no method it was 
         ->and($sent)->not->toHaveKey('method');
 });
 
-test('an initialized charge is logged with its references and whether it was idempotent', function (?string $key, bool $idempotent) {
+test('an initialized charge is logged with its references and whether it was idempotent', function (?string $key, bool $idempotent): void {
     $logs = captureLogs();
 
     mollieContractDriver([molliePayment()])->charge(mollieCharge(['idempotencyKey' => $key]));
@@ -95,7 +95,7 @@ test('an initialized charge is logged with its references and whether it was ide
     'without' => [null, false],
 ]);
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = mollieContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
@@ -121,7 +121,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0, and 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a payment is looked up by its id and read in full', function () {
+test('a payment is looked up by its id and read in full', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = mollieContractDriver([new Response(200, [], (string) json_encode([
@@ -137,7 +137,7 @@ test('a payment is looked up by its id and read in full', function () {
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'tr 1', 'status' => 'paid']);
 });
 
-test('a verification that fails is logged and wrapped, coded 0', function () {
+test('a verification that fails is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -155,13 +155,13 @@ test('a verification that fails is logged and wrapped, coded 0', function () {
 // Webhooks: by signature
 // ---------------------------------------------------------------------------
 
-test('the signature header is read in either case', function (string $header) {
+test('the signature header is read in either case', function (string $header): void {
     $body = '{"resource":"event","id":"event_1","type":"payment-link.paid"}';
 
     expect(mollieContractDriver([], secret: 'whsec')->validateWebhook([$header => ['sha256='.hash_hmac('sha256', $body, 'whsec')]], $body))->toBeTrue();
 })->with(['x-mollie-signature', 'X-Mollie-Signature']);
 
-test('each signed webhook outcome is logged with what an operator needs', function () {
+test('each signed webhook outcome is logged with what an operator needs', function (): void {
     $logs = captureLogs();
     $driver = mollieContractDriver([], secret: 'whsec');
     $sign = fn (string $body): array => ['x-mollie-signature' => [hash_hmac('sha256', $body, 'whsec')]];
@@ -182,7 +182,7 @@ test('each signed webhook outcome is logged with what an operator needs', functi
 // Webhooks: by looking the payment up
 // ---------------------------------------------------------------------------
 
-test('without a secret, a classic webhook is checked by looking its payment up, and logged', function () {
+test('without a secret, a classic webhook is checked by looking its payment up, and logged', function (): void {
     $logs = captureLogs();
     $history = [];
 
@@ -193,7 +193,7 @@ test('without a secret, a classic webhook is checked by looking its payment up, 
         ]);
 });
 
-test('without a secret, a webhook that is not JSON, names no payment, or is typed is refused and logged', function (string $body, string $message) {
+test('without a secret, a webhook that is not JSON, names no payment, or is typed is refused and logged', function (string $body, string $message): void {
     $logs = captureLogs();
 
     expect(mollieContractDriver([])->validateWebhook([], $body))->toBeFalse()
@@ -205,7 +205,7 @@ test('without a secret, a webhook that is not JSON, names no payment, or is type
     'no payment id' => ['{"resource":"payment"}', 'Webhook missing payment ID'],
 ]);
 
-test('without a secret, a typed webhook is refused with its type and how to fix it', function () {
+test('without a secret, a typed webhook is refused with its type and how to fix it', function (): void {
     $logs = captureLogs();
 
     expect(mollieContractDriver([])->validateWebhook([], '{"type":"hook.ping","id":"event_1"}'))->toBeFalse()
@@ -215,7 +215,7 @@ test('without a secret, a typed webhook is refused with its type and how to fix 
         ]);
 });
 
-test('a looked-up payment that is not the one named is refused, and logged with both ids', function (string $answer, ?string $received) {
+test('a looked-up payment that is not the one named is refused, and logged with both ids', function (string $answer, ?string $received): void {
     $logs = captureLogs();
 
     expect(mollieContractDriver([new Response(200, [], $answer)])->validateWebhook([], '{"id":"tr_named"}'))->toBeFalse()
@@ -225,7 +225,7 @@ test('a looked-up payment that is not the one named is refused, and logged with 
     'no id' => ['{"status":"paid"}', null],
 ]);
 
-test('a looked-up payment Mollie does not have is refused, and logged', function () {
+test('a looked-up payment Mollie does not have is refused, and logged', function (): void {
     $logs = captureLogs();
     $missing = new ClientException('Not Found', new Request('GET', '/v2/payments/tr_x'), new Response(404));
 
@@ -233,7 +233,7 @@ test('a looked-up payment Mollie does not have is refused, and logged', function
         ->and(loggedEntry($logs, 'Mollie rejected the payment lookup')['context']['error'])->toBeString()->not->toBeEmpty();
 });
 
-test('a lookup that cannot reach Mollie is raised, coded 0, so the delivery is retried', function () {
+test('a lookup that cannot reach Mollie is raised, coded 0, so the delivery is retried', function (): void {
     $logs = captureLogs();
     $down = new ServerException('Bad Gateway', new Request('GET', '/v2/payments/tr_y'), new Response(502));
 
@@ -255,7 +255,7 @@ test('a lookup that cannot reach Mollie is raised, coded 0, so the delivery is r
 // Health and amounts
 // ---------------------------------------------------------------------------
 
-test('the health check counts Mollie\'s 400 and 404 as healthy, and logs anything else', function () {
+test('the health check counts Mollie\'s 400 and 404 as healthy, and logs anything else', function (): void {
     $logs = captureLogs();
     $request = new Request('GET', '/v2/methods');
 
@@ -265,6 +265,6 @@ test('the health check counts Mollie\'s 400 and 404 as healthy, and logs anythin
         ->and(loggedEntry($logs, 'Health check failed')['context'])->toBe(['error' => 'not ours']);
 });
 
-test('an amount is sent with two decimals and no thousands separator', function () {
+test('an amount is sent with two decimals and no thousands separator', function (): void {
     expect((new ReflectionClass(MollieDriver::class))->getMethod('formatAmount')->invoke(mollieContractDriver([]), 1234567.891, 'EUR'))->toBe('1234567.89');
 });

@@ -14,7 +14,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Refund;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -28,7 +28,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a second refund for the same transaction submitted while the first is still in flight is rejected', function () {
+test('a second refund for the same transaction submitted while the first is still in flight is rejected', function (): void {
     $driver = makeRefundCapableDriver('primary');
 
     $manager = new PaymentManager;
@@ -134,7 +134,7 @@ test('a second refund for the same transaction submitted while the first is stil
         ->and($response->transactionReference)->toBe('txn_race');
 });
 
-test('the in-flight lock is released after the refund completes, so a later refund on the same transaction is not blocked', function () {
+test('the in-flight lock is released after the refund completes, so a later refund on the same transaction is not blocked', function (): void {
     $driver = makeRefundCapableDriver('primary');
 
     $manager = new PaymentManager;
@@ -147,7 +147,7 @@ test('the in-flight lock is released after the refund completes, so a later refu
         ->and($first->refundReference)->not->toBe($second->refundReference);
 });
 
-test('the in-flight lock is scoped per transaction reference, not global', function () {
+test('the in-flight lock is scoped per transaction reference, not global', function (): void {
     $driver = makeRefundCapableDriver('primary');
 
     $manager = new PaymentManager;
@@ -165,7 +165,7 @@ test('the in-flight lock is scoped per transaction reference, not global', funct
     Cache::forget('payzephyr:refund:inflight:txn_a');
 });
 
-test('prevent_duplicates=false disables the in-flight lock entirely', function () {
+test('prevent_duplicates=false disables the in-flight lock entirely', function (): void {
     config(['payments.refunds.prevent_duplicates' => false]);
 
     $driver = makeRefundCapableDriver('primary');

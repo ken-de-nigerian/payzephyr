@@ -25,7 +25,7 @@ use Tests\Helpers\PaystackDriverTestHelper;
  * is the only way to actually reach the JSON-status check and its adjacent
  * specific-exception rethrow.
  */
-test('paystack fetchPlan throws PlanException from the JSON status check (not an HTTP error)', function () {
+test('paystack fetchPlan throws PlanException from the JSON status check (not an HTTP error)', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -36,7 +36,7 @@ test('paystack fetchPlan throws PlanException from the JSON status check (not an
     $driver->fetchPlan('PLN_missing');
 })->throws(PlanException::class, 'Plan does not exist');
 
-test('paystack listPlans throws PlanException from the JSON status check (not an HTTP error)', function () {
+test('paystack listPlans throws PlanException from the JSON status check (not an HTTP error)', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -47,7 +47,7 @@ test('paystack listPlans throws PlanException from the JSON status check (not an
     $driver->listPlans();
 })->throws(PlanException::class, 'Could not list plans');
 
-test('paystack enableSubscription throws SubscriptionException from the JSON status check (not an HTTP error)', function () {
+test('paystack enableSubscription throws SubscriptionException from the JSON status check (not an HTTP error)', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -58,7 +58,7 @@ test('paystack enableSubscription throws SubscriptionException from the JSON sta
     $driver->enableSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'expired_token_1234']));
 })->throws(SubscriptionException::class, 'Token has expired');
 
-test('paystack listSubscriptions throws SubscriptionException from the JSON status check (not an HTTP error)', function () {
+test('paystack listSubscriptions throws SubscriptionException from the JSON status check (not an HTTP error)', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -69,7 +69,7 @@ test('paystack listSubscriptions throws SubscriptionException from the JSON stat
     $driver->listSubscriptions();
 })->throws(SubscriptionException::class, 'Could not list subscriptions');
 
-test('paystack createSubscription throws when the response has no subscription_code or code field', function () {
+test('paystack createSubscription throws when the response has no subscription_code or code field', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -92,7 +92,7 @@ test('paystack createSubscription throws when the response has no subscription_c
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Subscription code not found in response');
 
-test('paystack cancelSubscription wraps a non-domain (network/HTTP) failure via the generic catch branch', function () {
+test('paystack cancelSubscription wraps a non-domain (network/HTTP) failure via the generic catch branch', function (): void {
     // A 500 on the disable endpoint itself makes Guzzle throw a
     // ServerException before any JSON body is parsed. makeRequest() turns
     // that into a ChargeException, which is not a SubscriptionException, so
@@ -105,18 +105,18 @@ test('paystack cancelSubscription wraps a non-domain (network/HTTP) failure via 
     $driver->cancelSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'token_abc123']));
 })->throws(SubscriptionException::class, 'Failed to cancel subscription:');
 
-test('a created subscription whose response omits its status is reported as unknown, not as a failure', function () {
+test('a created subscription whose response omits its status is reported as unknown, not as a failure', function (): void {
     // The subscription exists at Paystack once this response arrives. Reading
     // the missing status raised a TypeError, reported as "Failed to create
     // subscription" - inviting a retry that subscribes the customer twice.
-    $driver = \Tests\Helpers\PaystackDriverTestHelper::createWithMock([
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+    $driver = PaystackDriverTestHelper::createWithMock([
+        new Response(200, [], json_encode([
             'status' => true,
             'data' => ['subscription_code' => 'SUB_nostatus', 'amount' => 500000],
         ])),
     ]);
 
-    $subscription = $driver->createSubscription(new \KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO(
+    $subscription = $driver->createSubscription(new SubscriptionRequestDTO(
         customer: 'a@b.com',
         plan: 'PLN_1',
     ));
@@ -127,9 +127,9 @@ test('a created subscription whose response omits its status is reported as unkn
         ->and($subscription->amount)->toBe(5000.0);
 });
 
-test('subscription metadata Paystack returns as a JSON string is read', function () {
-    $driver = \Tests\Helpers\PaystackDriverTestHelper::createWithMock([
-        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+test('subscription metadata Paystack returns as a JSON string is read', function (): void {
+    $driver = PaystackDriverTestHelper::createWithMock([
+        new Response(200, [], json_encode([
             'status' => true,
             'data' => [
                 'subscription_code' => 'SUB_json',

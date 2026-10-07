@@ -5,7 +5,7 @@ declare(strict_types=1);
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 
-test('the trace event taxonomy covers every recorded stage of a payment', function () {
+test('the trace event taxonomy covers every recorded stage of a payment', function (): void {
     expect(TraceEvent::cases())->toHaveCount(39)
         ->and(TraceEvent::REFUND_REQUESTED->value)->toBe('refund.requested')
         ->and(TraceEvent::REFUND_ACCEPTED->value)->toBe('refund.accepted')
@@ -29,13 +29,13 @@ test('the trace event taxonomy covers every recorded stage of a payment', functi
         ->and(TraceEvent::CUSTOM->value)->toBe('custom');
 });
 
-test('every trace event has a non-empty description', function () {
+test('every trace event has a non-empty description', function (): void {
     foreach (TraceEvent::cases() as $case) {
         expect($case->description())->toBeString()->not->toBe('');
     }
 });
 
-test('terminal events are exactly the ones that end a payment flow', function () {
+test('terminal events are exactly the ones that end a payment flow', function (): void {
     $terminal = array_values(array_filter(
         TraceEvent::cases(),
         fn (TraceEvent $case): bool => $case->isTerminal()
@@ -55,7 +55,7 @@ test('terminal events are exactly the ones that end a payment flow', function ()
     ]);
 });
 
-test('error events are exactly the ones worth surfacing as a problem', function () {
+test('error events are exactly the ones worth surfacing as a problem', function (): void {
     $errors = array_values(array_filter(
         TraceEvent::cases(),
         fn (TraceEvent $case): bool => $case->isError()
@@ -79,7 +79,7 @@ test('error events are exactly the ones worth surfacing as a problem', function 
     ]);
 });
 
-test('no refund or subscription event is terminal', function () {
+test('no refund or subscription event is terminal', function (): void {
     // A refunded payment still completed: Timeline::terminal() takes the
     // first terminal event, so a refund marked terminal would misreport it.
     foreach (TraceEvent::cases() as $case) {
@@ -89,30 +89,30 @@ test('no refund or subscription event is terminal', function () {
     }
 });
 
-test('a successful payment is terminal without being an error', function () {
+test('a successful payment is terminal without being an error', function (): void {
     expect(TraceEvent::PAYMENT_COMPLETED->isTerminal())->toBeTrue()
         ->and(TraceEvent::PAYMENT_COMPLETED->isError())->toBeFalse();
 });
 
-test('a failed payment is both terminal and an error', function () {
+test('a failed payment is both terminal and an error', function (): void {
     expect(TraceEvent::PAYMENT_FAILED->isTerminal())->toBeTrue()
         ->and(TraceEvent::PAYMENT_FAILED->isError())->toBeTrue();
 });
 
-test('an ordinary provider round trip is neither terminal nor an error', function () {
+test('an ordinary provider round trip is neither terminal nor an error', function (): void {
     expect(TraceEvent::PROVIDER_REQUEST_SENT->isTerminal())->toBeFalse()
         ->and(TraceEvent::PROVIDER_REQUEST_SENT->isError())->toBeFalse()
         ->and(TraceEvent::PROVIDER_RESPONSE_RECEIVED->isError())->toBeFalse();
 });
 
-test('trace direction distinguishes internal steps from provider traffic', function () {
+test('trace direction distinguishes internal steps from provider traffic', function (): void {
     expect(TraceDirection::cases())->toHaveCount(3)
         ->and(TraceDirection::INTERNAL->value)->toBe('internal')
         ->and(TraceDirection::OUTBOUND->value)->toBe('outbound')
         ->and(TraceDirection::INBOUND->value)->toBe('inbound');
 });
 
-test('each direction renders a distinct timeline icon', function () {
+test('each direction renders a distinct timeline icon', function (): void {
     $icons = array_map(
         fn (TraceDirection $case): string => $case->icon(),
         TraceDirection::cases()
@@ -122,7 +122,7 @@ test('each direction renders a distinct timeline icon', function () {
         ->and(array_unique($icons))->toHaveCount(3);
 });
 
-test('every direction has a non-empty description', function () {
+test('every direction has a non-empty description', function (): void {
     foreach (TraceDirection::cases() as $case) {
         expect($case->description())->toBeString()->not->toBe('');
     }

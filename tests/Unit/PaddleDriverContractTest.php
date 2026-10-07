@@ -13,8 +13,10 @@ use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaddleDriver;
+use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 
 /*
  * What PaddleDriver sends to Paddle, what it makes of the answers, and what
@@ -57,7 +59,7 @@ afterEach(fn () => Carbon::setTestNow());
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Paddle its full transaction, authenticated, as JSON', function () {
+test('a charge sends Paddle its full transaction, authenticated, as JSON', function (): void {
     $history = [];
     $result = paddleContractDriver([paddleTransaction(['status' => 'completed'])], $history, ['product_name' => 'Shop', 'tax_category' => 'digital-goods'])
         ->charge(paddleCharge(['description' => 'Order 9', 'metadata' => ['order' => 9]]));
@@ -86,7 +88,7 @@ test('a charge sends Paddle its full transaction, authenticated, as JSON', funct
         ->and($result->metadata)->toBe(['order' => 9, 'paddle_transaction_id' => 'txn_1', 'reference' => 'PADDLE_1']);
 });
 
-test('a charge without a description, product or callback falls back, and sends no checkout', function () {
+test('a charge without a description, product or callback falls back, and sends no checkout', function (): void {
     $history = [];
     $result = paddleContractDriver([paddleTransaction(['status' => null])], $history)->charge(paddleCharge(['callbackUrl' => null]));
 
@@ -99,7 +101,7 @@ test('a charge without a description, product or callback falls back, and sends 
         ->and($result->status)->toBe('pending');
 });
 
-test('an amount is sent in minor units, rounded, and whole for a zero-decimal currency', function (float $amount, string $currency, string $minor) {
+test('an amount is sent in minor units, rounded, and whole for a zero-decimal currency', function (float $amount, string $currency, string $minor): void {
     $history = [];
     paddleContractDriver([paddleTransaction()], $history)->charge(paddleCharge(['amount' => $amount, 'currency' => $currency]));
 
@@ -111,14 +113,14 @@ test('an amount is sent in minor units, rounded, and whole for a zero-decimal cu
     'zero-decimal down' => [1000.4, 'JPY', '1000'],
 ]);
 
-test('an initialized charge is logged with both references', function () {
+test('an initialized charge is logged with both references', function (): void {
     $logs = captureLogs();
     paddleContractDriver([paddleTransaction()])->charge(paddleCharge());
 
     expect(loggedEntry($logs, 'Charge initialized successfully')['context'])->toBe(['reference' => 'PADDLE_1', 'paddle_id' => 'txn_1']);
 });
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -131,7 +133,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0', fun
     expect(loggedEntry($logs, 'Charge failed')['context'])->toBe(['error' => 'handler blew up', 'error_class' => LogicException::class]);
 });
 
-test('a charge does not leave its request behind for the next one', function () {
+test('a charge does not leave its request behind for the next one', function (): void {
     $driver = paddleContractDriver([paddleTransaction()]);
     $driver->charge(paddleCharge(['idempotencyKey' => 'idem-1']));
 
@@ -151,7 +153,7 @@ function paddleVerified(array $data): Response
     ]]));
 }
 
-test('a transaction is looked up by its id and read in full', function () {
+test('a transaction is looked up by its id and read in full', function (): void {
     $logs = captureLogs();
     $history = [];
     $result = paddleContractDriver([paddleVerified(['custom_data' => ['reference' => 'PADDLE_V', 'email' => 'a@b.com']])], $history)->verify('txn V');
@@ -166,14 +168,14 @@ test('a transaction is looked up by its id and read in full', function () {
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'txn V', 'status' => 'completed']);
 });
 
-test('a transaction without its own reference is read by Paddle\'s id, or by the one asked for', function (array $data, string $reference) {
+test('a transaction without its own reference is read by Paddle\'s id, or by the one asked for', function (array $data, string $reference): void {
     expect(paddleContractDriver([paddleVerified($data)])->verify('txn_asked')->reference)->toBe($reference);
 })->with([
     'Paddle id' => [[], 'txn_V'],
     'no id' => [['id' => null], 'txn_asked'],
 ]);
 
-test('a verification that fails is logged and wrapped, coded 0', function () {
+test('a verification that fails is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -191,7 +193,7 @@ test('a verification that fails is logged and wrapped, coded 0', function () {
 // Webhooks
 // ---------------------------------------------------------------------------
 
-test('a signature header is read in either case, with spaces, after junk, and with any h1 matching', function (string $name, string $header) {
+test('a signature header is read in either case, with spaces, after junk, and with any h1 matching', function (string $name, string $header): void {
     Carbon::setTestNow(Carbon::createFromTimestamp(1_800_000_000));
     $body = '{"event_type":"transaction.completed"}';
     $header = str_replace('SIG', paddleSignature($body, 1_800_000_000), $header);
@@ -205,7 +207,7 @@ test('a signature header is read in either case, with spaces, after junk, and wi
     'rotation' => ['paddle-signature', 'ts=1800000000;h1=old;h1=SIG'],
 ]);
 
-test('a malformed signature header is refused as malformed', function (string $header) {
+test('a malformed signature header is refused as malformed', function (string $header): void {
     $logs = captureLogs();
 
     expect(paddleContractDriver()->validateWebhook(['paddle-signature' => [$header]], '{}'))->toBeFalse();
@@ -218,14 +220,14 @@ test('a malformed signature header is refused as malformed', function (string $h
     'timestamp not a number' => ['ts=soon;h1=abc'],
 ]);
 
-test('a signature containing "=" is compared, not dropped as malformed', function () {
+test('a signature containing "=" is compared, not dropped as malformed', function (): void {
     $logs = captureLogs();
 
     expect(paddleContractDriver()->validateWebhook(['paddle-signature' => ['ts=1800000000;h1=a=b']], '{}'))->toBeFalse()
         ->and(loggedEntry($logs, 'Webhook signature validation failed')['context']['hint'])->toContain('PADDLE_WEBHOOK_SECRET');
 });
 
-test('without a secret, or a signature header, a webhook is refused and says why', function () {
+test('without a secret, or a signature header, a webhook is refused and says why', function (): void {
     $logs = captureLogs();
 
     expect(paddleContractDriver(config: ['webhook_secret' => null])->validateWebhook(['paddle-signature' => ['x']], '{}'))->toBeFalse()
@@ -234,7 +236,7 @@ test('without a secret, or a signature header, a webhook is refused and says why
         ->and(loggedEntry($logs, 'Webhook signature missing')['context']['hint'])->toContain('Paddle-Signature');
 });
 
-test('a signature at the edge of the window is accepted, and one second past it is refused and logged', function (int $age, bool $accepted) {
+test('a signature at the edge of the window is accepted, and one second past it is refused and logged', function (int $age, bool $accepted): void {
     config(['payments.security.webhook_timestamp_tolerance' => 300]);
     app()->forgetInstance('payments.config');
     Carbon::setTestNow(Carbon::createFromTimestamp(1_800_000_000 + $age));
@@ -251,7 +253,7 @@ test('a signature at the edge of the window is accepted, and one second past it 
     'past it' => [301, false],
 ]);
 
-test('only a transaction event carries a payment status', function () {
+test('only a transaction event carries a payment status', function (): void {
     $driver = paddleContractDriver();
 
     expect($driver->extractWebhookStatus(['event_type' => 'transaction.completed', 'data' => ['status' => 'completed']]))->toBe('completed')
@@ -263,7 +265,7 @@ test('only a transaction event carries a payment status', function () {
 // Health
 // ---------------------------------------------------------------------------
 
-test('the health check counts Paddle\'s 400 and 404 as healthy, and anything else as down', function () {
+test('the health check counts Paddle\'s 400 and 404 as healthy, and anything else as down', function (): void {
     $logs = captureLogs();
     $request = new Request('GET', '/event-types');
 
@@ -274,19 +276,19 @@ test('the health check counts Paddle\'s 400 and 404 as healthy, and anything els
         ->and(array_column(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'Health check failed')), 'context')[0])->toBe(['error' => 'not ours']);
 });
 
-test('without a configured product name, the product is named after the charge', function () {
+test('without a configured product name, the product is named after the charge', function (): void {
     $history = [];
     paddleContractDriver([paddleTransaction()], $history)->charge(paddleCharge(['description' => 'Order 9']));
 
     expect(json_decode((string) $history[0]['request']->getBody(), true)['items'][0]['price']['product']['name'])->toBe('Order 9');
 });
 
-test('a charge\'s round trip to Paddle is recorded on its own timeline', function () {
+test('a charge\'s round trip to Paddle is recorded on its own timeline', function (): void {
     config(['payments.features.trace' => true, 'payments.trace.async' => false]);
     app()->forgetInstance('payments.config');
 
     paddleContractDriver([paddleTransaction()])->charge(paddleCharge());
 
-    expect(KenDeNigerian\PayZephyr\Models\PaymentTraceEvent::where('reference', 'PADDLE_1')->pluck('event')->map->value->all())
-        ->toBe([KenDeNigerian\PayZephyr\Enums\TraceEvent::PROVIDER_REQUEST_SENT->value, KenDeNigerian\PayZephyr\Enums\TraceEvent::PROVIDER_RESPONSE_RECEIVED->value]);
+    expect(PaymentTraceEvent::where('reference', 'PADDLE_1')->pluck('event')->map->value->all())
+        ->toBe([TraceEvent::PROVIDER_REQUEST_SENT->value, TraceEvent::PROVIDER_RESPONSE_RECEIVED->value]);
 });

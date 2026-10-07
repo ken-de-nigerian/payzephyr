@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
-test('verification response getNormalizedStatus uses container when available', function () {
+test('verification response getNormalizedStatus uses container when available', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'succeeded',
@@ -14,7 +16,7 @@ test('verification response getNormalizedStatus uses container when available', 
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response getNormalizedStatus falls back to static when container unavailable', function () {
+test('verification response getNormalizedStatus falls back to static when container unavailable', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'completed',
@@ -26,7 +28,7 @@ test('verification response getNormalizedStatus falls back to static when contai
     expect($response->isSuccessful())->toBeTrue();
 });
 
-test('verification response handles all status variations with normalization', function () {
+test('verification response handles all status variations with normalization', function (): void {
     $successStatuses = ['success', 'succeeded', 'completed', 'successful', 'paid'];
     $failedStatuses = ['failed', 'declined', 'rejected', 'cancelled'];
 

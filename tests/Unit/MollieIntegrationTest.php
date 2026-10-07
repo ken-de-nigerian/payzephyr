@@ -9,7 +9,7 @@ use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 
-test('mollie integration - full payment flow', function () {
+test('mollie integration - full payment flow', function (): void {
     // Create a mock Mollie driver
     $config = [
         'api_key' => 'test_xxx',
@@ -51,7 +51,6 @@ test('mollie integration - full payment flow', function () {
         amount: 10.00,
         currency: 'EUR',
         email: 'test@example.com',
-        reference: null,
         callbackUrl: 'https://example.com/callback',
         metadata: ['description' => 'Test Payment']
     );

@@ -11,6 +11,8 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Carbon;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -38,7 +40,7 @@ function monnifyContractDriver(array $responses, array &$history = []): MonnifyD
 
 function monnifyLogin(?int $expiresIn = 3600, string $token = 'tok-1'): Response
 {
-    return new Response(200, [], (string) json_encode(['requestSuccessful' => true, 'responseBody' => array_filter(['accessToken' => $token, 'expiresIn' => $expiresIn], fn ($v) => $v !== null)]));
+    return new Response(200, [], (string) json_encode(['requestSuccessful' => true, 'responseBody' => array_filter(['accessToken' => $token, 'expiresIn' => $expiresIn], fn ($v): bool => $v !== null)]));
 }
 
 function monnifyInitialized(): Response
@@ -57,15 +59,15 @@ afterEach(fn () => Carbon::setTestNow());
 // Configuration and authentication
 // ---------------------------------------------------------------------------
 
-test('a Monnify driver needs its API key, secret key and contract code', function (array $config) {
-    expect(fn () => new MonnifyDriver($config + ['currencies' => ['NGN']]))->toThrow(InvalidConfigurationException::class);
+test('a Monnify driver needs its API key, secret key and contract code', function (array $config): void {
+    expect(fn (): MonnifyDriver => new MonnifyDriver($config + ['currencies' => ['NGN']]))->toThrow(InvalidConfigurationException::class);
 })->with([
     'no API key' => [['secret_key' => 'SK', 'contract_code' => 'CC']],
     'no secret key' => [['api_key' => 'MK', 'contract_code' => 'CC']],
     'no contract code' => [['api_key' => 'MK', 'secret_key' => 'SK']],
 ]);
 
-test('Monnify is logged in to with the API key and secret, and requests then carry the token as JSON', function () {
+test('Monnify is logged in to with the API key and secret, and requests then carry the token as JSON', function (): void {
     $history = [];
     monnifyContractDriver([monnifyLogin(), monnifyInitialized()], $history)->charge(monnifyCharge());
 
@@ -75,7 +77,7 @@ test('Monnify is logged in to with the API key and secret, and requests then car
         ->and($history[1]['request']->getHeaderLine('Content-Type'))->toBe('application/json');
 });
 
-test('the token is reused until a minute before it expires, then fetched again', function (?int $expiresIn, int $lifetime) {
+test('the token is reused until a minute before it expires, then fetched again', function (?int $expiresIn, int $lifetime): void {
     Carbon::setTestNow('2026-10-01 12:00:00');
     $history = [];
     $driver = monnifyContractDriver([monnifyLogin($expiresIn), monnifyInitialized(), monnifyInitialized(), monnifyLogin($expiresIn, 'tok-2'), monnifyInitialized()], $history);
@@ -94,7 +96,7 @@ test('the token is reused until a minute before it expires, then fetched again',
     'an hour when it does not say' => [null, 3540],
 ]);
 
-test('a login Monnify does not confirm, or that brings no token, fails the charge and is logged', function (string $body, string $reason) {
+test('a login Monnify does not confirm, or that brings no token, fails the charge and is logged', function (string $body, string $reason): void {
     $logs = captureLogs();
 
     try {
@@ -116,7 +118,7 @@ test('a login Monnify does not confirm, or that brings no token, fails the charg
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Monnify its full payload', function () {
+test('a charge sends Monnify its full payload', function (): void {
     $history = [];
     monnifyContractDriver([monnifyLogin(), monnifyInitialized()], $history)->charge(monnifyCharge([
         'description' => 'Order 9', 'customer' => ['name' => 'Ada'], 'metadata' => ['order' => 9], 'channels' => ['card'],
@@ -136,7 +138,7 @@ test('a charge sends Monnify its full payload', function () {
     ])->and((string) $history[1]['request']->getUri())->toEndWith('/api/v1/merchant/transactions/init-transaction');
 });
 
-test('a charge without a name or description uses Monnify\'s defaults, and sends no methods it was not given', function () {
+test('a charge without a name or description uses Monnify\'s defaults, and sends no methods it was not given', function (): void {
     $history = [];
     monnifyContractDriver([monnifyLogin(), monnifyInitialized()], $history)->charge(monnifyCharge());
 
@@ -146,16 +148,16 @@ test('a charge without a name or description uses Monnify\'s defaults, and sends
         ->and($sent)->not->toHaveKey('paymentMethods');
 });
 
-test('an initialized charge is logged with its reference, and one Monnify refuses carries its message', function () {
+test('an initialized charge is logged with its reference, and one Monnify refuses carries its message', function (): void {
     $logs = captureLogs();
     monnifyContractDriver([monnifyLogin(), monnifyInitialized()])->charge(monnifyCharge());
 
     expect(loggedEntry($logs, 'Charge initialized successfully')['context'])->toBe(['reference' => 'MON_1'])
-        ->and(fn () => monnifyContractDriver([monnifyLogin(), new Response(200, [], '{"responseMessage":"Invalid contract"}')])->charge(monnifyCharge()))
+        ->and(fn (): ChargeResponseDTO => monnifyContractDriver([monnifyLogin(), new Response(200, [], '{"responseMessage":"Invalid contract"}')])->charge(monnifyCharge()))
         ->toThrow(ChargeException::class, 'Invalid contract');
 });
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = monnifyContractDriver([monnifyLogin(), fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
@@ -181,7 +183,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0, and 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a payment is verified by its reference, without a query string a redirect added, and read in full', function () {
+test('a payment is verified by its reference, without a query string a redirect added, and read in full', function (): void {
     $history = [];
     $driver = monnifyContractDriver([monnifyLogin(), new Response(200, [], (string) json_encode(['requestSuccessful' => true, 'responseBody' => [
         'paymentStatus' => 'PAID', 'amountPaid' => 250, 'currency' => 'NGN', 'paidOn' => '2026-10-01 10:00:00', 'metaData' => ['order' => 1],
@@ -200,7 +202,7 @@ test('a payment is verified by its reference, without a query string a redirect 
         ->and($result->customer)->toBe(['email' => 'a@b.com', 'name' => 'Ada']);
 });
 
-test('a verified payment carries the reference Monnify reports when it reports one', function () {
+test('a verified payment carries the reference Monnify reports when it reports one', function (): void {
     $driver = monnifyContractDriver([monnifyLogin(), new Response(200, [], (string) json_encode(['requestSuccessful' => true, 'responseBody' => [
         'paymentReference' => 'MON_CANONICAL', 'paymentStatus' => 'PAID', 'amountPaid' => 1, 'currencyCode' => 'NGN',
     ]]))]);
@@ -208,15 +210,15 @@ test('a verified payment carries the reference Monnify reports when it reports o
     expect($driver->verify('MON_CANONICAL?from=redirect')->reference)->toBe('MON_CANONICAL');
 });
 
-test('a verification Monnify does not confirm is refused with its message', function (string $body) {
-    expect(fn () => monnifyContractDriver([monnifyLogin(), new Response(200, [], $body)])->verify('MON_X'))
+test('a verification Monnify does not confirm is refused with its message', function (string $body): void {
+    expect(fn (): VerificationResponseDTO => monnifyContractDriver([monnifyLogin(), new Response(200, [], $body)])->verify('MON_X'))
         ->toThrow(VerificationException::class, 'Transaction not found');
 })->with([
     'not successful' => ['{"requestSuccessful":false,"responseMessage":"Transaction not found"}'],
     'no flag' => ['{"responseMessage":"Transaction not found"}'],
 ]);
 
-test('a verification that fails on the way is logged and wrapped, coded 0', function () {
+test('a verification that fails on the way is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -234,13 +236,13 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
 // Webhooks and health
 // ---------------------------------------------------------------------------
 
-test('the monnify-signature header is read in either case', function (string $header) {
+test('the monnify-signature header is read in either case', function (string $header): void {
     $body = '{"eventType":"SUCCESSFUL_TRANSACTION"}';
 
     expect(monnifyContractDriver([])->validateWebhook([$header => [hash_hmac('sha512', $body, 'SK_TEST')]], $body))->toBeTrue();
 })->with(['monnify-signature', 'Monnify-Signature']);
 
-test('the health check is up when Monnify answers a login, even with a client error, and logs anything else', function () {
+test('the health check is up when Monnify answers a login, even with a client error, and logs anything else', function (): void {
     $logs = captureLogs();
     $clientError = new ClientException('Unauthorized', new Request('POST', '/api/v1/auth/login'), new Response(401));
 

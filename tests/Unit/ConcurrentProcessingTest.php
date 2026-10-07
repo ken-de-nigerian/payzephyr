@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 
-beforeEach(function () {
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
+beforeEach(function (): void {
+    DB::setDefaultConnection('testing');
 
     try {
-        \Illuminate\Support\Facades\Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+        Schema::connection('testing')->dropIfExists('payment_transactions');
+    } catch (\Exception) {
     }
 
-    \Illuminate\Support\Facades\Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference')->unique();
         $table->string('provider');
@@ -30,7 +31,7 @@ beforeEach(function () {
     });
 });
 
-test('it prevents race conditions in transaction updates', function () {
+test('it prevents race conditions in transaction updates', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
@@ -40,7 +41,7 @@ test('it prevents race conditions in transaction updates', function () {
         'email' => 'test@example.com',
     ]);
 
-    DB::transaction(function () {
+    DB::transaction(function (): void {
         $t = PaymentTransaction::where('reference', 'TEST_123')
             ->lockForUpdate()
             ->first();
@@ -53,7 +54,7 @@ test('it prevents race conditions in transaction updates', function () {
     expect($transaction->status)->toBe('success');
 });
 
-test('it handles concurrent webhook and verification updates', function () {
+test('it handles concurrent webhook and verification updates', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'TEST_456',
         'provider' => 'paystack',
@@ -63,7 +64,7 @@ test('it handles concurrent webhook and verification updates', function () {
         'email' => 'test2@example.com',
     ]);
 
-    DB::transaction(function () {
+    DB::transaction(function (): void {
         $t = PaymentTransaction::where('reference', 'TEST_456')
             ->lockForUpdate()
             ->first();
@@ -73,7 +74,7 @@ test('it handles concurrent webhook and verification updates', function () {
         }
     });
 
-    DB::transaction(function () {
+    DB::transaction(function (): void {
         $t = PaymentTransaction::where('reference', 'TEST_456')
             ->lockForUpdate()
             ->first();
@@ -88,7 +89,7 @@ test('it handles concurrent webhook and verification updates', function () {
         ->and($transaction->paid_at)->not->toBeNull();
 });
 
-test('it prevents duplicate webhook processing', function () {
+test('it prevents duplicate webhook processing', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'TEST_789',
         'provider' => 'paystack',
@@ -101,7 +102,7 @@ test('it prevents duplicate webhook processing', function () {
     $updateCount = 0;
 
     for ($i = 0; $i < 2; $i++) {
-        DB::transaction(function () use (&$updateCount) {
+        DB::transaction(function () use (&$updateCount): void {
             $t = PaymentTransaction::where('reference', 'TEST_789')
                 ->lockForUpdate()
                 ->first();
@@ -119,7 +120,7 @@ test('it prevents duplicate webhook processing', function () {
     expect($transaction->status)->toBe('success');
 });
 
-test('it handles concurrent cache writes safely', function () {
+test('it handles concurrent cache writes safely', function (): void {
     $reference = 'CACHE_TEST_123';
     $key = "payzephyr:session:{$reference}";
 
@@ -137,7 +138,7 @@ test('it handles concurrent cache writes safely', function () {
         ->and($cached['provider'])->toBe('paystack');
 });
 
-test('it handles concurrent verification requests', function () {
+test('it handles concurrent verification requests', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'VERIFY_TEST',
         'provider' => 'paystack',
@@ -150,7 +151,7 @@ test('it handles concurrent verification requests', function () {
     $verifyCount = 0;
 
     for ($i = 0; $i < 3; $i++) {
-        DB::transaction(function () use (&$verifyCount) {
+        DB::transaction(function () use (&$verifyCount): void {
             $t = PaymentTransaction::where('reference', 'VERIFY_TEST')
                 ->lockForUpdate()
                 ->first();

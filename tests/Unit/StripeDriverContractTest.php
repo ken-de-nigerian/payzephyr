@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -11,6 +13,7 @@ use Stripe\Checkout\Session;
 use Stripe\Exception\ApiConnectionException;
 use Stripe\Exception\AuthenticationException;
 use Stripe\Exception\InvalidRequestException;
+use Stripe\Exception\UnexpectedValueException;
 use Stripe\PaymentIntent;
 
 /*
@@ -87,7 +90,7 @@ function stripeCharge(array $overrides = []): ChargeRequestDTO
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge asks Stripe for a checkout session with everything it needs', function () {
+test('a charge asks Stripe for a checkout session with everything it needs', function (): void {
     [$driver, $stripe] = stripeContractDriver(['sessions' => ['create' => stripeSession()]]);
 
     $result = $driver->charge(stripeCharge([
@@ -119,7 +122,7 @@ test('a charge asks Stripe for a checkout session with everything it needs', fun
         ->and($result->metadata)->toBe(['session_id' => 'cs_1']);
 });
 
-test('a charge without a description or channels says "Payment", offers cards, and sends no key it was not given', function () {
+test('a charge without a description or channels says "Payment", offers cards, and sends no key it was not given', function (): void {
     [$driver, $stripe] = stripeContractDriver(['sessions' => ['create' => stripeSession()]]);
 
     $driver->charge(stripeCharge());
@@ -130,16 +133,16 @@ test('a charge without a description or channels says "Payment", offers cards, a
         ->and($options)->toBe([]);
 });
 
-test('a charge without a callback URL is refused, saying how to set one', function () {
+test('a charge without a callback URL is refused, saying how to set one', function (): void {
     [$driver] = stripeContractDriver();
 
-    expect(fn () => $driver->charge(stripeCharge(['callbackUrl' => null])))->toThrow(
+    expect(fn (): ChargeResponseDTO => $driver->charge(stripeCharge(['callbackUrl' => null])))->toThrow(
         InvalidConfigurationException::class,
         'Stripe requires a callback URL for its redirect flow. Please use ->callback() in your payment chain to set the callback URL.'
     );
 });
 
-test('an initialized charge is logged with its references and whether it was idempotent', function (?string $key, bool $idempotent) {
+test('an initialized charge is logged with its references and whether it was idempotent', function (?string $key, bool $idempotent): void {
     $logs = captureLogs();
     [$driver] = stripeContractDriver(['sessions' => ['create' => stripeSession()]]);
 
@@ -151,7 +154,7 @@ test('an initialized charge is logged with its references and whether it was ide
     'without' => [null, false],
 ]);
 
-test('a charge Stripe refuses, or that fails otherwise, is logged and wrapped, coded 0', function (Throwable $failure, array $context) {
+test('a charge Stripe refuses, or that fails otherwise, is logged and wrapped, coded 0', function (Throwable $failure, array $context): void {
     $logs = captureLogs();
     [$driver] = stripeContractDriver(['sessions' => ['create' => $failure]]);
 
@@ -170,14 +173,14 @@ test('a charge Stripe refuses, or that fails otherwise, is logged and wrapped, c
     'anything else' => [new LogicException('sdk blew up'), ['error' => 'sdk blew up', 'error_class' => LogicException::class]],
 ]);
 
-test('a session without a URL is refused', function () {
+test('a session without a URL is refused', function (): void {
     [$driver] = stripeContractDriver(['sessions' => ['create' => stripeSession(['url' => null])]]);
 
-    expect(fn () => $driver->charge(stripeCharge()))
+    expect(fn (): ChargeResponseDTO => $driver->charge(stripeCharge()))
         ->toThrow(ChargeException::class, 'Stripe created checkout session [cs_1] without a URL to redirect the customer to');
 });
 
-test('a Stripe driver builds no HTTP client: it talks to Stripe through the SDK alone', function () {
+test('a Stripe driver builds no HTTP client: it talks to Stripe through the SDK alone', function (): void {
     $driver = new StripeDriver(['secret_key' => 'sk_test_1', 'currencies' => ['USD']]);
 
     expect((new ReflectionClass($driver))->getProperty('client')->isInitialized($driver))->toBeFalse()
@@ -188,7 +191,7 @@ test('a Stripe driver builds no HTTP client: it talks to Stripe through the SDK 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a checkout session id is retrieved with its payment intent, and read in full', function () {
+test('a checkout session id is retrieved with its payment intent, and read in full', function (): void {
     [$driver, $stripe] = stripeContractDriver(['sessions' => ['retrieve' => stripeSession()]]);
 
     $result = $driver->verify('cs_1');
@@ -204,7 +207,7 @@ test('a checkout session id is retrieved with its payment intent, and read in fu
         ->and($result->customer)->toBe(['email' => 'a@b.com']);
 });
 
-test('a session reads its status, amount and details whatever Stripe left out', function () {
+test('a session reads its status, amount and details whatever Stripe left out', function (): void {
     [$driver] = stripeContractDriver(['sessions' => ['retrieve' => Session::constructFrom([
         'id' => 'cs_2', 'payment_status' => 'unpaid', 'currency' => 'usd', 'created' => 1, 'payment_intent' => ['amount' => 700],
     ])]]);
@@ -220,15 +223,15 @@ test('a session reads its status, amount and details whatever Stripe left out', 
         ->and($result->customer)->toBe(['email' => null]);
 });
 
-test('a session neither paid nor unpaid has failed, and one without a currency cannot be verified', function () {
+test('a session neither paid nor unpaid has failed, and one without a currency cannot be verified', function (): void {
     [$driver] = stripeContractDriver(['sessions' => ['retrieve' => stripeSession(['payment_status' => 'no_payment_required'])]]);
     [$noCurrency] = stripeContractDriver(['sessions' => ['retrieve' => stripeSession(['currency' => null])]]);
 
     expect($driver->verify('cs_1')->status)->toBe('failed')
-        ->and(fn () => $noCurrency->verify('cs_1'))->toThrow(VerificationException::class, 'omitted the required field [currency]');
+        ->and(fn (): VerificationResponseDTO => $noCurrency->verify('cs_1'))->toThrow(VerificationException::class, 'omitted the required field [currency]');
 });
 
-test('a payment intent id is retrieved directly, and read in full', function () {
+test('a payment intent id is retrieved directly, and read in full', function (): void {
     [$driver, $stripe] = stripeContractDriver(['paymentIntents' => ['retrieve' => stripeIntent()]]);
 
     $result = $driver->verify('pi_1');
@@ -244,7 +247,7 @@ test('a payment intent id is retrieved directly, and read in full', function () 
         ->and($result->customer)->toBe(['email' => 'c@d.com']);
 });
 
-test('a payment intent without a reference of its own is read by its id', function () {
+test('a payment intent without a reference of its own is read by its id', function (): void {
     [$driver] = stripeContractDriver(['paymentIntents' => ['retrieve' => stripeIntent(['metadata' => [], 'status' => 'processing'])]]);
 
     $result = $driver->verify('pi_1');
@@ -270,7 +273,7 @@ function stripeNoIntents(): array
     return ['search' => (object) ['data' => []]];
 }
 
-test('a reference is searched for in payment intent metadata first, quotes escaped, and no session is read when it is found', function () {
+test('a reference is searched for in payment intent metadata first, quotes escaped, and no session is read when it is found', function (): void {
     [$driver, $stripe] = stripeContractDriver([
         'paymentIntents' => ['search' => (object) ['data' => [stripeIntent(['id' => 'pi_match', 'metadata' => ['reference' => "O'Brien\\1"]]), stripeIntent(['id' => 'pi_second'])]]],
     ]);
@@ -285,14 +288,14 @@ test('a reference is searched for in payment intent metadata first, quotes escap
         ->and($stripe['sessions']->calls)->toBe([]);
 });
 
-test('a reference the search does not find is looked for among recent sessions a page of 100 at a time, then fetched with its payment intent', function () {
+test('a reference the search does not find is looked for among recent sessions a page of 100 at a time, then fetched with its payment intent', function (): void {
     [$driver, $stripe] = stripeContractDriver([
         'paymentIntents' => stripeNoIntents(),
         'sessions' => [
-            'all' => fn (array $params) => isset($params['starting_after'])
+            'all' => fn (array $params): object => isset($params['starting_after'])
                 ? stripeSessionPage([stripeSession(['id' => 'cs_match']), stripeSession(['id' => 'cs_older'])])
                 : stripeSessionPage([Session::constructFrom(['id' => 'cs_unnamed']), stripeSession(['id' => 'cs_other', 'client_reference_id' => 'other'])], true),
-            'retrieve' => fn (string $id) => stripeSession(['id' => $id]),
+            'retrieve' => fn (string $id): Session => stripeSession(['id' => $id]),
         ],
     ]);
 
@@ -305,13 +308,13 @@ test('a reference the search does not find is looked for among recent sessions a
     ]);
 });
 
-test('the sessions read stop at verify_search_pages pages, ten unless set, and never fewer than one', function (array $config, int $pages) {
+test('the sessions read stop at verify_search_pages pages, ten unless set, and never fewer than one', function (array $config, int $pages): void {
     [$driver, $stripe] = stripeContractDriver([
         'paymentIntents' => stripeNoIntents(),
         'sessions' => ['all' => stripeSessionPage([stripeSession(['id' => 'cs_other', 'client_reference_id' => 'other'])], true)],
     ], $config);
 
-    expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, "among the $pages most recent")
+    expect(fn (): VerificationResponseDTO => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, "among the $pages most recent")
         ->and($stripe['sessions']->calls)->toHaveCount($pages);
 })->with([
     'unset' => [[], 10],
@@ -319,23 +322,23 @@ test('the sessions read stop at verify_search_pages pages, ten unless set, and n
     'zero' => [['verify_search_pages' => 0], 1],
 ]);
 
-test('an empty page ends the sessions read even if Stripe says there are more', function () {
+test('an empty page ends the sessions read even if Stripe says there are more', function (): void {
     [$driver, $stripe] = stripeContractDriver([
         'paymentIntents' => stripeNoIntents(),
         'sessions' => ['all' => stripeSessionPage([], true)],
     ]);
 
-    expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, 'among the 0 most recent')
+    expect(fn (): VerificationResponseDTO => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, 'among the 0 most recent')
         ->and($stripe['sessions']->calls)->toBe([['all', [['limit' => 100]]]]);
 });
 
-test('where Stripe refuses the search, the sessions are read alone, and the refusal is logged', function () {
+test('where Stripe refuses the search, the sessions are read alone, and the refusal is logged', function (): void {
     $logs = captureLogs();
     [$driver, $stripe] = stripeContractDriver([
         'paymentIntents' => ['search' => InvalidRequestException::factory('Search is not available in your region')],
         'sessions' => [
             'all' => stripeSessionPage([stripeSession(['id' => 'cs_match'])]),
-            'retrieve' => fn (string $id) => stripeSession(['id' => $id]),
+            'retrieve' => fn (string $id): Session => stripeSession(['id' => $id]),
         ],
     ]);
 
@@ -347,16 +350,16 @@ test('where Stripe refuses the search, the sessions are read alone, and the refu
         ]);
 });
 
-test('a reference nothing names is not found, saying what was tried, and a lookup that fails is wrapped, coded 0', function (array $search, string $tried) {
+test('a reference nothing names is not found, saying what was tried, and a lookup that fails is wrapped, coded 0', function (array $search, string $tried): void {
     [$driver] = stripeContractDriver([
         'paymentIntents' => $search,
-        'sessions' => ['all' => fn (array $params) => isset($params['starting_after'])
+        'sessions' => ['all' => fn (array $params): object => isset($params['starting_after'])
             ? stripeSessionPage([stripeSession(['id' => 'cs_3', 'client_reference_id' => 'c'])])
             : stripeSessionPage([stripeSession(['id' => 'cs_1', 'client_reference_id' => 'a']), stripeSession(['id' => 'cs_2', 'client_reference_id' => 'b'])], true)],
     ]);
     [$failing] = stripeContractDriver(['paymentIntents' => ['retrieve' => ApiConnectionException::factory('Stripe is down')]]);
 
-    expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(
+    expect(fn (): VerificationResponseDTO => $driver->verify('STRIPE_GONE'))->toThrow(
         VerificationException::class,
         "Payment not found for reference [STRIPE_GONE] by searching payment intents$tried or among the 3 most recent Stripe checkout sessions. ".
         "Stripe's search can trail a new payment by a minute; verify with the cs_ or pi_ id to read it directly."
@@ -384,14 +387,14 @@ function stripeSignatureHeader(string $body, string $secret = 'whsec_1'): string
     return "t=$ts,v1=".hash_hmac('sha256', "$ts.$body", $secret);
 }
 
-test('the signature header is read in either case', function (string $header) {
+test('the signature header is read in either case', function (string $header): void {
     [$driver] = stripeContractDriver();
     $body = '{"id":"evt_1","object":"event","type":"checkout.session.completed"}';
 
     expect($driver->validateWebhook([$header => [stripeSignatureHeader($body)]], $body))->toBeTrue();
 })->with(['stripe-signature', 'Stripe-Signature']);
 
-test('each webhook outcome is logged with what an operator needs, and each refusal is final', function () {
+test('each webhook outcome is logged with what an operator needs, and each refusal is final', function (): void {
     $logs = captureLogs();
     [$driver] = stripeContractDriver();
     [$noSecret] = stripeContractDriver(config: ['webhook_secret' => null]);
@@ -417,10 +420,10 @@ test('each webhook outcome is logged with what an operator needs, and each refus
         ->and(array_keys($failures[0]['context']))->toBe(['error', 'hint'])
         ->and($failures[0]['context']['hint'])->toContain('whsec_')
         ->and(array_keys($failures[1]['context']))->toBe(['error', 'exception_type'])
-        ->and($failures[1]['context']['exception_type'])->toBe(Stripe\Exception\UnexpectedValueException::class);
+        ->and($failures[1]['context']['exception_type'])->toBe(UnexpectedValueException::class);
 });
 
-test('the health check is up when Stripe answers, even to refuse the key, and down on a server error or no answer', function (mixed $answer, bool $healthy) {
+test('the health check is up when Stripe answers, even to refuse the key, and down on a server error or no answer', function (mixed $answer, bool $healthy): void {
     $logs = captureLogs();
     [$driver] = stripeContractDriver(['balance' => ['retrieve' => $answer]]);
 
@@ -437,7 +440,7 @@ test('the health check is up when Stripe answers, even to refuse the key, and do
     'no answer' => [ApiConnectionException::factory('Unreachable'), false],
 ]);
 
-test('a webhook\'s reference, status and channel are read from its object', function () {
+test('a webhook\'s reference, status and channel are read from its object', function (): void {
     [$driver] = stripeContractDriver();
 
     expect($driver->extractWebhookReference(['data' => ['object' => ['metadata' => ['reference' => 'R1'], 'client_reference_id' => 'R2']]]))->toBe('R1')

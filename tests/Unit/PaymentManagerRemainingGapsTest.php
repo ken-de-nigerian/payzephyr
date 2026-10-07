@@ -3,7 +3,6 @@
 use Illuminate\Http\Request;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
@@ -28,17 +27,16 @@ function injectMockedDriver(PaymentManager $manager, string $provider, DriverInt
 {
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, [$provider => $driver]);
 }
 
-afterEach(function () {
+afterEach(function (): void {
     if (app()->bound('request')) {
         app()->forgetInstance('request');
     }
 });
 
-test('chargeWithFallback skips a provider that fails its health check', function () {
+test('chargeWithFallback skips a provider that fails its health check', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.health_check.enabled' => true]);
 
@@ -64,11 +62,11 @@ test('chargeWithFallback skips a provider that fails its health check', function
         'email' => 'test@example.com',
     ]);
 
-    expect(fn () => $manager->chargeWithFallback($request, ['unhealthy']))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback($request, ['unhealthy']))
         ->toThrow(ProviderException::class, 'All payment providers failed');
 });
 
-test('verify dispatches PaymentVerificationSuccess for a successful response', function () {
+test('verify dispatches PaymentVerificationSuccess for a successful response', function (): void {
     Event::fake([PaymentVerificationSuccess::class, PaymentVerificationFailed::class]);
 
     $driver = Mockery::mock(DriverInterface::class);
@@ -92,7 +90,7 @@ test('verify dispatches PaymentVerificationSuccess for a successful response', f
     Event::assertNotDispatched(PaymentVerificationFailed::class);
 });
 
-test('verify dispatches PaymentVerificationFailed for a failed response', function () {
+test('verify dispatches PaymentVerificationFailed for a failed response', function (): void {
     Event::fake([PaymentVerificationSuccess::class, PaymentVerificationFailed::class]);
 
     $driver = Mockery::mock(DriverInterface::class);
@@ -116,7 +114,7 @@ test('verify dispatches PaymentVerificationFailed for a failed response', functi
     Event::assertNotDispatched(PaymentVerificationSuccess::class);
 });
 
-test('logTransaction returns early without persisting when logging is disabled', function () {
+test('logTransaction returns early without persisting when logging is disabled', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.logging.enabled' => false]);
 
@@ -145,13 +143,12 @@ test('logTransaction returns early without persisting when logging is disabled',
     expect(PaymentTransaction::where('reference', 'no_log_ref')->exists())->toBeFalse();
 });
 
-test('getCacheContext memoizes the resolved context and does not re-resolve on second call', function () {
+test('getCacheContext memoizes the resolved context and does not re-resolve on second call', function (): void {
     mockAuthGuard(check: true, id: 42);
 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('getCacheContext');
-    $method->setAccessible(true);
 
     $first = $method->invoke($manager);
     $second = $method->invoke($manager);
@@ -160,7 +157,7 @@ test('getCacheContext memoizes the resolved context and does not re-resolve on s
         ->and($second)->toBe('user_42');
 });
 
-test('getCacheContext resolves context from an authenticated request user', function () {
+test('getCacheContext resolves context from an authenticated request user', function (): void {
     mockAuthGuard(check: false);
 
     $fakeUser = new class
@@ -173,24 +170,23 @@ test('getCacheContext resolves context from an authenticated request user', func
     // Binding a Request via instance() triggers Laravel's auth "rebinding"
     // hook, which overwrites the user resolver to call $app['auth']. Set our
     // fake resolver AFTER the instance() call so it wins.
-    $request->setUserResolver(fn () => $fakeUser);
+    $request->setUserResolver(fn (): object => $fakeUser);
 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('getCacheContext');
-    $method->setAccessible(true);
 
     expect($method->invoke($manager))->toBe('user_555');
 });
 
-test('getCacheContext resolves context from a session user_id when no auth user is present', function () {
+test('getCacheContext resolves context from a session user_id when no auth user is present', function (): void {
     mockAuthGuard(check: false);
 
     $request = new Request;
     app()->instance('request', $request);
     // See note above: reset the user resolver after instance() so it stays
     // null instead of the auth-based resolver Laravel wires in on rebind.
-    $request->setUserResolver(fn () => null);
+    $request->setUserResolver(fn (): null => null);
 
     $session = new Store('test_session', new ArraySessionHandler(120));
     $session->put('user_id', 789);
@@ -199,12 +195,11 @@ test('getCacheContext resolves context from a session user_id when no auth user 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('getCacheContext');
-    $method->setAccessible(true);
 
     expect($method->invoke($manager))->toBe('user_789');
 });
 
-test('resolveVerificationContext DriverNotFoundException branch falls back to reference with empty metadata', function () {
+test('resolveVerificationContext DriverNotFoundException branch falls back to reference with empty metadata', function (): void {
     PaymentTransaction::create([
         'reference' => 'unknown_driver_ref',
         'provider' => 'totally_unconfigured_provider',
@@ -218,7 +213,6 @@ test('resolveVerificationContext DriverNotFoundException branch falls back to re
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager, 'unknown_driver_ref', null);
 
@@ -226,7 +220,7 @@ test('resolveVerificationContext DriverNotFoundException branch falls back to re
         ->and($result['id'])->toBe('unknown_driver_ref');
 });
 
-test('updateTransactionFromVerification logs and swallows exceptions from the repository', function () {
+test('updateTransactionFromVerification logs and swallows exceptions from the repository', function (): void {
     $repository = Mockery::mock(TransactionRepositoryInterface::class);
     $repository->shouldReceive('updateIfNotSuccessful')
         ->once()
@@ -241,7 +235,6 @@ test('updateTransactionFromVerification logs and swallows exceptions from the re
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    $method->setAccessible(true);
 
     $response = new VerificationResponseDTO(
         reference: 'err_ref',

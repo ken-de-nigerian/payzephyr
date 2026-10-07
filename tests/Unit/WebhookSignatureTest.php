@@ -14,7 +14,7 @@ use KenDeNigerian\PayZephyr\PaymentManager;
 // closed when it can't find a timestamp, so a test using a fake shape would
 // either false-pass (bypassing the check entirely) or false-fail.
 
-test('it validates paystack webhook signature correctly', function () {
+test('it validates paystack webhook signature correctly', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -33,7 +33,7 @@ test('it validates paystack webhook signature correctly', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it rejects paystack webhook with invalid signature', function () {
+test('it rejects paystack webhook with invalid signature', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -51,7 +51,7 @@ test('it rejects paystack webhook with invalid signature', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('it rejects paystack webhook with missing signature', function () {
+test('it rejects paystack webhook with missing signature', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -66,7 +66,7 @@ test('it rejects paystack webhook with missing signature', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('it validates flutterwave webhook signature correctly', function () {
+test('it validates flutterwave webhook signature correctly', function (): void {
     $config = [
         'secret_key' => 'FLW_SECRET_KEY',
         'webhook_secret' => 'FLW_WEBHOOK_SECRET',
@@ -89,7 +89,7 @@ test('it validates flutterwave webhook signature correctly', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it validates monnify webhook signature correctly', function () {
+test('it validates monnify webhook signature correctly', function (): void {
     $config = [
         'api_key' => 'MON_API_KEY',
         'secret_key' => 'MON_SECRET_KEY',
@@ -116,7 +116,7 @@ test('it validates monnify webhook signature correctly', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it validates opay webhook signature correctly', function () {
+test('it validates opay webhook signature correctly', function (): void {
     $config = [
         'merchant_id' => 'OPAY_MERCHANT',
         'public_key' => 'OPAY_PUBLIC',
@@ -144,7 +144,7 @@ test('it validates opay webhook signature correctly', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it validates square webhook signature correctly', function () {
+test('it validates square webhook signature correctly', function (): void {
     $config = [
         'access_token' => 'SQUARE_TOKEN',
         'location_id' => 'SQUARE_LOCATION',
@@ -169,7 +169,7 @@ test('it validates square webhook signature correctly', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('it rejects webhook with wrong signature algorithm', function () {
+test('it rejects webhook with wrong signature algorithm', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -188,7 +188,7 @@ test('it rejects webhook with wrong signature algorithm', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('it handles case-insensitive webhook headers', function () {
+test('it handles case-insensitive webhook headers', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -213,7 +213,7 @@ test('it handles case-insensitive webhook headers', function () {
         ->and($isValid2)->toBeTrue();
 });
 
-test('it validates webhook with timestamp within tolerance', function () {
+test('it validates webhook with timestamp within tolerance', function (): void {
     $driver = app(PaymentManager::class)->driver('paystack');
 
     $payload = [
@@ -235,7 +235,7 @@ test('it validates webhook with timestamp within tolerance', function () {
     expect($isValid)->toBeTrue();
 });
 
-test('providers without an event time accept a validly-signed webhook on its signature (ADR-0017)', function (object $driver, string $body, Closure $headers) {
+test('providers without an event time accept a validly-signed webhook on its signature (ADR-0017)', function (object $driver, string $body, Closure $headers): void {
     // Paystack, Flutterwave, Monnify and OPay carry no field that says when an
     // event happened, so a window on whatever timestamp is there rejected real
     // events. Their replay defence is deduplication: a replay is
@@ -245,26 +245,26 @@ test('providers without an event time accept a validly-signed webhook on its sig
     'paystack, no timestamp at all' => [
         fn () => app(PaymentManager::class)->driver('paystack'),
         (string) json_encode(['event' => 'charge.success', 'data' => ['reference' => 'TEST_123']]),
-        fn (string $b) => ['x-paystack-signature' => [hash_hmac('sha512', $b, config('payments.providers.paystack.secret_key'))]],
+        fn (string $b): array => ['x-paystack-signature' => [hash_hmac('sha512', $b, config('payments.providers.paystack.secret_key'))]],
     ],
     'flutterwave, no created_at' => [
-        fn () => new FlutterwaveDriver(['secret_key' => 'FLW_SECRET_KEY', 'webhook_secret' => 'FLW_WEBHOOK_SECRET', 'currencies' => ['NGN']]),
+        fn (): FlutterwaveDriver => new FlutterwaveDriver(['secret_key' => 'FLW_SECRET_KEY', 'webhook_secret' => 'FLW_WEBHOOK_SECRET', 'currencies' => ['NGN']]),
         (string) json_encode(['event' => 'charge.completed', 'data' => ['id' => 123]]),
-        fn (string $b) => ['verif-hash' => ['FLW_WEBHOOK_SECRET']],
+        fn (string $b): array => ['verif-hash' => ['FLW_WEBHOOK_SECRET']],
     ],
     'monnify, no paidOn' => [
-        fn () => new MonnifyDriver(['api_key' => 'MON_API_KEY', 'secret_key' => 'MON_SECRET_KEY', 'contract_code' => 'MON_CONTRACT', 'currencies' => ['NGN']]),
+        fn (): MonnifyDriver => new MonnifyDriver(['api_key' => 'MON_API_KEY', 'secret_key' => 'MON_SECRET_KEY', 'contract_code' => 'MON_CONTRACT', 'currencies' => ['NGN']]),
         (string) json_encode(['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => ['transactionReference' => 'REF_123']]),
-        fn (string $b) => ['monnify-signature' => [hash_hmac('sha512', $b, 'MON_SECRET_KEY')]],
+        fn (string $b): array => ['monnify-signature' => [hash_hmac('sha512', $b, 'MON_SECRET_KEY')]],
     ],
     'opay, no timestamp' => [
-        fn () => new OPayDriver(['merchant_id' => 'OPAY_MERCHANT', 'public_key' => 'OPAY_PUBLIC', 'secret_key' => 'OPAY_SECRET', 'currencies' => ['NGN']]),
+        fn (): OPayDriver => new OPayDriver(['merchant_id' => 'OPAY_MERCHANT', 'public_key' => 'OPAY_PUBLIC', 'secret_key' => 'OPAY_SECRET', 'currencies' => ['NGN']]),
         (string) json_encode(['payload' => ['reference' => 'OPAY_123', 'status' => 'SUCCESS'], 'type' => 'transaction-status']),
-        fn (string $b) => ['x-opay-signature' => [hash_hmac('sha256', $b, 'OPAY_SECRET')]],
+        fn (string $b): array => ['x-opay-signature' => [hash_hmac('sha256', $b, 'OPAY_SECRET')]],
     ],
 ]);
 
-test('a paystack charge.success is accepted however long the customer took to pay', function () {
+test('a paystack charge.success is accepted however long the customer took to pay', function (): void {
     // data.created_at is when the transaction was initialised. The old window
     // read it before paid_at, so a customer who spent more than five minutes
     // on checkout had their payment notification rejected - and every
@@ -281,7 +281,7 @@ test('a paystack charge.success is accepted however long the customer took to pa
     expect($driver->validateWebhook(['x-paystack-signature' => [$signature]], $body))->toBeTrue();
 });
 
-test('a paystack subscription cancellation is accepted for a subscription created long ago', function () {
+test('a paystack subscription cancellation is accepted for a subscription created long ago', function (): void {
     // Its only timestamp is the subscription's own createdAt, so the old
     // window rejected every cancellation of a subscription older than five
     // minutes.
@@ -296,7 +296,7 @@ test('a paystack subscription cancellation is accepted for a subscription create
     expect($driver->validateWebhook(['x-paystack-signature' => [$signature]], $body))->toBeTrue();
 });
 
-test('square accepts a retry of an event created hours ago, and rejects one older than the replay window', function () {
+test('square accepts a retry of an event created hours ago, and rejects one older than the replay window', function (): void {
     // Square's created_at is the event's own creation time and is signed, so
     // it bounds replays - but every retry repeats it, so the window has to
     // outlast Square's retry schedule rather than be five minutes.
@@ -318,7 +318,7 @@ test('square accepts a retry of an event created hours ago, and rejects one olde
         ->and($deliver(time() - 4 * 86400))->toBeFalse();
 });
 
-test('the replay window for event timestamps follows payments.webhook.events.replay_window', function () {
+test('the replay window for event timestamps follows payments.webhook.events.replay_window', function (): void {
     config(['payments.webhook.events.replay_window' => 3600]);
     app()->forgetInstance('payments.config');
 

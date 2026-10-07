@@ -10,6 +10,7 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
 use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
@@ -19,6 +20,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\Services\NullTraceRecorder;
 use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
 use Psr\Http\Message\StreamInterface;
 use Tests\Helpers\PaystackDriverTestHelper;
@@ -48,7 +50,7 @@ function tracingDriver(string $name, ?Throwable $throws = null, bool $healthy = 
         {
             $this->chargeCalls++;
 
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -115,7 +117,6 @@ function tracingManager(array $drivers): PaymentManager
 {
     $manager = new PaymentManager;
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
@@ -188,7 +189,7 @@ function recordedEvents(string $reference): array
         ->all();
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -209,7 +210,7 @@ beforeEach(function () {
 // The fallback chain, which is what this whole feature is for
 // ---------------------------------------------------------------------------
 
-test('a payment recovered by a fallback provider leaves one readable timeline', function () {
+test('a payment recovered by a fallback provider leaves one readable timeline', function (): void {
     // The exit criterion for this phase. Before tracing, the only record of
     // this payment was a single row saying "succeeded, via secondary" - with
     // nothing at all to say primary had been tried first, or why it lost.
@@ -235,7 +236,7 @@ test('a payment recovered by a fallback provider leaves one readable timeline', 
         ->and($completed->provider)->toBe('secondary');
 });
 
-test('a recovered payment reads as succeeded, not failed', function () {
+test('a recovered payment reads as succeeded, not failed', function (): void {
     // Timeline::terminal() takes the first terminal event, so recording a
     // single provider's failure as PAYMENT_FAILED would report a payment that
     // actually went through as having failed.
@@ -252,7 +253,7 @@ test('a recovered payment reads as succeeded, not failed', function () {
         ->and($timeline->errors())->toHaveCount(1);
 });
 
-test('every provider in the chain is recorded under the one reference', function () {
+test('every provider in the chain is recorded under the one reference', function (): void {
     $primary = tracingDriver('primary', throws: new ChargeException('down'));
     $secondary = tracingDriver('secondary');
 
@@ -266,7 +267,7 @@ test('every provider in the chain is recorded under the one reference', function
 // Why a provider was never contacted
 // ---------------------------------------------------------------------------
 
-test('a provider skipped for failing its health check says so', function () {
+test('a provider skipped for failing its health check says so', function (): void {
     $primary = tracingDriver('primary', healthy: false);
     $secondary = tracingDriver('secondary');
 
@@ -281,7 +282,7 @@ test('a provider skipped for failing its health check says so', function () {
         ->and($response->provider)->toBe('secondary');
 });
 
-test('a provider skipped for the wrong currency records the currency', function () {
+test('a provider skipped for the wrong currency records the currency', function (): void {
     $primary = tracingDriver('primary', currencies: ['USD']);
     $secondary = tracingDriver('secondary', currencies: ['NGN']);
 
@@ -299,7 +300,7 @@ test('a provider skipped for the wrong currency records the currency', function 
 // The outcomes worth waking someone up for
 // ---------------------------------------------------------------------------
 
-test('an ambiguous charge outcome is recorded before the chain is abandoned', function () {
+test('an ambiguous charge outcome is recorded before the chain is abandoned', function (): void {
     // The single highest-value event in the system: the provider may or may
     // not have taken the customer's money, and PayZephyr refuses to retry.
     // isAmbiguousProviderOutcome() walks the exception chain rather than
@@ -317,7 +318,7 @@ test('an ambiguous charge outcome is recorded before the chain is abandoned', fu
         'secondary' => tracingDriver('secondary'),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequest()))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequest()))
         ->toThrow(ProviderException::class);
 
     $recorded = PaymentTraceEvent::where('event', TraceEvent::CHARGE_AMBIGUOUS->value)->sole();
@@ -327,13 +328,13 @@ test('an ambiguous charge outcome is recorded before the chain is abandoned', fu
         ->and($recorded->event->isError())->toBeTrue();
 });
 
-test('when every provider fails the payment is recorded as failed once, with the reasons', function () {
+test('when every provider fails the payment is recorded as failed once, with the reasons', function (): void {
     $manager = tracingManager([
         'primary' => tracingDriver('primary', throws: new ChargeException('primary down')),
         'secondary' => tracingDriver('secondary', throws: new ChargeException('secondary down')),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequest()))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequest()))
         ->toThrow(ProviderException::class);
 
     $reference = PaymentTraceEvent::query()->value('reference');
@@ -354,7 +355,7 @@ test('when every provider fails the payment is recorded as failed once, with the
         ]);
 });
 
-test('a rejected duplicate submission is recorded without claiming the payment failed', function () {
+test('a rejected duplicate submission is recorded without claiming the payment failed', function (): void {
     // Both submissions share a reference and therefore a timeline. Marking the
     // rejection terminal would overwrite the real outcome of the one that won.
     $manager = tracingManager(['primary' => tracingDriver('primary')]);
@@ -368,7 +369,7 @@ test('a rejected duplicate submission is recorded without claiming the payment f
         'reference' => $response->reference,
     ]);
 
-    expect(fn () => $manager->chargeWithFallback($resubmission))->toThrow(ProviderException::class);
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback($resubmission))->toThrow(ProviderException::class);
 
     $rejected = PaymentTraceEvent::where('event', TraceEvent::CHARGE_DUPLICATE_REJECTED->value)->sole();
     $timeline = app(TraceTimelineBuilder::class)->build($response->reference);
@@ -381,7 +382,7 @@ test('a rejected duplicate submission is recorded without claiming the payment f
 // Correlation: one group per provider attempt
 // ---------------------------------------------------------------------------
 
-test('each provider attempt gets its own correlation group', function () {
+test('each provider attempt gets its own correlation group', function (): void {
     // A reference spans the payment; a correlation id spans one provider
     // round-trip. Without that, a fallback chain is a flat pile of events.
     $response = paystackTracingManager([paystackChargeResponse(reference: 'order_corr')])
@@ -398,7 +399,7 @@ test('each provider attempt gets its own correlation group', function () {
         ->and($http[1]->correlation_id)->toBe($http[0]->correlation_id);
 });
 
-test('the correlation id does not leak into the next payment', function () {
+test('the correlation id does not leak into the next payment', function (): void {
     // PaymentManager caches drivers by name, so a second charge reuses the
     // same object. A leaked correlation id would file one customer's provider
     // round-trip under another customer's attempt.
@@ -423,7 +424,7 @@ test('the correlation id does not leak into the next payment', function () {
 // The HTTP round trip, recorded once for all eight drivers
 // ---------------------------------------------------------------------------
 
-test('the provider round trip is recorded with its method, url, status and timing', function () {
+test('the provider round trip is recorded with its method, url, status and timing', function (): void {
     $response = paystackTracingManager([paystackChargeResponse()])->chargeWithFallback(tracingRequest());
 
     $sent = PaymentTraceEvent::where('event', TraceEvent::PROVIDER_REQUEST_SENT->value)->sole();
@@ -440,7 +441,7 @@ test('the provider round trip is recorded with its method, url, status and timin
         ->and($response->accessCode)->toBe('ac');
 });
 
-test('reading the response body for the timeline does not consume it for the driver', function () {
+test('reading the response body for the timeline does not consume it for the driver', function (): void {
     // peekResponseBody() rewinds, because parseResponse() reads the same
     // stream immediately afterwards. Getting this wrong breaks every charge.
     $response = paystackTracingManager([paystackChargeResponse('ac_123', 'https://paystack.test/pay')])->chargeWithFallback(tracingRequest());
@@ -449,7 +450,7 @@ test('reading the response body for the timeline does not consume it for the dri
         ->and($response->accessCode)->toBe('ac_123');
 });
 
-test('with body capture off the round trip is still recorded, without the bodies', function () {
+test('with body capture off the round trip is still recorded, without the bodies', function (): void {
     config(['payments.trace.record_http_bodies' => false]);
     app()->forgetInstance('payments.config');
 
@@ -467,7 +468,7 @@ test('with body capture off the round trip is still recorded, without the bodies
 // Tracing is never allowed to matter to the payment
 // ---------------------------------------------------------------------------
 
-test('with tracing off a charge behaves exactly as before and records nothing', function () {
+test('with tracing off a charge behaves exactly as before and records nothing', function (): void {
     config(['payments.features.trace' => false]);
     app()->forgetInstance('payments.config');
 
@@ -480,7 +481,7 @@ test('with tracing off a charge behaves exactly as before and records nothing', 
         ->and(PaymentTraceEvent::count())->toBe(0);
 });
 
-test('a charge still completes when the trace table was never migrated', function () {
+test('a charge still completes when the trace table was never migrated', function (): void {
     // The end-to-end half of the fail-safe promise, which Phase 3 could only
     // prove at the recorder. The realistic case: PAYZEPHYR_FEATURE_TRACE=true
     // before `payzephyr:install --features=trace` has been run.
@@ -499,18 +500,18 @@ test('a charge still completes when the trace table was never migrated', functio
 // Classifying a failed round trip
 // ---------------------------------------------------------------------------
 
-test('a connect timeout is recorded as a timeout', function () {
+test('a connect timeout is recorded as a timeout', function (): void {
     $manager = paystackTracingManager([
         new ConnectException('cURL error 28: Operation timed out after 30000 ms', new Request('POST', 'https://api.paystack.co')),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequestWith('order_timeout')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequestWith('order_timeout')))
         ->toThrow(ProviderException::class);
 
     expect(PaymentTraceEvent::where('event', TraceEvent::PROVIDER_TIMEOUT->value)->exists())->toBeTrue();
 });
 
-test('a refused connection is not recorded as a timeout', function () {
+test('a refused connection is not recorded as a timeout', function (): void {
     // Connection refused, DNS failure and connect timeouts all arrive as
     // ConnectException. Calling them all timeouts sends whoever reads the
     // timeline looking for a slow provider when the answer is a bad host.
@@ -518,14 +519,14 @@ test('a refused connection is not recorded as a timeout', function () {
         new ConnectException('cURL error 7: Failed to connect to api.paystack.co port 443: Connection refused', new Request('POST', 'https://api.paystack.co')),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequestWith('order_refused')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequestWith('order_refused')))
         ->toThrow(ProviderException::class);
 
     expect(PaymentTraceEvent::where('event', TraceEvent::PROVIDER_EXCEPTION->value)->exists())->toBeTrue()
         ->and(PaymentTraceEvent::where('event', TraceEvent::PROVIDER_TIMEOUT->value)->exists())->toBeFalse();
 });
 
-test('a provider error response is recorded with its status code', function () {
+test('a provider error response is recorded with its status code', function (): void {
     $manager = paystackTracingManager([
         new RequestException(
             'Unauthorized',
@@ -534,7 +535,7 @@ test('a provider error response is recorded with its status code', function () {
         ),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequestWith('order_denied')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequestWith('order_denied')))
         ->toThrow(ProviderException::class);
 
     $recorded = PaymentTraceEvent::where('event', TraceEvent::PROVIDER_ERROR->value)
@@ -544,7 +545,7 @@ test('a provider error response is recorded with its status code', function () {
         ->and($recorded->provider)->toBe('paystack');
 });
 
-test('a response body that cannot be rewound costs the timeline its payload and nothing else', function () {
+test('a response body that cannot be rewound costs the timeline its payload and nothing else', function (): void {
     // Draining a non-seekable stream to describe the charge would break the
     // charge: parseResponse() reads the same stream immediately afterwards.
     $body = json_encode(['status' => true, 'data' => [
@@ -564,7 +565,7 @@ test('a response body that cannot be rewound costs the timeline its payload and 
         ->and($received->http_status_code)->toBe(200);
 });
 
-test('a body that explodes while being read costs the timeline its payload and nothing else', function () {
+test('a body that explodes while being read costs the timeline its payload and nothing else', function (): void {
     // peekResponseBody() runs on the payment path. A stream that claims to be
     // seekable and then misbehaves must not be able to fail the charge it is
     // only there to describe.
@@ -587,7 +588,7 @@ test('a body that explodes while being read costs the timeline its payload and n
 
         public function close(): void {}
 
-        public function detach() {}
+        public function detach(): void {}
 
         public function getSize(): ?int
         {
@@ -636,7 +637,7 @@ test('a body that explodes while being read costs the timeline its payload and n
 
     $manager = paystackTracingManager([new Response(200, [], $hostile)]);
 
-    expect(fn () => $manager->chargeWithFallback(tracingRequestWith('order_hostile')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(tracingRequestWith('order_hostile')))
         ->toThrow(ProviderException::class);
 
     // The round trip is still on the timeline, just without a body.
@@ -646,14 +647,14 @@ test('a body that explodes while being read costs the timeline its payload and n
         ->and($received->http_status_code)->toBe(200);
 });
 
-test('tracing switched off with the string an env file produces is off', function (mixed $off) {
+test('tracing switched off with the string an env file produces is off', function (mixed $off): void {
     // The binding read the switch by truthiness, and "false" is truthy: tracing
     // was on, writing every payload to the trace table, for a merchant who had
     // turned it off.
     config(['payments.features.trace' => $off]);
     app()->forgetInstance('payments.config');
-    app()->forgetInstance(\KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface::class);
+    app()->forgetInstance(TraceRecorderInterface::class);
 
-    expect(app(\KenDeNigerian\PayZephyr\Contracts\TraceRecorderInterface::class))
-        ->toBeInstanceOf(\KenDeNigerian\PayZephyr\Services\NullTraceRecorder::class);
+    expect(app(TraceRecorderInterface::class))
+        ->toBeInstanceOf(NullTraceRecorder::class);
 })->with(['false', 'off', '0']);

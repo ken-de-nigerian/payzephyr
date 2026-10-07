@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Services\MetadataSanitizer;
 
-test('metadata sanitizer removes script tags', function () {
+test('metadata sanitizer removes script tags', function (): void {
     $sanitizer = new MetadataSanitizer;
     $data = [
         'description' => '<script>alert("xss")</script>Safe content',
@@ -14,7 +14,7 @@ test('metadata sanitizer removes script tags', function () {
         ->and($sanitized['description'])->toContain('Safe content');
 });
 
-test('metadata sanitizer removes javascript protocol', function () {
+test('metadata sanitizer removes javascript protocol', function (): void {
     $sanitizer = new MetadataSanitizer;
     $data = [
         'url' => 'javascript:alert("xss")',
@@ -25,7 +25,7 @@ test('metadata sanitizer removes javascript protocol', function () {
     expect($sanitized['url'])->not->toContain('javascript:');
 });
 
-test('metadata sanitizer limits string length', function () {
+test('metadata sanitizer limits string length', function (): void {
     $sanitizer = new MetadataSanitizer;
     $longString = str_repeat('a', 20000);
     $data = ['description' => $longString];
@@ -35,7 +35,7 @@ test('metadata sanitizer limits string length', function () {
     expect(strlen($sanitized['description']))->toBeLessThanOrEqual(10000);
 });
 
-test('metadata sanitizer limits array size', function () {
+test('metadata sanitizer limits array size', function (): void {
     $sanitizer = new MetadataSanitizer;
     $largeArray = array_fill(0, 200, 'value');
     $data = ['items' => $largeArray];
@@ -45,7 +45,7 @@ test('metadata sanitizer limits array size', function () {
     expect(count($sanitized['items']))->toBeLessThanOrEqual(100);
 });
 
-test('metadata sanitizer sanitizes nested arrays', function () {
+test('metadata sanitizer sanitizes nested arrays', function (): void {
     $sanitizer = new MetadataSanitizer;
     $data = [
         'user' => [
@@ -60,7 +60,7 @@ test('metadata sanitizer sanitizes nested arrays', function () {
         ->and($sanitized['user']['email'])->toBe('john@example.com');
 });
 
-test('metadata sanitizer rejects invalid keys', function () {
+test('metadata sanitizer rejects invalid keys', function (): void {
     $sanitizer = new MetadataSanitizer;
     $data = [
         'valid_key' => 'value',

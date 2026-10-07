@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Tests\Integration;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\Facades\Payment;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
@@ -29,7 +30,7 @@ class UnifiedPaymentAbstractionTest extends TestCase
 
         // Reset facade and manager instances to ensure clean state
         Payment::clearResolvedInstances();
-        $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+        $this->app->forgetInstance(PaymentManager::class);
         $this->app->forgetInstance('payments.config');
     }
 

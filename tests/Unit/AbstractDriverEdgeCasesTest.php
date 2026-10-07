@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 
-test('abstract driver handles missing base url gracefully', function () {
+test('abstract driver handles missing base url gracefully', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -16,7 +16,7 @@ test('abstract driver handles missing base url gracefully', function () {
     expect($driver->getName())->toBe('paystack');
 });
 
-test('abstract driver handles empty currency list', function () {
+test('abstract driver handles empty currency list', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -31,7 +31,7 @@ test('abstract driver handles empty currency list', function () {
     expect($driver->isCurrencySupported('NGN'))->toBeFalse();
 });
 
-test('abstract driver handles null currency check', function () {
+test('abstract driver handles null currency check', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -43,11 +43,11 @@ test('abstract driver handles null currency check', function () {
 
     $driver = new PaystackDriver(config('payments.providers.paystack'));
 
-    expect(fn () => $driver->isCurrencySupported(null))
+    expect(fn (): bool => $driver->isCurrencySupported(null))
         ->toThrow(TypeError::class);
 });
 
-test('abstract driver reference generation handles custom prefix', function () {
+test('abstract driver reference generation handles custom prefix', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -68,7 +68,7 @@ test('abstract driver reference generation handles custom prefix', function () {
         ->and(strlen($reference))->toBeGreaterThan(0);
 });
 
-test('abstract driver handles ssl verification in testing mode', function () {
+test('abstract driver handles ssl verification in testing mode', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -87,7 +87,7 @@ test('abstract driver handles ssl verification in testing mode', function () {
     expect($client)->not->toBeNull();
 });
 
-test('abstract driver health check caching respects ttl', function () {
+test('abstract driver health check caching respects ttl', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -106,7 +106,7 @@ test('abstract driver health check caching respects ttl', function () {
     expect($result1)->toBe($result2);
 });
 
-test('abstract driver handles logging disabled config', function () {
+test('abstract driver handles logging disabled config', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -123,7 +123,7 @@ test('abstract driver handles logging disabled config', function () {
     expect($result)->toBeBool();
 });
 
-test('abstract driver handles different log levels', function () {
+test('abstract driver handles different log levels', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -146,7 +146,7 @@ test('abstract driver handles different log levels', function () {
     expect(true)->toBeTrue(); // If no exception, logging works
 });
 
-test('abstract driver stores configuration correctly', function () {
+test('abstract driver stores configuration correctly', function (): void {
     $config = [
         'driver' => 'paystack',
         'secret_key' => 'sk_test_xxx',

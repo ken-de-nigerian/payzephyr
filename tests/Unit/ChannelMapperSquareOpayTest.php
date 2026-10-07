@@ -3,7 +3,7 @@
 use KenDeNigerian\PayZephyr\Enums\PaymentChannel;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 
-test('channel mapper mapToSquare maps card channel correctly', function () {
+test('channel mapper mapToSquare maps card channel correctly', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::CARD->value], 'square');
@@ -11,7 +11,7 @@ test('channel mapper mapToSquare maps card channel correctly', function () {
     expect($result)->toBe(['CARD']);
 });
 
-test('channel mapper mapToSquare maps bank transfer to OTHER', function () {
+test('channel mapper mapToSquare maps bank transfer to OTHER', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::BANK_TRANSFER->value], 'square');
@@ -19,7 +19,7 @@ test('channel mapper mapToSquare maps bank transfer to OTHER', function () {
     expect($result)->toBe(['OTHER']);
 });
 
-test('channel mapper mapToSquare filters invalid channels', function () {
+test('channel mapper mapToSquare filters invalid channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['CARD', 'INVALID_CHANNEL'], 'square');
@@ -27,7 +27,7 @@ test('channel mapper mapToSquare filters invalid channels', function () {
     expect($result)->toBe(['CARD']);
 });
 
-test('channel mapper mapToSquare accepts valid Square payment methods', function () {
+test('channel mapper mapToSquare accepts valid Square payment methods', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['CARD', 'CASH', 'SQUARE_GIFT_CARD'], 'square');
@@ -35,7 +35,7 @@ test('channel mapper mapToSquare accepts valid Square payment methods', function
     expect($result)->toContain('CARD', 'CASH', 'SQUARE_GIFT_CARD');
 });
 
-test('channel mapper mapToSquare handles case insensitive input', function () {
+test('channel mapper mapToSquare handles case insensitive input', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'Bank_Transfer'], 'square');
@@ -43,7 +43,7 @@ test('channel mapper mapToSquare handles case insensitive input', function () {
     expect($result)->toContain('CARD', 'OTHER');
 });
 
-test('channel mapper mapToOpay maps all unified channels', function () {
+test('channel mapper mapToOpay maps all unified channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([
@@ -57,7 +57,7 @@ test('channel mapper mapToOpay maps all unified channels', function () {
     expect($result)->toContain('CARD', 'BANK_ACCOUNT', 'OPAY_ACCOUNT', 'OPAY_QRCODE');
 });
 
-test('channel mapper mapToOpay maps card to CARD', function () {
+test('channel mapper mapToOpay maps card to CARD', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::CARD->value], 'opay');
@@ -65,7 +65,7 @@ test('channel mapper mapToOpay maps card to CARD', function () {
     expect($result)->toBe(['CARD']);
 });
 
-test('channel mapper mapToOpay maps bank transfer to BANK_ACCOUNT', function () {
+test('channel mapper mapToOpay maps bank transfer to BANK_ACCOUNT', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::BANK_TRANSFER->value], 'opay');
@@ -73,7 +73,7 @@ test('channel mapper mapToOpay maps bank transfer to BANK_ACCOUNT', function () 
     expect($result)->toBe(['BANK_ACCOUNT']);
 });
 
-test('channel mapper mapToOpay maps ussd to OPAY_ACCOUNT', function () {
+test('channel mapper mapToOpay maps ussd to OPAY_ACCOUNT', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::USSD->value], 'opay');
@@ -81,7 +81,7 @@ test('channel mapper mapToOpay maps ussd to OPAY_ACCOUNT', function () {
     expect($result)->toBe(['OPAY_ACCOUNT']);
 });
 
-test('channel mapper mapToOpay maps mobile money to OPAY_ACCOUNT', function () {
+test('channel mapper mapToOpay maps mobile money to OPAY_ACCOUNT', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::MOBILE_MONEY->value], 'opay');
@@ -89,7 +89,7 @@ test('channel mapper mapToOpay maps mobile money to OPAY_ACCOUNT', function () {
     expect($result)->toBe(['OPAY_ACCOUNT']);
 });
 
-test('channel mapper mapToOpay maps qr code to OPAY_QRCODE', function () {
+test('channel mapper mapToOpay maps qr code to OPAY_QRCODE', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels([PaymentChannel::QR_CODE->value], 'opay');
@@ -97,7 +97,7 @@ test('channel mapper mapToOpay maps qr code to OPAY_QRCODE', function () {
     expect($result)->toBe(['OPAY_QRCODE']);
 });
 
-test('channel mapper mapToOpay filters invalid channels', function () {
+test('channel mapper mapToOpay filters invalid channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['card', 'invalid_channel'], 'opay');
@@ -105,7 +105,7 @@ test('channel mapper mapToOpay filters invalid channels', function () {
     expect($result)->toBe(['CARD']);
 });
 
-test('channel mapper mapToOpay returns null for unmapped channels', function () {
+test('channel mapper mapToOpay returns null for unmapped channels', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['unknown_channel'], 'opay');
@@ -113,7 +113,7 @@ test('channel mapper mapToOpay returns null for unmapped channels', function () 
     expect($result)->toBe([]);
 });
 
-test('channel mapper mapToOpay accepts valid OPay options', function () {
+test('channel mapper mapToOpay accepts valid OPay options', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['CARD', 'BALANCE', 'OTHERS'], 'opay');
@@ -123,7 +123,7 @@ test('channel mapper mapToOpay accepts valid OPay options', function () {
         ->and($result)->toContain('OTHERS');
 });
 
-test('channel mapper mapToOpay handles case insensitive input', function () {
+test('channel mapper mapToOpay handles case insensitive input', function (): void {
     $mapper = new ChannelMapper;
 
     $result = $mapper->mapChannels(['Card', 'BANK_TRANSFER', 'Qr_Code'], 'opay');

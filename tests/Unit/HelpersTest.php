@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Payment;
 
-test('the payment() helper resolves the Payment builder from the container', function () {
+test('the payment() helper resolves the Payment builder from the container', function (): void {
     expect(payment())->toBeInstanceOf(Payment::class);
 });
 
-test('loading helpers.php again leaves an existing payment() function alone', function () {
+test('loading helpers.php again leaves an existing payment() function alone', function (): void {
     // Composer's "files" autoload runs helpers.php once, before any test. An
     // application that defines its own payment() first, or a second autoloader
     // including the file again, must not hit "Cannot redeclare payment()".

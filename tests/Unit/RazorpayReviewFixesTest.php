@@ -11,6 +11,8 @@ use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\RazorpayDriver;
 use KenDeNigerian\PayZephyr\Events\RefundCompleted;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
@@ -45,7 +47,7 @@ function rzpJson(array $body): Response
 // The outbound refund amount
 // ---------------------------------------------------------------------------
 
-test('a refund is refused when the payment does not say what currency it is in', function () {
+test('a refund is refused when the payment does not say what currency it is in', function (): void {
     // The exponent decides the outbound amount, so this is not a labelling
     // problem: refunding JPY 500 against a payment with no currency used to
     // send 50000 minor units - a hundredfold over-refund Razorpay has no
@@ -54,11 +56,11 @@ test('a refund is refused when the payment does not say what currency it is in',
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 500, 'amount_refunded' => 0]),
     ]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'pay_1', amount: 500.0)))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'pay_1', amount: 500.0)))
         ->toThrow(RefundException::class, 'currency');
 });
 
-test('a zero-decimal refund sends the amount unmultiplied', function () {
+test('a zero-decimal refund sends the amount unmultiplied', function (): void {
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 500, 'amount_refunded' => 0, 'currency' => 'JPY']),
         rzpJson(['id' => 'rfnd_1', 'status' => 'processed', 'amount' => 500, 'currency' => 'JPY']),
@@ -70,7 +72,7 @@ test('a zero-decimal refund sends the amount unmultiplied', function () {
         ->and($refund->amount)->toBe(500.0);
 });
 
-test('a three-decimal refund sends thousandths with a trailing zero', function () {
+test('a three-decimal refund sends thousandths with a trailing zero', function (): void {
     // Razorpay requires the last digit to be 0 for these currencies.
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 5000, 'amount_refunded' => 0, 'currency' => 'KWD']),
@@ -86,7 +88,7 @@ test('a three-decimal refund sends thousandths with a trailing zero', function (
 // Refund amounts are never invented
 // ---------------------------------------------------------------------------
 
-test('a refund response that omits the amount reports what was actually sent', function () {
+test('a refund response that omits the amount reports what was actually sent', function (): void {
     // The amount PayZephyr sent is a defensible inference; zero is not.
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 90000, 'amount_refunded' => 0, 'currency' => 'INR']),
@@ -97,7 +99,7 @@ test('a refund response that omits the amount reports what was actually sent', f
         ->toBe(250.0);
 });
 
-test('a full refund that is not echoed back reports the unrefunded remainder', function () {
+test('a full refund that is not echoed back reports the unrefunded remainder', function (): void {
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 90000, 'amount_refunded' => 40000, 'currency' => 'INR']),
         rzpJson(['id' => 'rfnd_1', 'status' => 'processed', 'currency' => 'INR']),
@@ -106,15 +108,15 @@ test('a full refund that is not echoed back reports the unrefunded remainder', f
     expect($driver->refund(new RefundRequestDTO(transactionReference: 'pay_1'))->amount)->toBe(500.0);
 });
 
-test('a fetched refund missing its amount or currency is refused, never reported as zero', function (string $omit) {
+test('a fetched refund missing its amount or currency is refused, never reported as zero', function (string $omit): void {
     $body = ['id' => 'rfnd_1', 'status' => 'processed', 'amount' => 25000, 'currency' => 'INR', 'payment_id' => 'pay_1'];
     unset($body[$omit]);
 
-    expect(fn () => rzpDriver([rzpJson($body)])->fetchRefund('rfnd_1'))
+    expect(fn (): RefundResponseDTO => rzpDriver([rzpJson($body)])->fetchRefund('rfnd_1'))
         ->toThrow(RefundException::class, $omit);
 })->with(['amount', 'currency']);
 
-test('a fetched refund with no status is treated as still in flight, not as unknown', function () {
+test('a fetched refund with no status is treated as still in flight, not as unknown', function (): void {
     // 'unknown' maps to no RefundStatus at all, which would drop the refund
     // out of the over-refund guard's accounting entirely.
     $refund = rzpDriver([rzpJson([
@@ -128,19 +130,19 @@ test('a fetched refund with no status is treated as still in flight, not as unkn
 // Idempotency
 // ---------------------------------------------------------------------------
 
-test('an idempotency key Razorpay would not accept is refused, not silently dropped', function () {
+test('an idempotency key Razorpay would not accept is refused, not silently dropped', function (): void {
     // Sending the refund anyway would leave the caller believing a retry is
     // protected against double-refunding when nothing would deduplicate it.
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 90000, 'amount_refunded' => 0, 'currency' => 'INR']),
     ]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(
         transactionReference: 'pay_1', amount: 250.0, idempotencyKey: 'short'
     )))->toThrow(RefundException::class, 'at least 10 characters');
 });
 
-test('a valid idempotency key is sent as the header Razorpay documents', function () {
+test('a valid idempotency key is sent as the header Razorpay documents', function (): void {
     $driver = rzpDriver([
         rzpJson(['id' => 'pay_1', 'status' => 'captured', 'amount' => 90000, 'amount_refunded' => 0, 'currency' => 'INR']),
         rzpJson(['id' => 'rfnd_1', 'status' => 'processed', 'amount' => 25000, 'currency' => 'INR']),
@@ -157,7 +159,7 @@ test('a valid idempotency key is sent as the header Razorpay documents', functio
 // The shared refund-webhook path
 // ---------------------------------------------------------------------------
 
-test('a Razorpay refund webhook resolves its reference from the notes', function () {
+test('a Razorpay refund webhook resolves its reference from the notes', function (): void {
     Event::fake();
 
     app()->call([new ProcessWebhook('razorpay', [
@@ -168,10 +170,10 @@ test('a Razorpay refund webhook resolves its reference from the notes', function
         ]]],
     ]), 'handle']);
 
-    Event::assertDispatched(RefundCompleted::class, fn ($e) => $e->transactionReference === 'PZ_123');
+    Event::assertDispatched(RefundCompleted::class, fn ($e): bool => $e->transactionReference === 'PZ_123');
 });
 
-test('a Square refund webhook reports the payment it refunds', function () {
+test('a Square refund webhook reports the payment it refunds', function (): void {
     // Square refunds are made against a payment id, and refund_transactions
     // records that id as the refund's transaction reference. The event used
     // to carry '' instead - and, in Square's real shape, nested one level
@@ -185,7 +187,7 @@ test('a Square refund webhook reports the payment it refunds', function () {
         ]]],
     ]), 'handle']);
 
-    Event::assertDispatched(RefundCompleted::class, fn ($e) => $e->refundReference === 'sq_refund_1'
+    Event::assertDispatched(RefundCompleted::class, fn ($e): bool => $e->refundReference === 'sq_refund_1'
         && $e->transactionReference === 'sq_payment_999');
 });
 
@@ -193,7 +195,7 @@ test('a Square refund webhook reports the payment it refunds', function () {
 // Failure paths the contribution left uncovered
 // ---------------------------------------------------------------------------
 
-test('an unexpected failure during a charge is still reported as a charge failure', function () {
+test('an unexpected failure during a charge is still reported as a charge failure', function (): void {
     // Anything that is not already a ChargeException and not a recognised
     // network fault must still leave through ChargeException, or the fallback
     // chain sees a type it does not handle.
@@ -212,20 +214,20 @@ test('an unexpected failure during a charge is still reported as a charge failur
         ->and($thrown->getPrevious())->toBeInstanceOf(RuntimeException::class);
 });
 
-test('a payment link fetched by id that comes back without one is refused', function () {
-    expect(fn () => rzpDriver([rzpJson(['status' => 'paid', 'amount' => 100, 'currency' => 'INR'])])->verify('plink_missing'))
+test('a payment link fetched by id that comes back without one is refused', function (): void {
+    expect(fn (): VerificationResponseDTO => rzpDriver([rzpJson(['status' => 'paid', 'amount' => 100, 'currency' => 'INR'])])->verify('plink_missing'))
         ->toThrow(VerificationException::class, 'not found');
 });
 
-test('a refund fetched by an id Razorpay does not know is refused', function () {
-    expect(fn () => rzpDriver([rzpJson(['status' => 'processed'])])->fetchRefund('rfnd_missing'))
+test('a refund fetched by an id Razorpay does not know is refused', function (): void {
+    expect(fn (): RefundResponseDTO => rzpDriver([rzpJson(['status' => 'processed'])])->fetchRefund('rfnd_missing'))
         ->toThrow(RefundException::class, 'not found');
 });
 
-test('a refund fetch that fails in transport is wrapped as a refund failure', function () {
+test('a refund fetch that fails in transport is wrapped as a refund failure', function (): void {
     $driver = rzpDriver([
         new ConnectException('Connection refused', new Request('GET', 'https://api.razorpay.com/v1/refunds/rfnd_1')),
     ]);
 
-    expect(fn () => $driver->fetchRefund('rfnd_1'))->toThrow(RefundException::class, 'Failed to fetch refund');
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rfnd_1'))->toThrow(RefundException::class, 'Failed to fetch refund');
 });

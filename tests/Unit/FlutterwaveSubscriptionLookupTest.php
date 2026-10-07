@@ -32,7 +32,7 @@ function flutterwaveSubscriptionRow(int $id, string $email, mixed $plan): array
     return ['id' => $id, 'status' => 'active', 'amount' => 5000, 'plan' => $plan, 'customer' => ['email' => $email, 'currency' => 'NGN']];
 }
 
-test('listing a customer\'s subscriptions asks Flutterwave to filter by their email', function () {
+test('listing a customer\'s subscriptions asks Flutterwave to filter by their email', function (): void {
     $history = [];
     $driver = flutterwaveLookupDriver([
         new Response(200, [], json_encode(['status' => 'success', 'data' => [
@@ -50,7 +50,7 @@ test('listing a customer\'s subscriptions asks Flutterwave to filter by their em
         ->and($listing['data'][0]->subscriptionCode)->toBe('1');
 });
 
-test('the subscription a charge created is looked up by customer and plan', function () {
+test('the subscription a charge created is looked up by customer and plan', function (): void {
     $history = [];
     $driver = flutterwaveLookupDriver([
         new Response(200, [], json_encode(['status' => 'success', 'data' => ['id' => 99]])),
@@ -73,7 +73,7 @@ test('the subscription a charge created is looked up by customer and plan', func
         ->and($subscription->plan)->toBe('3807');
 });
 
-test('the subscription a charge created is the customer\'s active one, newest first, not an older cancelled one', function () {
+test('the subscription a charge created is the customer\'s active one, newest first, not an older cancelled one', function (): void {
     // A customer who subscribed to the plan before has an older, cancelled
     // subscription to it too - listed here first, and newest last.
     $row = fn (int $id, string $status): array => array_merge(flutterwaveSubscriptionRow($id, 'a@b.com', 3807), ['status' => $status]);

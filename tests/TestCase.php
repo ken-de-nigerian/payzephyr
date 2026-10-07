@@ -2,9 +2,26 @@
 
 namespace KenDeNigerian\PayZephyr\Tests;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\DB;
+use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
+use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
+use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
+use KenDeNigerian\PayZephyr\Drivers\OPayDriver;
+use KenDeNigerian\PayZephyr\Drivers\PaddleDriver;
+use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
+use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
+use KenDeNigerian\PayZephyr\Drivers\RazorpayDriver;
+use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
+use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
+use KenDeNigerian\PayZephyr\Payment;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\PaymentServiceProvider;
 use Orchestra\Testbench\TestCase as Orchestra;
+use Stripe\Exception\ApiErrorException;
 
 abstract class TestCase extends Orchestra
 {
@@ -68,7 +85,7 @@ abstract class TestCase extends Orchestra
         // Enable all providers for comprehensive testing
         $app['config']->set('payments.providers.paystack', [
             'driver' => 'paystack',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\PaystackDriver::class,
+            'driver_class' => PaystackDriver::class,
             'secret_key' => 'sk_test_xxx',
             'public_key' => 'pk_test_xxx',
             'enabled' => true,
@@ -77,7 +94,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.stripe', [
             'driver' => 'stripe',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\StripeDriver::class,
+            'driver_class' => StripeDriver::class,
             'secret_key' => 'sk_test_xxx',
             'public_key' => 'pk_test_xxx',
             'enabled' => true,
@@ -86,7 +103,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.flutterwave', [
             'driver' => 'flutterwave',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver::class,
+            'driver_class' => FlutterwaveDriver::class,
             'reference_prefix' => 'FLW',
             'secret_key' => 'FLWSECK_TEST_xxx',
             'public_key' => 'FLWPUBK_TEST_xxx',
@@ -96,7 +113,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.monnify', [
             'driver' => 'monnify',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\MonnifyDriver::class,
+            'driver_class' => MonnifyDriver::class,
             'api_key' => 'test_api_key',
             'secret_key' => 'test_secret_key',
             'contract_code' => 'test_contract',
@@ -106,7 +123,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.paypal', [
             'driver' => 'paypal',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\PayPalDriver::class,
+            'driver_class' => PayPalDriver::class,
             'client_id' => 'test_client_id',
             'client_secret' => 'test_client_secret',
             'enabled' => true,
@@ -115,7 +132,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.square', [
             'driver' => 'square',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\SquareDriver::class,
+            'driver_class' => SquareDriver::class,
             'access_token' => 'test_token',
             'location_id' => 'test_location',
             'enabled' => true,
@@ -124,7 +141,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.opay', [
             'driver' => 'opay',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\OPayDriver::class,
+            'driver_class' => OPayDriver::class,
             'merchant_id' => 'test_merchant',
             'public_key' => 'test_public_key',
             'enabled' => true,
@@ -133,7 +150,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.paddle', [
             'driver' => 'paddle',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\PaddleDriver::class,
+            'driver_class' => PaddleDriver::class,
             'api_key' => 'pdl_sdbx_apikey_test',
             'webhook_secret' => 'pdl_ntfset_test_secret',
             'enabled' => true,
@@ -142,7 +159,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.mollie', [
             'driver' => 'mollie',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\MollieDriver::class,
+            'driver_class' => MollieDriver::class,
             'api_key' => 'test_api_key',
             'enabled' => true,
             'currencies' => ['EUR', 'USD'],
@@ -150,7 +167,7 @@ abstract class TestCase extends Orchestra
 
         $app['config']->set('payments.providers.razorpay', [
             'driver' => 'razorpay',
-            'driver_class' => \KenDeNigerian\PayZephyr\Drivers\RazorpayDriver::class,
+            'driver_class' => RazorpayDriver::class,
             'key_id' => 'rzp_test_xxx',
             'key_secret' => 'test_key_secret',
             'webhook_secret' => 'test_webhook_secret',
@@ -318,7 +335,7 @@ abstract class TestCase extends Orchestra
      * Helper method to set up mocked HTTP client for a provider
      * and ensure Payment facade uses the mocked manager
      */
-    protected function setupMockedProvider(string $provider, array $responses): \KenDeNigerian\PayZephyr\PaymentManager
+    protected function setupMockedProvider(string $provider, array $responses): PaymentManager
     {
         // CRITICAL: Update config FIRST before any PaymentManager is created
         // Ensure health checks are disabled for testing
@@ -351,25 +368,21 @@ abstract class TestCase extends Orchestra
 
         // CRITICAL: Forget PaymentManager BEFORE creating new one
         // This ensures it reads the updated config
-        $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+        $this->app->forgetInstance(PaymentManager::class);
 
         // Also forget Payment to ensure it gets fresh manager
-        $this->app->forgetInstance(\KenDeNigerian\PayZephyr\Payment::class);
+        $this->app->forgetInstance(Payment::class);
 
         // Get manager - it will read the updated config from singleton
-        $manager = app(\KenDeNigerian\PayZephyr\PaymentManager::class);
+        $manager = app(PaymentManager::class);
 
         // CRITICAL: Update the manager's config property directly via reflection
         // This ensures it has the latest config even if singleton was cached
         $reflection = new \ReflectionClass($manager);
         $configProperty = $reflection->getProperty('config');
-        $configProperty->setAccessible(true);
         $freshConfig = app('payments.config') ?? config('payments');
-        $freshConfig['health_check']['enabled'] = false; // Force disabled
-        // Ensure provider is enabled in the config
-        if (! isset($freshConfig['providers'][$provider])) {
-            $freshConfig['providers'][$provider] = [];
-        }
+        $freshConfig['health_check']['enabled'] = false;
+        $freshConfig['providers'][$provider] ??= [];
         $freshConfig['providers'][$provider]['enabled'] = true;
         // Ensure currency is supported
         $currency = match ($provider) {
@@ -385,14 +398,13 @@ abstract class TestCase extends Orchestra
 
         // Clear any cached drivers to ensure fresh instance
         $driversProperty = $reflection->getProperty('drivers');
-        $driversProperty->setAccessible(true);
         $driversProperty->setValue($manager, []);
 
         // Get the driver - this will create it fresh
         $driver = $manager->driver($provider);
 
         // Stripe uses SDK, not HTTP client
-        if ($provider === 'stripe' && $driver instanceof \KenDeNigerian\PayZephyr\Drivers\StripeDriver) {
+        if ($provider === 'stripe' && $driver instanceof StripeDriver) {
             // Use a shared object to store references that both sessions and paymentIntents can access
             // Also store a map of all references that have been created, so we can match any STRIPE_* reference
             $sharedState = new class
@@ -410,7 +422,7 @@ abstract class TestCase extends Orchestra
             // We need to make this dynamic so it can match verification references
             $sessionsService = new class($sharedState)
             {
-                public function __construct(private object $sharedState) {}
+                public function __construct(private readonly object $sharedState) {}
 
                 public function create(array $params = [], array $options = [])
                 {
@@ -425,17 +437,15 @@ abstract class TestCase extends Orchestra
                         $this->sharedState->allStripeReferences[] = $reference;
                     }
 
-                    $session = (object) [
+                    return (object) [
                         'id' => 'cs_test_'.substr(md5($reference), 0, 8),
                         'url' => 'https://checkout.stripe.com/pay/cs_test_123',
                         'status' => 'open',
                         'client_reference_id' => $reference,
                     ];
-
-                    return $session;
                 }
 
-                public function all(array $params = []): object
+                public function all(array $params = []): \stdClass
                 {
                     // Return sessions that match stored references
                     // The verification code searches by client_reference_id with exact match
@@ -458,7 +468,7 @@ abstract class TestCase extends Orchestra
                     }
 
                     // Fallback: if no references stored but we have a session reference, use it
-                    if (empty($sessions) && $this->sharedState->createdSessionRef !== null) {
+                    if ($sessions === [] && $this->sharedState->createdSessionRef !== null) {
                         $sessions[] = (object) [
                             'id' => 'cs_test_123',
                             'url' => 'https://checkout.stripe.com/pay/cs_test_123',
@@ -511,7 +521,7 @@ abstract class TestCase extends Orchestra
             // We need to make this work with the verification search which looks for metadata['reference']
             $paymentIntents = new class($sharedState)
             {
-                public function __construct(private object $sharedState) {}
+                public function __construct(private readonly object $sharedState) {}
 
                 public function retrieve(string $id)
                 {
@@ -530,7 +540,7 @@ abstract class TestCase extends Orchestra
                     ];
                 }
 
-                public function all(array $params = []): object
+                public function all(array $params = []): \stdClass
                 {
                     // Return intents that can be searched by metadata reference
                     // The verification code searches through intents looking for metadata['reference']
@@ -556,7 +566,7 @@ abstract class TestCase extends Orchestra
                     }
 
                     // Fallback: if no references stored but we have a session reference, use it
-                    if (empty($intents) && $this->sharedState->createdSessionRef !== null) {
+                    if ($intents === [] && $this->sharedState->createdSessionRef !== null) {
                         $intents[] = (object) [
                             'id' => 'pi_test_123',
                             'status' => 'succeeded',
@@ -583,19 +593,19 @@ abstract class TestCase extends Orchestra
 
             // Check if we need to simulate an error (for error handling tests)
             // If responses contains an error response, make create() throw an exception
-            if (! empty($responses) && $responses[0] instanceof \GuzzleHttp\Psr7\Response) {
+            if ($responses !== [] && $responses[0] instanceof Response) {
                 $statusCode = $responses[0]->getStatusCode();
                 if ($statusCode >= 400) {
                     // Wrap the sessions service to throw an error on create
                     $originalSessions = $sessionsService;
                     $sessionsService = new class($originalSessions)
                     {
-                        public function __construct(private object $originalSessions) {}
+                        public function __construct(private readonly object $originalSessions) {}
 
-                        public function create(array $params = [], array $options = [])
+                        public function create(array $params = [], array $options = []): never
                         {
                             // Throw Stripe API error exception
-                            throw new \Stripe\Exception\ApiErrorException('Payment failed', 400);
+                            throw new ApiErrorException('Payment failed', 400);
                         }
 
                         public function all(array $params = []): object
@@ -622,13 +632,13 @@ abstract class TestCase extends Orchestra
             };
 
             $driver->setStripeClient($stripeMock);
-        } elseif ($provider === 'paypal' && $driver instanceof \KenDeNigerian\PayZephyr\Drivers\PayPalDriver) {
+        } elseif ($provider === 'paypal' && $driver instanceof PayPalDriver) {
             // PayPal needs OAuth token first, then charge response
             $paypalResponses = $responses;
             if (count($responses) === 1) {
                 // Add OAuth token response before charge response
                 $paypalResponses = [
-                    new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                    new Response(200, [], json_encode([
                         'access_token' => 'A21AA_test_token',
                         'token_type' => 'Bearer',
                         'expires_in' => 32400,
@@ -636,9 +646,9 @@ abstract class TestCase extends Orchestra
                     ...$responses,
                 ];
             }
-            $mock = new \GuzzleHttp\Handler\MockHandler($paypalResponses);
-            $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
-            $client = new \GuzzleHttp\Client(['handler' => $handlerStack]);
+            $mock = new MockHandler($paypalResponses);
+            $handlerStack = HandlerStack::create($mock);
+            $client = new Client(['handler' => $handlerStack]);
             $driver->setClient($client);
         } else {
             // For HTTP-based providers, mock the HTTP client
@@ -663,7 +673,7 @@ abstract class TestCase extends Orchestra
                             $responseData['data']['orderNo'] = $reference;
                         }
 
-                        return new \GuzzleHttp\Psr7\Response(
+                        return new Response(
                             $verifyResponse->getStatusCode(),
                             $verifyResponse->getHeaders(),
                             json_encode($responseData)
@@ -674,8 +684,8 @@ abstract class TestCase extends Orchestra
                     return $responses[0];
                 };
 
-                $handlerStack = \GuzzleHttp\HandlerStack::create($handler);
-                $client = new \GuzzleHttp\Client(['handler' => $handlerStack]);
+                $handlerStack = HandlerStack::create($handler);
+                $client = new Client(['handler' => $handlerStack]);
                 $driver->setClient($client);
             } else {
                 // Monnify needs OAuth token first, then charge response
@@ -683,7 +693,7 @@ abstract class TestCase extends Orchestra
                 if ($provider === 'monnify' && count($responses) === 1) {
                     // Add OAuth token response before charge response
                     $providerResponses = [
-                        new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+                        new Response(200, [], json_encode([
                             'requestSuccessful' => true,
                             'responseBody' => [
                                 'accessToken' => 'test_access_token',
@@ -693,9 +703,9 @@ abstract class TestCase extends Orchestra
                         ...$responses,
                     ];
                 }
-                $mock = new \GuzzleHttp\Handler\MockHandler($providerResponses);
-                $handlerStack = \GuzzleHttp\HandlerStack::create($mock);
-                $client = new \GuzzleHttp\Client(['handler' => $handlerStack]);
+                $mock = new MockHandler($providerResponses);
+                $handlerStack = HandlerStack::create($mock);
+                $client = new Client(['handler' => $handlerStack]);
                 $driver->setClient($client);
             }
         }
@@ -703,19 +713,14 @@ abstract class TestCase extends Orchestra
         // Use reflection to ensure the driver is cached with the mocked client
         $reflection = new \ReflectionClass($manager);
         $driversProperty = $reflection->getProperty('drivers');
-        $driversProperty->setAccessible(true);
         $drivers = $driversProperty->getValue($manager);
         $drivers[$provider] = $driver;
         $driversProperty->setValue($manager, $drivers);
 
         // Also ensure the config is updated in the manager
         $configProperty = $reflection->getProperty('config');
-        $configProperty->setAccessible(true);
         $currentConfig = $configProperty->getValue($manager);
-        // Ensure provider is enabled in manager's config
-        if (! isset($currentConfig['providers'][$provider])) {
-            $currentConfig['providers'][$provider] = [];
-        }
+        $currentConfig['providers'][$provider] ??= [];
         $currentConfig['providers'][$provider]['enabled'] = true;
         // Ensure currency is supported
         $currency = match ($provider) {
@@ -732,15 +737,11 @@ abstract class TestCase extends Orchestra
 
         // CRITICAL: Bind PaymentManager as singleton with our mocked instance
         // This ensures Payment facade always uses our manager
-        $this->app->singleton(\KenDeNigerian\PayZephyr\PaymentManager::class, function () use ($manager) {
-            return $manager;
-        });
+        $this->app->singleton(PaymentManager::class, fn () => $manager);
 
         // CRITICAL: Bind Payment to use our manager
         // Payment is bound (not singleton), so each call gets fresh instance but same manager
-        $this->app->bind(\KenDeNigerian\PayZephyr\Payment::class, function ($app) use ($manager) {
-            return new \KenDeNigerian\PayZephyr\Payment($manager);
-        });
+        $this->app->bind(Payment::class, fn ($app): Payment => new Payment($manager));
 
         // Clear facade cache to ensure it uses our bindings
         \KenDeNigerian\PayZephyr\Facades\Payment::clearResolvedInstances();

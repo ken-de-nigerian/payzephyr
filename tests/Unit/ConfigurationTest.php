@@ -4,11 +4,11 @@ use KenDeNigerian\PayZephyr\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\PaymentServiceProvider;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->provider = new PaymentServiceProvider($this->app);
 });
 
-test('service provider registers payment manager as singleton', function () {
+test('service provider registers payment manager as singleton', function (): void {
     $this->provider->register();
 
     $manager1 = app(PaymentManager::class);
@@ -17,7 +17,7 @@ test('service provider registers payment manager as singleton', function () {
     expect($manager1)->toBe($manager2);
 });
 
-test('service provider registers payment class', function () {
+test('service provider registers payment class', function (): void {
     $this->provider->register();
 
     $payment = app(Payment::class);
@@ -25,14 +25,14 @@ test('service provider registers payment class', function () {
     expect($payment)->toBeInstanceOf(Payment::class);
 });
 
-test('service provider merges config from package', function () {
+test('service provider merges config from package', function (): void {
     $this->provider->register();
 
     expect(config('payments'))->toBeArray()
         ->and(config('payments.default'))->not->toBeNull();
 });
 
-test('config has all required keys', function () {
+test('config has all required keys', function (): void {
     $this->provider->register();
 
     $config = config('payments');
@@ -48,13 +48,13 @@ test('config has all required keys', function () {
     ]);
 });
 
-test('config providers section has paystack', function () {
+test('config providers section has paystack', function (): void {
     $this->provider->register();
 
     expect(config('payments.providers'))->toHaveKey('paystack');
 });
 
-test('config providers section has all five providers', function () {
+test('config providers section has all five providers', function (): void {
     $this->provider->register();
 
     $providers = config('payments.providers');
@@ -68,19 +68,19 @@ test('config providers section has all five providers', function () {
     ]);
 });
 
-test('default provider is configurable', function () {
+test('default provider is configurable', function (): void {
     config(['payments.default' => 'stripe']);
 
     expect(config('payments.default'))->toBe('stripe');
 });
 
-test('fallback provider is configurable', function () {
+test('fallback provider is configurable', function (): void {
     config(['payments.fallback' => 'paystack']);
 
     expect(config('payments.fallback'))->toBe('paystack');
 });
 
-test('webhook settings are configurable', function () {
+test('webhook settings are configurable', function (): void {
     config([
         'payments.webhook.path' => '/custom/webhook',
         'payments.webhook.verify_signature' => false,
@@ -90,7 +90,7 @@ test('webhook settings are configurable', function () {
         ->and(config('payments.webhook.verify_signature'))->toBeFalse();
 });
 
-test('health check is configurable', function () {
+test('health check is configurable', function (): void {
     config([
         'payments.health_check.enabled' => false,
         'payments.health_check.cache_ttl' => 600,
@@ -100,7 +100,7 @@ test('health check is configurable', function () {
         ->and(config('payments.health_check.cache_ttl'))->toBe(600);
 });
 
-test('logging is configurable', function () {
+test('logging is configurable', function (): void {
     config([
         'payments.logging.enabled' => true,
         'payments.logging.table' => 'custom_transactions',
@@ -110,7 +110,7 @@ test('logging is configurable', function () {
         ->and(config('payments.logging.table'))->toBe('custom_transactions');
 });
 
-test('currency settings are configurable', function () {
+test('currency settings are configurable', function (): void {
     config([
         'payments.currency.default' => 'USD',
         'payments.currency.converter' => 'custom',
@@ -120,7 +120,7 @@ test('currency settings are configurable', function () {
         ->and(config('payments.currency.converter'))->toBe('custom');
 });
 
-test('testing_mode config key was removed (ADR-0002)', function () {
+test('testing_mode config key was removed (ADR-0002)', function (): void {
     // testing_mode used to disable Guzzle TLS verification globally, which was
     // an unsafe default footgun. It is no longer read anywhere - drivers
     // always verify TLS certs. Tests inject a mock client via setClient()
@@ -128,13 +128,13 @@ test('testing_mode config key was removed (ADR-0002)', function () {
     expect(config('payments.testing_mode'))->toBeNull();
 });
 
-test('provider can be enabled/disabled', function () {
+test('provider can be enabled/disabled', function (): void {
     config(['payments.providers.paystack.enabled' => false]);
 
     expect(config('payments.providers.paystack.enabled'))->toBeFalse();
 });
 
-test('provider credentials are configurable', function () {
+test('provider credentials are configurable', function (): void {
     config([
         'payments.providers.paystack.secret_key' => 'sk_test_custom',
         'payments.providers.paystack.public_key' => 'pk_test_custom',
@@ -144,14 +144,14 @@ test('provider credentials are configurable', function () {
         ->and(config('payments.providers.paystack.public_key'))->toBe('pk_test_custom');
 });
 
-test('provider currencies are configurable', function () {
+test('provider currencies are configurable', function (): void {
     config(['payments.providers.paystack.currencies' => ['NGN', 'USD', 'GHS']]);
 
     expect(config('payments.providers.paystack.currencies'))
         ->toBe(['NGN', 'USD', 'GHS']);
 });
 
-test('security settings are configurable', function () {
+test('security settings are configurable', function (): void {
     config([
         'payments.security.encrypt_keys' => true,
         'payments.security.rate_limit.enabled' => true,
@@ -163,26 +163,26 @@ test('security settings are configurable', function () {
         ->and(config('payments.security.rate_limit.max_attempts'))->toBe(100);
 });
 
-test('webhook middleware is configurable', function () {
+test('webhook middleware is configurable', function (): void {
     config(['payments.webhook.middleware' => ['api', 'throttle:60,1']]);
 
     expect(config('payments.webhook.middleware'))
         ->toBe(['api', 'throttle:60,1']);
 });
 
-test('webhook tolerance is configurable', function () {
+test('webhook tolerance is configurable', function (): void {
     config(['payments.webhook.tolerance' => 600]);
 
     expect(config('payments.webhook.tolerance'))->toBe(600);
 });
 
-test('health check timeout is configurable', function () {
+test('health check timeout is configurable', function (): void {
     config(['payments.health_check.timeout' => 10]);
 
     expect(config('payments.health_check.timeout'))->toBe(10);
 });
 
-test('each provider has required configuration keys', function () {
+test('each provider has required configuration keys', function (): void {
     $this->provider->register();
 
     $providers = ['paystack', 'flutterwave', 'monnify', 'stripe', 'paypal'];
@@ -198,7 +198,7 @@ test('each provider has required configuration keys', function () {
     }
 });
 
-test('paystack has all required config keys', function () {
+test('paystack has all required config keys', function (): void {
     $this->provider->register();
 
     $config = config('payments.providers.paystack');
@@ -212,7 +212,7 @@ test('paystack has all required config keys', function () {
     ]);
 });
 
-test('flutterwave has all required config keys', function () {
+test('flutterwave has all required config keys', function (): void {
     $this->provider->register();
 
     $config = config('payments.providers.flutterwave');
@@ -226,7 +226,7 @@ test('flutterwave has all required config keys', function () {
     ]);
 });
 
-test('monnify has all required config keys', function () {
+test('monnify has all required config keys', function (): void {
     $this->provider->register();
 
     $config = config('payments.providers.monnify');
@@ -241,7 +241,7 @@ test('monnify has all required config keys', function () {
     ]);
 });
 
-test('stripe has all required config keys', function () {
+test('stripe has all required config keys', function (): void {
     $this->provider->register();
 
     $config = config('payments.providers.stripe');
@@ -260,7 +260,7 @@ test('stripe has all required config keys', function () {
     }
 });
 
-test('paypal has all required config keys', function () {
+test('paypal has all required config keys', function (): void {
     $this->provider->register();
 
     $config = config('payments.providers.paypal');

@@ -5,16 +5,15 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     Cache::flush();
 });
 
-test('it clears session cache after successful verification', function () {
+test('it clears session cache after successful verification', function (): void {
     $manager = app(PaymentManager::class);
     $reflection = new ReflectionClass($manager);
 
     $cacheKeyMethod = $reflection->getMethod('cacheKey');
-    $cacheKeyMethod->setAccessible(true);
 
     $reference = 'TEST_REF_123';
     $key = $cacheKeyMethod->invoke($manager, 'session', $reference);
@@ -31,12 +30,11 @@ test('it clears session cache after successful verification', function () {
     expect(Cache::get($key))->toBeNull();
 });
 
-test('it expires session cache after configured ttl', function () {
+test('it expires session cache after configured ttl', function (): void {
     $manager = app(PaymentManager::class);
     $reflection = new ReflectionClass($manager);
 
     $cacheKeyMethod = $reflection->getMethod('cacheKey');
-    $cacheKeyMethod->setAccessible(true);
 
     $reference = 'TEST_REF_456';
     $key = $cacheKeyMethod->invoke($manager, 'session', $reference);
@@ -53,7 +51,7 @@ test('it expires session cache after configured ttl', function () {
     expect(Cache::get($key))->toBeNull();
 });
 
-test('it caches health checks for configured duration', function () {
+test('it caches health checks for configured duration', function (): void {
     config(['payments.health_check.cache_ttl' => 120]); // 2 minutes
 
     $driver = app(PaymentManager::class)->driver('paystack');
@@ -71,12 +69,11 @@ test('it caches health checks for configured duration', function () {
     expect($result3)->toBeBool();
 });
 
-test('it handles cache key collisions with user context', function () {
+test('it handles cache key collisions with user context', function (): void {
     $manager = app(PaymentManager::class);
     $reflection = new ReflectionClass($manager);
 
     $cacheKeyMethod = $reflection->getMethod('cacheKey');
-    $cacheKeyMethod->setAccessible(true);
 
     $key1 = $cacheKeyMethod->invoke($manager, 'session', 'REF_123');
     Cache::put($key1, ['provider' => 'paystack', 'id' => 'id1'], now()->addHour());
@@ -88,7 +85,7 @@ test('it handles cache key collisions with user context', function () {
         ->and(Cache::get($key2))->not->toBeNull();
 });
 
-test('it handles cache eviction when memory is low', function () {
+test('it handles cache eviction when memory is low', function (): void {
     $key = 'payzephyr:session:TEST_REF';
     $data = ['provider' => 'paystack', 'id' => 'test_id'];
 
@@ -101,7 +98,7 @@ test('it handles cache eviction when memory is low', function () {
     expect(Cache::get($key))->toBeNull();
 });
 
-test('it handles cache prefix isolation', function () {
+test('it handles cache prefix isolation', function (): void {
     $key1 = 'payzephyr:session:REF_1';
     $key2 = 'payzephyr:health:paystack';
     $key3 = 'other_prefix:session:REF_1';
@@ -115,7 +112,7 @@ test('it handles cache prefix isolation', function () {
         ->and(Cache::get($key3))->not->toBeNull();
 });
 
-test('it handles cache expiration edge cases', function () {
+test('it handles cache expiration edge cases', function (): void {
     $key = 'payzephyr:session:EDGE_CASE';
 
     Cache::put($key, ['provider' => 'paystack'], now()->addSecond());
@@ -127,7 +124,7 @@ test('it handles cache expiration edge cases', function () {
     expect(Cache::get($key))->toBeNull();
 });
 
-test('it handles cache with null values', function () {
+test('it handles cache with null values', function (): void {
     $key = 'payzephyr:session:NULL_TEST';
 
     Cache::put($key, null, now()->addHour());

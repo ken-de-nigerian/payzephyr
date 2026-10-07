@@ -26,7 +26,7 @@ function makeFlutterwaveRefundDriver(array $responses, ?array &$history = null):
     return $driver;
 }
 
-test('flutterwave refund succeeds with valid response', function () {
+test('flutterwave refund succeeds with valid response', function (): void {
     $driver = makeFlutterwaveRefundDriver([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -49,7 +49,7 @@ test('flutterwave refund succeeds with valid response', function () {
         ->and($result->provider)->toBe('flutterwave');
 });
 
-test('flutterwave refund throws exception on api error', function () {
+test('flutterwave refund throws exception on api error', function (): void {
     $driver = makeFlutterwaveRefundDriver([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'Transaction not found'])),
     ]);
@@ -57,7 +57,7 @@ test('flutterwave refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'invalid'));
 })->throws(RefundException::class, 'Transaction not found');
 
-test('flutterwave fetchRefund succeeds with valid response', function () {
+test('flutterwave fetchRefund succeeds with valid response', function (): void {
     $driver = makeFlutterwaveRefundDriver([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -78,7 +78,7 @@ test('flutterwave fetchRefund succeeds with valid response', function () {
         ->and($result->status)->toBe('completed');
 });
 
-test('flutterwave fetchRefund queries the refund-by-id endpoint, not the transaction-scoped refund list', function () {
+test('flutterwave fetchRefund queries the refund-by-id endpoint, not the transaction-scoped refund list', function (): void {
     // Regression: GET /v3/transactions/{id}/refunds is a *transaction*-id
     // keyed endpoint that lists every refund against that transaction. The
     // parameter fetchRefund() receives is a *refund* reference (a different

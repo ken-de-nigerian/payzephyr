@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 
-test('verification response checks success status', function () {
+test('verification response checks success status', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
@@ -15,7 +17,7 @@ test('verification response checks success status', function () {
         ->and($response->isPending())->toBeFalse();
 });
 
-test('verification response checks failed status', function () {
+test('verification response checks failed status', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'failed',
@@ -27,7 +29,7 @@ test('verification response checks failed status', function () {
         ->and($response->isFailed())->toBeTrue();
 });
 
-test('verification response checks pending status', function () {
+test('verification response checks pending status', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'pending',
@@ -39,7 +41,7 @@ test('verification response checks pending status', function () {
         ->and($response->isSuccessful())->toBeFalse();
 });
 
-test('verification response converts to array', function () {
+test('verification response converts to array', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
@@ -63,7 +65,7 @@ test('verification response converts to array', function () {
         ->and($array['provider'])->toBe('paystack');
 });
 
-test('verification response handles all successful status variations', function () {
+test('verification response handles all successful status variations', function (): void {
     expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'success',
@@ -91,7 +93,7 @@ test('verification response handles all successful status variations', function 
 
 });
 
-test('verification response handles all failed status variations', function () {
+test('verification response handles all failed status variations', function (): void {
     expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'failed',
@@ -113,7 +115,7 @@ test('verification response handles all failed status variations', function () {
 
 });
 
-test('verification response handles case insensitive status', function () {
+test('verification response handles case insensitive status', function (): void {
     expect(VerificationResponseDTO::fromArray([
         'reference' => 'ref',
         'status' => 'SUCCESS',
@@ -129,7 +131,7 @@ test('verification response handles case insensitive status', function () {
 
 });
 
-test('verification response includes payment details', function () {
+test('verification response includes payment details', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
@@ -153,7 +155,7 @@ test('verification response includes payment details', function () {
         ->and($response->customer)->toBe(['email' => 'customer@example.com', 'name' => 'John Doe']);
 });
 
-test('verification response handles optional fields as null', function () {
+test('verification response handles optional fields as null', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
@@ -170,7 +172,7 @@ test('verification response handles optional fields as null', function () {
         ->and($response->customer)->toBeNull();
 });
 
-test('verification response from array with defaults', function () {
+test('verification response from array with defaults', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
     ]);
@@ -181,7 +183,7 @@ test('verification response from array with defaults', function () {
         ->and($response->currency)->toBe('');
 });
 
-test('verification response normalizes currency to uppercase', function () {
+test('verification response normalizes currency to uppercase', function (): void {
     $response = VerificationResponseDTO::fromArray([
         'reference' => 'ref_123',
         'status' => 'success',
@@ -192,7 +194,7 @@ test('verification response normalizes currency to uppercase', function () {
     expect($response->currency)->toBe('NGN');
 });
 
-test('verification response is immutable', function () {
+test('verification response is immutable', function (): void {
     $response = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',

@@ -2,13 +2,15 @@
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment manager handles database error during transaction logging gracefully', function () {
+test('payment manager handles database error during transaction logging gracefully', function (): void {
     config([
         'payments.logging.enabled' => true,
         'payments.providers.paystack' => [
@@ -33,7 +35,7 @@ test('payment manager handles database error during transaction logging graceful
     }
 });
 
-test('payment manager handles database error during verification update gracefully', function () {
+test('payment manager handles database error during verification update gracefully', function (): void {
     config([
         'payments.logging.enabled' => true,
         'payments.providers.paystack' => [
@@ -53,7 +55,7 @@ test('payment manager handles database error during verification update graceful
     }
 });
 
-test('payment manager getDefaultDriver returns first provider when default not set', function () {
+test('payment manager getDefaultDriver returns first provider when default not set', function (): void {
     config([
         'payments.providers' => [
             'stripe' => ['driver' => 'stripe', 'secret_key' => 'test', 'enabled' => true],
@@ -67,17 +69,17 @@ test('payment manager getDefaultDriver returns first provider when default not s
     expect($default)->toBeString();
 });
 
-test('payment manager getDefaultDriver handles empty providers config', function () {
+test('payment manager getDefaultDriver handles empty providers config', function (): void {
     config()->set('payments.providers', []);
     config()->set('payments.default');
     app()->forgetInstance('payments.config');
 
     $manager = new PaymentManager;
 
-    expect(fn () => $manager->getDefaultDriver())->toThrow(DriverNotFoundException::class);
+    expect(fn (): string => $manager->getDefaultDriver())->toThrow(DriverNotFoundException::class);
 });
 
-test('payment manager getFallbackChain handles empty fallback string', function () {
+test('payment manager getFallbackChain handles empty fallback string', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -97,7 +99,7 @@ test('payment manager getFallbackChain handles empty fallback string', function 
         ->and($chain)->toHaveCount(1);
 });
 
-test('payment manager getFallbackChain handles false fallback', function () {
+test('payment manager getFallbackChain handles false fallback', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -117,7 +119,7 @@ test('payment manager getFallbackChain handles false fallback', function () {
         ->and($chain)->toHaveCount(1);
 });
 
-test('payment manager resolveDriverClass returns original string for unknown driver', function () {
+test('payment manager resolveDriverClass returns original string for unknown driver', function (): void {
     config([
         'payments.providers.custom' => [
             'driver' => 'CustomDriverClass',
@@ -128,11 +130,11 @@ test('payment manager resolveDriverClass returns original string for unknown dri
 
     $manager = new PaymentManager;
 
-    expect(fn () => $manager->driver('custom'))
+    expect(fn (): DriverInterface => $manager->driver('custom'))
         ->toThrow(DriverNotFoundException::class);
 });
 
-test('payment manager handles logging disabled during charge', function () {
+test('payment manager handles logging disabled during charge', function (): void {
     config([
         'payments.logging.enabled' => false,
         'payments.providers.paystack' => [
@@ -157,7 +159,7 @@ test('payment manager handles logging disabled during charge', function () {
     }
 });
 
-test('payment manager handles logging disabled during verification', function () {
+test('payment manager handles logging disabled during verification', function (): void {
     config([
         'payments.logging.enabled' => false,
         'payments.providers.paystack' => [
@@ -177,7 +179,7 @@ test('payment manager handles logging disabled during verification', function ()
     }
 });
 
-test('payment manager updateTransactionFromVerification handles successful payment with paidAt', function () {
+test('payment manager updateTransactionFromVerification handles successful payment with paidAt', function (): void {
     config([
         'payments.logging.enabled' => true,
     ]);
@@ -186,10 +188,10 @@ test('payment manager updateTransactionFromVerification handles successful payme
 
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (Exception $e) {
+    } catch (Exception) {
     }
 
-    Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference')->unique();
         $table->string('provider');
@@ -204,7 +206,7 @@ test('payment manager updateTransactionFromVerification handles successful payme
         $table->timestamps();
     });
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'test_ref_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -222,8 +224,7 @@ test('payment manager updateTransactionFromVerification handles successful payme
         paidAt: now()->toIso8601String(),
         metadata: [],
         provider: 'paystack',
-        channel: 'card',
-        customer: null
+        channel: 'card'
     );
 
     $reflection = new ReflectionClass($manager);
@@ -231,12 +232,12 @@ test('payment manager updateTransactionFromVerification handles successful payme
 
     $method->invoke($manager, 'test_ref_123', $response);
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'test_ref_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'test_ref_123')->first();
     expect($transaction->status)->toBe('success')
         ->and($transaction->paid_at)->not->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification handles failed payment', function () {
+test('payment manager updateTransactionFromVerification handles failed payment', function (): void {
     config([
         'payments.logging.enabled' => true,
     ]);
@@ -245,10 +246,10 @@ test('payment manager updateTransactionFromVerification handles failed payment',
 
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (Exception $e) {
+    } catch (Exception) {
     }
 
-    Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference')->unique();
         $table->string('provider');
@@ -263,7 +264,7 @@ test('payment manager updateTransactionFromVerification handles failed payment',
         $table->timestamps();
     });
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'test_ref_failed',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -278,11 +279,8 @@ test('payment manager updateTransactionFromVerification handles failed payment',
         status: 'failed',
         amount: 1000,
         currency: 'NGN',
-        paidAt: null,
         metadata: [],
-        provider: 'paystack',
-        channel: null,
-        customer: null
+        provider: 'paystack'
     );
 
     $reflection = new ReflectionClass($manager);
@@ -290,12 +288,12 @@ test('payment manager updateTransactionFromVerification handles failed payment',
 
     $method->invoke($manager, 'test_ref_failed', $response);
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'test_ref_failed')->first();
+    $transaction = PaymentTransaction::where('reference', 'test_ref_failed')->first();
     expect($transaction->status)->toBe('failed')
         ->and($transaction->paid_at)->toBeNull();
 });
 
-test('payment manager logTransaction creates transaction with all fields', function () {
+test('payment manager logTransaction creates transaction with all fields', function (): void {
     config([
         'payments.logging.enabled' => true,
     ]);
@@ -304,10 +302,10 @@ test('payment manager logTransaction creates transaction with all fields', funct
 
     try {
         Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (Exception $e) {
+    } catch (Exception) {
     }
 
-    Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference')->unique();
         $table->string('provider');
@@ -346,7 +344,7 @@ test('payment manager logTransaction creates transaction with all fields', funct
 
     $method->invoke($manager, $request, $response, 'paystack');
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'test_ref_log')->first();
+    $transaction = PaymentTransaction::where('reference', 'test_ref_log')->first();
     $laravelVersion = (float) app()->version();
 
     expect($transaction)->not->toBeNull()

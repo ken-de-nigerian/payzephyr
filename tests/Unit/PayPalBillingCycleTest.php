@@ -49,7 +49,7 @@ function payPalTrialPlan(string $regularPrice): Response
     ]));
 }
 
-test('a plan with a trial reports its regular price and interval', function () {
+test('a plan with a trial reports its regular price and interval', function (): void {
     $history = [];
     $plan = payPalRecordingDriver([payPalTrialPlan('120.00')], $history)->fetchPlan('P-trial');
 
@@ -58,7 +58,7 @@ test('a plan with a trial reports its regular price and interval', function () {
         ->and($plan->currency)->toBe('USD');
 });
 
-test('repricing a plan with a trial reprices its regular cycle', function () {
+test('repricing a plan with a trial reprices its regular cycle', function (): void {
     $history = [];
     $driver = payPalRecordingDriver([payPalTrialPlan('120.00'), new Response(204), payPalTrialPlan('150.00')], $history);
 
@@ -71,7 +71,7 @@ test('repricing a plan with a trial reprices its regular cycle', function () {
         ->and($plan->amount)->toBe(150.0);
 });
 
-test('a cancel with permanent set to the string false suspends rather than cancels for good', function (mixed $permanent, string $endpoint) {
+test('a cancel with permanent set to the string false suspends rather than cancels for good', function (mixed $permanent, string $endpoint): void {
     $history = [];
     $driver = payPalRecordingDriver([
         new Response(204),

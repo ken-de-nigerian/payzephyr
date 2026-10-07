@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 
-test('it can be constructed directly with all properties', function () {
+test('it can be constructed directly with all properties', function (): void {
     $dto = new PlanResponseDTO(
         planCode: 'PLN_123',
         name: 'Gold Plan',
@@ -28,7 +28,7 @@ test('it can be constructed directly with all properties', function () {
         ->and($dto->provider)->toBe('paystack');
 });
 
-test('fromArray converts minor units to major units and maps fields', function () {
+test('fromArray converts minor units to major units and maps fields', function (): void {
     $dto = PlanResponseDTO::fromArray([
         'plan_code' => 'PLN_456',
         'name' => 'Silver Plan',
@@ -52,13 +52,13 @@ test('fromArray converts minor units to major units and maps fields', function (
         ->and($dto->provider)->toBe('stripe');
 });
 
-test('fromArray falls back to id when plan_code is missing', function () {
+test('fromArray falls back to id when plan_code is missing', function (): void {
     $dto = PlanResponseDTO::fromArray(['id' => 'PLN_789']);
 
     expect($dto->planCode)->toBe('PLN_789');
 });
 
-test('fromArray applies defaults for missing keys', function () {
+test('fromArray applies defaults for missing keys', function (): void {
     $dto = PlanResponseDTO::fromArray([]);
 
     expect($dto->planCode)->toBe('')
@@ -75,17 +75,14 @@ test('fromArray applies defaults for missing keys', function () {
         ->and($dto->provider)->toBeNull();
 });
 
-test('toArray serializes the DTO back into an array', function () {
+test('toArray serializes the DTO back into an array', function (): void {
     $dto = new PlanResponseDTO(
         planCode: 'PLN_999',
         name: 'Bronze Plan',
         amount: 10.0,
         interval: 'weekly',
         currency: 'GHS',
-        description: null,
-        invoiceLimit: null,
         metadata: [],
-        provider: null,
     );
 
     expect($dto->toArray())->toBe([
@@ -101,7 +98,7 @@ test('toArray serializes the DTO back into an array', function () {
     ]);
 });
 
-test('isActive is true when metadata status is active or absent', function () {
+test('isActive is true when metadata status is active or absent', function (): void {
     $withStatus = new PlanResponseDTO('PLN', 'Name', 10.0, 'monthly', 'NGN', metadata: ['status' => 'active']);
     $withoutStatus = new PlanResponseDTO('PLN', 'Name', 10.0, 'monthly', 'NGN');
 
@@ -109,25 +106,25 @@ test('isActive is true when metadata status is active or absent', function () {
         ->and($withoutStatus->isActive())->toBeTrue();
 });
 
-test('isActive is false when metadata status is not active', function () {
+test('isActive is false when metadata status is not active', function (): void {
     $dto = new PlanResponseDTO('PLN', 'Name', 10.0, 'monthly', 'NGN', metadata: ['status' => 'inactive']);
 
     expect($dto->isActive())->toBeFalse();
 });
 
-test('getAmountInMajorUnits returns the amount as-is', function () {
+test('getAmountInMajorUnits returns the amount as-is', function (): void {
     $dto = new PlanResponseDTO('PLN', 'Name', 123.45, 'monthly', 'NGN');
 
     expect($dto->getAmountInMajorUnits())->toBe(123.45);
 });
 
-test('jsonSerialize returns the same shape as toArray', function () {
+test('jsonSerialize returns the same shape as toArray', function (): void {
     $dto = new PlanResponseDTO('PLN_1', 'Plan One', 20.0, 'daily', 'NGN', 'desc', 3, ['k' => 'v'], 'square');
 
     expect($dto->jsonSerialize())->toBe($dto->toArray());
 });
 
-test('json_encode uses JsonSerializable to produce the expected payload', function () {
+test('json_encode uses JsonSerializable to produce the expected payload', function (): void {
     $dto = new PlanResponseDTO('PLN_2', 'Plan Two', 15.5, 'monthly', 'USD');
 
     $encoded = json_encode($dto);

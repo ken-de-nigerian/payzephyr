@@ -19,7 +19,7 @@ function subscriptionTransactionData(array $overrides = []): array
     ], $overrides);
 }
 
-test('it uses the configured subscriptions table name', function () {
+test('it uses the configured subscriptions table name', function (): void {
     app()->forgetInstance('payments.config');
 
     config(['payments.subscriptions.logging.table' => 'custom_subscription_transactions']);
@@ -27,7 +27,6 @@ test('it uses the configured subscriptions table name', function () {
     $provider = new PaymentServiceProvider(app());
     $reflection = new ReflectionClass($provider);
     $method = $reflection->getMethod('configureModel');
-    $method->setAccessible(true);
     $method->invoke($provider);
 
     $model = new SubscriptionTransaction;
@@ -35,7 +34,7 @@ test('it uses the configured subscriptions table name', function () {
     expect($model->getTable())->toBe('custom_subscription_transactions');
 });
 
-test('it defaults to subscription_transactions table if config is missing', function () {
+test('it defaults to subscription_transactions table if config is missing', function (): void {
     config(['payments.subscriptions.logging.table' => null]);
 
     $model = new SubscriptionTransaction;
@@ -43,7 +42,7 @@ test('it defaults to subscription_transactions table if config is missing', func
     expect($model->getTable())->toBe('subscription_transactions');
 });
 
-test('it casts attributes correctly', function () {
+test('it casts attributes correctly', function (): void {
     $now = Carbon::now();
 
     $transaction = SubscriptionTransaction::create([
@@ -59,19 +58,19 @@ test('it casts attributes correctly', function () {
     ]);
 
     $amount = $transaction->amount;
-    expect(is_string($amount) ? $amount : (string) number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
+    expect(is_string($amount) ? $amount : number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
         ->and($transaction->next_payment_date)->toBeInstanceOf(Carbon::class)
         ->and($transaction->metadata)->toBeInstanceOf(ArrayObject::class)
         ->and($transaction->metadata['order_id'])->toBe(1);
 });
 
-test('it uses the testing connection while running under the testing environment', function () {
+test('it uses the testing connection while running under the testing environment', function (): void {
     $model = new SubscriptionTransaction;
 
     expect($model->getConnectionName())->toBe('testing');
 });
 
-test('scope active filters active and non-renewing subscriptions', function () {
+test('scope active filters active and non-renewing subscriptions', function (): void {
     SubscriptionTransaction::create(subscriptionTransactionData(['status' => 'active']));
     SubscriptionTransaction::create(subscriptionTransactionData(['status' => 'non-renewing']));
     SubscriptionTransaction::create(subscriptionTransactionData(['status' => 'cancelled']));
@@ -83,7 +82,7 @@ test('scope active filters active and non-renewing subscriptions', function () {
         ->and($active->pluck('status')->toArray())->toEqualCanonicalizing(['active', 'non-renewing']);
 });
 
-test('scope cancelled filters only cancelled subscriptions', function () {
+test('scope cancelled filters only cancelled subscriptions', function (): void {
     SubscriptionTransaction::create(subscriptionTransactionData(['status' => 'cancelled']));
     SubscriptionTransaction::create(subscriptionTransactionData(['status' => 'active']));
 
@@ -93,7 +92,7 @@ test('scope cancelled filters only cancelled subscriptions', function () {
         ->and($cancelled->first()->status)->toBe('cancelled');
 });
 
-test('scope forCustomer filters by customer email', function () {
+test('scope forCustomer filters by customer email', function (): void {
     SubscriptionTransaction::create(subscriptionTransactionData(['customer_email' => 'alice@example.com']));
     SubscriptionTransaction::create(subscriptionTransactionData(['customer_email' => 'bob@example.com']));
 
@@ -103,7 +102,7 @@ test('scope forCustomer filters by customer email', function () {
         ->and($result->first()->customer_email)->toBe('alice@example.com');
 });
 
-test('scope forPlan filters by plan code', function () {
+test('scope forPlan filters by plan code', function (): void {
     SubscriptionTransaction::create(subscriptionTransactionData(['plan_code' => 'PLN_A']));
     SubscriptionTransaction::create(subscriptionTransactionData(['plan_code' => 'PLN_B']));
 
@@ -113,7 +112,7 @@ test('scope forPlan filters by plan code', function () {
         ->and($result->first()->plan_code)->toBe('PLN_A');
 });
 
-test('scopes can be chained together', function () {
+test('scopes can be chained together', function (): void {
     SubscriptionTransaction::create(subscriptionTransactionData([
         'status' => 'active',
         'customer_email' => 'combo@example.com',

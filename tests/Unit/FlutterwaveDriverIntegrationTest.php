@@ -7,8 +7,10 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
 function createFlutterwaveDriverWithMock(array $responses): FlutterwaveDriver
@@ -30,7 +32,7 @@ function createFlutterwaveDriverWithMock(array $responses): FlutterwaveDriver
     return $driver;
 }
 
-test('flutterwave charge succeeds', function () {
+test('flutterwave charge succeeds', function (): void {
     $driver = createFlutterwaveDriverWithMock([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -49,16 +51,16 @@ test('flutterwave charge succeeds', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('flutterwave charge throws InvalidConfigurationException when no callback URL is set', function () {
+test('flutterwave charge throws InvalidConfigurationException when no callback URL is set', function (): void {
     $driver = createFlutterwaveDriverWithMock([]);
 
     $request = new ChargeRequestDTO(15000, 'NGN', 'test@example.com', 'fw_ref_123');
 
-    expect(fn () => $driver->charge($request))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class);
+    expect(fn (): ChargeResponseDTO => $driver->charge($request))
+        ->toThrow(InvalidConfigurationException::class);
 });
 
-test('flutterwave charge throws exception on error', function () {
+test('flutterwave charge throws exception on error', function (): void {
     $driver = createFlutterwaveDriverWithMock([
         new Response(400, [], json_encode([
             'status' => 'error',
@@ -69,7 +71,7 @@ test('flutterwave charge throws exception on error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'INVALID', 'test@example.com'));
 })->throws(InvalidArgumentException::class);
 
-test('flutterwave charge handles network error', function () {
+test('flutterwave charge handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/payments')),
     ]);
@@ -81,7 +83,7 @@ test('flutterwave charge handles network error', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class);
 
-test('flutterwave verify returns success', function () {
+test('flutterwave verify returns success', function (): void {
     $driver = createFlutterwaveDriverWithMock([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -103,7 +105,7 @@ test('flutterwave verify returns success', function () {
         ->and($result->isSuccessful())->toBeTrue();
 });
 
-test('flutterwave verify returns failed', function () {
+test('flutterwave verify returns failed', function (): void {
     $driver = createFlutterwaveDriverWithMock([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -121,7 +123,7 @@ test('flutterwave verify returns failed', function () {
     expect($result->isFailed())->toBeTrue();
 });
 
-test('flutterwave verify handles not found', function () {
+test('flutterwave verify handles not found', function (): void {
     $driver = createFlutterwaveDriverWithMock([
         new Response(404, [], json_encode([
             'status' => 'error',
@@ -132,7 +134,7 @@ test('flutterwave verify handles not found', function () {
     $driver->verify('fw_nonexistent');
 })->throws(VerificationException::class);
 
-test('flutterwave verify handles network error', function () {
+test('flutterwave verify handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Network error', new Request('GET', '/transactions/123/verify')),
     ]);

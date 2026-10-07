@@ -1,11 +1,12 @@
 <?php
 
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     // PaymentServiceProvider registers 'payments.config' as a singleton
     // snapshotting config('payments') the first time it's resolved. Without
     // forgetting it, a fresh PaymentManager() built after this file's own
@@ -15,7 +16,7 @@ beforeEach(function () {
     app()->forgetInstance('payments.config');
 });
 
-test('falls back to secondary provider when primary fails', function () {
+test('falls back to secondary provider when primary fails', function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.fallback' => 'stripe',
@@ -27,7 +28,7 @@ test('falls back to secondary provider when primary fails', function () {
     expect($manager->getFallbackChain())->toBe(['paystack', 'stripe']);
 });
 
-test('throws exception when all providers fail', function () {
+test('throws exception when all providers fail', function (): void {
     config([
         'payments.providers' => [
             'paystack' => ['enabled' => false],
@@ -46,7 +47,7 @@ test('throws exception when all providers fail', function () {
     $manager->chargeWithFallback($request);
 })->throws(ProviderException::class);
 
-test('skips providers that do not support currency', function () {
+test('skips providers that do not support currency', function (): void {
     config([
         'payments.health_check.enabled' => false,
         'payments.providers' => [
@@ -79,7 +80,7 @@ test('skips providers that do not support currency', function () {
     }
 });
 
-test('provider exception includes context about all failures', function () {
+test('provider exception includes context about all failures', function (): void {
     config([
         'payments.providers' => [
             'invalid1' => ['enabled' => false],
@@ -103,7 +104,7 @@ test('provider exception includes context about all failures', function () {
     }
 });
 
-test('verification tries all providers when provider not specified', function () {
+test('verification tries all providers when provider not specified', function (): void {
     config([
         'payments.providers' => [
             'paystack' => [
@@ -128,7 +129,7 @@ test('verification tries all providers when provider not specified', function ()
     }
 });
 
-test('verification uses specific provider when specified', function () {
+test('verification uses specific provider when specified', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -146,25 +147,25 @@ test('verification uses specific provider when specified', function () {
     }
 });
 
-test('health check can be disabled', function () {
+test('health check can be disabled', function (): void {
     config(['payments.health_check.enabled' => false]);
 
     expect(config('payments.health_check.enabled'))->toBeFalse();
 });
 
-test('health check can be enabled', function () {
+test('health check can be enabled', function (): void {
     config(['payments.health_check.enabled' => true]);
 
     expect(config('payments.health_check.enabled'))->toBeTrue();
 });
 
-test('health check cache ttl is configurable', function () {
+test('health check cache ttl is configurable', function (): void {
     config(['payments.health_check.cache_ttl' => 600]);
 
     expect(config('payments.health_check.cache_ttl'))->toBe(600);
 });
 
-test('fallback chain handles empty fallback', function () {
+test('fallback chain handles empty fallback', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -177,7 +178,7 @@ test('fallback chain handles empty fallback', function () {
     expect($manager->getFallbackChain())->toBe(['paystack']);
 });
 
-test('fallback chain handles same default and fallback', function () {
+test('fallback chain handles same default and fallback', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -190,7 +191,7 @@ test('fallback chain handles same default and fallback', function () {
     expect($manager->getFallbackChain())->toBe(['paystack']);
 });
 
-test('custom provider list overrides config fallback', function () {
+test('custom provider list overrides config fallback', function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.fallback' => 'stripe',
@@ -211,7 +212,7 @@ test('custom provider list overrides config fallback', function () {
     }
 });
 
-test('invalid driver configuration throws exception', function () {
+test('invalid driver configuration throws exception', function (): void {
     config([
         'payments.providers.invalid' => [
             'driver' => 'NonExistentDriver',
@@ -223,7 +224,7 @@ test('invalid driver configuration throws exception', function () {
     $manager->driver('invalid');
 })->throws(DriverNotFoundException::class);
 
-test('disabled provider is not available', function () {
+test('disabled provider is not available', function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -235,15 +236,15 @@ test('disabled provider is not available', function () {
     ]);
 
     $manager = new PaymentManager;
-    expect(fn () => $manager->driver('paystack'))->toThrow(DriverNotFoundException::class);
+    expect(fn (): DriverInterface => $manager->driver('paystack'))->toThrow(DriverNotFoundException::class);
 });
 
-test('missing provider configuration throws exception', function () {
+test('missing provider configuration throws exception', function (): void {
     $manager = new PaymentManager;
     $manager->driver('nonexistent');
 })->throws(DriverNotFoundException::class);
 
-test('driver instance is cached', function () {
+test('driver instance is cached', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',

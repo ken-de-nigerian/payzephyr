@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Facades\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Tests\Fixtures\CustomTestDriver;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -157,7 +158,7 @@ class UnifiedRefundAbstractionTest extends TestCase
             ],
         ]);
 
-        app(\KenDeNigerian\PayZephyr\Services\DriverFactory::class)->register('custom_test', CustomTestDriver::class);
+        app(DriverFactory::class)->register('custom_test', CustomTestDriver::class);
 
         $this->app->forgetInstance(PaymentManager::class);
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\Payment::class);

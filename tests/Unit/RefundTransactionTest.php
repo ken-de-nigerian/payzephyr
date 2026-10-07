@@ -17,7 +17,7 @@ function refundTransactionData(array $overrides = []): array
     ], $overrides);
 }
 
-test('it uses the configured refunds table name', function () {
+test('it uses the configured refunds table name', function (): void {
     app()->forgetInstance('payments.config');
 
     config(['payments.refunds.logging.table' => 'custom_refund_transactions']);
@@ -27,7 +27,7 @@ test('it uses the configured refunds table name', function () {
     expect($model->getTable())->toBe('custom_refund_transactions');
 });
 
-test('it defaults to refund_transactions table if config is missing', function () {
+test('it defaults to refund_transactions table if config is missing', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.refunds.logging.table' => null]);
 
@@ -36,26 +36,26 @@ test('it defaults to refund_transactions table if config is missing', function (
     expect($model->getTable())->toBe('refund_transactions');
 });
 
-test('it casts attributes correctly', function () {
+test('it casts attributes correctly', function (): void {
     $transaction = RefundTransaction::create(refundTransactionData([
         'amount' => 5000.50,
         'metadata' => ['note' => 'customer request'],
     ]));
 
     $amount = $transaction->amount;
-    expect(is_string($amount) ? $amount : (string) number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
+    expect(is_string($amount) ? $amount : number_format((float) $amount, 2, '.', ''))->toBe('5000.50')
         ->and($transaction->created_at)->toBeInstanceOf(Carbon::class)
         ->and($transaction->metadata)->toBeInstanceOf(ArrayObject::class)
         ->and($transaction->metadata['note'])->toBe('customer request');
 });
 
-test('it uses the testing connection while running under the testing environment', function () {
+test('it uses the testing connection while running under the testing environment', function (): void {
     $model = new RefundTransaction;
 
     expect($model->getConnectionName())->toBe('testing');
 });
 
-test('scope pending filters pending and processing refunds', function () {
+test('scope pending filters pending and processing refunds', function (): void {
     RefundTransaction::create(refundTransactionData(['status' => 'pending']));
     RefundTransaction::create(refundTransactionData(['status' => 'processing']));
     RefundTransaction::create(refundTransactionData(['status' => 'completed']));
@@ -66,7 +66,7 @@ test('scope pending filters pending and processing refunds', function () {
         ->and($pending->pluck('status')->toArray())->toEqualCanonicalizing(['pending', 'processing']);
 });
 
-test('scope completed filters only completed refunds', function () {
+test('scope completed filters only completed refunds', function (): void {
     RefundTransaction::create(refundTransactionData(['status' => 'completed']));
     RefundTransaction::create(refundTransactionData(['status' => 'pending']));
 
@@ -76,7 +76,7 @@ test('scope completed filters only completed refunds', function () {
         ->and($completed->first()->status)->toBe('completed');
 });
 
-test('scope forTransaction filters by transaction reference', function () {
+test('scope forTransaction filters by transaction reference', function (): void {
     RefundTransaction::create(refundTransactionData(['transaction_reference' => 'TXN_A']));
     RefundTransaction::create(refundTransactionData(['transaction_reference' => 'TXN_B']));
 
@@ -86,7 +86,7 @@ test('scope forTransaction filters by transaction reference', function () {
         ->and($result->first()->transaction_reference)->toBe('TXN_A');
 });
 
-test('scopes can be chained together', function () {
+test('scopes can be chained together', function (): void {
     RefundTransaction::create(refundTransactionData(['status' => 'pending', 'transaction_reference' => 'TXN_COMBO']));
     RefundTransaction::create(refundTransactionData(['status' => 'completed', 'transaction_reference' => 'TXN_COMBO']));
 

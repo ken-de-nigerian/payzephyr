@@ -8,6 +8,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
@@ -45,29 +46,29 @@ function clientReturning(array $responses): Client
     return new Client(['handler' => HandlerStack::create(new MockHandler($responses))]);
 }
 
-test('paystack fetchRefund wraps a network failure in a RefundException', function () {
+test('paystack fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
     $driver->setClient(clientThatFailsToConnect());
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('flutterwave fetchRefund wraps a network failure in a RefundException', function () {
+test('flutterwave fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'test_secret', 'currencies' => ['NGN']]);
     $driver->setClient(clientThatFailsToConnect());
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('mollie fetchRefund wraps a network failure in a RefundException', function () {
+test('mollie fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_test_key', 'currencies' => ['EUR']]);
     $driver->setClient(clientThatFailsToConnect());
 
     // Mollie keys refunds as "{paymentId}:{refundId}".
-    expect(fn () => $driver->fetchRefund('tr_1:re_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('tr_1:re_1'))->toThrow(RefundException::class);
 });
 
-test('square fetchRefund wraps a network failure in a RefundException', function () {
+test('square fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new SquareDriver([
         'access_token' => 'test_token',
         'location_id' => 'L123',
@@ -75,10 +76,10 @@ test('square fetchRefund wraps a network failure in a RefundException', function
     ]);
     $driver->setClient(clientThatFailsToConnect());
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('opay fetchRefund wraps a network failure in a RefundException', function () {
+test('opay fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'MERCHANT123',
         'public_key' => 'PUBLIC_KEY_123',
@@ -88,10 +89,10 @@ test('opay fetchRefund wraps a network failure in a RefundException', function (
     ]);
     $driver->setClient(clientThatFailsToConnect());
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('monnify fetchRefund wraps a network failure in a RefundException', function () {
+test('monnify fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'MK_TEST_xxx',
         'secret_key' => 'SK_TEST_xxx',
@@ -110,10 +111,10 @@ test('monnify fetchRefund wraps a network failure in a RefundException', functio
         new ConnectException('Connection timed out', new Request('GET', '/refunds/rf_1')),
     ]))]));
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('paypal fetchRefund wraps a network failure in a RefundException', function () {
+test('paypal fetchRefund wraps a network failure in a RefundException', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',
@@ -126,13 +127,13 @@ test('paypal fetchRefund wraps a network failure in a RefundException', function
         new ConnectException('Connection timed out', new Request('GET', '/v2/payments/refunds/rf_1')),
     ]))]));
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class);
 });
 
-test('stripe fetchRefund wraps an SDK error in a RefundException', function () {
+test('stripe fetchRefund wraps an SDK error in a RefundException', function (): void {
     $refundsService = new class
     {
-        public function retrieve()
+        public function retrieve(): never
         {
             throw new InvalidRequestException('No such refund', 404);
         }
@@ -146,10 +147,10 @@ test('stripe fetchRefund wraps an SDK error in a RefundException', function () {
     $driver = new StripeDriver(['secret_key' => 'sk_test', 'currencies' => ['USD']]);
     $driver->setStripeClient($stripeMock);
 
-    expect(fn () => $driver->fetchRefund('re_1'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('re_1'))->toThrow(RefundException::class);
 });
 
-test('paystack fetchRefund rejects a body whose status flag is false', function () {
+test('paystack fetchRefund rejects a body whose status flag is false', function (): void {
     // A 200 response that reports failure in the body must not be read as a
     // successful lookup.
     $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
@@ -157,25 +158,25 @@ test('paystack fetchRefund rejects a body whose status flag is false', function 
         new Response(200, [], (string) json_encode(['status' => false, 'message' => 'Refund not found'])),
     ]));
 
-    expect(fn () => $driver->fetchRefund('rf_missing'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_missing'))->toThrow(RefundException::class);
 });
 
-test('flutterwave fetchRefund rejects a body whose status is not success', function () {
+test('flutterwave fetchRefund rejects a body whose status is not success', function (): void {
     $driver = new FlutterwaveDriver(['secret_key' => 'test_secret', 'currencies' => ['NGN']]);
     $driver->setClient(clientReturning([
         new Response(200, [], (string) json_encode(['status' => 'error', 'message' => 'not found'])),
     ]));
 
-    expect(fn () => $driver->fetchRefund('rf_missing'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_missing'))->toThrow(RefundException::class);
 });
 
-test('mollie fetchRefund rejects a malformed composite reference', function () {
+test('mollie fetchRefund rejects a malformed composite reference', function (): void {
     // Mollie refunds live under their payment, so the reference must carry
     // both ids - a bare refund id cannot be resolved.
     $driver = new MollieDriver(['api_key' => 'test_test_key', 'currencies' => ['EUR']]);
     $driver->setClient(clientReturning([]));
 
-    expect(fn () => $driver->fetchRefund('re_no_payment_id'))->toThrow(RefundException::class);
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('re_no_payment_id'))->toThrow(RefundException::class);
 });
 
 /*
@@ -215,7 +216,7 @@ function opayDriverForFetch(array $overrides = []): OPayDriver
     ], $overrides));
 }
 
-test('monnify fetchRefund surfaces the provider message when requestSuccessful is false', function () {
+test('monnify fetchRefund surfaces the provider message when requestSuccessful is false', function (): void {
     $driver = monnifyDriverForFetch();
     $driver->setClient(clientReturning([
         monnifyTokenResponse(),
@@ -225,11 +226,11 @@ test('monnify fetchRefund surfaces the provider message when requestSuccessful i
         ])),
     ]));
 
-    expect(fn () => $driver->fetchRefund('rf_missing'))
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_missing'))
         ->toThrow(RefundException::class, 'Refund reference does not exist');
 });
 
-test('monnify fetchRefund falls back to a default message when the body carries none', function () {
+test('monnify fetchRefund falls back to a default message when the body carries none', function (): void {
     $driver = monnifyDriverForFetch();
     $driver->setClient(clientReturning([
         monnifyTokenResponse(),
@@ -245,19 +246,19 @@ test('monnify fetchRefund falls back to a default message when the body carries 
     }
 });
 
-test('opay fetchRefund refuses to sign a request without a secret key', function () {
+test('opay fetchRefund refuses to sign a request without a secret key', function (): void {
     // Status lookups are HMAC-signed with the secret key; without one there is
     // nothing to sign with, and no request may be sent.
     $driver = opayDriverForFetch(['secret_key' => '']);
     $mock = new MockHandler([]);
     $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
 
-    expect(fn () => $driver->fetchRefund('rf_1'))
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))
         ->toThrow(RefundException::class, 'OPay secret key (private key) is required for refund API authentication');
     expect($mock->count())->toBe(0);
 });
 
-test('opay fetchRefund surfaces the provider message when the code is not 00000', function () {
+test('opay fetchRefund surfaces the provider message when the code is not 00000', function (): void {
     $driver = opayDriverForFetch();
     $driver->setClient(clientReturning([
         new Response(200, [], (string) json_encode(['code' => '02001', 'message' => 'refund not found'])),
@@ -272,18 +273,18 @@ test('opay fetchRefund surfaces the provider message when the code is not 00000'
     }
 });
 
-test('opay fetchRefund reads the legacy msg field, then a default', function () {
+test('opay fetchRefund reads the legacy msg field, then a default', function (): void {
     $driver = opayDriverForFetch();
     $driver->setClient(clientReturning([
         new Response(200, [], (string) json_encode(['code' => '02001', 'msg' => 'legacy message'])),
         new Response(200, [], (string) json_encode(['code' => '02001'])),
     ]));
 
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'legacy message');
-    expect(fn () => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'Failed to fetch OPay refund');
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'legacy message');
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('rf_1'))->toThrow(RefundException::class, 'Failed to fetch OPay refund');
 });
 
-test('paypal fetchRefund reports a missing refund by reference', function () {
+test('paypal fetchRefund reports a missing refund by reference', function (): void {
     $driver = new PayPalDriver([
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',

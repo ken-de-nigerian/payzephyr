@@ -15,7 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->config = [
         'api_key' => 'test_mollie_api_key',
         'base_url' => 'https://api.mollie.com',
@@ -23,7 +23,7 @@ beforeEach(function () {
     ];
 });
 
-test('mollie driver initializes correctly', function () {
+test('mollie driver initializes correctly', function (): void {
     $driver = new MollieDriver($this->config);
 
     expect($driver->getName())->toBe('mollie')
@@ -32,13 +32,13 @@ test('mollie driver initializes correctly', function () {
         ->and($driver->isCurrencySupported('JPY'))->toBeFalse();
 });
 
-test('mollie driver throws exception for missing api key', function () {
+test('mollie driver throws exception for missing api key', function (): void {
     unset($this->config['api_key']);
 
     new MollieDriver($this->config);
 })->throws(InvalidConfigurationException::class, 'Mollie API key is required');
 
-test('mollie driver charges successfully', function () {
+test('mollie driver charges successfully', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -74,7 +74,7 @@ test('mollie driver charges successfully', function () {
         ->and($response->provider)->toBe('mollie');
 });
 
-test('mollie driver verifies payment successfully', function () {
+test('mollie driver verifies payment successfully', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -104,7 +104,7 @@ test('mollie driver verifies payment successfully', function () {
         ->and($verification->provider)->toBe('mollie');
 });
 
-test('mollie driver validates webhook by fetching payment from API', function () {
+test('mollie driver validates webhook by fetching payment from API', function (): void {
     // The freshness check is against the fetched Payment resource's
     // `createdAt`, not the incoming ping's body (which never carries a
     // timestamp) - see ADR-0001.
@@ -132,7 +132,7 @@ test('mollie driver validates webhook by fetching payment from API', function ()
     expect($isValid)->toBeTrue();
 });
 
-test('mollie driver validates webhook using signature when webhook secret is configured', function () {
+test('mollie driver validates webhook using signature when webhook secret is configured', function (): void {
     $config = array_merge($this->config, [
         'webhook_secret' => '4Js3DqVSKFMUvkbGzcvjuA5GcHG3MVBM',
     ]);
@@ -157,7 +157,7 @@ test('mollie driver validates webhook using signature when webhook secret is con
     expect($isValid)->toBeTrue();
 });
 
-test('mollie driver rejects webhook with invalid signature', function () {
+test('mollie driver rejects webhook with invalid signature', function (): void {
     $config = array_merge($this->config, [
         'webhook_secret' => '4Js3DqVSKFMUvkbGzcvjuA5GcHG3MVBM',
     ]);
@@ -180,7 +180,7 @@ test('mollie driver rejects webhook with invalid signature', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver rejects webhook without signature when webhook secret is configured', function () {
+test('mollie driver rejects webhook without signature when webhook secret is configured', function (): void {
     $config = array_merge($this->config, [
         'webhook_secret' => '4Js3DqVSKFMUvkbGzcvjuA5GcHG3MVBM',
     ]);
@@ -199,7 +199,7 @@ test('mollie driver rejects webhook without signature when webhook secret is con
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver accepts hook.ping test events with valid signature', function () {
+test('mollie driver accepts hook.ping test events with valid signature', function (): void {
     $config = array_merge($this->config, [
         'webhook_secret' => '4Js3DqVSKFMUvkbGzcvjuA5GcHG3MVBM',
     ]);
@@ -226,7 +226,7 @@ test('mollie driver accepts hook.ping test events with valid signature', functio
     expect($isValid)->toBeTrue();
 });
 
-test('mollie driver rejects a typed event it cannot verify without a webhook secret', function (string $type) {
+test('mollie driver rejects a typed event it cannot verify without a webhook secret', function (string $type): void {
     // Typed events are always signed. Without a secret there is nothing to
     // check one with and no payment to look up, so accepting it accepted
     // whatever anyone posted - which reached WebhookReceived listeners.
@@ -243,7 +243,7 @@ test('mollie driver rejects a typed event it cannot verify without a webhook sec
     expect($driver->validateWebhook([], $payload))->toBeFalse();
 })->with(['hook.ping', 'payment-link.paid']);
 
-test('mollie driver rejects webhook without payment id', function () {
+test('mollie driver rejects webhook without payment id', function (): void {
     $driver = new MollieDriver($this->config);
 
     $payload = json_encode([
@@ -255,7 +255,7 @@ test('mollie driver rejects webhook without payment id', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver rejects webhook when payment not found in API', function () {
+test('mollie driver rejects webhook when payment not found in API', function (): void {
     $mock = new MockHandler([
         new ClientException(
             'Not Found',
@@ -281,7 +281,7 @@ test('mollie driver rejects webhook when payment not found in API', function () 
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver webhook validation handles ClientException with response', function () {
+test('mollie driver webhook validation handles ClientException with response', function (): void {
     $mock = new MockHandler([
         new ClientException(
             'Bad Request',
@@ -307,7 +307,7 @@ test('mollie driver webhook validation handles ClientException with response', f
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver health check succeeds', function () {
+test('mollie driver health check succeeds', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'count' => 13,
@@ -323,7 +323,7 @@ test('mollie driver health check succeeds', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('mollie driver extracts webhook reference', function () {
+test('mollie driver extracts webhook reference', function (): void {
     $driver = new MollieDriver($this->config);
 
     $payload = [
@@ -333,7 +333,7 @@ test('mollie driver extracts webhook reference', function () {
     expect($driver->extractWebhookReference($payload))->toBe('tr_WDqYK6vllg');
 });
 
-test('mollie driver extracts webhook status', function () {
+test('mollie driver extracts webhook status', function (): void {
     $driver = new MollieDriver($this->config);
 
     $payload = [
@@ -343,7 +343,7 @@ test('mollie driver extracts webhook status', function () {
     expect($driver->extractWebhookStatus($payload))->toBe('paid');
 });
 
-test('mollie driver extracts webhook channel', function () {
+test('mollie driver extracts webhook channel', function (): void {
     $driver = new MollieDriver($this->config);
 
     $payload = [
@@ -353,7 +353,7 @@ test('mollie driver extracts webhook channel', function () {
     expect($driver->extractWebhookChannel($payload))->toBe('ideal');
 });
 
-test('mollie driver resolves verification id', function () {
+test('mollie driver resolves verification id', function (): void {
     $driver = new MollieDriver($this->config);
 
     $verificationId = $driver->resolveVerificationId('MOLLIE_123', 'tr_WDqYK6vllg');
@@ -361,7 +361,7 @@ test('mollie driver resolves verification id', function () {
     expect($verificationId)->toBe('tr_WDqYK6vllg');
 });
 
-test('mollie driver normalizes statuses correctly', function () {
+test('mollie driver normalizes statuses correctly', function (): void {
     $driver = new MollieDriver($this->config);
 
     // Use reflection to test protected method
@@ -377,7 +377,7 @@ test('mollie driver normalizes statuses correctly', function () {
         ->and($method->invoke($driver, 'pending'))->toBe('pending');
 });
 
-test('mollie driver handles charge failure', function () {
+test('mollie driver handles charge failure', function (): void {
     $mock = new MockHandler([
         new Response(422, [], json_encode([
             'status' => 422,
@@ -399,7 +399,7 @@ test('mollie driver handles charge failure', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('mollie driver handles verification failure', function () {
+test('mollie driver handles verification failure', function (): void {
     $mock = new MockHandler([
         new Response(404, [], json_encode([
             'status' => 404,
@@ -414,7 +414,7 @@ test('mollie driver handles verification failure', function () {
     $driver->verify('tr_invalid');
 })->throws(VerificationException::class);
 
-test('mollie driver formats amounts correctly', function () {
+test('mollie driver formats amounts correctly', function (): void {
     $driver = new MollieDriver($this->config);
 
     // Use reflection to test protected method
@@ -426,7 +426,7 @@ test('mollie driver formats amounts correctly', function () {
         ->and($method->invoke($driver, 10, 'EUR'))->toBe('10.00');
 });
 
-test('mollie driver with channels', function () {
+test('mollie driver with channels', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -460,7 +460,7 @@ test('mollie driver with channels', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('mollie driver with metadata', function () {
+test('mollie driver with metadata', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -498,7 +498,7 @@ test('mollie driver with metadata', function () {
         ->and($response->metadata['order_id'])->toBe(12345);
 });
 
-test('mollie driver handles webhook with invalid json', function () {
+test('mollie driver handles webhook with invalid json', function (): void {
     $driver = new MollieDriver($this->config);
 
     $payload = 'invalid json';
@@ -508,7 +508,7 @@ test('mollie driver handles webhook with invalid json', function () {
     expect($isValid)->toBeFalse();
 });
 
-test('mollie accepts a webhook for a payment created long before it was paid', function () {
+test('mollie accepts a webhook for a payment created long before it was paid', function (): void {
     // createdAt is when the payment was created, not when this event
     // happened. A customer who took an hour to pay is not a replay, and the
     // state acted on is fetched from Mollie, not taken from the ping.
@@ -535,7 +535,7 @@ test('mollie accepts a webhook for a payment created long before it was paid', f
         ->and($mock->count())->toBe(0);
 });
 
-test('mollie driver handles charge with custom reference', function () {
+test('mollie driver handles charge with custom reference', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -568,7 +568,7 @@ test('mollie driver handles charge with custom reference', function () {
     expect($response->reference)->toBe('CUSTOM_REF_123');
 });
 
-test('mollie driver generates reference with MOLLIE prefix', function () {
+test('mollie driver generates reference with MOLLIE prefix', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -600,7 +600,7 @@ test('mollie driver generates reference with MOLLIE prefix', function () {
     expect($response->reference)->toStartWith('MOLLIE_');
 });
 
-test('mollie driver handles charge with idempotency key', function () {
+test('mollie driver handles charge with idempotency key', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -634,7 +634,7 @@ test('mollie driver handles charge with idempotency key', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('mollie driver handles verification with missing metadata reference', function () {
+test('mollie driver handles verification with missing metadata reference', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -657,7 +657,7 @@ test('mollie driver handles verification with missing metadata reference', funct
         ->and($verification->status)->toBe('success');
 });
 
-test('mollie driver handles health check with 400 response', function () {
+test('mollie driver handles health check with 400 response', function (): void {
     $mock = new MockHandler([
         new Response(400, [], json_encode([
             'status' => 400,
@@ -671,7 +671,7 @@ test('mollie driver handles health check with 400 response', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('mollie driver handles health check with 404 response', function () {
+test('mollie driver handles health check with 404 response', function (): void {
     $mock = new MockHandler([
         new Response(404, [], json_encode([
             'status' => 404,
@@ -685,7 +685,7 @@ test('mollie driver handles health check with 404 response', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('mollie driver handles health check with network error', function () {
+test('mollie driver handles health check with network error', function (): void {
     $mock = new MockHandler([
         new ConnectException(
             'Connection failed',
@@ -699,7 +699,7 @@ test('mollie driver handles health check with network error', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('mollie driver handles charge with missing checkout url', function () {
+test('mollie driver handles charge with missing checkout url', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -725,7 +725,7 @@ test('mollie driver handles charge with missing checkout url', function () {
     $driver->charge($request);
 })->throws(ChargeException::class, 'No checkout URL returned by Mollie');
 
-test('mollie driver handles verify with missing amount data', function () {
+test('mollie driver handles verify with missing amount data', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',

@@ -11,6 +11,7 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaddleDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
@@ -49,7 +50,7 @@ function paddleLostResponse(): RequestException
 // Refund amounts and currencies are never invented
 // ---------------------------------------------------------------------------
 
-test('a refund whose adjustment omits its currency is refused, not read as USD', function () {
+test('a refund whose adjustment omits its currency is refused, not read as USD', function (): void {
     // `?? 'USD'` was not cosmetic: fromMinorUnits() uses the currency to decide
     // whether to divide by 100, so a JPY refund read as USD is reported at a
     // hundredth of its value - and that figure is what gets persisted.
@@ -58,21 +59,21 @@ test('a refund whose adjustment omits its currency is refused, not read as USD',
         'status' => 'approved', 'totals' => ['total' => '2500'],
     ]])]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'currency_code');
 });
 
-test('a refund whose adjustment omits its total is refused, not reported as zero', function () {
+test('a refund whose adjustment omits its total is refused, not reported as zero', function (): void {
     $driver = paddleFixDriver([paddleJson(['data' => [
         'id' => 'adj_1', 'transaction_id' => 'txn_1', 'action' => 'refund',
         'status' => 'approved', 'currency_code' => 'USD',
     ]])]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'totals');
 });
 
-test('a refund with no id of its own is refused rather than stored referenceless', function () {
+test('a refund with no id of its own is refused rather than stored referenceless', function (): void {
     // An empty refund_reference persists, and fetchRefund('') would later turn
     // into a list query rather than a lookup.
     $driver = paddleFixDriver([paddleJson(['data' => [
@@ -80,11 +81,11 @@ test('a refund with no id of its own is refused rather than stored referenceless
         'currency_code' => 'USD', 'totals' => ['total' => '2500'],
     ]])]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'id');
 });
 
-test('a complete adjustment still maps cleanly', function () {
+test('a complete adjustment still maps cleanly', function (): void {
     $driver = paddleFixDriver([paddleJson(['data' => [
         'id' => 'adj_1', 'transaction_id' => 'txn_1', 'action' => 'refund',
         'status' => 'approved', 'currency_code' => 'USD', 'totals' => ['total' => '2500'],
@@ -103,7 +104,7 @@ test('a complete adjustment still maps cleanly', function () {
 // Reconciliation when the refund's outcome is unknown
 // ---------------------------------------------------------------------------
 
-test('a refund whose response was lost reports what Paddle actually holds', function () {
+test('a refund whose response was lost reports what Paddle actually holds', function (): void {
     // Paddle accepts no idempotency key, and its own guidance is to list the
     // entity before retrying. PayZephyr cannot dedupe automatically - an
     // adjustment carries no custom_data, so a retry and a deliberate second
@@ -132,33 +133,33 @@ test('a refund whose response was lost reports what Paddle actually holds', func
         ->and($thrown->getMessage())->toContain('will not retry');
 });
 
-test('a lost response with no adjustment on record says so plainly', function () {
+test('a lost response with no adjustment on record says so plainly', function (): void {
     $driver = paddleFixDriver([paddleLostResponse(), paddleJson(['data' => []])]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'no refund adjustments');
 });
 
-test('non-refund adjustments are not counted as refunds', function () {
+test('non-refund adjustments are not counted as refunds', function (): void {
     $driver = paddleFixDriver([
         paddleLostResponse(),
         paddleJson(['data' => [['id' => 'adj_credit', 'action' => 'credit', 'status' => 'approved']]]),
     ]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'no refund adjustments');
 });
 
-test('a reconciliation lookup that itself fails does not replace the original error', function () {
+test('a reconciliation lookup that itself fails does not replace the original error', function (): void {
     // This runs while an error is already being reported. It must not throw a
     // different one on the way out.
     $driver = paddleFixDriver([paddleLostResponse(), paddleLostResponse()]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1')))
         ->toThrow(RefundException::class, 'could not list the existing adjustments');
 });
 
-test('a refund that definitively failed is not dressed up as ambiguous', function () {
+test('a refund that definitively failed is not dressed up as ambiguous', function (): void {
     // A connection that was never established means nothing reached Paddle.
     $driver = paddleFixDriver([
         new ConnectException('Connection refused', new Request('POST', 'https://sandbox-api.paddle.com/adjustments')),
@@ -181,7 +182,7 @@ test('a refund that definitively failed is not dressed up as ambiguous', functio
 // Paths the contribution left uncovered
 // ---------------------------------------------------------------------------
 
-test('a charge that never reached Paddle is reported as a clean connection failure', function () {
+test('a charge that never reached Paddle is reported as a clean connection failure', function (): void {
     // A refused connection is unambiguous - nothing was created - so this must
     // stay a plain connection error the fallback chain is free to retry, not
     // an ambiguous outcome that strands the payment.
@@ -202,7 +203,7 @@ test('a charge that never reached Paddle is reported as a clean connection failu
         ->and($thrown->isAmbiguousProviderOutcome())->toBeFalse();
 });
 
-test('a charge whose response Paddle never returned is surfaced as ambiguous', function () {
+test('a charge whose response Paddle never returned is surfaced as ambiguous', function (): void {
     // The opposite case: the request was transmitted, so a transaction may
     // exist. This one must NOT be retried blindly.
     $driver = paddleFixDriver([
@@ -221,30 +222,30 @@ test('a charge whose response Paddle never returned is surfaced as ambiguous', f
         ->and($thrown->isAmbiguousProviderOutcome())->toBeTrue();
 });
 
-test('a fetched refund that fails in transport is wrapped as a refund failure', function () {
+test('a fetched refund that fails in transport is wrapped as a refund failure', function (): void {
     $driver = paddleFixDriver([
         new ConnectException('Connection refused', new Request('GET', 'https://sandbox-api.paddle.com/adjustments')),
     ]);
 
-    expect(fn () => $driver->fetchRefund('adj_1'))->toThrow(RefundException::class, 'Failed to fetch refund');
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('adj_1'))->toThrow(RefundException::class, 'Failed to fetch refund');
 });
 
-test('a partial refund whose transaction cannot be looked up explains why', function () {
+test('a partial refund whose transaction cannot be looked up explains why', function (): void {
     $driver = paddleFixDriver([
         new ConnectException('Connection refused', new Request('GET', 'https://sandbox-api.paddle.com/transactions/txn_1')),
     ]);
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 5.0)))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 5.0)))
         ->toThrow(RefundException::class, 'failed to look up its line items');
 });
 
-test('the health check treats a 400 or 404 as reachable', function (int $status) {
+test('the health check treats a 400 or 404 as reachable', function (int $status): void {
     $driver = paddleFixDriver([paddleJson(['error' => ['code' => 'not_found']], $status)]);
 
     expect($driver->healthCheck())->toBeTrue();
 })->with([400, 404]);
 
-test('paddle declares its signed-timestamp tolerance as its replay horizon', function () {
+test('paddle declares its signed-timestamp tolerance as its replay horizon', function (): void {
     // validateWebhook() rejects a ts= older than the tolerance, and Paddle signs
     // a fresh one per attempt, so that is how long a deduplication record
     // must be kept before payzephyr:webhooks:prune may delete it.
@@ -254,7 +255,7 @@ test('paddle declares its signed-timestamp tolerance as its replay horizon', fun
     expect(paddleFixDriver([])->webhookReplayHorizon())->toBe(420);
 });
 
-test('every Paddle adjustment status maps to a refund status PayZephyr knows', function (string $paddle, string $expected) {
+test('every Paddle adjustment status maps to a refund status PayZephyr knows', function (string $paddle, string $expected): void {
     $driver = paddleFixDriver([paddleJson(['data' => [
         'id' => 'adj_1', 'transaction_id' => 'txn_1', 'action' => 'refund',
         'status' => $paddle, 'currency_code' => 'USD', 'totals' => ['total' => '100'],
@@ -272,7 +273,7 @@ test('every Paddle adjustment status maps to a refund status PayZephyr knows', f
 // Zero-decimal currencies
 // ---------------------------------------------------------------------------
 
-test('a zero-decimal currency is neither multiplied nor divided', function () {
+test('a zero-decimal currency is neither multiplied nor divided', function (): void {
     $driver = paddleFixDriver([paddleJson(['data' => [
         'id' => 'txn_1', 'status' => 'completed', 'currency_code' => 'JPY',
         'details' => ['totals' => ['grand_total' => '5000']],
@@ -281,7 +282,7 @@ test('a zero-decimal currency is neither multiplied nor divided', function () {
     expect($driver->verify('txn_1')->amount)->toBe(5000.0);
 });
 
-test('every zero-decimal currency is sent and read in its major unit', function (string $currency) {
+test('every zero-decimal currency is sent and read in its major unit', function (string $currency): void {
     // A merchant adding KRW or ISK to their Paddle currencies would otherwise
     // have amounts sent a hundred times too large. Each code is pinned, so
     // dropping one from the list fails here.
@@ -293,14 +294,14 @@ test('every zero-decimal currency is sent and read in its major unit', function 
         ->and($fromMinor->invoke($driver, '1500', strtolower($currency)))->toBe(1500.0);
 })->with(['BIF', 'CLP', 'DJF', 'GNF', 'ISK', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF']);
 
-test('a currency with a minor unit is sent and read in hundredths', function () {
+test('a currency with a minor unit is sent and read in hundredths', function (): void {
     $driver = paddleFixDriver([]);
 
     expect((new ReflectionMethod($driver, 'toMinorUnits'))->invoke($driver, 15.0, 'USD'))->toBe('1500')
         ->and((new ReflectionMethod($driver, 'fromMinorUnits'))->invoke($driver, '1500', 'USD'))->toBe(15.0);
 });
 
-test('an unexpected failure during a charge is still reported as a charge failure', function () {
+test('an unexpected failure during a charge is still reported as a charge failure', function (): void {
     // The generic catch in charge(): anything that is not already a
     // ChargeException and not a recognised network fault - a serialization
     // error, a contract violation in a DTO - must still leave through

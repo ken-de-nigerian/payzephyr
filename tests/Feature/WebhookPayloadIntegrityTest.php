@@ -26,7 +26,7 @@ function signedPaystackDelivery(array $body): array
     ]];
 }
 
-test('a signed delivery replayed with different query strings is processed once', function () {
+test('a signed delivery replayed with different query strings is processed once', function (): void {
     Event::fake([WebhookReceived::class]);
     [$json, $server] = signedPaystackDelivery(['event' => 'charge.success', 'data' => ['reference' => 'REPLAY_Q', 'status' => 'success']]);
 
@@ -38,17 +38,17 @@ test('a signed delivery replayed with different query strings is processed once'
     expect(WebhookEvent::where('provider', 'paystack')->count())->toBe(1);
 });
 
-test('only the signed body reaches the job', function () {
+test('only the signed body reaches the job', function (): void {
     Queue::fake();
     $body = ['event' => 'charge.success', 'data' => ['reference' => 'BODY_ONLY', 'status' => 'success']];
     [$json, $server] = signedPaystackDelivery($body);
 
     $this->call('POST', '/payments/webhook/paystack?event=refund.processed&injected=1', [], [], [], $server, $json)->assertStatus(202);
 
-    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job) => $job->payload === $body);
+    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job): bool => $job->payload === $body);
 });
 
-test('a form-encoded delivery reaches the job as its form fields', function () {
+test('a form-encoded delivery reaches the job as its form fields', function (): void {
     // Mollie's classic webhook is `id=tr_...`, verified through the API in the job.
     Queue::fake();
     config(['payments.providers.mollie.webhook_secret' => null]);
@@ -57,7 +57,7 @@ test('a form-encoded delivery reaches the job as its form fields', function () {
     $this->call('POST', '/payments/webhook/mollie?injected=1', ['id' => 'tr_form'], [], [], ['CONTENT_TYPE' => 'application/x-www-form-urlencoded'], 'id=tr_form')
         ->assertStatus(202);
 
-    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job) => $job->payload === ['id' => 'tr_form']);
+    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job): bool => $job->payload === ['id' => 'tr_form']);
 });
 
 /*
@@ -66,17 +66,17 @@ test('a form-encoded delivery reaches the job as its form fields', function () {
  * jobs. Only a provider whose signature is checked in the job needs them.
  */
 
-test('a delivery verified before it is queued carries no headers onto the queue', function () {
+test('a delivery verified before it is queued carries no headers onto the queue', function (): void {
     Queue::fake();
     [$json, $server] = signedPaystackDelivery(['event' => 'charge.success', 'data' => ['reference' => 'NO_HEADERS', 'status' => 'success']]);
 
     $this->call('POST', '/payments/webhook/paystack', [], ['session' => 'abc'], [], $server + ['HTTP_AUTHORIZATION' => 'Bearer proxy'], $json)
         ->assertStatus(202);
 
-    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job) => $job->headers === []);
+    Queue::assertPushed(ProcessWebhook::class, fn (ProcessWebhook $job): bool => $job->headers === []);
 });
 
-test('a delivery verified in the job carries its headers, without credentials or cookies', function () {
+test('a delivery verified in the job carries its headers, without credentials or cookies', function (): void {
     Queue::fake();
     config(['payments.providers.mollie.webhook_secret' => null]);
     app()->forgetInstance('payments.config');
@@ -100,7 +100,7 @@ test('a delivery verified in the job carries its headers, without credentials or
     });
 });
 
-test('a queued delivery is answered with its status, and logged with its provider and sender', function () {
+test('a queued delivery is answered with its status, and logged with its provider and sender', function (): void {
     Queue::fake();
     $logs = captureLogs();
     [$json, $server] = signedPaystackDelivery(['event' => 'charge.success', 'data' => ['reference' => 'LOGGED', 'status' => 'success']]);

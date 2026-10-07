@@ -7,7 +7,7 @@ use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 
-test('abstract driver injects idempotency key when request has it', function () {
+test('abstract driver injects idempotency key when request has it', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'status' => true,
@@ -46,7 +46,7 @@ test('abstract driver injects idempotency key when request has it', function () 
         ->and($headers['Idempotency-Key'][0])->toBe('idempotency_key_123');
 });
 
-test('abstract driver does not override existing idempotency header', function () {
+test('abstract driver does not override existing idempotency header', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'status' => true,

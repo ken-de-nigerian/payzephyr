@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Stripe\Exception\ApiErrorException;
 
@@ -20,10 +22,10 @@ function makeStripeRefundDriverWithClient(object $client): StripeDriver
     return $driver;
 }
 
-test('stripe refund creates a refund against a payment intent', function () {
+test('stripe refund creates a refund against a payment intent', function (): void {
     $refundsResource = new class
     {
-        public function create(array $params, array $options = [])
+        public function create(array $params, array $options = []): object
         {
             return stripeRefundObj([
                 'id' => 're_123',
@@ -55,13 +57,13 @@ test('stripe refund creates a refund against a payment intent', function () {
         ->and($result->provider)->toBe('stripe');
 });
 
-test('stripe refund omits amount for a full refund', function () {
+test('stripe refund omits amount for a full refund', function (): void {
     $capturedParams = null;
     $refundsResource = new class($capturedParams)
     {
         public function __construct(public mixed &$capturedParams) {}
 
-        public function create(array $params, array $options = [])
+        public function create(array $params, array $options = []): object
         {
             $this->capturedParams = $params;
 
@@ -87,15 +89,15 @@ test('stripe refund omits amount for a full refund', function () {
     expect($refundsResource->capturedParams)->not->toHaveKey('amount');
 });
 
-test('stripe refund throws RefundException on api error', function () {
+test('stripe refund throws RefundException on api error', function (): void {
     $apiError = Mockery::mock(ApiErrorException::class);
     $apiError->shouldReceive('getMessage')->andReturn('No such payment_intent');
 
     $refundsResource = new class($apiError)
     {
-        public function __construct(private object $apiError) {}
+        public function __construct(private readonly object $apiError) {}
 
-        public function create(array $params, array $options = [])
+        public function create(array $params, array $options = []): never
         {
             throw $this->apiError;
         }
@@ -110,10 +112,10 @@ test('stripe refund throws RefundException on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'pi_invalid'));
 })->throws(RefundException::class);
 
-test('stripe fetchRefund retrieves and maps a refund', function () {
+test('stripe fetchRefund retrieves and maps a refund', function (): void {
     $refundsResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeRefundObj([
                 'id' => $id,
@@ -154,7 +156,7 @@ function stripeRefundClientReturning(array $refund): object
 {
     $refunds = new class($refund)
     {
-        public function __construct(private array $refund) {}
+        public function __construct(private readonly array $refund) {}
 
         public function create(array $params, array $options = []): object
         {
@@ -173,7 +175,7 @@ function stripeRefundClientReturning(array $refund): object
     };
 }
 
-test('a stripe refund with no amount surfaces as a RefundException, not a ChargeException', function () {
+test('a stripe refund with no amount surfaces as a RefundException, not a ChargeException', function (): void {
     $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
         'id' => 're_noamount',
         'payment_intent' => 'pi_123',
@@ -191,10 +193,10 @@ test('a stripe refund with no amount surfaces as a RefundException, not a Charge
 
     expect($thrown)->toBeInstanceOf(RefundException::class)
         ->and($thrown->getMessage())->toContain('may already have been created')
-        ->and($thrown->getPrevious())->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class);
+        ->and($thrown->getPrevious())->toBeInstanceOf(ChargeException::class);
 });
 
-test('a stripe refund with no status surfaces as a RefundException, not a TypeError', function () {
+test('a stripe refund with no status surfaces as a RefundException, not a TypeError', function (): void {
     $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
         'id' => 're_nostatus',
         'payment_intent' => 'pi_123',
@@ -202,11 +204,11 @@ test('a stripe refund with no status surfaces as a RefundException, not a TypeEr
         'currency' => 'usd',
     ]));
 
-    expect(fn () => $driver->refund(new RefundRequestDTO(transactionReference: 'pi_123', amount: 50.00)))
+    expect(fn (): RefundResponseDTO => $driver->refund(new RefundRequestDTO(transactionReference: 'pi_123', amount: 50.00)))
         ->toThrow(RefundException::class);
 });
 
-test('fetching a stripe refund with no amount surfaces as a RefundException', function () {
+test('fetching a stripe refund with no amount surfaces as a RefundException', function (): void {
     $driver = makeStripeRefundDriverWithClient(stripeRefundClientReturning([
         'id' => 're_noamount',
         'payment_intent' => 'pi_123',
@@ -214,6 +216,6 @@ test('fetching a stripe refund with no amount surfaces as a RefundException', fu
         'currency' => 'usd',
     ]));
 
-    expect(fn () => $driver->fetchRefund('re_noamount'))
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('re_noamount'))
         ->toThrow(RefundException::class, 'Failed to read refund from Stripe');
 });

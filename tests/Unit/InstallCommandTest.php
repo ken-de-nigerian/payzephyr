@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use KenDeNigerian\PayZephyr\Console\Features;
@@ -61,39 +62,39 @@ function installedMigrationFiles(): array
     ];
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     cleanPublishedInstallerState();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     cleanPublishedInstallerState();
 });
 
-test('install command is registered', function () {
+test('install command is registered', function (): void {
     $commands = Artisan::all();
 
     expect($commands)->toHaveKey('payzephyr:install');
 });
 
-test('install command has correct signature', function () {
+test('install command has correct signature', function (): void {
     $command = new InstallCommand;
 
     expect($command->getName())->toBe('payzephyr:install');
 });
 
-test('install command description is set', function () {
+test('install command description is set', function (): void {
     $command = new InstallCommand;
 
     expect($command->getDescription())->toBe('Install PayZephyr package');
 });
 
-test('install command publishes config', function () {
+test('install command publishes config', function (): void {
     Artisan::call('payzephyr:install', ['--force' => true, '--no-interaction' => true]);
 
     expect(config_path('payments.php'))->toBeFile();
 });
 
-test('install command always publishes core migrations', function () {
+test('install command always publishes core migrations', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true]);
 
     $files = installedMigrationFiles();
@@ -102,7 +103,7 @@ test('install command always publishes core migrations', function () {
         ->and($files['webhooks'])->not->toBeEmpty();
 });
 
-test('--no-interaction with no explicit feature flags installs core only, with no prompts', function () {
+test('--no-interaction with no explicit feature flags installs core only, with no prompts', function (): void {
     // Regression guard: this must NOT ask "Install Subscriptions?" or
     // "Install Refunds?" - non-interactive with no explicit selection must
     // never silently install every optional feature.
@@ -116,7 +117,7 @@ test('--no-interaction with no explicit feature flags installs core only, with n
         ->and($files['refunds'])->toBeEmpty();
 });
 
-test('install command runs migrations when the user confirms every prompt', function () {
+test('install command runs migrations when the user confirms every prompt', function (): void {
     // Covers the interactive branch: the multiselect feature prompt comes
     // before the "run migrations now" confirmation.
     $this->artisan('payzephyr:install')
@@ -125,14 +126,14 @@ test('install command runs migrations when the user confirms every prompt', func
         ->assertExitCode(0);
 });
 
-test('install command skips migrations when the user declines the final prompt', function () {
+test('install command skips migrations when the user declines the final prompt', function (): void {
     $this->artisan('payzephyr:install')
         ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
         ->assertExitCode(0);
 });
 
-test('interactively selecting one optional feature installs only that feature', function () {
+test('interactively selecting one optional feature installs only that feature', function (): void {
     $this->artisan('payzephyr:install')
         ->expectsChoice('Select the optional features you want to install', ['subscriptions'], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
@@ -144,7 +145,7 @@ test('interactively selecting one optional feature installs only that feature', 
         ->and($files['refunds'])->toBeEmpty();
 });
 
-test('--all installs every optional feature without prompting', function () {
+test('--all installs every optional feature without prompting', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     $files = installedMigrationFiles();
@@ -154,7 +155,7 @@ test('--all installs every optional feature without prompting', function () {
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('--features= installs exactly the named features and nothing else', function () {
+test('--features= installs exactly the named features and nothing else', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
     $files = installedMigrationFiles();
@@ -163,7 +164,7 @@ test('--features= installs exactly the named features and nothing else', functio
         ->and($files['subscriptions'])->toBeEmpty();
 });
 
-test('--features= accepts multiple comma-separated values', function () {
+test('--features= accepts multiple comma-separated values', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions,refunds']);
 
     $files = installedMigrationFiles();
@@ -172,7 +173,7 @@ test('--features= accepts multiple comma-separated values', function () {
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('--features= is case-insensitive, trims whitespace, and dedupes', function () {
+test('--features= is case-insensitive, trims whitespace, and dedupes', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => ' Refunds , REFUNDS ,refunds']);
 
     $files = installedMigrationFiles();
@@ -181,7 +182,7 @@ test('--features= is case-insensitive, trims whitespace, and dedupes', function 
         ->and($files['subscriptions'])->toBeEmpty();
 });
 
-test('--features= with an unknown feature name fails clearly and installs nothing optional', function () {
+test('--features= with an unknown feature name fails clearly and installs nothing optional', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'payouts']);
 
     expect(Artisan::output())->toContain('Unknown feature [payouts]');
@@ -191,22 +192,22 @@ test('--features= with an unknown feature name fails clearly and installs nothin
         ->and($files['refunds'])->toBeEmpty();
 });
 
-test('--features= with an empty value fails clearly', function () {
+test('--features= with an empty value fails clearly', function (): void {
     $exitCode = Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => '   ']);
 
     expect($exitCode)->toBe(InstallCommand::FAILURE);
 });
 
-test('Features::parseList rejects an unknown feature and names it in the exception', function () {
+test('Features::parseList rejects an unknown feature and names it in the exception', function (): void {
     Features::parseList('subscriptions,bogus_feature');
 })->throws(InvalidArgumentException::class, 'Unknown feature [bogus_feature]');
 
-test('Features::resolveDependencies is stable when no dependencies exist', function () {
+test('Features::resolveDependencies is stable when no dependencies exist', function (): void {
     expect(Features::resolveDependencies(['refunds']))->toBe(['refunds'])
         ->and(Features::resolveDependencies(['subscriptions', 'refunds']))->toEqualCanonicalizing(['subscriptions', 'refunds']);
 });
 
-test('repeated installation with the same selection is idempotent and does not duplicate migration files', function () {
+test('repeated installation with the same selection is idempotent and does not duplicate migration files', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
     $firstRun = installedMigrationFiles()['refunds'];
 
@@ -218,7 +219,7 @@ test('repeated installation with the same selection is idempotent and does not d
         ->and($secondRun)->toBe($firstRun);
 });
 
-test('a feature can be added later without disturbing a previously installed one (upgrade scenario)', function () {
+test('a feature can be added later without disturbing a previously installed one (upgrade scenario)', function (): void {
     // Simulates: v1 install with subscriptions only, then a later run adds refunds.
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
     expect(installedMigrationFiles()['subscriptions'])->not->toBeEmpty();
@@ -230,7 +231,7 @@ test('a feature can be added later without disturbing a previously installed one
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('declining an already-installed feature interactively does not remove it', function () {
+test('declining an already-installed feature interactively does not remove it', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
     expect(installedMigrationFiles()['subscriptions'])->not->toBeEmpty();
 
@@ -245,7 +246,7 @@ test('declining an already-installed feature interactively does not remove it', 
     expect(installedMigrationFiles()['subscriptions'])->not->toBeEmpty();
 });
 
-test('interactive prompts pre-select features that are already installed', function () {
+test('interactive prompts pre-select features that are already installed', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
     // expectsChoice()'s $answer is the answer given, not the default - this
@@ -261,7 +262,7 @@ test('interactive prompts pre-select features that are already installed', funct
     expect(installedMigrationFiles()['refunds'])->toHaveCount(1);
 });
 
-test('newly selected features are recorded in .env as PAYZEPHYR_FEATURE_* flags', function () {
+test('newly selected features are recorded in .env as PAYZEPHYR_FEATURE_* flags', function (): void {
     File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
@@ -272,7 +273,7 @@ test('newly selected features are recorded in .env as PAYZEPHYR_FEATURE_* flags'
         ->and($env)->not->toContain('PAYZEPHYR_FEATURE_SUBSCRIPTIONS=true');
 });
 
-test('re-running install does not duplicate an already-written .env flag', function () {
+test('re-running install does not duplicate an already-written .env flag', function (): void {
     File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
@@ -283,7 +284,7 @@ test('re-running install does not duplicate an already-written .env flag', funct
     expect(substr_count($env, 'PAYZEPHYR_FEATURE_REFUNDS='))->toBe(1);
 });
 
-test('install command gracefully handles a missing .env file instead of erroring', function () {
+test('install command gracefully handles a missing .env file instead of erroring', function (): void {
     $envPath = app()->environmentFilePath();
     $hadEnv = File::exists($envPath);
     if ($hadEnv) {
@@ -303,7 +304,7 @@ test('install command gracefully handles a missing .env file instead of erroring
     }
 });
 
-test('interactive installation shows an intro and outro', function () {
+test('interactive installation shows an intro and outro', function (): void {
     $this->artisan('payzephyr:install')
         ->expectsChoice('Select the optional features you want to install', [], featureMultiselectOptions())
         ->expectsConfirmation('Run migrations now?', 'no')
@@ -312,7 +313,7 @@ test('interactive installation shows an intro and outro', function () {
         ->assertExitCode(0);
 });
 
-test('non-interactive installation does not print the interactive intro/outro framing', function () {
+test('non-interactive installation does not print the interactive intro/outro framing', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
     $output = Artisan::output();
@@ -321,7 +322,7 @@ test('non-interactive installation does not print the interactive intro/outro fr
         ->and($output)->toContain('Installing PayZephyr...');
 });
 
-test('selecting both optional features installs both and neither is skipped', function () {
+test('selecting both optional features installs both and neither is skipped', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions,refunds']);
 
     $files = installedMigrationFiles();
@@ -332,12 +333,12 @@ test('selecting both optional features installs both and neither is skipped', fu
         ->and($files['refunds'])->not->toBeEmpty();
 });
 
-test('re-running install publishes migrations a later version added to an installed feature', function () {
+test('re-running install publishes migrations a later version added to an installed feature', function (): void {
     // An install from before the state_as_of migration existed: the feature's
     // original migration is there, the newer one is not.
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
     $added = glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')) ?: [];
-    array_map('unlink', $added);
+    array_map(unlink(...), $added);
     expect(glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')))->toBeEmpty();
 
     // The documented upgrade step, with no features named.
@@ -346,7 +347,7 @@ test('re-running install publishes migrations a later version added to an instal
     expect(glob(database_path('migrations/*_add_state_as_of_to_subscription_transactions_table.php')))->not->toBeEmpty();
 });
 
-test('re-running install never overwrites a migration the application has edited', function () {
+test('re-running install never overwrites a migration the application has edited', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'subscriptions']);
     $file = (glob(database_path('migrations/*_create_subscription_transactions_table.php')) ?: [])[0];
     file_put_contents($file, "<?php\n// edited by the application\n");
@@ -357,7 +358,7 @@ test('re-running install never overwrites a migration the application has edited
         ->and(Artisan::output())->toContain('only migrations added since were published; existing files are never overwritten or removed.');
 });
 
-test('feature flags go to the .env file Laravel actually loads', function () {
+test('feature flags go to the .env file Laravel actually loads', function (): void {
     // Tests run with a per-process environment path, so this is also the
     // case of an app that moved its .env with useEnvironmentPath().
     File::put(app()->environmentFilePath(), "APP_NAME=Test\n");
@@ -368,11 +369,11 @@ test('feature flags go to the .env file Laravel actually loads', function () {
         ->and(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_REFUNDS=true');
 });
 
-test('outside a full Laravel application the .env file is taken from the project root', function () {
-    $container = Mockery::mock(Illuminate\Contracts\Foundation\Application::class);
+test('outside a full Laravel application the .env file is taken from the project root', function (): void {
+    $container = Mockery::mock(Application::class);
     $container->shouldReceive('basePath')->with('.env')->andReturn('/srv/app/.env');
 
-    $command = new KenDeNigerian\PayZephyr\Console\InstallCommand;
+    $command = new InstallCommand;
     $command->setLaravel($container);
 
     expect((new ReflectionMethod($command, 'environmentFilePath'))->invoke($command))->toBe('/srv/app/.env');

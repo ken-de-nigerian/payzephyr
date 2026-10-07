@@ -1,12 +1,15 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Facades\Payment;
+use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment rate limits by user when authenticated', function () {
+test('payment rate limits by user when authenticated', function (): void {
     $user = new class
     {
-        public function getAuthIdentifier()
+        public function getAuthIdentifier(): int
         {
             return 123;
         }
@@ -27,10 +30,10 @@ test('payment rate limits by user when authenticated', function () {
         ->email('test@example.com')
         ->callback('https://example.com/callback')
         ->charge())
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'Too many payment attempts');
+        ->toThrow(ChargeException::class, 'Too many payment attempts');
 });
 
-test('payment rate limits by email when not authenticated', function () {
+test('payment rate limits by email when not authenticated', function (): void {
     mockAuthGuard(check: false);
 
     $email = 'test@example.com';
@@ -47,13 +50,13 @@ test('payment rate limits by email when not authenticated', function () {
         ->email($email)
         ->callback('https://example.com/callback')
         ->charge())
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'Too many payment attempts');
+        ->toThrow(ChargeException::class, 'Too many payment attempts');
 });
 
-test('payment rate limits by IP when no email provided', function () {
+test('payment rate limits by IP when no email provided', function (): void {
     mockAuthGuard(check: false);
 
-    $request = new \Illuminate\Http\Request;
+    $request = new Request;
     $request->server->set('REMOTE_ADDR', '192.168.1.1');
 
     app()->instance('request', $request);
@@ -68,24 +71,23 @@ test('payment rate limits by IP when no email provided', function () {
     expect(RateLimiter::tooManyAttempts($key, 10))->toBeTrue();
 });
 
-test('payment rate limits fallback to global when no request available', function () {
+test('payment rate limits fallback to global when no request available', function (): void {
     mockAuthGuard(check: false);
 
     if (app()->bound('request')) {
         app()->forgetInstance('request');
     }
 
-    $payment = new \KenDeNigerian\PayZephyr\Payment(app(\KenDeNigerian\PayZephyr\PaymentManager::class));
+    $payment = new \KenDeNigerian\PayZephyr\Payment(app(PaymentManager::class));
     $reflection = new ReflectionClass($payment);
     $method = $reflection->getMethod('getRateLimitKey');
-    $method->setAccessible(true);
 
     $key = $method->invoke($payment);
 
     expect($key)->toBe('payment_charge:global');
 });
 
-test('payment allows requests within rate limit', function () {
+test('payment allows requests within rate limit', function (): void {
     mockAuthGuard(check: false);
 
     $email = 'test@example.com';

@@ -41,7 +41,7 @@ test('every status the normalizer understands is matched by both the scope and t
     string $normalized,
     string $scope,
     string $predicate,
-) {
+): void {
     $vocabulary = (new StatusNormalizer)->statusesNormalizingTo($normalized);
 
     expect($vocabulary)->not->toBeEmpty();
@@ -70,7 +70,7 @@ test('every status the normalizer understands is matched by both the scope and t
     'pending' => [PaymentStatus::PENDING->value, 'pending', 'isPending'],
 ]);
 
-test('the statuses that regressed before are all covered now', function (string $status) {
+test('the statuses that regressed before are all covered now', function (string $status): void {
     // Named explicitly as well as derived, so the specific bug stays pinned
     // even if someone changes how the vocabulary is assembled.
     storeTransactionWithStatus($status, 0);
@@ -79,7 +79,7 @@ test('the statuses that regressed before are all covered now', function (string 
         ->and(PaymentTransaction::first()->isSuccessful())->toBeTrue();
 })->with(['captured', 'overpaid', 'paidout', 'complete']);
 
-test('a cancelled transaction is still found by the failed scope', function () {
+test('a cancelled transaction is still found by the failed scope', function (): void {
     // Cancelled is its own PaymentStatus but has always been reported by
     // scopeFailed(); keeping that is deliberate, not accidental.
     storeTransactionWithStatus(PaymentStatus::CANCELLED->value, 0);
@@ -87,7 +87,7 @@ test('a cancelled transaction is still found by the failed scope', function () {
     expect(PaymentTransaction::failed()->count())->toBe(1);
 });
 
-test('a status no provider claims is matched by no scope and no predicate', function () {
+test('a status no provider claims is matched by no scope and no predicate', function (): void {
     storeTransactionWithStatus('teapot', 0);
 
     $transaction = PaymentTransaction::first();
@@ -100,7 +100,7 @@ test('a status no provider claims is matched by no scope and no predicate', func
         ->and(PaymentTransaction::pending()->count())->toBe(0);
 });
 
-test('a predicate reads the vocabulary of the provider that wrote the row', function () {
+test('a predicate reads the vocabulary of the provider that wrote the row', function (): void {
     // Drivers normalize before persisting, so this is the uncommon path - a
     // row written directly by the application, or stored before a provider
     // vocabulary was registered. It still must not answer "none of the above".
@@ -124,7 +124,7 @@ test('a predicate reads the vocabulary of the provider that wrote the row', func
         ->and($paystack->isPending())->toBeFalse();
 });
 
-test('an ambiguous status is read differently for each provider that claims it', function () {
+test('an ambiguous status is read differently for each provider that claims it', function (): void {
     // APPROVED is success for Square and pending for PayPal. This is exactly
     // why the query scopes use only the provider-agnostic vocabulary: at SQL
     // level the string alone cannot answer the question.
@@ -145,7 +145,7 @@ test('an ambiguous status is read differently for each provider that claims it',
 // The status vocabulary documented in docs/verification.md
 // ---------------------------------------------------------------------------
 
-test('a status the normalizer does not recognise is passed through, not forced into the enum', function () {
+test('a status the normalizer does not recognise is passed through, not forced into the enum', function (): void {
     // docs/verification.md used to promise "always one of four values". It is
     // not a closed set: an unmapped provider vocabulary comes back as the
     // provider's own string, lowercased. A reader who wrote a four-arm match on
@@ -158,7 +158,7 @@ test('a status the normalizer does not recognise is passed through, not forced i
         ->and(PaymentStatus::tryFromString('abandoned'))->toBeNull();
 });
 
-test('a cancellation normalizes to failed, so verify() never reports cancelled', function () {
+test('a cancellation normalizes to failed, so verify() never reports cancelled', function (): void {
     // PaymentStatus::CANCELLED exists and is used on stored rows and refunds,
     // but every cancellation vocabulary collapses into failed on the way
     // through the normalizer. The docs said otherwise.
@@ -169,7 +169,7 @@ test('a cancellation normalizes to failed, so verify() never reports cancelled',
         ->and($normalizer->normalize('CANCELLED'))->toBe('failed');
 });
 
-test('the boolean helpers answer false for a status the package does not recognise', function () {
+test('the boolean helpers answer false for a status the package does not recognise', function (): void {
     // The safe reading: an unrecognised status is not a successful payment.
     storeTransactionWithStatus('abandoned', 0);
 
@@ -180,12 +180,12 @@ test('the boolean helpers answer false for a status the package does not recogni
         ->and($transaction->isPending())->toBeFalse();
 });
 
-test('a custom normalizer that is not StatusNormalizer falls back to the shipped vocabulary', function () {
+test('a custom normalizer that is not StatusNormalizer falls back to the shipped vocabulary', function (): void {
     // The scopes need the concrete vocabulary, which only StatusNormalizer can
     // supply. An application that binds its own StatusNormalizerInterface is
     // entitled to do so, and the scopes must still work rather than throwing on
     // a method the interface does not promise.
-    app()->bind(StatusNormalizerInterface::class, fn () => new class implements StatusNormalizerInterface
+    app()->bind(StatusNormalizerInterface::class, fn (): StatusNormalizerInterface => new class implements StatusNormalizerInterface
     {
         public function normalize(string $status, ?string $provider = null): string
         {

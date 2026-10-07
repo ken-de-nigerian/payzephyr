@@ -12,6 +12,7 @@ use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Facades\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
@@ -283,7 +284,7 @@ class UnifiedSubscriptionAbstractionTest extends TestCase
                 continue; // Skip if it actually supports subscriptions
             }
 
-            $this->expectException(\KenDeNigerian\PayZephyr\Exceptions\PaymentException::class);
+            $this->expectException(PaymentException::class);
             $this->expectExceptionMessage('does not support subscriptions');
 
             Payment::subscription()
@@ -446,7 +447,7 @@ class UnifiedSubscriptionAbstractionTest extends TestCase
     protected function providerSupportsSubscriptions(string $provider): bool
     {
         try {
-            $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
+            $driver = app(PaymentManager::class)->driver($provider);
 
             return $driver instanceof SupportsSubscriptionsInterface;
         } catch (\Exception) {

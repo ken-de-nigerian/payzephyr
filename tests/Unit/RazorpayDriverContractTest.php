@@ -11,6 +11,8 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\RazorpayDriver;
 use KenDeNigerian\PayZephyr\Enums\TraceEvent;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
@@ -62,7 +64,7 @@ function razorpayRequestError(string $body, ?Throwable $previous = null): Reques
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Razorpay a full payment link, authenticated, as JSON', function () {
+test('a charge sends Razorpay a full payment link, authenticated, as JSON', function (): void {
     $history = [];
     $result = razorpayContractDriver([razorpayLink(['status' => 'issued'])], $history)->charge(razorpayCharge([
         'description' => 'Order 9', 'customer' => ['name' => 'Ada', 'phone' => '+919000000000'], 'metadata' => ['order' => 9], 'channels' => ['card', 'upi'],
@@ -87,7 +89,7 @@ test('a charge sends Razorpay a full payment link, authenticated, as JSON', func
         ->and($result->metadata)->toBe(['order' => 9, 'razorpay_payment_link_id' => 'plink_1']);
 });
 
-test('a charge without a description, customer details, callback or methods sends only what it has', function () {
+test('a charge without a description, customer details, callback or methods sends only what it has', function (): void {
     $history = [];
     $result = razorpayContractDriver([razorpayLink(['status' => null])], $history)->charge(razorpayCharge(['callbackUrl' => null]));
 
@@ -99,7 +101,7 @@ test('a charge without a description, customer details, callback or methods send
         ->and($result->status)->toBe('pending');
 });
 
-test('a customer\'s contact is taken from phone or contact, and numbers are sent as text', function (array $customer, array $expected) {
+test('a customer\'s contact is taken from phone or contact, and numbers are sent as text', function (array $customer, array $expected): void {
     $history = [];
     razorpayContractDriver([razorpayLink()], $history)->charge(razorpayCharge(['customer' => $customer]));
 
@@ -110,7 +112,7 @@ test('a customer\'s contact is taken from phone or contact, and numbers are sent
     'not scalar' => [['name' => ['x'], 'phone' => ['y']], []],
 ]);
 
-test('notes carry the reference first, then scalar metadata as text, at most fifteen and 256 characters each', function () {
+test('notes carry the reference first, then scalar metadata as text, at most fifteen and 256 characters each', function (): void {
     $history = [];
     $metadata = ['nested' => ['x'], 'payzephyr_reference' => 'spoofed', 'flag' => true, 'long' => str_repeat('a', 300)];
     for ($i = 1; $i <= 20; $i++) {
@@ -125,7 +127,7 @@ test('notes carry the reference first, then scalar metadata as text, at most fif
         ->and(array_key_last($notes))->toBe('k12');
 });
 
-test('an amount is sent in the currency\'s minor unit, rounded', function (float $amount, string $currency, int $minor) {
+test('an amount is sent in the currency\'s minor unit, rounded', function (float $amount, string $currency, int $minor): void {
     $history = [];
     razorpayContractDriver([razorpayLink()], $history)->charge(razorpayCharge(['amount' => $amount, 'currency' => $currency]));
 
@@ -138,16 +140,16 @@ test('an amount is sent in the currency\'s minor unit, rounded', function (float
     'thousandths, to the hundredth' => [10.006, 'KWD', 10010],
 ]);
 
-test('a reference longer than Razorpay takes is refused before anything is sent', function () {
+test('a reference longer than Razorpay takes is refused before anything is sent', function (): void {
     $history = [];
     $reference = str_repeat('R', 41);
 
-    expect(fn () => razorpayContractDriver([], $history)->charge(razorpayCharge(['reference' => $reference])))
+    expect(fn (): ChargeResponseDTO => razorpayContractDriver([], $history)->charge(razorpayCharge(['reference' => $reference])))
         ->toThrow(ChargeException::class, "Razorpay references are limited to 40 characters; [$reference] is 41.")
         ->and($history)->toBe([]);
 });
 
-test('an initialized charge is logged with both references, and traced under the charge\'s', function () {
+test('an initialized charge is logged with both references, and traced under the charge\'s', function (): void {
     config(['payments.features.trace' => true, 'payments.trace.async' => false]);
     app()->forgetInstance('payments.config');
     $logs = captureLogs();
@@ -158,7 +160,7 @@ test('an initialized charge is logged with both references, and traced under the
         ->and(PaymentTraceEvent::where('reference', 'RZP_1')->where('event', TraceEvent::PROVIDER_REQUEST_SENT->value)->exists())->toBeTrue();
 });
 
-test('a charge Razorpay refuses carries Razorpay\'s own description, coded 0', function () {
+test('a charge Razorpay refuses carries Razorpay\'s own description, coded 0', function (): void {
     try {
         razorpayContractDriver([razorpayRequestError('{"error":{"description":"The amount must be atleast INR 1.00"}}')])->charge(razorpayCharge());
         test()->fail('Expected a ChargeException.');
@@ -169,7 +171,7 @@ test('a charge Razorpay refuses carries Razorpay\'s own description, coded 0', f
     }
 });
 
-test('Razorpay\'s description is added only when it gave one, from the first answer in the chain', function (string $body, ?string $innerBody) {
+test('Razorpay\'s description is added only when it gave one, from the first answer in the chain', function (string $body, ?string $innerBody): void {
     $inner = $innerBody === null ? null : razorpayRequestError($innerBody);
 
     try {
@@ -184,7 +186,7 @@ test('Razorpay\'s description is added only when it gave one, from the first ans
     'only a deeper answer has one' => ['{"error":{}}', '{"error":{"description":"deeper"}}'],
 ]);
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no request behind', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no request behind', function (): void {
     $logs = captureLogs();
     $driver = razorpayContractDriver([fn () => throw new LogicException('handler blew up')]);
 
@@ -212,7 +214,7 @@ function razorpayFullLink(array $data = []): Response
     ]));
 }
 
-test('a link is verified by its id and read in full, its payment the settled one', function () {
+test('a link is verified by its id and read in full, its payment the settled one', function (): void {
     $logs = captureLogs();
     $history = [];
     $result = razorpayContractDriver([razorpayFullLink()], $history)->verify('plink_V');
@@ -230,20 +232,20 @@ test('a link is verified by its id and read in full, its payment the settled one
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'plink_V', 'status' => 'paid']);
 });
 
-test('a refunded payment counts as the settled one', function () {
+test('a refunded payment counts as the settled one', function (): void {
     $result = razorpayContractDriver([razorpayFullLink(['payments' => [['status' => 'refunded', 'method' => 'netbanking']]])])->verify('plink_V');
 
     expect($result->channel)->toBe('netbanking');
 });
 
-test('a link with no reference or status of its own is read by the one asked for, as unknown', function () {
+test('a link with no reference or status of its own is read by the one asked for, as unknown', function (): void {
     $result = razorpayContractDriver([razorpayFullLink(['reference_id' => null, 'status' => null])])->verify('plink_V');
 
     expect($result->reference)->toBe('plink_V')
         ->and($result->status)->toBe('unknown');
 });
 
-test('a link is found by its reference, then fetched by its id', function () {
+test('a link is found by its reference, then fetched by its id', function (): void {
     $history = [];
     $result = razorpayContractDriver([new Response(200, [], '{"payment_links":[{"id":"plink_V"}]}'), razorpayFullLink()], $history)->verify('RZP_V');
 
@@ -253,8 +255,8 @@ test('a link is found by its reference, then fetched by its id', function () {
         ->and($result->reference)->toBe('RZP_V');
 });
 
-test('a reference that finds no link, several, or one without an id is refused, saying which', function (string $body, string $message) {
-    expect(fn () => razorpayContractDriver([new Response(200, [], $body)])->verify('RZP_X'))->toThrow(VerificationException::class, $message);
+test('a reference that finds no link, several, or one without an id is refused, saying which', function (string $body, string $message): void {
+    expect(fn (): VerificationResponseDTO => razorpayContractDriver([new Response(200, [], $body)])->verify('RZP_X'))->toThrow(VerificationException::class, $message);
 })->with([
     'none' => ['{"payment_links":[]}', "Expected exactly one Razorpay payment link for reference [RZP_X], found 0. Razorpay's reference_id lookup can trail link creation by a few seconds; the plink_ id is always current."],
     'several' => ['{"payment_links":[{"id":"plink_1"},{"id":"plink_2"}]}', 'Expected exactly one Razorpay payment link for reference [RZP_X], found 2'],
@@ -263,7 +265,7 @@ test('a reference that finds no link, several, or one without an id is refused, 
     'not a plink id' => ['{"payment_links":[{"id":"inv_1"}]}', 'Razorpay returned a payment link without an id for reference [RZP_X]'],
 ]);
 
-test('several links found is not described as a delay', function () {
+test('several links found is not described as a delay', function (): void {
     try {
         razorpayContractDriver([new Response(200, [], '{"payment_links":[{"id":"plink_1"},{"id":"plink_2"}]}')])->verify('RZP_X');
     } catch (VerificationException $e) {
@@ -271,7 +273,7 @@ test('several links found is not described as a delay', function () {
     }
 });
 
-test('a verification that fails on the way is logged and wrapped with Razorpay\'s description, coded 0', function () {
+test('a verification that fails on the way is logged and wrapped with Razorpay\'s description, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -293,13 +295,13 @@ test('a verification that fails on the way is logged and wrapped with Razorpay\'
 // Webhooks
 // ---------------------------------------------------------------------------
 
-test('the signature header is read in either case', function (string $header) {
+test('the signature header is read in either case', function (string $header): void {
     $body = '{"event":"payment_link.paid"}';
 
     expect(razorpayContractDriver()->validateWebhook([$header => [hash_hmac('sha256', $body, 'rzp_whsec')]], $body))->toBeTrue();
 })->with(['x-razorpay-signature', 'X-Razorpay-Signature']);
 
-test('each webhook outcome is logged, and each refusal is final', function () {
+test('each webhook outcome is logged, and each refusal is final', function (): void {
     $logs = captureLogs();
     $driver = razorpayContractDriver();
     $sign = fn (string $body): array => ['x-razorpay-signature' => [hash_hmac('sha256', $body, 'rzp_whsec')]];
@@ -322,7 +324,7 @@ test('each webhook outcome is logged, and each refusal is final', function () {
         ->and(loggedEntry($logs, 'Webhook signature invalid')['context']['hint'])->toContain('not the API key secret');
 });
 
-test('only a payment link event names a payment link\'s reference and status', function () {
+test('only a payment link event names a payment link\'s reference and status', function (): void {
     $driver = razorpayContractDriver();
     $entity = ['payload' => ['payment_link' => ['entity' => ['reference_id' => 'RZP_W', 'status' => 'paid']]]];
 
@@ -333,7 +335,7 @@ test('only a payment link event names a payment link\'s reference and status', f
         ->and($driver->extractWebhookReference($entity))->toBeNull();
 });
 
-test('an event id leaves out the parts a delivery does not have', function () {
+test('an event id leaves out the parts a delivery does not have', function (): void {
     expect(razorpayContractDriver()->extractWebhookEventId(['event' => '', 'payload' => ['payment_link' => ['entity' => ['id' => 'plink_1']], 'payment' => ['entity' => ['id' => 'pay_1']]]]))
         ->toBe('plink_1:pay_1');
 });
@@ -342,7 +344,7 @@ test('an event id leaves out the parts a delivery does not have', function () {
 // Health
 // ---------------------------------------------------------------------------
 
-test('the health check lists one link, counts Razorpay\'s 400 and 404 as healthy, and anything else as down', function () {
+test('the health check lists one link, counts Razorpay\'s 400 and 404 as healthy, and anything else as down', function (): void {
     $logs = captureLogs();
     $history = [];
     $request = new Request('GET', '/v1/payment_links');
@@ -357,7 +359,7 @@ test('the health check lists one link, counts Razorpay\'s 400 and 404 as healthy
         ->and(loggedEntry($logs, 'Health check failed')['context'])->toBe(['error' => 'not ours']);
 });
 
-test('a note keeps a numeric metadata key as it was given', function () {
+test('a note keeps a numeric metadata key as it was given', function (): void {
     $history = [];
     razorpayContractDriver([razorpayLink()], $history)->charge(razorpayCharge(['metadata' => [7 => 'seven']]));
 

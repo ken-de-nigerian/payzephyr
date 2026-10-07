@@ -5,6 +5,8 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
@@ -34,7 +36,7 @@ function flutterwaveGapsDriverWithMock(array $responses, array $configOverrides 
 // error" test uses an HTTP 400 (which Guzzle turns into a ClientException
 // caught by the generic Throwable handler) and an invalid DTO currency that
 // never even reaches charge(), so this specific branch was never exercised.
-test('flutterwave charge throws ChargeException when body status is not success despite 200 response', function () {
+test('flutterwave charge throws ChargeException when body status is not success despite 200 response', function (): void {
     $driver = flutterwaveGapsDriverWithMock([
         new Response(200, [], json_encode([
             'status' => 'error',
@@ -44,14 +46,14 @@ test('flutterwave charge throws ChargeException when body status is not success 
 
     $request = new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback');
 
-    expect(fn () => $driver->charge($request))
+    expect(fn (): ChargeResponseDTO => $driver->charge($request))
         ->toThrow(ChargeException::class, 'Insufficient funds');
 });
 
 // Covers the generic catch (Throwable $e) branch of charge() (lines ~128-133),
 // which only triggers for exceptions that are neither ChargeException nor
 // GuzzleException (those are already wrapped/rethrown by makeRequest()).
-test('flutterwave charge wraps unexpected non-guzzle exceptions from the http client', function () {
+test('flutterwave charge wraps unexpected non-guzzle exceptions from the http client', function (): void {
     $config = [
         'secret_key' => 'FLWSECK_TEST-xxx',
         'currencies' => ['NGN'],
@@ -68,7 +70,7 @@ test('flutterwave charge wraps unexpected non-guzzle exceptions from the http cl
 
     $request = new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback');
 
-    expect(fn () => $driver->charge($request))
+    expect(fn (): ChargeResponseDTO => $driver->charge($request))
         ->toThrow(ChargeException::class, 'Payment initialization failed: Unexpected serialization failure');
 });
 
@@ -78,7 +80,7 @@ test('flutterwave charge wraps unexpected non-guzzle exceptions from the http cl
 // test uses an HTTP 404, which Guzzle turns into a ClientException that gets
 // wrapped by makeRequest() into a ChargeException and then re-wrapped by the
 // generic Throwable catch in verify() - a different code path entirely.
-test('flutterwave verify throws VerificationException when body status is not success despite 200 response', function () {
+test('flutterwave verify throws VerificationException when body status is not success despite 200 response', function (): void {
     $driver = flutterwaveGapsDriverWithMock([
         new Response(200, [], json_encode([
             'status' => 'error',
@@ -86,12 +88,12 @@ test('flutterwave verify throws VerificationException when body status is not su
         ])),
     ]);
 
-    expect(fn () => $driver->verify('fw_gap_ref'))
+    expect(fn (): VerificationResponseDTO => $driver->verify('fw_gap_ref'))
         ->toThrow(VerificationException::class, 'Transaction could not be verified');
 });
 
 // Covers the "missing verif-hash header" branch of validateWebhook() (lines ~211-218).
-test('flutterwave driver rejects webhook when verif-hash header is missing', function () {
+test('flutterwave driver rejects webhook when verif-hash header is missing', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'test_secret',
         'webhook_secret' => 'webhook_secret',
@@ -103,7 +105,7 @@ test('flutterwave driver rejects webhook when verif-hash header is missing', fun
 });
 
 // A blank webhook_secret is no secret hash at all, and rejects the delivery.
-test('flutterwave driver rejects webhook when configured secret hash is empty', function () {
+test('flutterwave driver rejects webhook when configured secret hash is empty', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'test_secret',
         'webhook_secret' => '',

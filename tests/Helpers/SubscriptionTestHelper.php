@@ -59,7 +59,6 @@ class SubscriptionTestHelper
         // Update manager config to ensure paystack is enabled
         $reflection = new ReflectionClass($manager);
         $configProperty = $reflection->getProperty('config');
-        $configProperty->setAccessible(true);
         $config = $configProperty->getValue($manager);
         $config['providers']['paystack']['enabled'] = true;
         $config['default'] = 'paystack';
@@ -70,7 +69,6 @@ class SubscriptionTestHelper
         // CRITICAL: Inject the driver BEFORE any calls to driver() method
         // This ensures the manager uses our mocked driver, not creating a new one
         $driversProperty = $reflection->getProperty('drivers');
-        $driversProperty->setAccessible(true);
         $drivers = $driversProperty->getValue($manager);
         $drivers['paystack'] = $driver;
         $driversProperty->setValue($manager, $drivers);
@@ -79,7 +77,6 @@ class SubscriptionTestHelper
         // Use reflection to check the client property
         $driverReflection = new ReflectionClass($driver);
         $clientProperty = $driverReflection->getProperty('client');
-        $clientProperty->setAccessible(true);
         $client = $clientProperty->getValue($driver);
 
         // Ensure the client is using our MockHandler

@@ -14,7 +14,7 @@ function makeStripeSignatureHeader(string $payload, string $secret, int $timesta
     return "t=$timestamp,v1=$signature";
 }
 
-test('stripe driver accepts webhook with created timestamp within tolerance (ADR-0001)', function () {
+test('stripe driver accepts webhook with created timestamp within tolerance (ADR-0001)', function (): void {
     $secret = 'whsec_test_secret';
     config([
         'payments.providers.stripe' => [
@@ -41,7 +41,7 @@ test('stripe driver accepts webhook with created timestamp within tolerance (ADR
     expect($driver->validateWebhook($headers, $payload))->toBeTrue();
 });
 
-test('stripe accepts a retry of an old event, because its window is on the freshly signed t=', function () {
+test('stripe accepts a retry of an old event, because its window is on the freshly signed t=', function (): void {
     // Stripe signs a new t= for every delivery attempt; Event.created is the
     // event's and is repeated by every retry. The old check on Event.created
     // rejected every Stripe retry more than five minutes after the event.
@@ -59,7 +59,7 @@ test('stripe accepts a retry of an old event, because its window is on the fresh
         ->and($driver->validateWebhook(['stripe-signature' => [makeStripeSignatureHeader($payload, $secret, time() - 600)]], $payload))->toBeFalse();
 });
 
-test('stripe applies the configured tolerance to the signed t= and declares it as its replay horizon', function () {
+test('stripe applies the configured tolerance to the signed t= and declares it as its replay horizon', function (): void {
     config(['payments.security.webhook_timestamp_tolerance' => 900]);
     app()->forgetInstance('payments.config');
 
@@ -71,7 +71,7 @@ test('stripe applies the configured tolerance to the signed t= and declares it a
         ->and($driver->webhookReplayHorizon())->toBe(900);
 });
 
-test('stripe driver handles webhook with metadata reference', function () {
+test('stripe driver handles webhook with metadata reference', function (): void {
     config([
         'payments.providers.stripe' => [
             'driver' => 'stripe',
@@ -103,7 +103,7 @@ test('stripe driver handles webhook with metadata reference', function () {
     expect($result)->toBeBool();
 });
 
-test('stripe driver handles webhook with client_reference_id', function () {
+test('stripe driver handles webhook with client_reference_id', function (): void {
     config([
         'payments.providers.stripe' => [
             'driver' => 'stripe',
@@ -133,7 +133,7 @@ test('stripe driver handles webhook with client_reference_id', function () {
     expect($result)->toBeBool();
 });
 
-test('stripe driver handles charge with zero decimal currency', function () {
+test('stripe driver handles charge with zero decimal currency', function (): void {
     config([
         'payments.providers.stripe' => [
             'driver' => 'stripe',
@@ -148,7 +148,7 @@ test('stripe driver handles charge with zero decimal currency', function () {
     expect($driver->isCurrencySupported('JPY'))->toBeTrue();
 });
 
-test('stripe driver handles verify with different status formats', function () {
+test('stripe driver handles verify with different status formats', function (): void {
     config([
         'payments.providers.stripe' => [
             'driver' => 'stripe',

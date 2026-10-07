@@ -7,7 +7,7 @@ use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
-test('flutterwave driver getIdempotencyHeader returns correct header', function () {
+test('flutterwave driver getIdempotencyHeader returns correct header', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['NGN'],
@@ -21,7 +21,7 @@ test('flutterwave driver getIdempotencyHeader returns correct header', function 
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
-test('flutterwave driver healthCheck returns true for 200 response', function () {
+test('flutterwave driver healthCheck returns true for 200 response', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['NGN'],
@@ -40,7 +40,7 @@ test('flutterwave driver healthCheck returns true for 200 response', function ()
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('flutterwave driver healthCheck returns true for 4xx errors', function () {
+test('flutterwave driver healthCheck returns true for 4xx errors', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['NGN'],
@@ -59,7 +59,7 @@ test('flutterwave driver healthCheck returns true for 4xx errors', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('flutterwave driver healthCheck returns false for network errors', function () {
+test('flutterwave driver healthCheck returns false for network errors', function (): void {
     $driver = new FlutterwaveDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['NGN'],

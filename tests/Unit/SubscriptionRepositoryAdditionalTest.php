@@ -20,11 +20,11 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentSubscriptionRepository;
  * database the suite runs on, so PostgreSQL's 23505 and its aborted
  * transaction are exercised too.
  */
-beforeEach(function () {
+beforeEach(function (): void {
     $this->repository = new EloquentSubscriptionRepository;
 });
 
-test('updateOrCreateAtomic recovers when create() genuinely loses the insert race', function () {
+test('updateOrCreateAtomic recovers when create() genuinely loses the insert race', function (): void {
     insertConcurrentlyAfterLookup((new SubscriptionTransaction)->getTable(), [
         'subscription_code' => 'SUB_RACE_CODE',
         'provider' => 'paystack',
@@ -49,7 +49,7 @@ test('updateOrCreateAtomic recovers when create() genuinely loses the insert rac
         ->and(SubscriptionTransaction::where('subscription_code', 'SUB_RACE_CODE')->count())->toBe(1);
 });
 
-test('updateOrCreateAtomic rethrows an integrity failure that is not a duplicate', function () {
+test('updateOrCreateAtomic rethrows an integrity failure that is not a duplicate', function (): void {
     // A missing NOT NULL column is SQLSTATE 23000 on SQLite and MySQL - the
     // code the duplicate check used to treat as "duplicate key", which sent
     // this down the race path to a ModelNotFoundException instead.

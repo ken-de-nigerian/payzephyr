@@ -39,7 +39,7 @@ function makeMonnifyRefundDriver(array $responses, ?array &$history = null): Mon
     return $driver;
 }
 
-test('monnify refund succeeds with valid response', function () {
+test('monnify refund succeeds with valid response', function (): void {
     $driver = makeMonnifyRefundDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -62,7 +62,7 @@ test('monnify refund succeeds with valid response', function () {
         ->and($result->provider)->toBe('monnify');
 });
 
-test('monnify refund throws exception on api error', function () {
+test('monnify refund throws exception on api error', function (): void {
     $driver = makeMonnifyRefundDriver([
         new Response(200, [], json_encode(['requestSuccessful' => false, 'responseMessage' => 'Transaction not found'])),
     ]);
@@ -73,7 +73,7 @@ test('monnify refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'invalid', amount: 10.0));
 })->throws(RefundException::class, 'Transaction not found');
 
-test('a full monnify refund (no explicit amount) looks up the original transaction to determine refundAmount', function () {
+test('a full monnify refund (no explicit amount) looks up the original transaction to determine refundAmount', function (): void {
     // Regression: Monnify's initiate-refund API documents refundAmount as
     // required with no "omit for a full refund" semantics ("for a full
     // refund, set this to the full transaction amount") - omitting it used
@@ -112,7 +112,7 @@ test('a full monnify refund (no explicit amount) looks up the original transacti
     expect($result->amount)->toBe(7500.0);
 });
 
-test('a full monnify refund fails clearly when the original transaction cannot be looked up', function () {
+test('a full monnify refund fails clearly when the original transaction cannot be looked up', function (): void {
     $driver = makeMonnifyRefundDriver([
         new Response(200, [], json_encode(['requestSuccessful' => false, 'responseMessage' => 'Transaction not found'])),
     ]);
@@ -120,7 +120,7 @@ test('a full monnify refund fails clearly when the original transaction cannot b
     $driver->refund(new RefundRequestDTO(transactionReference: 'mn_ref_missing'));
 })->throws(RefundException::class, 'Cannot issue a full refund for Monnify transaction [mn_ref_missing]');
 
-test('monnify fetchRefund succeeds with valid response', function () {
+test('monnify fetchRefund succeeds with valid response', function (): void {
     $driver = makeMonnifyRefundDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,

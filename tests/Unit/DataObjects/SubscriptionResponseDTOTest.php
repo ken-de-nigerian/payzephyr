@@ -5,7 +5,7 @@ declare(strict_types=1);
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Enums\SubscriptionStatus;
 
-test('it can be constructed directly with all properties', function () {
+test('it can be constructed directly with all properties', function (): void {
     $dto = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_123',
         status: 'active',
@@ -31,7 +31,7 @@ test('it can be constructed directly with all properties', function () {
         ->and($dto->provider)->toBe('paystack');
 });
 
-test('fromArray builds a DTO from a full data array', function () {
+test('fromArray builds a DTO from a full data array', function (): void {
     $dto = SubscriptionResponseDTO::fromArray([
         'subscription_code' => 'SUB_456',
         'status' => 'cancelled',
@@ -61,7 +61,7 @@ test('fromArray builds a DTO from a full data array', function () {
         ->and($dto->createdAt)->toBe('2026-08-01T09:00:00+00:00');
 });
 
-test('fromArray applies defaults for missing keys', function () {
+test('fromArray applies defaults for missing keys', function (): void {
     $dto = SubscriptionResponseDTO::fromArray([]);
 
     expect($dto->subscriptionCode)->toBe('')
@@ -79,7 +79,7 @@ test('fromArray applies defaults for missing keys', function () {
         ->and($dto->createdAt)->toBeNull();
 });
 
-test('toArray serializes the DTO back into an array', function () {
+test('toArray serializes the DTO back into an array', function (): void {
     $dto = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_789',
         status: 'active',
@@ -111,46 +111,46 @@ test('toArray serializes the DTO back into an array', function () {
     ]);
 });
 
-test('getStatus resolves a known status string into the matching enum', function () {
+test('getStatus resolves a known status string into the matching enum', function (): void {
     $dto = SubscriptionResponseDTO::fromArray(['status' => 'active']);
 
     expect($dto->getStatus())->toBe(SubscriptionStatus::ACTIVE);
 });
 
-test('getStatus falls back to EXPIRED for an unmappable status string', function () {
+test('getStatus falls back to EXPIRED for an unmappable status string', function (): void {
     $dto = SubscriptionResponseDTO::fromArray(['status' => 'totally-unknown-status']);
 
     expect($dto->getStatus())->toBe(SubscriptionStatus::EXPIRED);
 });
 
-test('isActive is true for active and non-renewing statuses', function () {
+test('isActive is true for active and non-renewing statuses', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'active'])->isActive())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'non-renewing'])->isActive())->toBeTrue();
 });
 
-test('isActive is false for cancelled, completed and unknown statuses', function () {
+test('isActive is false for cancelled, completed and unknown statuses', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'cancelled'])->isActive())->toBeFalse()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'completed'])->isActive())->toBeFalse()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'nonsense'])->isActive())->toBeFalse();
 });
 
-test('isCancelled reflects the cancelled status only', function () {
+test('isCancelled reflects the cancelled status only', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'cancelled'])->isCancelled())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'active'])->isCancelled())->toBeFalse();
 });
 
-test('isCompleted reflects the completed status only', function () {
+test('isCompleted reflects the completed status only', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'completed'])->isCompleted())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'active'])->isCompleted())->toBeFalse();
 });
 
-test('canBeCancelled delegates to the status enum', function () {
+test('canBeCancelled delegates to the status enum', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'active'])->canBeCancelled())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'attention'])->canBeCancelled())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'completed'])->canBeCancelled())->toBeFalse();
 });
 
-test('canBeResumed delegates to the status enum', function () {
+test('canBeResumed delegates to the status enum', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['status' => 'cancelled'])->canBeResumed())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'non-renewing'])->canBeResumed())->toBeTrue()
         ->and(SubscriptionResponseDTO::fromArray(['status' => 'active'])->canBeResumed())->toBeFalse();

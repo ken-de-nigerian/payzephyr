@@ -60,7 +60,7 @@ function bundledProviders(): array
     return $names;
 }
 
-test('no live document states how many providers there are', function () {
+test('no live document states how many providers there are', function (): void {
     $offenders = [];
     $pattern = '/\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\d+)\s+'
         .'(?:of\s+the\s+\w+\s+)?(?:supported\s+|bundled\s+)?(?:payment\s+)?providers?\b/i';
@@ -76,43 +76,43 @@ test('no live document states how many providers there are', function () {
     expect($offenders)->toBe([], "Name the providers or link the matrix in docs/providers.md instead of counting them:\n  ".implode("\n  ", $offenders));
 });
 
-test('every bundled provider appears in the provider matrix', function () {
+test('every bundled provider appears in the provider matrix', function (): void {
     $matrix = (string) file_get_contents(dirname(__DIR__, 2).'/docs/providers.md');
 
     // The matrix is the single reference the prose points at, so a driver that
     // is missing from it is invisible no matter how complete the code is.
     $missing = array_values(array_filter(
         bundledProviders(),
-        fn (string $provider) => ! str_contains(strtolower($matrix), '| '.$provider.' |')
+        fn (string $provider): bool => ! str_contains(strtolower($matrix), '| '.$provider.' |')
     ));
 
     expect($missing)->toBe([], 'Missing from the matrix in docs/providers.md: '.implode(', ', $missing));
 });
 
-test('the README names every bundled provider', function () {
+test('the README names every bundled provider', function (): void {
     $readme = strtolower((string) file_get_contents(dirname(__DIR__, 2).'/README.md'));
 
     $missing = array_values(array_filter(
         bundledProviders(),
-        fn (string $provider) => ! str_contains($readme, $provider)
+        fn (string $provider): bool => ! str_contains($readme, $provider)
     ));
 
     expect($missing)->toBe([], 'The README does not mention: '.implode(', ', $missing));
 });
 
-test('every provider in the matrix is a driver that actually exists', function () {
+test('every provider in the matrix is a driver that actually exists', function (): void {
     // The opposite drift: a provider documented after it was removed, or
     // announced before it shipped.
     $matrix = (string) file_get_contents(dirname(__DIR__, 2).'/docs/providers.md');
     preg_match_all('/^\| ([A-Za-z][A-Za-z ]*?) \| (?:✅|❌) \| (?:✅|❌) \|/m', $matrix, $rows);
 
-    $documented = array_map(fn (string $name) => strtolower(trim($name)), $rows[1]);
+    $documented = array_map(fn (string $name): string => strtolower(trim($name)), $rows[1]);
 
     expect($documented)->not->toBeEmpty()
         ->and(array_diff($documented, bundledProviders()))->toBe([]);
 });
 
-test('every exception the package can throw is in the catalogue', function () {
+test('every exception the package can throw is in the catalogue', function (): void {
     // RefundException went undocumented through ten drivers' worth of refund
     // support, which is how a caller ends up not knowing that an ambiguous
     // refund must not be retried.
@@ -131,7 +131,7 @@ test('every exception the package can throw is in the catalogue', function () {
     expect($undocumented)->toBe([], 'Missing from docs/error-handling.md: '.implode(', ', $undocumented));
 });
 
-test('every event the package dispatches is in the events reference', function () {
+test('every event the package dispatches is in the events reference', function (): void {
     $reference = (string) file_get_contents(dirname(__DIR__, 2).'/docs/events.md');
 
     $undocumented = [];
@@ -147,7 +147,7 @@ test('every event the package dispatches is in the events reference', function (
     expect($undocumented)->toBe([], 'Missing from docs/events.md: '.implode(', ', $undocumented));
 });
 
-test('every queued job is described in the queue chapter', function () {
+test('every queued job is described in the queue chapter', function (): void {
     // A job the application has to run a worker for, but does not know exists,
     // is a promise the documentation failed to keep.
     $chapter = (string) file_get_contents(dirname(__DIR__, 2).'/docs/queues.md');
@@ -165,7 +165,7 @@ test('every queued job is described in the queue chapter', function () {
     expect($undocumented)->toBe([], 'Missing from docs/queues.md: '.implode(', ', $undocumented));
 });
 
-test('every artisan command named in the docs actually exists', function () {
+test('every artisan command named in the docs actually exists', function (): void {
     // The production checklist tells an operator to schedule a command. If the
     // name is wrong they find out at 3am, or never. One wrong name reached the
     // docs during this audit - written by the audit itself.
@@ -202,7 +202,7 @@ test('every artisan command named in the docs actually exists', function () {
     expect($ghosts)->toBe([], 'Commands named in the docs that do not exist: '.implode('; ', $ghosts));
 });
 
-test('no documented link points at a file or anchor that does not exist', function () {
+test('no documented link points at a file or anchor that does not exist', function (): void {
     $broken = [];
 
     foreach (liveDocs() as $file) {
@@ -248,7 +248,7 @@ test('no documented link points at a file or anchor that does not exist', functi
     expect($broken)->toBe([], "Broken documentation links:\n  ".implode("\n  ", $broken));
 });
 
-test('every environment variable the config ships is documented somewhere', function () {
+test('every environment variable the config ships is documented somewhere', function (): void {
     $config = (string) file_get_contents(dirname(__DIR__, 2).'/config/payments.php');
     preg_match_all("/env\(\s*'([A-Z0-9_]+)'/", $config, $matches);
 
@@ -259,7 +259,7 @@ test('every environment variable the config ships is documented somewhere', func
 
     $undocumented = array_values(array_unique(array_filter(
         $matches[1],
-        fn (string $variable) => ! str_contains($prose, $variable)
+        fn (string $variable): bool => ! str_contains($prose, $variable)
     )));
 
     sort($undocumented);

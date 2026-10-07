@@ -18,12 +18,12 @@ function makeLogsToPaymentChannelSubject(): object
     };
 }
 
-afterEach(function () {
+afterEach(function (): void {
     config(['payments.logging.channel' => null]);
     app()->forgetInstance('payments.config');
 });
 
-test('log writes to the configured payments channel', function () {
+test('log writes to the configured payments channel', function (): void {
     config(['payments.logging.channel' => 'payments']);
     app()->forgetInstance('payments.config');
 
@@ -33,7 +33,7 @@ test('log writes to the configured payments channel', function () {
     makeLogsToPaymentChannelSubject()->logPublic('info', 'Something happened', ['foo' => 'bar']);
 });
 
-test('log falls back to the default logger when the configured channel is invalid', function () {
+test('log falls back to the default logger when the configured channel is invalid', function (): void {
     config(['payments.logging.channel' => 'nonexistent_channel_xyz']);
     app()->forgetInstance('payments.config');
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Enums\SubscriptionStatus;
 
-test('subscription status enum has all expected cases', function () {
+test('subscription status enum has all expected cases', function (): void {
     expect(SubscriptionStatus::cases())->toHaveCount(6)
         ->and(SubscriptionStatus::ACTIVE->value)->toBe('active')
         ->and(SubscriptionStatus::NON_RENEWING->value)->toBe('non-renewing')
@@ -14,7 +14,7 @@ test('subscription status enum has all expected cases', function () {
         ->and(SubscriptionStatus::EXPIRED->value)->toBe('expired');
 });
 
-test('label returns a human-readable string for every case', function () {
+test('label returns a human-readable string for every case', function (): void {
     expect(SubscriptionStatus::ACTIVE->label())->toBe('Active')
         ->and(SubscriptionStatus::NON_RENEWING->label())->toBe('Non-Renewing')
         ->and(SubscriptionStatus::CANCELLED->label())->toBe('Cancelled')
@@ -23,7 +23,7 @@ test('label returns a human-readable string for every case', function () {
         ->and(SubscriptionStatus::EXPIRED->label())->toBe('Expired');
 });
 
-test('canBeCancelled is true only for active, non-renewing and attention', function () {
+test('canBeCancelled is true only for active, non-renewing and attention', function (): void {
     expect(SubscriptionStatus::ACTIVE->canBeCancelled())->toBeTrue()
         ->and(SubscriptionStatus::NON_RENEWING->canBeCancelled())->toBeTrue()
         ->and(SubscriptionStatus::ATTENTION->canBeCancelled())->toBeTrue()
@@ -32,7 +32,7 @@ test('canBeCancelled is true only for active, non-renewing and attention', funct
         ->and(SubscriptionStatus::EXPIRED->canBeCancelled())->toBeFalse();
 });
 
-test('canBeResumed is true only for cancelled and non-renewing', function () {
+test('canBeResumed is true only for cancelled and non-renewing', function (): void {
     expect(SubscriptionStatus::CANCELLED->canBeResumed())->toBeTrue()
         ->and(SubscriptionStatus::NON_RENEWING->canBeResumed())->toBeTrue()
         ->and(SubscriptionStatus::ACTIVE->canBeResumed())->toBeFalse()
@@ -41,7 +41,7 @@ test('canBeResumed is true only for cancelled and non-renewing', function () {
         ->and(SubscriptionStatus::EXPIRED->canBeResumed())->toBeFalse();
 });
 
-test('isBilling is true only for active and non-renewing', function () {
+test('isBilling is true only for active and non-renewing', function (): void {
     expect(SubscriptionStatus::ACTIVE->isBilling())->toBeTrue()
         ->and(SubscriptionStatus::NON_RENEWING->isBilling())->toBeTrue()
         ->and(SubscriptionStatus::CANCELLED->isBilling())->toBeFalse()
@@ -50,7 +50,7 @@ test('isBilling is true only for active and non-renewing', function () {
         ->and(SubscriptionStatus::EXPIRED->isBilling())->toBeFalse();
 });
 
-test('allowedTransitions returns the correct set for every case', function () {
+test('allowedTransitions returns the correct set for every case', function (): void {
     expect(SubscriptionStatus::ACTIVE->allowedTransitions())->toBe([
         SubscriptionStatus::NON_RENEWING,
         SubscriptionStatus::CANCELLED,
@@ -71,13 +71,13 @@ test('allowedTransitions returns the correct set for every case', function () {
         ->and(SubscriptionStatus::EXPIRED->allowedTransitions())->toBe([]);
 });
 
-test('canTransitionTo validates against allowedTransitions', function () {
+test('canTransitionTo validates against allowedTransitions', function (): void {
     expect(SubscriptionStatus::ACTIVE->canTransitionTo(SubscriptionStatus::CANCELLED))->toBeTrue()
         ->and(SubscriptionStatus::ACTIVE->canTransitionTo(SubscriptionStatus::COMPLETED))->toBeFalse()
         ->and(SubscriptionStatus::COMPLETED->canTransitionTo(SubscriptionStatus::ACTIVE))->toBeFalse();
 });
 
-test('fromString normalizes provider-specific strings for every branch', function () {
+test('fromString normalizes provider-specific strings for every branch', function (): void {
     expect(SubscriptionStatus::fromString('active'))->toBe(SubscriptionStatus::ACTIVE)
         ->and(SubscriptionStatus::fromString('subscribed'))->toBe(SubscriptionStatus::ACTIVE)
         ->and(SubscriptionStatus::fromString('ENABLED'))->toBe(SubscriptionStatus::ACTIVE)
@@ -100,20 +100,20 @@ test('fromString normalizes provider-specific strings for every branch', functio
         ->and(SubscriptionStatus::fromString('unpaid'))->toBe(SubscriptionStatus::EXPIRED);
 });
 
-test('fromString trims and lowercases the input before matching', function () {
+test('fromString trims and lowercases the input before matching', function (): void {
     expect(SubscriptionStatus::fromString('  ACTIVE  '))->toBe(SubscriptionStatus::ACTIVE);
 });
 
-test('fromString throws for an unmappable status string', function () {
+test('fromString throws for an unmappable status string', function (): void {
     SubscriptionStatus::fromString('totally-unknown');
 })->throws(InvalidArgumentException::class, 'Unknown subscription status: totally-unknown');
 
-test('tryFromString returns the enum for a valid status string', function () {
+test('tryFromString returns the enum for a valid status string', function (): void {
     expect(SubscriptionStatus::tryFromString('active'))->toBe(SubscriptionStatus::ACTIVE)
         ->and(SubscriptionStatus::tryFromString('cancelled'))->toBe(SubscriptionStatus::CANCELLED);
 });
 
-test('tryFromString returns null for an unmappable status string', function () {
+test('tryFromString returns null for an unmappable status string', function (): void {
     expect(SubscriptionStatus::tryFromString('nonsense'))->toBeNull()
         ->and(SubscriptionStatus::tryFromString(''))->toBeNull();
 });

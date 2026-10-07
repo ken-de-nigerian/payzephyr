@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
@@ -82,13 +83,12 @@ function managerWithDriver(string $name, DriverInterface $driver): PaymentManage
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, [$name => $driver]);
 
     return $manager;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -104,7 +104,7 @@ beforeEach(function () {
     ]);
 });
 
-test('using() is an alias for with() and selects the same provider', function () {
+test('using() is an alias for with() and selects the same provider', function (): void {
     $driver = makeRefundCapableDriver('primary');
     $manager = managerWithDriver('primary', $driver);
 
@@ -114,7 +114,7 @@ test('using() is an alias for with() and selects the same provider', function ()
         ->and($driver->refundCalls)->toBe(1);
 });
 
-test('using() accepts an array of providers, like with()', function () {
+test('using() accepts an array of providers, like with()', function (): void {
     $driver = makeRefundCapableDriver('primary');
     $manager = managerWithDriver('primary', $driver);
 
@@ -123,7 +123,7 @@ test('using() accepts an array of providers, like with()', function () {
     expect($response->transactionReference)->toBe('txn_alias_array');
 });
 
-test('idempotency() generates a key when none is supplied', function () {
+test('idempotency() generates a key when none is supplied', function (): void {
     $captured = null;
     $driver = makeCapturingRefundDriver($captured);
     $manager = managerWithDriver('primary', $driver);
@@ -135,7 +135,7 @@ test('idempotency() generates a key when none is supplied', function () {
         ->and($captured->idempotencyKey)->not->toBe('');
 });
 
-test('idempotency() uses the caller-supplied key verbatim', function () {
+test('idempotency() uses the caller-supplied key verbatim', function (): void {
     $captured = null;
     $driver = makeCapturingRefundDriver($captured);
     $manager = managerWithDriver('primary', $driver);
@@ -145,27 +145,27 @@ test('idempotency() uses the caller-supplied key verbatim', function () {
     expect($captured->idempotencyKey)->toBe('my-stable-key');
 });
 
-test('refund() rejects a provider that does not support refunds', function () {
+test('refund() rejects a provider that does not support refunds', function (): void {
     $manager = managerWithDriver('nonrefundable', makeNonRefundableDriver());
 
-    expect(fn () => (new Refund($manager))->transaction('txn_x')->with('nonrefundable')->refund())
+    expect(fn (): RefundResponseDTO => (new Refund($manager))->transaction('txn_x')->with('nonrefundable')->refund())
         ->toThrow(PaymentException::class, 'does not support refunds');
 });
 
-test('fetch() rejects a provider that does not support refunds', function () {
+test('fetch() rejects a provider that does not support refunds', function (): void {
     $manager = managerWithDriver('nonrefundable', makeNonRefundableDriver());
 
-    expect(fn () => (new Refund($manager))->with('nonrefundable')->fetch('rf_1'))
+    expect(fn (): RefundResponseDTO => (new Refund($manager))->with('nonrefundable')->fetch('rf_1'))
         ->toThrow(PaymentException::class, 'does not support refunds');
 });
 
-test('fetch() returns the refund for a supporting provider', function () {
+test('fetch() returns the refund for a supporting provider', function (): void {
     $manager = managerWithDriver('primary', makeRefundCapableDriver('primary'));
 
     expect((new Refund($manager))->with('primary')->fetch('rf_1')->refundReference)->toBe('rf_1');
 });
 
-test('an ambiguous refund outcome is reported as unconfirmed and the lock is deliberately NOT released', function () {
+test('an ambiguous refund outcome is reported as unconfirmed and the lock is deliberately NOT released', function (): void {
     // A refund whose response was lost may already have moved money. The lock
     // must stay held so a retry cannot immediately re-issue it, and the error
     // must tell the caller to reconcile rather than retry.
@@ -173,26 +173,26 @@ test('an ambiguous refund outcome is reported as unconfirmed and the lock is del
     $driver = makeThrowingRefundDriver(new RefundException('refund failed', 0, $lost));
     $manager = managerWithDriver('primary', $driver);
 
-    expect(fn () => (new Refund($manager))->transaction('txn_ambiguous')->with('primary')->refund())
+    expect(fn (): RefundResponseDTO => (new Refund($manager))->transaction('txn_ambiguous')->with('primary')->refund())
         ->toThrow(RefundException::class, 'timed out or lost its response');
 
     // Still locked: a second attempt is refused rather than reaching the provider.
     expect(Cache::get('payzephyr:refund:inflight:txn_ambiguous'))->not->toBeNull();
 });
 
-test('a definitive refund failure releases the lock so a genuine retry is allowed', function () {
+test('a definitive refund failure releases the lock so a genuine retry is allowed', function (): void {
     // No previous network exception - the provider gave a real answer, so the
     // refund definitively did not happen and retrying is safe.
     $driver = makeThrowingRefundDriver(new RefundException('card declined'));
     $manager = managerWithDriver('primary', $driver);
 
-    expect(fn () => (new Refund($manager))->transaction('txn_definitive')->with('primary')->refund())
+    expect(fn (): RefundResponseDTO => (new Refund($manager))->transaction('txn_definitive')->with('primary')->refund())
         ->toThrow(RefundException::class, 'card declined');
 
     expect(Cache::get('payzephyr:refund:inflight:txn_definitive'))->toBeNull();
 });
 
-test('RefundStatus::label returns a human-readable label for every case', function () {
+test('RefundStatus::label returns a human-readable label for every case', function (): void {
     expect(RefundStatus::PENDING->label())->toBe('Pending')
         ->and(RefundStatus::PROCESSING->label())->toBe('Processing')
         ->and(RefundStatus::COMPLETED->label())->toBe('Completed')
@@ -200,7 +200,7 @@ test('RefundStatus::label returns a human-readable label for every case', functi
         ->and(RefundStatus::CANCELLED->label())->toBe('Cancelled');
 });
 
-test('updateOrCreateAtomic updates the existing row when the reference already exists', function () {
+test('updateOrCreateAtomic updates the existing row when the reference already exists', function (): void {
     $repo = new EloquentRefundRepository;
 
     $repo->updateOrCreateAtomic('rf_existing', [
@@ -217,7 +217,7 @@ test('updateOrCreateAtomic updates the existing row when the reference already e
         ->and(RefundTransaction::where('refund_reference', 'rf_existing')->first()->status)->toBe('completed');
 });
 
-test('updateOrCreateAtomic creates a row when the reference is new', function () {
+test('updateOrCreateAtomic creates a row when the reference is new', function (): void {
     $repo = new EloquentRefundRepository;
 
     $created = $repo->updateOrCreateAtomic('rf_brand_new', [

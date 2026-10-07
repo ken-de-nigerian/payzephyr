@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
@@ -27,17 +28,17 @@ function makeStripeDriverWithClient2(object $client): StripeDriver
 // createPlan - error branch
 // ---------------------------------------------------------------------
 
-test('stripe createPlan throws PlanException on API error', function () {
+test('stripe createPlan throws PlanException on API error', function (): void {
     $productsResource = new class
     {
-        public function create(array $params)
+        public function create(array $params): never
         {
             throw ApiConnectionException::factory('network down');
         }
     };
     $pricesResource = new class
     {
-        public function create(array $params) {}
+        public function create(array $params): void {}
     };
 
     $client = new class($productsResource, $pricesResource)
@@ -51,10 +52,10 @@ test('stripe createPlan throws PlanException on API error', function () {
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Failed to create plan');
 
-test('stripe createPlan maps daily, weekly and annually intervals', function (string $interval, string $stripeInterval) {
+test('stripe createPlan maps daily, weekly and annually intervals', function (string $interval, string $stripeInterval): void {
     $pricesResource = new class
     {
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj2([
                 'id' => 'price_123',
@@ -67,7 +68,7 @@ test('stripe createPlan maps daily, weekly and annually intervals', function (st
     };
     $productsResource = new class
     {
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj2(['id' => 'prod_123', 'name' => $params['name'] ?? '']);
         }
@@ -94,10 +95,10 @@ test('stripe createPlan maps daily, weekly and annually intervals', function (st
 // updatePlan
 // ---------------------------------------------------------------------
 
-test('stripe updatePlan updates the product name/description without changing the price', function () {
+test('stripe updatePlan updates the product name/description without changing the price', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -113,14 +114,14 @@ test('stripe updatePlan updates the product name/description without changing th
     {
         public array $updateCalls = [];
 
-        public function update($id, array $params)
+        public function update($id, array $params): object
         {
             $this->updateCalls[] = [$id, $params];
 
             return stripeObj2(['id' => $id, 'name' => $params['name'] ?? 'Old Name']);
         }
 
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'New Name']);
         }
@@ -138,10 +139,10 @@ test('stripe updatePlan updates the product name/description without changing th
         ->and($result->planCode)->toBe('price_abc');
 });
 
-test('stripe updatePlan creates a new price when the amount changes', function () {
+test('stripe updatePlan creates a new price when the amount changes', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -153,7 +154,7 @@ test('stripe updatePlan creates a new price when the amount changes', function (
             ]);
         }
 
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj2([
                 'id' => 'price_new',
@@ -166,7 +167,7 @@ test('stripe updatePlan creates a new price when the amount changes', function (
     };
     $productsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'Product']);
         }
@@ -185,12 +186,12 @@ test('stripe updatePlan creates a new price when the amount changes', function (
         ->and($result->interval)->toBe('annually');
 });
 
-test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in place', function () {
+test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in place', function (): void {
     $pricesResource = new class
     {
         public array $updateCalls = [];
 
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -202,7 +203,7 @@ test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in
             ]);
         }
 
-        public function update($id, array $params)
+        public function update($id, array $params): object
         {
             $this->updateCalls[] = [$id, $params];
 
@@ -217,7 +218,7 @@ test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in
     };
     $productsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'Product']);
         }
@@ -235,7 +236,7 @@ test('stripe updatePlan updates mutable attributes (metadata/active/nickname) in
         ->and($result->metadata)->toBe(['foo' => 'bar']);
 });
 
-test('stripe updatePlan casts non-string metadata values before sending them to Stripe', function () {
+test('stripe updatePlan casts non-string metadata values before sending them to Stripe', function (): void {
     // Regression: Stripe's metadata parameter is documented as
     // array<string, string>. This package's own DTOs/consumer input declare
     // metadata as array<string, mixed> (a general-purpose bag), so a
@@ -245,7 +246,7 @@ test('stripe updatePlan casts non-string metadata values before sending them to 
     {
         public array $updateCalls = [];
 
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -257,7 +258,7 @@ test('stripe updatePlan casts non-string metadata values before sending them to 
             ]);
         }
 
-        public function update($id, array $params)
+        public function update($id, array $params): object
         {
             $this->updateCalls[] = [$id, $params];
 
@@ -272,7 +273,7 @@ test('stripe updatePlan casts non-string metadata values before sending them to 
     };
     $productsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'Product']);
         }
@@ -293,10 +294,10 @@ test('stripe updatePlan casts non-string metadata values before sending them to 
         ->and($sentMetadata['active_flag'])->toBe('true');
 });
 
-test('stripe updatePlan returns the existing price unchanged when no mutable attributes are given', function () {
+test('stripe updatePlan returns the existing price unchanged when no mutable attributes are given', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -308,14 +309,14 @@ test('stripe updatePlan returns the existing price unchanged when no mutable att
             ]);
         }
 
-        public function update($id, array $params)
+        public function update($id, array $params): never
         {
             throw new RuntimeException('update should not be called');
         }
     };
     $productsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'Product']);
         }
@@ -332,10 +333,10 @@ test('stripe updatePlan returns the existing price unchanged when no mutable att
     expect($result->planCode)->toBe('price_abc');
 });
 
-test('stripe updatePlan throws PlanException on API error', function () {
+test('stripe updatePlan throws PlanException on API error', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): never
         {
             throw ApiConnectionException::factory('boom');
         }
@@ -355,10 +356,10 @@ test('stripe updatePlan throws PlanException on API error', function () {
 // fetchPlan - error branch
 // ---------------------------------------------------------------------
 
-test('stripe fetchPlan throws PlanException on API error', function () {
+test('stripe fetchPlan throws PlanException on API error', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): never
         {
             throw ApiConnectionException::factory('not found');
         }
@@ -378,10 +379,10 @@ test('stripe fetchPlan throws PlanException on API error', function () {
 // listPlans
 // ---------------------------------------------------------------------
 
-test('stripe listPlans returns a mapped list of plans', function () {
+test('stripe listPlans returns a mapped list of plans', function (): void {
     $pricesResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2([
                 'data' => [
@@ -412,10 +413,10 @@ test('stripe listPlans returns a mapped list of plans', function () {
         ->and($result['has_more'])->toBeFalse();
 });
 
-test('stripe listPlans logs a warning when page greater than one is requested', function () {
+test('stripe listPlans logs a warning when page greater than one is requested', function (): void {
     $pricesResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2(['data' => [], 'has_more' => false]);
         }
@@ -432,10 +433,10 @@ test('stripe listPlans logs a warning when page greater than one is requested', 
     expect($result['data'])->toBe([]);
 });
 
-test('stripe listPlans throws PlanException on API error', function () {
+test('stripe listPlans throws PlanException on API error', function (): void {
     $pricesResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): never
         {
             throw ApiConnectionException::factory('down');
         }
@@ -455,22 +456,22 @@ test('stripe listPlans throws PlanException on API error', function () {
 // createSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('stripe createSubscription throws SubscriptionException on API error', function () {
+test('stripe createSubscription throws SubscriptionException on API error', function (): void {
     $customersResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2(['data' => []]);
         }
 
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj2(['id' => 'cus_new', 'email' => $params['email']]);
         }
     };
     $subscriptionsResource = new class
     {
-        public function create(array $params, array $options = [])
+        public function create(array $params, array $options = []): never
         {
             throw ApiConnectionException::factory('down');
         }
@@ -491,10 +492,10 @@ test('stripe createSubscription throws SubscriptionException on API error', func
 // fetchSubscription
 // ---------------------------------------------------------------------
 
-test('stripe fetchSubscription retrieves and maps a subscription', function () {
+test('stripe fetchSubscription retrieves and maps a subscription', function (): void {
     $subscriptionsResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -526,10 +527,10 @@ test('stripe fetchSubscription retrieves and maps a subscription', function () {
         ->and($result->createdAt)->toBe('2024-12-01T00:00:00+00:00');
 });
 
-test('stripe fetchSubscription throws SubscriptionException on API error', function () {
+test('stripe fetchSubscription throws SubscriptionException on API error', function (): void {
     $subscriptionsResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): never
         {
             throw ApiConnectionException::factory('missing');
         }
@@ -549,10 +550,10 @@ test('stripe fetchSubscription throws SubscriptionException on API error', funct
 // cancelSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('stripe cancelSubscription throws SubscriptionException on API error', function () {
+test('stripe cancelSubscription throws SubscriptionException on API error', function (): void {
     $subscriptionsResource = new class
     {
-        public function cancel($id)
+        public function cancel($id): never
         {
             throw ApiConnectionException::factory('down');
         }
@@ -572,10 +573,10 @@ test('stripe cancelSubscription throws SubscriptionException on API error', func
 // enableSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('stripe enableSubscription throws SubscriptionException when the Stripe API errors', function () {
+test('stripe enableSubscription throws SubscriptionException when the Stripe API errors', function (): void {
     $subscriptionsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): never
         {
             throw ApiConnectionException::factory('down');
         }
@@ -595,10 +596,10 @@ test('stripe enableSubscription throws SubscriptionException when the Stripe API
 // listSubscriptions
 // ---------------------------------------------------------------------
 
-test('stripe listSubscriptions returns a mapped list without a customer filter', function () {
+test('stripe listSubscriptions returns a mapped list without a customer filter', function (): void {
     $subscriptionsResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             expect($params)->not->toHaveKey('customer');
 
@@ -629,17 +630,17 @@ test('stripe listSubscriptions returns a mapped list without a customer filter',
         ->and($result['has_more'])->toBeTrue();
 });
 
-test('stripe listSubscriptions filters by customer email when a matching customer is found', function () {
+test('stripe listSubscriptions filters by customer email when a matching customer is found', function (): void {
     $customersResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2(['data' => [['id' => 'cus_1', 'email' => $params['email']]]]);
         }
     };
     $subscriptionsResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             expect($params['customer'])->toBe('cus_1');
 
@@ -658,17 +659,17 @@ test('stripe listSubscriptions filters by customer email when a matching custome
     expect($result['data'])->toBe([]);
 });
 
-test('stripe listSubscriptions returns an empty list when the customer email is not found', function () {
+test('stripe listSubscriptions returns an empty list when the customer email is not found', function (): void {
     $customersResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2(['data' => []]);
         }
     };
     $subscriptionsResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): never
         {
             throw new RuntimeException('should not be called');
         }
@@ -685,10 +686,10 @@ test('stripe listSubscriptions returns an empty list when the customer email is 
     expect($result)->toBe(['data' => [], 'has_more' => false]);
 });
 
-test('stripe listSubscriptions logs a warning when page greater than one is requested', function () {
+test('stripe listSubscriptions logs a warning when page greater than one is requested', function (): void {
     $subscriptionsResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj2(['data' => [], 'has_more' => false]);
         }
@@ -705,10 +706,10 @@ test('stripe listSubscriptions logs a warning when page greater than one is requ
     expect($result['data'])->toBe([]);
 });
 
-test('stripe listSubscriptions throws SubscriptionException on API error', function () {
+test('stripe listSubscriptions throws SubscriptionException on API error', function (): void {
     $subscriptionsResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): never
         {
             throw ApiConnectionException::factory('down');
         }
@@ -728,12 +729,12 @@ test('stripe listSubscriptions throws SubscriptionException on API error', funct
 // mapIntervalFromStripe - day / week
 // ---------------------------------------------------------------------
 
-test('stripe fetchPlan maps day and week stripe intervals back to daily/weekly', function (string $stripeInterval, string $expected) {
+test('stripe fetchPlan maps day and week stripe intervals back to daily/weekly', function (string $stripeInterval, string $expected): void {
     $pricesResource = new class($stripeInterval)
     {
         public function __construct(private readonly string $interval) {}
 
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -764,12 +765,12 @@ test('stripe fetchPlan maps day and week stripe intervals back to daily/weekly',
 // mapStripeSubscriptionStatus
 // ---------------------------------------------------------------------
 
-test('stripe fetchSubscription maps trialing, incomplete and incomplete_expired statuses', function (string $stripeStatus, string $expected) {
+test('stripe fetchSubscription maps trialing, incomplete and incomplete_expired statuses', function (string $stripeStatus, string $expected): void {
     $subscriptionsResource = new class($stripeStatus)
     {
         public function __construct(private readonly string $status) {}
 
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2([
                 'id' => $id,
@@ -816,14 +817,14 @@ function stripePlanCloneClient(array $price): array
         /** @var array<int, array<string, mixed>> */
         public array $created = [];
 
-        public function __construct(private array $price) {}
+        public function __construct(private readonly array $price) {}
 
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj2(array_merge(['id' => $id], $this->price));
         }
 
-        public function create(array $params)
+        public function create(array $params): object
         {
             $this->created[] = $params;
 
@@ -839,7 +840,7 @@ function stripePlanCloneClient(array $price): array
 
     $products = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj2(['id' => $id, 'name' => 'Plan']);
         }
@@ -853,7 +854,7 @@ function stripePlanCloneClient(array $price): array
     return [$client, $prices];
 }
 
-test('changing only the interval of a tiered price is refused rather than creating a free plan', function () {
+test('changing only the interval of a tiered price is refused rather than creating a free plan', function (): void {
     [$client, $prices] = stripePlanCloneClient([
         'unit_amount' => null,
         'currency' => 'usd',
@@ -862,13 +863,13 @@ test('changing only the interval of a tiered price is refused rather than creati
         'product' => 'prod_123',
     ]);
 
-    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_tiered', ['interval' => 'annually']))
+    expect(fn (): PlanResponseDTO => makeStripeDriverWithClient2($client)->updatePlan('price_tiered', ['interval' => 'annually']))
         ->toThrow(PlanException::class, 'would create a free plan');
 
     expect($prices->created)->toBe([]);
 });
 
-test('changing the interval of a metered price is refused rather than making it licensed', function () {
+test('changing the interval of a metered price is refused rather than making it licensed', function (): void {
     [$client, $prices] = stripePlanCloneClient([
         'unit_amount' => 5,
         'currency' => 'usd',
@@ -877,13 +878,13 @@ test('changing the interval of a metered price is refused rather than making it 
         'product' => 'prod_123',
     ]);
 
-    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['interval' => 'annually']))
+    expect(fn (): PlanResponseDTO => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['interval' => 'annually']))
         ->toThrow(PlanException::class, 'metered plan');
 
     expect($prices->created)->toBe([]);
 });
 
-test('changing the amount of a metered price is refused as well', function () {
+test('changing the amount of a metered price is refused as well', function (): void {
     [$client, $prices] = stripePlanCloneClient([
         'unit_amount' => 5,
         'currency' => 'usd',
@@ -892,13 +893,13 @@ test('changing the amount of a metered price is refused as well', function () {
         'product' => 'prod_123',
     ]);
 
-    expect(fn () => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['amount' => 20.00]))
+    expect(fn (): PlanResponseDTO => makeStripeDriverWithClient2($client)->updatePlan('price_metered', ['amount' => 20.00]))
         ->toThrow(PlanException::class, 'metered plan');
 
     expect($prices->created)->toBe([]);
 });
 
-test('a tiered price can still be given a fixed amount explicitly', function () {
+test('a tiered price can still be given a fixed amount explicitly', function (): void {
     // The refusal is about PayZephyr inventing a number. Asked for one, it
     // creates the price as instructed.
     [$client, $prices] = stripePlanCloneClient([
@@ -915,7 +916,7 @@ test('a tiered price can still be given a fixed amount explicitly', function () 
         ->and($prices->created[0]['unit_amount'])->toBe(2500);
 });
 
-test('an ordinary licensed price still clones on an interval change', function () {
+test('an ordinary licensed price still clones on an interval change', function (): void {
     [$client, $prices] = stripePlanCloneClient([
         'unit_amount' => 1000,
         'currency' => 'usd',

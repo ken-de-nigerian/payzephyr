@@ -38,11 +38,11 @@ function publishedTraceMigrations(): array
     return glob(database_path('migrations/*_create_payment_trace_events_table.php')) ?: [];
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     traceInstallCleanState();
 });
 
-afterEach(function () {
+afterEach(function (): void {
     traceInstallCleanState();
 });
 
@@ -50,17 +50,17 @@ afterEach(function () {
 // The registry entry
 // ---------------------------------------------------------------------------
 
-test('trace is offered as an optional feature', function () {
+test('trace is offered as an optional feature', function (): void {
     expect(Features::optionalKeys())->toContain('trace')
         ->and(Features::exists('trace'))->toBeTrue();
 });
 
-test('trace resolves through the same parsing every other feature uses', function () {
+test('trace resolves through the same parsing every other feature uses', function (): void {
     expect(Features::parseList(' Trace , TRACE '))->toBe(['trace'])
         ->and(Features::resolveDependencies(['trace']))->toBe(['trace']);
 });
 
-test("the registry's migration pattern actually matches the shipped migration", function () {
+test("the registry's migration pattern actually matches the shipped migration", function (): void {
     // A typo here would make the installer publish nothing and report success.
     $pattern = Features::get('trace')['migrationPattern'];
     $shipped = glob(__DIR__.'/../../database/migrations/'.$pattern);
@@ -68,7 +68,7 @@ test("the registry's migration pattern actually matches the shipped migration", 
     expect($shipped)->toHaveCount(1);
 });
 
-test("the registry's table key resolves to the table the model actually uses", function () {
+test("the registry's table key resolves to the table the model actually uses", function (): void {
     // If these drift, uninstall drops the wrong table - or nothing at all.
     $feature = Features::get('trace');
     $configured = config('payments.'.$feature['tableConfigKey'], $feature['defaultTable']);
@@ -77,7 +77,7 @@ test("the registry's table key resolves to the table the model actually uses", f
         ->and($feature['defaultTable'])->toBe('payment_trace_events');
 });
 
-test("the registry's env var is the one the runtime flag reads", function () {
+test("the registry's env var is the one the runtime flag reads", function (): void {
     expect(Features::get('trace')['envVar'])->toBe('PAYZEPHYR_FEATURE_TRACE');
 });
 
@@ -85,31 +85,31 @@ test("the registry's env var is the one the runtime flag reads", function () {
 // Installing
 // ---------------------------------------------------------------------------
 
-test('installing trace publishes its migration', function () {
+test('installing trace publishes its migration', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
 
     expect(publishedTraceMigrations())->not->toBeEmpty();
 });
 
-test('installing another feature leaves trace alone', function () {
+test('installing another feature leaves trace alone', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'refunds']);
 
     expect(publishedTraceMigrations())->toBeEmpty();
 });
 
-test('trace is not installed unless it is asked for', function () {
+test('trace is not installed unless it is asked for', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true]);
 
     expect(publishedTraceMigrations())->toBeEmpty();
 });
 
-test('--all includes trace', function () {
+test('--all includes trace', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--all' => true]);
 
     expect(publishedTraceMigrations())->not->toBeEmpty();
 });
 
-test('installing trace records the flag the runtime actually reads', function () {
+test('installing trace records the flag the runtime actually reads', function (): void {
     File::put(app()->environmentFilePath(), "APP_ENV=testing\n");
 
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
@@ -117,7 +117,7 @@ test('installing trace records the flag the runtime actually reads', function ()
     expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_TRACE=true');
 });
 
-test('installing trace twice does not publish the migration twice', function () {
+test('installing trace twice does not publish the migration twice', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
     $first = publishedTraceMigrations();
 
@@ -131,7 +131,7 @@ test('installing trace twice does not publish the migration twice', function () 
 // Uninstalling
 // ---------------------------------------------------------------------------
 
-test('uninstalling trace drops its table and removes its migration', function () {
+test('uninstalling trace drops its table and removes its migration', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
     expect(Schema::hasTable('payment_trace_events'))->toBeTrue();
 
@@ -141,7 +141,7 @@ test('uninstalling trace drops its table and removes its migration', function ()
         ->and(publishedTraceMigrations())->toBeEmpty();
 });
 
-test('uninstalling trace clears the flag, so the app stops trying to write', function () {
+test('uninstalling trace clears the flag, so the app stops trying to write', function (): void {
     // Ordering note: removeResource() drops the table before clearing the
     // flag, so a live app briefly sees tracing on with no table behind it.
     // TraceRecorder::record() is guaranteed not to throw, which is what makes
@@ -153,7 +153,7 @@ test('uninstalling trace clears the flag, so the app stops trying to write', fun
     expect(File::get(app()->environmentFilePath()))->toContain('PAYZEPHYR_FEATURE_TRACE=false');
 });
 
-test('uninstalling another feature leaves the trace table standing', function () {
+test('uninstalling another feature leaves the trace table standing', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace,refunds']);
 
     Artisan::call('payzephyr:uninstall', ['--no-interaction' => true, '--force' => true, '--features' => 'refunds']);
@@ -166,7 +166,7 @@ test('uninstalling another feature leaves the trace table standing', function ()
 // Installed state and the runtime flag are separate things
 // ---------------------------------------------------------------------------
 
-test('publishing the migration does not by itself switch tracing on', function () {
+test('publishing the migration does not by itself switch tracing on', function (): void {
     // Installing creates the table; the flag is what makes PayZephyr write to
     // it. A published migration with the flag still off must stay silent.
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
@@ -178,7 +178,7 @@ test('publishing the migration does not by itself switch tracing on', function (
     expect(app(TraceRecorderInterface::class))->toBeInstanceOf(NullTraceRecorder::class);
 });
 
-test('with the table installed and the flag on, the real recorder is wired up', function () {
+test('with the table installed and the flag on, the real recorder is wired up', function (): void {
     Artisan::call('payzephyr:install', ['--no-interaction' => true, '--features' => 'trace']);
 
     config(['payments.features.trace' => true]);

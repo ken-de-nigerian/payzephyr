@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 
-test('payment transaction isFailed handles all failed status variations', function () {
+test('payment transaction isFailed handles all failed status variations', function (): void {
     $failedStatuses = ['failed', 'declined', 'rejected', 'cancelled', 'denied', 'voided', 'expired'];
 
     foreach ($failedStatuses as $status) {
@@ -11,7 +13,7 @@ test('payment transaction isFailed handles all failed status variations', functi
     }
 });
 
-test('payment transaction isPending handles all pending status variations', function () {
+test('payment transaction isPending handles all pending status variations', function (): void {
     $pendingStatuses = ['pending', 'processing', 'approved', 'created', 'saved'];
 
     foreach ($pendingStatuses as $status) {
@@ -20,7 +22,7 @@ test('payment transaction isPending handles all pending status variations', func
     }
 });
 
-test('payment transaction isSuccessful handles all success status variations', function () {
+test('payment transaction isSuccessful handles all success status variations', function (): void {
     $successStatuses = ['success', 'succeeded', 'completed', 'successful', 'paid'];
 
     foreach ($successStatuses as $status) {
@@ -29,7 +31,7 @@ test('payment transaction isSuccessful handles all success status variations', f
     }
 });
 
-test('payment transaction methods handle normalization when container unavailable', function () {
+test('payment transaction methods handle normalization when container unavailable', function (): void {
     $model = new PaymentTransaction(['status' => 'completed']);
 
     expect($model->isSuccessful())->toBeTrue();

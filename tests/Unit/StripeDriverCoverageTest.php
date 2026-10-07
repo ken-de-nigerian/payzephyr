@@ -1,10 +1,13 @@
 <?php
 
+use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\AuthenticationException;
 
-test('stripe driver mapFromCheckoutSession handles paid status', function () {
+test('stripe driver mapFromCheckoutSession handles paid status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -25,7 +28,6 @@ test('stripe driver mapFromCheckoutSession handles paid status', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromCheckoutSession');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $session);
 
@@ -34,7 +36,7 @@ test('stripe driver mapFromCheckoutSession handles paid status', function () {
         ->and($result->paidAt)->not->toBeNull();
 });
 
-test('stripe driver mapFromCheckoutSession handles unpaid status', function () {
+test('stripe driver mapFromCheckoutSession handles unpaid status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -54,7 +56,6 @@ test('stripe driver mapFromCheckoutSession handles unpaid status', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromCheckoutSession');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $session);
 
@@ -62,7 +63,7 @@ test('stripe driver mapFromCheckoutSession handles unpaid status', function () {
         ->and($result->paidAt)->toBeNull();
 });
 
-test('stripe driver mapFromCheckoutSession handles failed status', function () {
+test('stripe driver mapFromCheckoutSession handles failed status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -83,14 +84,13 @@ test('stripe driver mapFromCheckoutSession handles failed status', function () {
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromCheckoutSession');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $session);
 
     expect($result->status)->toBe('failed');
 });
 
-test('stripe driver mapFromCheckoutSession uses payment intent amount when amount_total missing', function () {
+test('stripe driver mapFromCheckoutSession uses payment intent amount when amount_total missing', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -112,14 +112,13 @@ test('stripe driver mapFromCheckoutSession uses payment intent amount when amoun
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromCheckoutSession');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $session);
 
     expect($result->amount)->toBe(200.0);
 });
 
-test('stripe driver mapFromPaymentIntent handles succeeded status', function () {
+test('stripe driver mapFromPaymentIntent handles succeeded status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -138,7 +137,6 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
@@ -147,7 +145,7 @@ test('stripe driver mapFromPaymentIntent handles succeeded status', function () 
         ->and($result->paidAt)->not->toBeNull();
 });
 
-test('stripe driver mapFromPaymentIntent uses id when metadata reference missing', function () {
+test('stripe driver mapFromPaymentIntent uses id when metadata reference missing', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -166,14 +164,13 @@ test('stripe driver mapFromPaymentIntent uses id when metadata reference missing
 
     $reflection = new \ReflectionClass($driver);
     $method = $reflection->getMethod('mapFromPaymentIntent');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, $intent);
 
     expect($result->reference)->toBe('pi_test_123');
 });
 
-test('stripe driver healthCheck returns true for authentication exception', function () {
+test('stripe driver healthCheck returns true for authentication exception', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -191,7 +188,7 @@ test('stripe driver healthCheck returns true for authentication exception', func
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('stripe driver healthCheck returns true for 4xx errors', function () {
+test('stripe driver healthCheck returns true for 4xx errors', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -212,7 +209,7 @@ test('stripe driver healthCheck returns true for 4xx errors', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('stripe driver healthCheck returns false for 5xx errors', function () {
+test('stripe driver healthCheck returns false for 5xx errors', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -234,7 +231,7 @@ test('stripe driver healthCheck returns false for 5xx errors', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('stripe refuses a checkout session that came back without a url', function () {
+test('stripe refuses a checkout session that came back without a url', function (): void {
     // Only a hosted session has somewhere to send the customer. Passing a
     // null on as the authorization url surfaced as a TypeError from the DTO.
     $driver = new StripeDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['USD']]);
@@ -245,13 +242,13 @@ test('stripe refuses a checkout session that came back without a url', function 
     $stripe->checkout = (object) ['sessions' => $sessions];
     $driver->setStripeClient($stripe);
 
-    expect(fn () => $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+    expect(fn (): ChargeResponseDTO => $driver->charge(ChargeRequestDTO::fromArray([
         'amount' => 10, 'currency' => 'USD', 'email' => 'a@b.test',
         'reference' => 'STRIPE_NO_URL', 'callback_url' => 'https://shop.example.com/cb',
-    ])))->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ChargeException::class, 'without a URL to redirect the customer to');
+    ])))->toThrow(ChargeException::class, 'without a URL to redirect the customer to');
 });
 
-test('stripe sends metadata as strings, with nested values as json', function () {
+test('stripe sends metadata as strings, with nested values as json', function (): void {
     // Stripe metadata is string to string. A nested value sent as it is
     // becomes nested form fields, and Stripe rejects the whole charge.
     $driver = new StripeDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['USD']]);
@@ -267,7 +264,7 @@ test('stripe sends metadata as strings, with nested values as json', function ()
     $stripe->checkout = (object) ['sessions' => $sessions];
     $driver->setStripeClient($stripe);
 
-    $driver->charge(\KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO::fromArray([
+    $driver->charge(ChargeRequestDTO::fromArray([
         'amount' => 10, 'currency' => 'USD', 'email' => 'a@b.test',
         'reference' => 'STRIPE_META', 'callback_url' => 'https://shop.example.com/cb',
         'metadata' => ['order_id' => 991, 'gift' => true, 'note' => null, 'cart' => ['sku' => 'A1', 'qty' => 2], 'ratio' => 1.5],

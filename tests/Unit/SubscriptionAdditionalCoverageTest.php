@@ -34,7 +34,6 @@ function makeAdditionalCoverageManager(string $provider, DriverInterface $driver
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, [$provider => $driver]);
 
     config(['payments.default' => $provider]);
@@ -42,7 +41,7 @@ function makeAdditionalCoverageManager(string $provider, DriverInterface $driver
     return $manager;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     // Most of these tests bypass validation on purpose: we're targeting the
     // Subscription class's own fluent setters / guard clauses / hook
     // dispatch, not SubscriptionValidator (which is covered elsewhere).
@@ -52,11 +51,11 @@ beforeEach(function () {
 
 // ==================== Fluent setter coverage ====================
 
-test('subscription authorization() forwards the authorization code to the request', function () {
+test('subscription authorization() forwards the authorization code to the request', function (): void {
     $driver = Mockery::mock(AdditionalCoverageSubscriptionDriver::class);
     $driver->shouldReceive('createSubscription')
         ->once()
-        ->andReturnUsing(function (SubscriptionRequestDTO $request) {
+        ->andReturnUsing(function (SubscriptionRequestDTO $request): SubscriptionResponseDTO {
             expect($request->authorization)->toBe('AUTH_1234567890');
 
             return new SubscriptionResponseDTO(
@@ -81,11 +80,11 @@ test('subscription authorization() forwards the authorization code to the reques
         ->and($result->subscriptionCode)->toBe('SUB_123');
 });
 
-test('subscription callbackUrl() forwards the callback url to the request', function () {
+test('subscription callbackUrl() forwards the callback url to the request', function (): void {
     $driver = Mockery::mock(AdditionalCoverageSubscriptionDriver::class);
     $driver->shouldReceive('createSubscription')
         ->once()
-        ->andReturnUsing(function (SubscriptionRequestDTO $request) {
+        ->andReturnUsing(function (SubscriptionRequestDTO $request): SubscriptionResponseDTO {
             expect($request->callbackUrl)->toBe('https://example.com/callback');
 
             return new SubscriptionResponseDTO(
@@ -109,11 +108,11 @@ test('subscription callbackUrl() forwards the callback url to the request', func
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription idempotency() forwards an explicit key to the request', function () {
+test('subscription idempotency() forwards an explicit key to the request', function (): void {
     $driver = Mockery::mock(AdditionalCoverageSubscriptionDriver::class);
     $driver->shouldReceive('createSubscription')
         ->once()
-        ->andReturnUsing(function (SubscriptionRequestDTO $request) {
+        ->andReturnUsing(function (SubscriptionRequestDTO $request): SubscriptionResponseDTO {
             expect($request->idempotencyKey)->toBe('my-explicit-key');
 
             return new SubscriptionResponseDTO(
@@ -137,11 +136,11 @@ test('subscription idempotency() forwards an explicit key to the request', funct
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription idempotency() generates a uuid when no key is given', function () {
+test('subscription idempotency() generates a uuid when no key is given', function (): void {
     $driver = Mockery::mock(AdditionalCoverageSubscriptionDriver::class);
     $driver->shouldReceive('createSubscription')
         ->once()
-        ->andReturnUsing(function (SubscriptionRequestDTO $request) {
+        ->andReturnUsing(function (SubscriptionRequestDTO $request): SubscriptionResponseDTO {
             expect($request->idempotencyKey)
                 ->toBeString()
                 ->toMatch('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i');
@@ -169,12 +168,12 @@ test('subscription idempotency() generates a uuid when no key is given', functio
 
 // ==================== Lifecycle hooks coverage ====================
 
-test('subscription create() invokes beforeSubscriptionCreate and afterSubscriptionCreate hooks', function () {
+test('subscription create() invokes beforeSubscriptionCreate and afterSubscriptionCreate hooks', function (): void {
     $driver = Mockery::mock(AdditionalCoverageHooksSubscriptionDriver::class);
 
     $driver->shouldReceive('beforeSubscriptionCreate')
         ->once()
-        ->andReturnUsing(fn (SubscriptionRequestDTO $request) => $request);
+        ->andReturnUsing(fn (SubscriptionRequestDTO $request): SubscriptionRequestDTO => $request);
 
     $response = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_123',
@@ -198,12 +197,12 @@ test('subscription create() invokes beforeSubscriptionCreate and afterSubscripti
     expect($result)->toBe($response);
 });
 
-test('subscription create() sends the request returned by beforeSubscriptionCreate, not the original', function () {
+test('subscription create() sends the request returned by beforeSubscriptionCreate, not the original', function (): void {
     $driver = Mockery::mock(AdditionalCoverageHooksSubscriptionDriver::class);
 
     $driver->shouldReceive('beforeSubscriptionCreate')
         ->once()
-        ->andReturnUsing(fn (SubscriptionRequestDTO $request) => new SubscriptionRequestDTO(
+        ->andReturnUsing(fn (SubscriptionRequestDTO $request): SubscriptionRequestDTO => new SubscriptionRequestDTO(
             customer: $request->customer,
             plan: $request->plan,
             metadata: ['modified_by_hook' => true],
@@ -211,7 +210,7 @@ test('subscription create() sends the request returned by beforeSubscriptionCrea
 
     $driver->shouldReceive('createSubscription')
         ->once()
-        ->andReturnUsing(function (SubscriptionRequestDTO $request) {
+        ->andReturnUsing(function (SubscriptionRequestDTO $request): SubscriptionResponseDTO {
             expect($request->metadata)->toBe(['modified_by_hook' => true]);
 
             return new SubscriptionResponseDTO(
@@ -236,7 +235,7 @@ test('subscription create() sends the request returned by beforeSubscriptionCrea
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription cancel() invokes beforeSubscriptionCancel and afterSubscriptionCancel hooks', function () {
+test('subscription cancel() invokes beforeSubscriptionCancel and afterSubscriptionCancel hooks', function (): void {
     $driver = Mockery::mock(AdditionalCoverageHooksSubscriptionDriver::class);
 
     $driver->shouldReceive('beforeSubscriptionCancel')->once()->with('SUB_123');
@@ -265,7 +264,7 @@ test('subscription cancel() invokes beforeSubscriptionCancel and afterSubscripti
 // createPlan() already has coverage for this guard elsewhere; the remaining
 // six subscription-management methods each guard independently.
 
-test('subscription fetch() throws when the provider does not support subscriptions', function () {
+test('subscription fetch() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -273,7 +272,7 @@ test('subscription fetch() throws when the provider does not support subscriptio
     $subscription->code('SUB_123')->fetch();
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription cancel() throws when the provider does not support subscriptions', function () {
+test('subscription cancel() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -281,7 +280,7 @@ test('subscription cancel() throws when the provider does not support subscripti
     $subscription->code('SUB_123')->cancel('token_12345');
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription enable() throws when the provider does not support subscriptions', function () {
+test('subscription enable() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -289,7 +288,7 @@ test('subscription enable() throws when the provider does not support subscripti
     $subscription->code('SUB_123')->enable('token_12345');
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription list() throws when the provider does not support subscriptions', function () {
+test('subscription list() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -297,7 +296,7 @@ test('subscription list() throws when the provider does not support subscription
     $subscription->list();
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription updatePlan() throws when the provider does not support subscriptions', function () {
+test('subscription updatePlan() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -305,7 +304,7 @@ test('subscription updatePlan() throws when the provider does not support subscr
     $subscription->plan('PLN_123')->planUpdates(['name' => 'New Name'])->updatePlan();
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription fetchPlan() throws when the provider does not support subscriptions', function () {
+test('subscription fetchPlan() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);
@@ -313,7 +312,7 @@ test('subscription fetchPlan() throws when the provider does not support subscri
     $subscription->plan('PLN_123')->fetchPlan();
 })->throws(PaymentException::class, 'Provider [paystack] does not support subscriptions');
 
-test('subscription listPlans() throws when the provider does not support subscriptions', function () {
+test('subscription listPlans() throws when the provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $manager = makeAdditionalCoverageManager('paystack', $driver);
     $subscription = new Subscription($manager);

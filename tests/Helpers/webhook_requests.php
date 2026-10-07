@@ -21,9 +21,9 @@ function makeWebhookRequestFor(string $provider, string $body, array $headers = 
         $base->headers->set($key, $value);
     }
 
-    $request = new class($base, $body, $provider) extends WebhookRequest
+    return new class($base, $body, $provider) extends WebhookRequest
     {
-        public function __construct(private readonly Request $base, private readonly string $body, private readonly string $provider)
+        public function __construct(Request $base, private readonly string $body, private readonly string $provider)
         {
             parent::__construct(
                 $base->query->all(),
@@ -47,8 +47,6 @@ function makeWebhookRequestFor(string $provider, string $body, array $headers = 
             return $param === 'provider' ? $this->provider : $default;
         }
     };
-
-    return $request;
 }
 
 /**

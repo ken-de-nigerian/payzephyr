@@ -1,8 +1,11 @@
 <?php
 
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use Stripe\Exception\InvalidRequestException;
 
@@ -20,7 +23,7 @@ function createMockStripeDriver(object $stripeMock): StripeDriver
     return $driver;
 }
 
-test('stripe charge succeeds', function () {
+test('stripe charge succeeds', function (): void {
     $sessionMock = (object) [
         'id' => 'cs_test_123',
         'url' => 'https://checkout.stripe.com/pay/cs_test_123',
@@ -31,7 +34,7 @@ test('stripe charge succeeds', function () {
     {
         public function __construct(private readonly object $session) {}
 
-        public function create()
+        public function create(): object
         {
             return $this->session;
         }
@@ -58,10 +61,10 @@ test('stripe charge succeeds', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('stripe charge handles api error', function () {
+test('stripe charge handles api error', function (): void {
     $sessionsService = new class
     {
-        public function create()
+        public function create(): never
         {
             throw new InvalidRequestException('Invalid currency', 400);
         }
@@ -79,11 +82,11 @@ test('stripe charge handles api error', function () {
 
     $driver = createMockStripeDriver($stripeMock);
 
-    expect(fn () => $driver->charge(new ChargeRequestDTO(100, 'USD', 'test@example.com', null, 'https://example.com/callback')))
+    expect(fn (): ChargeResponseDTO => $driver->charge(new ChargeRequestDTO(100, 'USD', 'test@example.com', null, 'https://example.com/callback')))
         ->toThrow(ChargeException::class);
 });
 
-test('stripe verify returns success', function () {
+test('stripe verify returns success', function (): void {
     $intentMock = (object) [
         'id' => 'pi_test_123',
         'status' => 'succeeded',
@@ -99,7 +102,7 @@ test('stripe verify returns success', function () {
     {
         public function __construct(private readonly object $intent) {}
 
-        public function retrieve()
+        public function retrieve(): object
         {
             return $this->intent;
         }
@@ -107,7 +110,7 @@ test('stripe verify returns success', function () {
 
     $sessionsService = new class
     {
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => []];
         }
@@ -131,7 +134,7 @@ test('stripe verify returns success', function () {
         ->and($result->isSuccessful())->toBeTrue();
 });
 
-test('stripe verify returns failed', function () {
+test('stripe verify returns failed', function (): void {
     $intentMock = (object) [
         'id' => 'pi_test_123',
         'status' => 'canceled',
@@ -145,7 +148,7 @@ test('stripe verify returns failed', function () {
     {
         public function __construct(private readonly object $intent) {}
 
-        public function retrieve()
+        public function retrieve(): object
         {
             return $this->intent;
         }
@@ -153,7 +156,7 @@ test('stripe verify returns failed', function () {
 
     $sessionsService = new class
     {
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => []];
         }
@@ -175,15 +178,15 @@ test('stripe verify returns failed', function () {
     expect($result->isFailed())->toBeTrue();
 });
 
-test('stripe verify handles not found', function () {
+test('stripe verify handles not found', function (): void {
     $paymentIntents = new class
     {
-        public function retrieve()
+        public function retrieve(): never
         {
             throw new InvalidRequestException('No such payment_intent', 404);
         }
 
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => []];
         }
@@ -191,7 +194,7 @@ test('stripe verify handles not found', function () {
 
     $sessionsService = new class
     {
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => []];
         }
@@ -212,13 +215,13 @@ test('stripe verify handles not found', function () {
     $driver->verify('stripe_nonexistent');
 })->throws(VerificationException::class);
 
-test('stripe charge wraps a non-SDK exception in a ChargeException', function () {
+test('stripe charge wraps a non-SDK exception in a ChargeException', function (): void {
     // Stripe's charge() previously caught only ApiErrorException, so anything
     // else - an unexpectedly-shaped SDK object, a TypeError - propagated raw
     // instead of as the ChargeException callers classify on.
     $sessionsService = new class
     {
-        public function create()
+        public function create(): never
         {
             throw new RuntimeException('unexpected SDK shape');
         }
@@ -237,10 +240,10 @@ test('stripe charge wraps a non-SDK exception in a ChargeException', function ()
     $driver = createMockStripeDriver($stripeMock);
     $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'ref_x', 'https://example.com/callback');
 
-    expect(fn () => $driver->charge($request))->toThrow(ChargeException::class);
+    expect(fn (): ChargeResponseDTO => $driver->charge($request))->toThrow(ChargeException::class);
 });
 
-test('stripe charge still surfaces a missing callback URL as a configuration error', function () {
+test('stripe charge still surfaces a missing callback URL as a configuration error', function (): void {
     // InvalidConfigurationException is a sibling of ChargeException, not a
     // subclass - the broad Throwable catch must not swallow it into a generic
     // charge failure.
@@ -273,14 +276,14 @@ test('stripe charge still surfaces a missing callback URL as a configuration err
 
     $request = new ChargeRequestDTO(10000, 'USD', 'test@example.com', 'ref_no_cb');
 
-    expect(fn () => $driver->charge($request))
-        ->toThrow(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class);
+    expect(fn (): ChargeResponseDTO => $driver->charge($request))
+        ->toThrow(InvalidConfigurationException::class);
 });
 
-test('stripe verify wraps a non-SDK exception in a VerificationException', function () {
+test('stripe verify wraps a non-SDK exception in a VerificationException', function (): void {
     $sessionsService = new class
     {
-        public function retrieve()
+        public function retrieve(): never
         {
             throw new RuntimeException('unexpected SDK shape');
         }
@@ -298,5 +301,5 @@ test('stripe verify wraps a non-SDK exception in a VerificationException', funct
 
     $driver = createMockStripeDriver($stripeMock);
 
-    expect(fn () => $driver->verify('cs_test_123'))->toThrow(VerificationException::class);
+    expect(fn (): VerificationResponseDTO => $driver->verify('cs_test_123'))->toThrow(VerificationException::class);
 });

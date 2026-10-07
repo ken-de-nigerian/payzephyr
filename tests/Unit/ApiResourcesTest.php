@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\Http\Resources\ChargeResource;
 use KenDeNigerian\PayZephyr\Http\Resources\PlanResource;
 use KenDeNigerian\PayZephyr\Http\Resources\VerificationResource;
 
-test('charge resource transforms dto correctly', function () {
+test('charge resource transforms dto correctly', function (): void {
     $dto = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://paystack.com/checkout/ref_123',
@@ -34,18 +34,18 @@ test('charge resource transforms dto correctly', function () {
         ->and($array['amount']['currency'])->toBe('NGN');
 });
 
-test('verification resource transforms dto correctly', function () {
+test('verification resource transforms dto correctly', function (): void {
     $dto = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'success',
         amount: 10000.0,
         currency: 'NGN',
-        channel: 'card',
+        paidAt: now()->toIso8601String(),
         metadata: [
             'amount' => 10000,
             'currency' => 'NGN',
         ],
-        paidAt: now()->toIso8601String()
+        channel: 'card'
     );
 
     $resource = new VerificationResource($dto);
@@ -59,15 +59,14 @@ test('verification resource transforms dto correctly', function () {
         ->and($array['verified_at'])->not->toBeNull();
 });
 
-test('verification resource handles null paid_at', function () {
+test('verification resource handles null paid_at', function (): void {
     $dto = new VerificationResponseDTO(
         reference: 'ref_123',
         status: 'pending',
         amount: 0.0,
         currency: 'NGN',
-        channel: 'card',
         metadata: [],
-        paidAt: null
+        channel: 'card'
     );
 
     $resource = new VerificationResource($dto);
@@ -76,14 +75,14 @@ test('verification resource handles null paid_at', function () {
     expect($array['paid_at'])->toBeNull();
 });
 
-test('charge resource includes provider when available', function () {
+test('charge resource includes provider when available', function (): void {
     $dto = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://paystack.com/checkout/ref_123',
         accessCode: 'access_123',
         status: 'pending',
-        provider: 'paystack',
-        metadata: []
+        metadata: [],
+        provider: 'paystack'
     );
 
     $resource = new ChargeResource($dto);
@@ -92,7 +91,7 @@ test('charge resource includes provider when available', function () {
     expect($array['provider'])->toBe('paystack');
 });
 
-test('charge resource handles missing amount in metadata', function () {
+test('charge resource handles missing amount in metadata', function (): void {
     $dto = new ChargeResponseDTO(
         reference: 'ref_123',
         authorizationUrl: 'https://paystack.com/checkout/ref_123',
@@ -108,7 +107,7 @@ test('charge resource handles missing amount in metadata', function () {
         ->and($array['amount']['currency'])->toBeNull();
 });
 
-test('plan resource transforms dto correctly', function () {
+test('plan resource transforms dto correctly', function (): void {
     $dto = new PlanResponseDTO(
         planCode: 'PLN_abc123xyz',
         name: 'Monthly Premium',
@@ -136,17 +135,14 @@ test('plan resource transforms dto correctly', function () {
         ->and($array['provider'])->toBe('paystack');
 });
 
-test('plan resource handles null values', function () {
+test('plan resource handles null values', function (): void {
     $dto = new PlanResponseDTO(
         planCode: 'PLN_abc123xyz',
         name: 'Basic Plan',
         amount: 1000.0,
         interval: 'monthly',
         currency: 'NGN',
-        description: null,
-        invoiceLimit: null,
-        metadata: [],
-        provider: null
+        metadata: []
     );
 
     $resource = new PlanResource($dto);

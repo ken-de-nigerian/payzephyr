@@ -30,7 +30,7 @@ function makeSquareRefundDriver(array $responses, ?array &$history = null): Squa
     return $driver;
 }
 
-test('square refund succeeds with an explicit amount, without looking up the original payment', function () {
+test('square refund succeeds with an explicit amount, without looking up the original payment', function (): void {
     $history = [];
     $driver = makeSquareRefundDriver([
         new Response(200, [], json_encode([
@@ -54,7 +54,7 @@ test('square refund succeeds with an explicit amount, without looking up the ori
         ->and($history)->toHaveCount(1);
 });
 
-test('a full square refund (no explicit amount) fetches the original payment to determine amount_money', function () {
+test('a full square refund (no explicit amount) fetches the original payment to determine amount_money', function (): void {
     // Regression: Square's CreateRefund API requires amount_money
     // unconditionally - there is no "omit amount for a full refund"
     // semantics the way Stripe/Paystack/PayPal/Mollie/Flutterwave work.
@@ -92,7 +92,7 @@ test('a full square refund (no explicit amount) fetches the original payment to 
     expect($result->amount)->toBe(123.45);
 });
 
-test('a full square refund fails clearly when the original payment cannot be looked up', function () {
+test('a full square refund fails clearly when the original payment cannot be looked up', function (): void {
     $driver = makeSquareRefundDriver([
         new Response(200, [], json_encode(['errors' => [['detail' => 'Payment not found', 'code' => 'NOT_FOUND']]])),
     ]);
@@ -100,7 +100,7 @@ test('a full square refund fails clearly when the original payment cannot be loo
     $driver->refund(new RefundRequestDTO(transactionReference: 'payment_missing'));
 })->throws(RefundException::class, "Cannot issue a full refund for Square payment [payment_missing]: the original payment's amount could not be determined");
 
-test('square refund sends the explicit request currency, not just the first configured currency', function () {
+test('square refund sends the explicit request currency, not just the first configured currency', function (): void {
     // The merchant is configured for USD *and* CAD (multi-currency), and
     // the original charge being refunded was in CAD - if the driver fell
     // back to config['currencies'][0] ('USD') instead of the request's
@@ -126,7 +126,7 @@ test('square refund sends the explicit request currency, not just the first conf
         ->and($result->currency)->toBe('CAD');
 });
 
-test('square refund throws exception on api error', function () {
+test('square refund throws exception on api error', function (): void {
     $driver = makeSquareRefundDriver([
         new Response(200, [], json_encode(['errors' => [['detail' => 'Payment not found', 'code' => 'NOT_FOUND']]])),
     ]);
@@ -137,7 +137,7 @@ test('square refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'invalid', amount: 10.0));
 })->throws(RefundException::class, 'Payment not found');
 
-test('square fetchRefund succeeds with valid response', function () {
+test('square fetchRefund succeeds with valid response', function (): void {
     $driver = makeSquareRefundDriver([
         new Response(200, [], json_encode([
             'refund' => [

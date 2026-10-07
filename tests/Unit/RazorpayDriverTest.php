@@ -8,6 +8,7 @@ use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\RazorpayDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -26,11 +27,11 @@ function razorpayLinkCreatedResponse(): Response
     ]));
 }
 
-test('razorpay driver requires both the key id and the key secret', function () {
+test('razorpay driver requires both the key id and the key secret', function (): void {
     new RazorpayDriver(['key_id' => 'rzp_test_key']);
 })->throws(InvalidConfigurationException::class, 'Razorpay key id and key secret are required');
 
-test('razorpay driver authenticates with http basic auth', function () {
+test('razorpay driver authenticates with http basic auth', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
 
     $method = (new ReflectionClass($driver))->getMethod('getDefaultHeaders');
@@ -39,7 +40,7 @@ test('razorpay driver authenticates with http basic auth', function () {
         ->toBe('Basic '.base64_encode('rzp_test_key:test_key_secret'));
 });
 
-test('razorpay charge creates a payment link and returns its short url', function () {
+test('razorpay charge creates a payment link and returns its short url', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $response = $driver->charge(new ChargeRequestDTO(
@@ -73,7 +74,7 @@ test('razorpay charge creates a payment link and returns its short url', functio
         ->and($request->hasHeader('Idempotency-Key'))->toBeFalse();
 });
 
-test('razorpay charge omits the callback when none is given', function () {
+test('razorpay charge omits the callback when none is given', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com'));
@@ -84,7 +85,7 @@ test('razorpay charge omits the callback when none is given', function () {
         ->and($body)->not->toHaveKey('callback_method');
 });
 
-test('razorpay charge converts amounts using the currency exponent', function (string $currency, float $amount, int $expected) {
+test('razorpay charge converts amounts using the currency exponent', function (string $currency, float $amount, int $expected): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $driver->charge(new ChargeRequestDTO(amount: $amount, currency: $currency, email: 'buyer@example.com'));
@@ -98,7 +99,7 @@ test('razorpay charge converts amounts using the currency exponent', function (s
     'three-decimal KWD keeps a trailing zero' => ['KWD', 99.991, 99990],
 ]);
 
-test('razorpay charge sends customer name and contact when provided', function () {
+test('razorpay charge sends customer name and contact when provided', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $driver->charge(new ChargeRequestDTO(
@@ -117,7 +118,7 @@ test('razorpay charge sends customer name and contact when provided', function (
     ]);
 });
 
-test('razorpay charge caps notes at fifteen scalar pairs', function () {
+test('razorpay charge caps notes at fifteen scalar pairs', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $metadata = [];
@@ -133,7 +134,7 @@ test('razorpay charge caps notes at fifteen scalar pairs', function () {
         ->and(strlen($notes['key_1']))->toBe(256);
 });
 
-test('razorpay charge generates a RAZORPAY_ reference within the reference_id limit', function () {
+test('razorpay charge generates a RAZORPAY_ reference within the reference_id limit', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()]);
 
     $response = $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com'));
@@ -142,10 +143,10 @@ test('razorpay charge generates a RAZORPAY_ reference within the reference_id li
         ->and(strlen($response->reference))->toBeLessThanOrEqual(40);
 });
 
-test('razorpay charge rejects a reference longer than 40 characters without calling razorpay', function () {
+test('razorpay charge rejects a reference longer than 40 characters without calling razorpay', function (): void {
     $driver = RazorpayDriverTestHelper::driver([], $history);
 
-    expect(fn () => $driver->charge(new ChargeRequestDTO(
+    expect(fn (): ChargeResponseDTO => $driver->charge(new ChargeRequestDTO(
         amount: 10,
         currency: 'INR',
         email: 'buyer@example.com',
@@ -155,7 +156,7 @@ test('razorpay charge rejects a reference longer than 40 characters without call
     expect($history)->toBeEmpty();
 });
 
-test('razorpay charge throws when the response has no checkout url', function () {
+test('razorpay charge throws when the response has no checkout url', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['id' => 'plink_Abc123', 'status' => 'created'])),
     ]);
@@ -163,7 +164,7 @@ test('razorpay charge throws when the response has no checkout url', function ()
     $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com'));
 })->throws(ChargeException::class, 'did not return a payment link id and checkout URL');
 
-test('razorpay charge throws when the response has no payment link id', function () {
+test('razorpay charge throws when the response has no payment link id', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['short_url' => 'https://rzp.io/i/abc123'])),
     ]);
@@ -171,7 +172,7 @@ test('razorpay charge throws when the response has no payment link id', function
     $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com'));
 })->throws(ChargeException::class, 'did not return a payment link id and checkout URL');
 
-test('a razorpay rejection is a definitive charge failure, not an ambiguous one', function () {
+test('a razorpay rejection is a definitive charge failure, not an ambiguous one', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(400, [], json_encode(['error' => [
             'code' => 'BAD_REQUEST_ERROR',
@@ -191,7 +192,7 @@ test('a razorpay rejection is a definitive charge failure, not an ambiguous one'
         ->and($exception->getMessage())->toContain('Razorpay: reference_id already exists');
 });
 
-test('a razorpay rejection without an error description keeps the generic message', function () {
+test('a razorpay rejection without an error description keeps the generic message', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(400, [], 'not json'),
     ]);
@@ -207,7 +208,7 @@ test('a razorpay rejection without an error description keeps the generic messag
         ->and($exception->getMessage())->not->toContain('Razorpay:');
 });
 
-test('a razorpay charge that loses its response is ambiguous', function () {
+test('a razorpay charge that loses its response is ambiguous', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new RequestException('Operation timed out', new Request('POST', '/v1/payment_links')),
     ]);
@@ -223,7 +224,7 @@ test('a razorpay charge that loses its response is ambiguous', function () {
         ->and($exception->isAmbiguousProviderOutcome())->toBeTrue();
 });
 
-test('razorpay charge maps channels to the payment link checkout methods', function () {
+test('razorpay charge maps channels to the payment link checkout methods', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $driver->charge(new ChargeRequestDTO(
@@ -243,7 +244,7 @@ test('razorpay charge maps channels to the payment link checkout methods', funct
     ]]]);
 });
 
-test('razorpay verify fetches a payment link by its id', function () {
+test('razorpay verify fetches a payment link by its id', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(RazorpayDriverTestHelper::paymentLink())),
     ], $history);
@@ -263,7 +264,7 @@ test('razorpay verify fetches a payment link by its id', function () {
         ->and($result->provider)->toBe('razorpay');
 });
 
-test('razorpay verify looks a payment link up by reference, then re-fetches it by id for its payments', function () {
+test('razorpay verify looks a payment link up by reference, then re-fetches it by id for its payments', function (): void {
     // Razorpay's list endpoint returns payments: [] even for a paid link.
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['payment_links' => [RazorpayDriverTestHelper::paymentLink(['payments' => []])]])),
@@ -282,7 +283,7 @@ test('razorpay verify looks a payment link up by reference, then re-fetches it b
         ->and($result->channel)->toBe('upi');
 });
 
-test('razorpay verify throws when the reference lookup returns a link without an id', function () {
+test('razorpay verify throws when the reference lookup returns a link without an id', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['payment_links' => [['reference_id' => 'ORDER_1001']]])),
     ]);
@@ -290,7 +291,7 @@ test('razorpay verify throws when the reference lookup returns a link without an
     $driver->verify('ORDER_1001');
 })->throws(VerificationException::class, 'without an id');
 
-test('razorpay verify throws when no payment link matches the reference', function () {
+test('razorpay verify throws when no payment link matches the reference', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['payment_links' => []])),
     ]);
@@ -298,7 +299,7 @@ test('razorpay verify throws when no payment link matches the reference', functi
     $driver->verify('ORDER_MISSING');
 })->throws(VerificationException::class, 'found 0');
 
-test('razorpay verify throws when razorpay returns an error', function () {
+test('razorpay verify throws when razorpay returns an error', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(404, [], json_encode(['error' => ['code' => 'BAD_REQUEST_ERROR', 'description' => 'The id provided does not exist']])),
     ]);
@@ -306,7 +307,7 @@ test('razorpay verify throws when razorpay returns an error', function () {
     $driver->verify('plink_Missing');
 })->throws(VerificationException::class, 'Razorpay: The id provided does not exist');
 
-test('razorpay verify normalizes payment link statuses', function (string $linkStatus, string $expected) {
+test('razorpay verify normalizes payment link statuses', function (string $linkStatus, string $expected): void {
     $link = RazorpayDriverTestHelper::paymentLink(['status' => $linkStatus, 'payments' => []]);
     $driver = RazorpayDriverTestHelper::driver([new Response(200, [], json_encode($link))]);
 
@@ -322,7 +323,7 @@ test('razorpay verify normalizes payment link statuses', function (string $linkS
     ['cancelled', 'failed'],
 ]);
 
-test('razorpay webhook validation accepts a correctly signed, fresh event', function () {
+test('razorpay webhook validation accepts a correctly signed, fresh event', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
     $body = json_encode(RazorpayDriverTestHelper::paymentLinkWebhook());
 
@@ -331,7 +332,7 @@ test('razorpay webhook validation accepts a correctly signed, fresh event', func
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('razorpay webhook validation rejects a wrong signature', function () {
+test('razorpay webhook validation rejects a wrong signature', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
     $body = json_encode(RazorpayDriverTestHelper::paymentLinkWebhook());
 
@@ -340,13 +341,13 @@ test('razorpay webhook validation rejects a wrong signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('razorpay webhook validation rejects a missing signature header', function () {
+test('razorpay webhook validation rejects a missing signature header', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
 
     expect($driver->validateWebhook([], json_encode(RazorpayDriverTestHelper::paymentLinkWebhook())))->toBeFalse();
 });
 
-test('razorpay webhook validation rejects every event when no webhook secret is configured', function () {
+test('razorpay webhook validation rejects every event when no webhook secret is configured', function (): void {
     $driver = RazorpayDriverTestHelper::driver(config: ['webhook_secret' => null]);
     $body = json_encode(RazorpayDriverTestHelper::paymentLinkWebhook());
 
@@ -355,7 +356,7 @@ test('razorpay webhook validation rejects every event when no webhook secret is 
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('razorpay webhook validation accepts a signed event whose created_at is long past', function () {
+test('razorpay webhook validation accepts a signed event whose created_at is long past', function (): void {
     // Regression: Razorpay's envelope created_at is the link's creation time, so
     // a link paid an hour after creation is delivered with an hour-old value.
     $driver = RazorpayDriverTestHelper::driver();
@@ -366,7 +367,7 @@ test('razorpay webhook validation accepts a signed event whose created_at is lon
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('razorpay webhook validation rejects a correctly signed body that is not a json object', function () {
+test('razorpay webhook validation rejects a correctly signed body that is not a json object', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
     $body = 'not json';
 
@@ -375,7 +376,7 @@ test('razorpay webhook validation rejects a correctly signed body that is not a 
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('razorpay extracts reference, status, channel and event id from payment link events', function () {
+test('razorpay extracts reference, status, channel and event id from payment link events', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
     $payload = RazorpayDriverTestHelper::paymentLinkWebhook(createdAt: 1757000100);
 
@@ -385,7 +386,7 @@ test('razorpay extracts reference, status, channel and event id from payment lin
         ->and($driver->extractWebhookEventId($payload))->toBe('payment_link.paid:plink_Abc123:pay_Abc123');
 });
 
-test('razorpay refund events never carry a transaction reference or status', function () {
+test('razorpay refund events never carry a transaction reference or status', function (): void {
     // Regression guard: refund and payment events reach the same endpoint, and
     // a refund's "processed" must not be written over the payment's status.
     $driver = RazorpayDriverTestHelper::driver();
@@ -396,13 +397,13 @@ test('razorpay refund events never carry a transaction reference or status', fun
         ->and($driver->extractWebhookEventId($payload))->toBe('refund.processed:rfnd_Abc123:pay_Abc123');
 });
 
-test('razorpay event id falls back to the content hash when no entity id is present', function () {
+test('razorpay event id falls back to the content hash when no entity id is present', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
 
     expect($driver->extractWebhookEventId(['event' => 'payment_link.paid', 'payload' => []]))->toBeNull();
 });
 
-test('razorpay event id for an event without a payment keys on the link alone', function () {
+test('razorpay event id for an event without a payment keys on the link alone', function (): void {
     $driver = RazorpayDriverTestHelper::driver();
 
     $payload = [
@@ -413,7 +414,7 @@ test('razorpay event id for an event without a payment keys on the link alone', 
     expect($driver->extractWebhookEventId($payload))->toBe('payment_link.cancelled:plink_Abc123');
 });
 
-test('a razorpay payment_link.paid webhook marks the logged transaction successful', function () {
+test('a razorpay payment_link.paid webhook marks the logged transaction successful', function (): void {
     PaymentTransaction::create([
         'reference' => 'ORDER_1001',
         'provider' => 'razorpay',
@@ -431,7 +432,7 @@ test('a razorpay payment_link.paid webhook marks the logged transaction successf
         ->and($transaction->channel)->toBe('upi');
 });
 
-test('a replayed razorpay webhook with an old created_at is accepted once and deduplicated', function () {
+test('a replayed razorpay webhook with an old created_at is accepted once and deduplicated', function (): void {
     PaymentTransaction::create([
         'reference' => 'ORDER_1001',
         'provider' => 'razorpay',
@@ -456,7 +457,7 @@ test('a replayed razorpay webhook with an old created_at is accepted once and de
         ->and(WebhookEvent::where('provider', 'razorpay')->count())->toBe(1);
 });
 
-test('razorpay health check passes when the api responds', function () {
+test('razorpay health check passes when the api responds', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new Response(200, [], json_encode(['payment_links' => []])),
     ], $history);
@@ -465,7 +466,7 @@ test('razorpay health check passes when the api responds', function () {
         ->and($history[0]['request']->getUri()->getPath())->toBe('/v1/payment_links');
 });
 
-test('razorpay health check treats a 400 as reachable', function () {
+test('razorpay health check treats a 400 as reachable', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new ClientException('Bad Request', new Request('GET', '/v1/payment_links'), new Response(400)),
     ]);
@@ -473,7 +474,7 @@ test('razorpay health check treats a 400 as reachable', function () {
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('razorpay health check fails on bad credentials', function () {
+test('razorpay health check fails on bad credentials', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new ClientException('Unauthorized', new Request('GET', '/v1/payment_links'), new Response(401)),
     ]);
@@ -481,7 +482,7 @@ test('razorpay health check fails on bad credentials', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('razorpay health check fails when razorpay cannot be reached', function () {
+test('razorpay health check fails when razorpay cannot be reached', function (): void {
     $driver = RazorpayDriverTestHelper::driver([
         new ConnectException('Connection refused', new Request('GET', '/v1/payment_links')),
     ]);
@@ -489,7 +490,7 @@ test('razorpay health check fails when razorpay cannot be reached', function () 
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('every currency is billed with the exponent Razorpay uses for it', function (string $currency, int $exponent) {
+test('every currency is billed with the exponent Razorpay uses for it', function (string $currency, int $exponent): void {
     // Each code is pinned: dropping one from a list would bill it a hundred
     // (or ten) times too much or too little.
     $driver = RazorpayDriverTestHelper::driver();
@@ -502,7 +503,7 @@ test('every currency is billed with the exponent Razorpay uses for it', function
     ['INR', 2], ['USD', 2],
 ]);
 
-test('razorpay charge accepts a reference of exactly 40 characters', function () {
+test('razorpay charge accepts a reference of exactly 40 characters', function (): void {
     $driver = RazorpayDriverTestHelper::driver([razorpayLinkCreatedResponse()], $history);
 
     $driver->charge(new ChargeRequestDTO(amount: 10, currency: 'INR', email: 'buyer@example.com', reference: str_repeat('A', 40)));

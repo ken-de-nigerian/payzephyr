@@ -21,7 +21,7 @@ function makeFlutterwaveSubscriptionDriver(array $responses): FlutterwaveDriver
     return $driver;
 }
 
-test('flutterwave createPlan creates a payment plan', function () {
+test('flutterwave createPlan creates a payment plan', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -48,7 +48,7 @@ test('flutterwave createPlan creates a payment plan', function () {
         ->and($result->interval)->toBe('monthly');
 });
 
-test('flutterwave createSubscription requires an authorization (card token)', function () {
+test('flutterwave createSubscription requires an authorization (card token)', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([]);
 
     $request = new SubscriptionRequestDTO(customer: 'test@example.com', plan: '3807');
@@ -56,7 +56,7 @@ test('flutterwave createSubscription requires an authorization (card token)', fu
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Flutterwave requires an existing card token');
 
-test('flutterwave createSubscription charges the token then locates the resulting subscription', function () {
+test('flutterwave createSubscription charges the token then locates the resulting subscription', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -90,7 +90,7 @@ test('flutterwave createSubscription charges the token then locates the resultin
         ->and($result->plan)->toBe('3807');
 });
 
-test('flutterwave cancelSubscription calls the cancel endpoint then re-fetches', function () {
+test('flutterwave cancelSubscription calls the cancel endpoint then re-fetches', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([
         new Response(200, [], json_encode(['status' => 'success', 'data' => []])),
         new Response(200, [], json_encode([
@@ -111,7 +111,7 @@ test('flutterwave cancelSubscription calls the cancel endpoint then re-fetches',
         ->and($result->isCancelled())->toBeTrue();
 });
 
-test('flutterwave enableSubscription calls the activate endpoint then re-fetches', function () {
+test('flutterwave enableSubscription calls the activate endpoint then re-fetches', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([
         new Response(200, [], json_encode(['status' => 'success', 'data' => []])),
         new Response(200, [], json_encode([
@@ -132,7 +132,7 @@ test('flutterwave enableSubscription calls the activate endpoint then re-fetches
         ->and($result->isActive())->toBeTrue();
 });
 
-test('flutterwave listSubscriptions filters by customer email client-side', function () {
+test('flutterwave listSubscriptions filters by customer email client-side', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver([
         new Response(200, [], json_encode([
             'status' => 'success',

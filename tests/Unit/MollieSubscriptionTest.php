@@ -22,7 +22,7 @@ function makeMollieSubscriptionDriver(array $responses): MollieDriver
     return $driver;
 }
 
-test('mollie createPlan encodes the plan client-side without an API call', function () {
+test('mollie createPlan encodes the plan client-side without an API call', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $plan = new SubscriptionPlanDTO('Pro Plan', 10, 'monthly', 'EUR');
@@ -39,19 +39,19 @@ test('mollie createPlan encodes the plan client-side without an API call', funct
         ->and($fetched->amount)->toBe(10.0);
 });
 
-test('mollie fetchPlan rejects an invalid plan code', function () {
+test('mollie fetchPlan rejects an invalid plan code', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $driver->fetchPlan('not-a-valid-plan-code');
 })->throws(PlanException::class, 'Invalid Mollie plan code');
 
-test('mollie listPlans throws because there is no server-side plan storage', function () {
+test('mollie listPlans throws because there is no server-side plan storage', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $driver->listPlans();
 })->throws(PlanException::class, 'Mollie has no server-side plan storage');
 
-test('mollie createSubscription requires an authorization (mandate id)', function () {
+test('mollie createSubscription requires an authorization (mandate id)', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $plan = $driver->createPlan(new SubscriptionPlanDTO('Pro Plan', 10, 'monthly', 'EUR'));
@@ -60,7 +60,7 @@ test('mollie createSubscription requires an authorization (mandate id)', functio
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Mollie requires an existing mandate ID');
 
-test('mollie createSubscription finds or creates a customer then creates the subscription', function () {
+test('mollie createSubscription finds or creates a customer then creates the subscription', function (): void {
     $driver = makeMollieSubscriptionDriver([
         new Response(200, [], json_encode(['_embedded' => ['customers' => []]])),
         new Response(200, [], json_encode(['id' => 'cst_1', 'email' => 'test@example.com'])),
@@ -88,7 +88,7 @@ test('mollie createSubscription finds or creates a customer then creates the sub
         ->and($result->amount)->toBe(10.0);
 });
 
-test('mollie cancelSubscription decodes the composite subscription code and calls DELETE', function () {
+test('mollie cancelSubscription decodes the composite subscription code and calls DELETE', function (): void {
     $driver = makeMollieSubscriptionDriver([
         new Response(200, [], json_encode([
             'id' => 'sub_1',
@@ -105,25 +105,25 @@ test('mollie cancelSubscription decodes the composite subscription code and call
         ->and($result->isCancelled())->toBeTrue();
 });
 
-test('mollie cancelSubscription rejects a malformed subscription code', function () {
+test('mollie cancelSubscription rejects a malformed subscription code', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $driver->cancelSubscription(new SubscriptionActionDTO('sub_1'));
 })->throws(SubscriptionException::class, 'Invalid Mollie subscription code');
 
-test('mollie enableSubscription always throws - Mollie has no resume', function () {
+test('mollie enableSubscription always throws - Mollie has no resume', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $driver->enableSubscription(new SubscriptionActionDTO('cst_1:sub_1'));
 })->throws(SubscriptionException::class, 'cannot be re-enabled on Mollie');
 
-test('mollie listSubscriptions requires a customer', function () {
+test('mollie listSubscriptions requires a customer', function (): void {
     $driver = makeMollieSubscriptionDriver([]);
 
     $driver->listSubscriptions();
 })->throws(SubscriptionException::class, 'listed per-customer');
 
-test('mollie listSubscriptions returns subscriptions for a found customer', function () {
+test('mollie listSubscriptions returns subscriptions for a found customer', function (): void {
     $driver = makeMollieSubscriptionDriver([
         new Response(200, [], json_encode([
             '_embedded' => ['customers' => [['id' => 'cst_1', 'email' => 'test@example.com']]],

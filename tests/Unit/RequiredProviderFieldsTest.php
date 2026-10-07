@@ -94,27 +94,27 @@ function requiredFieldsDriver(): object
 // Present values pass straight through
 // ---------------------------------------------------------------------------
 
-test('a present field is returned unchanged', function () {
+test('a present field is returned unchanged', function (): void {
     expect(requiredFieldsDriver()->field(['reference' => 'PZ_1'], 'reference'))->toBe('PZ_1');
 });
 
-test('a numeric string is accepted as a string, because providers send both', function () {
+test('a numeric string is accepted as a string, because providers send both', function (): void {
     expect(requiredFieldsDriver()->str(['currency' => 'NGN'], 'currency'))->toBe('NGN')
         ->and(requiredFieldsDriver()->str(['code' => 200], 'code'))->toBe('200');
 });
 
-test('an amount is returned as a float whether it arrived as one or not', function () {
+test('an amount is returned as a float whether it arrived as one or not', function (): void {
     expect(requiredFieldsDriver()->money(['amount' => 20000], 'amount'))->toBe(20000.0)
         ->and(requiredFieldsDriver()->money(['amount' => '199.99'], 'amount'))->toBe(199.99);
 });
 
-test('a genuine zero amount is still allowed through', function () {
+test('a genuine zero amount is still allowed through', function (): void {
     // The guard is against *absence*, not against zero. A provider that
     // reports a zero-value authorization is telling us something real.
     expect(requiredFieldsDriver()->money(['amount' => 0], 'amount'))->toBe(0.0);
 });
 
-test('a nested array is returned for mapping', function () {
+test('a nested array is returned for mapping', function (): void {
     expect(requiredFieldsDriver()->arr(['amount' => ['total' => 1]], 'amount'))->toBe(['total' => 1]);
 });
 
@@ -122,26 +122,26 @@ test('a nested array is returned for mapping', function () {
 // Absence is refused, loudly and by name
 // ---------------------------------------------------------------------------
 
-test('a missing field names the provider, the field and the operation', function () {
+test('a missing field names the provider, the field and the operation', function (): void {
     expect(fn () => requiredFieldsDriver()->field([], 'reference'))
         ->toThrow(ChargeException::class, 'omitted the required field [reference]');
 });
 
-test('a null field is treated as missing', function () {
+test('a null field is treated as missing', function (): void {
     // Providers send explicit nulls as readily as they omit keys, and the
     // consequence is identical.
     expect(fn () => requiredFieldsDriver()->field(['reference' => null], 'reference'))
         ->toThrow(ChargeException::class, 'omitted the required field [reference]');
 });
 
-test('a missing field warns that the request may still have been accepted', function () {
+test('a missing field warns that the request may still have been accepted', function (): void {
     // The conservative reading. The provider call already happened, so the
     // caller must not assume nothing occurred just because mapping failed.
     expect(fn () => requiredFieldsDriver()->field([], 'reference'))
         ->toThrow(ChargeException::class, 'verify before retrying');
 });
 
-test('the failure carries machine-readable context', function () {
+test('the failure carries machine-readable context', function (): void {
     try {
         requiredFieldsDriver()->field([], 'reference');
     } catch (ChargeException $e) {
@@ -157,40 +157,40 @@ test('the failure carries machine-readable context', function () {
     $this->fail('Expected a ChargeException.');
 });
 
-test('a non-string value where a string is required is refused', function () {
+test('a non-string value where a string is required is refused', function (): void {
     expect(fn () => requiredFieldsDriver()->str(['currency' => ['NGN']], 'currency'))
         ->toThrow(ChargeException::class, 'returned a non-string value for [currency]');
 });
 
-test('a missing amount is refused rather than defaulted to zero', function () {
+test('a missing amount is refused rather than defaulted to zero', function (): void {
     // The single most important assertion in this file.
     expect(fn () => requiredFieldsDriver()->money([], 'amount'))
         ->toThrow(ChargeException::class, 'omitted the required field [amount]');
 });
 
-test('a non-numeric amount is refused', function () {
+test('a non-numeric amount is refused', function (): void {
     expect(fn () => requiredFieldsDriver()->money(['amount' => 'not money'], 'amount'))
         ->toThrow(ChargeException::class, 'returned a non-numeric amount for [amount]');
 });
 
-test('an absent amount value is refused, for providers that return objects', function () {
+test('an absent amount value is refused, for providers that return objects', function (): void {
     // The Stripe path: the value is read off an SDK object before it can be
     // checked, so the guard has to accept the value rather than the array.
     expect(fn () => requiredFieldsDriver()->moneyValue(null))
         ->toThrow(ChargeException::class, 'omitted the amount [amount]');
 });
 
-test('an absent amount value explains why zero is not an acceptable substitute', function () {
+test('an absent amount value explains why zero is not an acceptable substitute', function (): void {
     expect(fn () => requiredFieldsDriver()->moneyValue(null))
         ->toThrow(ChargeException::class, 'Reporting this as a zero-value payment would be worse than failing');
 });
 
-test('a non-numeric amount value is refused', function () {
+test('a non-numeric amount value is refused', function (): void {
     expect(fn () => requiredFieldsDriver()->moneyValue('not money'))
         ->toThrow(ChargeException::class, 'returned a non-numeric amount for [amount]');
 });
 
-test('a scalar where a nested block is required is refused', function () {
+test('a scalar where a nested block is required is refused', function (): void {
     // OPay returns `amount` as {total, currency}. A fixture that passed it as
     // a scalar produced an amount of 0.0 and a test that still passed, because
     // nothing asserted the amount.
@@ -198,7 +198,7 @@ test('a scalar where a nested block is required is refused', function () {
         ->toThrow(ChargeException::class, 'returned a non-array value for [amount]');
 });
 
-test('a missing nested block is refused', function () {
+test('a missing nested block is refused', function (): void {
     expect(fn () => requiredFieldsDriver()->arr([], 'amount_money'))
         ->toThrow(ChargeException::class, 'omitted the required field [amount_money]');
 });

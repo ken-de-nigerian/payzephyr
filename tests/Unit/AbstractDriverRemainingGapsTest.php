@@ -2,12 +2,17 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Log;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
+use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 
 /**
  * Targets the remaining uncovered lines in AbstractDriver that are not
@@ -52,14 +57,14 @@ function makeGapTestDriver(array $config = ['currencies' => ['NGN']]): AbstractD
     };
 }
 
-afterEach(function () {
+afterEach(function (): void {
     config(['payments.logging.enabled' => true, 'payments.logging.channel' => null]);
     app()->forgetInstance('payments.config');
 });
 
 // ==================== getIdempotencyHeader() default (line 176) ====================
 
-test('abstract driver default getIdempotencyHeader returns Idempotency-Key header', function () {
+test('abstract driver default getIdempotencyHeader returns Idempotency-Key header', function (): void {
     $driver = makeGapTestDriver();
 
     $reflection = new ReflectionClass($driver);
@@ -72,7 +77,7 @@ test('abstract driver default getIdempotencyHeader returns Idempotency-Key heade
 
 // ==================== log() disabled early return (line 278) ====================
 
-test('abstract driver log does nothing when logging is disabled', function () {
+test('abstract driver log does nothing when logging is disabled', function (): void {
     config(['payments.logging.enabled' => false]);
     app()->forgetInstance('payments.config');
 
@@ -91,7 +96,7 @@ test('abstract driver log does nothing when logging is disabled', function () {
 
 // ==================== log() invalid channel fallback (lines 286-287) ====================
 
-test('abstract driver log falls back to default logger when configured channel is invalid', function () {
+test('abstract driver log falls back to default logger when configured channel is invalid', function (): void {
     config([
         'payments.logging.enabled' => true,
         'payments.logging.channel' => 'nonexistent_channel_xyz',
@@ -119,7 +124,7 @@ test('abstract driver log falls back to default logger when configured channel i
 
 // ==================== setSubscriptionRepository() (lines 401-403) ====================
 
-test('abstract driver setSubscriptionRepository stores a custom repository and returns self', function () {
+test('abstract driver setSubscriptionRepository stores a custom repository and returns self', function (): void {
     $driver = makeGapTestDriver();
     $repository = Mockery::mock(SubscriptionRepositoryInterface::class);
 
@@ -135,7 +140,7 @@ test('abstract driver setSubscriptionRepository stores a custom repository and r
 
 // ==================== extractWebhookReference/Status/Channel defaults (lines 438-463) ====================
 
-test('abstract driver default extractWebhookReference reads the reference key', function () {
+test('abstract driver default extractWebhookReference reads the reference key', function (): void {
     $driver = makeGapTestDriver();
 
     expect($driver->extractWebhookReference(['reference' => 'REF_123']))->toBe('REF_123')
@@ -143,7 +148,7 @@ test('abstract driver default extractWebhookReference reads the reference key', 
         ->and($driver->extractWebhookReference([]))->toBeNull();
 });
 
-test('abstract driver default extractWebhookStatus reads the status key', function () {
+test('abstract driver default extractWebhookStatus reads the status key', function (): void {
     $driver = makeGapTestDriver();
 
     expect($driver->extractWebhookStatus(['status' => 'success']))->toBe('success')
@@ -151,7 +156,7 @@ test('abstract driver default extractWebhookStatus reads the status key', functi
         ->and($driver->extractWebhookStatus([]))->toBe('unknown');
 });
 
-test('abstract driver default extractWebhookChannel reads the channel key', function () {
+test('abstract driver default extractWebhookChannel reads the channel key', function (): void {
     $driver = makeGapTestDriver();
 
     expect($driver->extractWebhookChannel(['channel' => 'card']))->toBe('card')
@@ -159,7 +164,7 @@ test('abstract driver default extractWebhookChannel reads the channel key', func
         ->and($driver->extractWebhookChannel([]))->toBeNull();
 });
 
-test('a charge still succeeds when both the payments channel and the default logger throw', function () {
+test('a charge still succeeds when both the payments channel and the default logger throw', function (): void {
     // A full disk or a broken log handler must never turn a payment the
     // provider accepted into an exception the caller sees as a failure.
     config(['payments.logging.enabled' => true, 'payments.logging.channel' => 'payments']);
@@ -168,9 +173,9 @@ test('a charge still succeeds when both the payments channel and the default log
     Log::shouldReceive('channel')->andThrow(new InvalidArgumentException('Log channel [payments] is not defined.'));
     Log::shouldReceive('info')->andThrow(new RuntimeException('disk full'));
 
-    $driver = new \KenDeNigerian\PayZephyr\Drivers\PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create(new \GuzzleHttp\Handler\MockHandler([
-        new \GuzzleHttp\Psr7\Response(200, [], (string) json_encode([
+    $driver = new PaystackDriver(['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
+    $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
+        new Response(200, [], (string) json_encode([
             'status' => true,
             'data' => ['authorization_url' => 'https://checkout.paystack.com/abc', 'access_code' => 'abc', 'reference' => 'REF_LOGFAIL'],
         ])),

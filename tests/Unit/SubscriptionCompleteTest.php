@@ -8,6 +8,8 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
@@ -22,7 +24,7 @@ use Tests\Helpers\SubscriptionTestHelper;
 
 // ==================== Subscription Fluent API Tests ====================
 
-test('subscription fluent api with() method sets provider', function () {
+test('subscription fluent api with() method sets provider', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $result = $subscription->with('paystack');
@@ -30,7 +32,7 @@ test('subscription fluent api with() method sets provider', function () {
     expect($result)->toBe($subscription);
 });
 
-test('subscription fluent api using() method sets provider', function () {
+test('subscription fluent api using() method sets provider', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $result = $subscription->using('paystack');
@@ -38,7 +40,7 @@ test('subscription fluent api using() method sets provider', function () {
     expect($result)->toBe($subscription);
 });
 
-test('subscription fluent api with() accepts array of providers', function () {
+test('subscription fluent api with() accepts array of providers', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $result = $subscription->with(['paystack', 'stripe']);
@@ -46,7 +48,7 @@ test('subscription fluent api with() accepts array of providers', function () {
     expect($result)->toBe($subscription);
 });
 
-test('subscription fluent api methods can be chained', function () {
+test('subscription fluent api methods can be chained', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -71,20 +73,19 @@ test('subscription fluent api methods can be chained', function () {
 
 // ==================== Plan Creation Tests ====================
 
-test('subscription createPlan validates plan data is set', function () {
+test('subscription createPlan validates plan data is set', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->createPlan();
 })->throws(PaymentException::class, 'Plan data is required');
 
-test('subscription createPlan requires provider to support subscriptions', function () {
+test('subscription createPlan requires provider to support subscriptions', function (): void {
     // Create a driver that doesn't support subscriptions
-    $nonSubscriptionDriver = Mockery::mock('KenDeNigerian\PayZephyr\Contracts\DriverInterface');
+    $nonSubscriptionDriver = Mockery::mock(DriverInterface::class);
 
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $nonSubscriptionDriver;
     $driversProperty->setValue($manager, $drivers);
@@ -96,7 +97,7 @@ test('subscription createPlan requires provider to support subscriptions', funct
     $subscription->planData($planDTO)->createPlan();
 })->throws(PaymentException::class, 'does not support subscriptions');
 
-test('subscription createPlan handles network errors', function () {
+test('subscription createPlan handles network errors', function (): void {
     $mock = new MockHandler([
         new ConnectException('Connection timeout', new Request('POST', '/plan')),
     ]);
@@ -108,7 +109,6 @@ test('subscription createPlan handles network errors', function () {
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $driver;
     $driversProperty->setValue($manager, $drivers);
@@ -120,7 +120,7 @@ test('subscription createPlan handles network errors', function () {
     $subscription->planData($planDTO)->createPlan();
 })->throws(PlanException::class);
 
-test('subscription createPlan handles invalid response structure', function () {
+test('subscription createPlan handles invalid response structure', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -133,7 +133,7 @@ test('subscription createPlan handles invalid response structure', function () {
     $subscription->planData($planDTO)->createPlan();
 })->throws(PlanException::class);
 
-test('subscription createPlan handles missing data in response', function () {
+test('subscription createPlan handles missing data in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -145,18 +145,18 @@ test('subscription createPlan handles missing data in response', function () {
 
     $result = $subscription->planData($planDTO)->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
 // ==================== Plan Retrieval Tests ====================
 
-test('subscription getPlan requires plan code', function () {
+test('subscription getPlan requires plan code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->fetchPlan();
 })->throws(PaymentException::class, 'Plan code is required');
 
-test('subscription getPlan handles plan not found', function () {
+test('subscription getPlan handles plan not found', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -167,7 +167,7 @@ test('subscription getPlan handles plan not found', function () {
     $subscription->plan('PLN_nonexistent')->fetchPlan();
 })->throws(PlanException::class);
 
-test('subscription getPlan handles unauthorized access', function () {
+test('subscription getPlan handles unauthorized access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(401, [], json_encode([
             'status' => false,
@@ -180,19 +180,19 @@ test('subscription getPlan handles unauthorized access', function () {
 
 // ==================== Plan Update Tests ====================
 
-test('subscription updatePlan requires plan code', function () {
+test('subscription updatePlan requires plan code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->planUpdates(['name' => 'New Name'])->updatePlan();
 })->throws(PaymentException::class, 'Plan code is required');
 
-test('subscription updatePlan requires plan updates', function () {
+test('subscription updatePlan requires plan updates', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->plan('PLN_123')->updatePlan();
 })->throws(PaymentException::class, 'Plan updates are required');
 
-test('subscription updatePlan handles invalid updates', function () {
+test('subscription updatePlan handles invalid updates', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -207,7 +207,7 @@ test('subscription updatePlan handles invalid updates', function () {
 
 // ==================== Plan Listing Tests ====================
 
-test('subscription listPlans handles empty response', function () {
+test('subscription listPlans handles empty response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -220,7 +220,7 @@ test('subscription listPlans handles empty response', function () {
     expect($result)->toBe(['data' => [], 'meta' => null]);
 });
 
-test('subscription listPlans respects pagination', function () {
+test('subscription listPlans respects pagination', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -233,7 +233,7 @@ test('subscription listPlans respects pagination', function () {
     expect($result)->toBeArray();
 });
 
-test('subscription listPlans handles pagination edge cases', function () {
+test('subscription listPlans handles pagination edge cases', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -262,19 +262,19 @@ test('subscription listPlans handles pagination edge cases', function () {
 
 // ==================== Subscription Creation Tests ====================
 
-test('subscription create validates customer is set', function () {
+test('subscription create validates customer is set', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->plan('PLN_123')->create();
 })->throws(InvalidArgumentException::class, 'Customer is required');
 
-test('subscription create validates plan is set', function () {
+test('subscription create validates plan is set', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->customer('test@example.com')->create();
 })->throws(InvalidArgumentException::class, 'Plan is required');
 
-test('subscription create handles invalid customer email', function () {
+test('subscription create handles invalid customer email', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -288,7 +288,7 @@ test('subscription create handles invalid customer email', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription create handles invalid plan code', function () {
+test('subscription create handles invalid plan code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -301,7 +301,7 @@ test('subscription create handles invalid plan code', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription create handles missing authorization code when required', function () {
+test('subscription create handles missing authorization code when required', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -315,7 +315,7 @@ test('subscription create handles missing authorization code when required', fun
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription create handles duplicate subscription attempt', function () {
+test('subscription create handles duplicate subscription attempt', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(409, [], json_encode([
@@ -329,7 +329,7 @@ test('subscription create handles duplicate subscription attempt', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription create handles rate limiting', function () {
+test('subscription create handles rate limiting', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(429, [], json_encode([
@@ -345,13 +345,13 @@ test('subscription create handles rate limiting', function () {
 
 // ==================== Subscription Retrieval Tests ====================
 
-test('subscription get requires subscription code', function () {
+test('subscription get requires subscription code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->fetch();
 })->throws(PaymentException::class, 'Subscription code is required');
 
-test('subscription get handles subscription not found', function () {
+test('subscription get handles subscription not found', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -362,7 +362,7 @@ test('subscription get handles subscription not found', function () {
     $subscription->code('SUB_nonexistent')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription get handles unauthorized access', function () {
+test('subscription get handles unauthorized access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -373,7 +373,7 @@ test('subscription get handles unauthorized access', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription get handles malformed response', function () {
+test('subscription get handles malformed response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], 'invalid json'),
     ]);
@@ -383,13 +383,13 @@ test('subscription get handles malformed response', function () {
 
 // ==================== Subscription Cancellation Tests ====================
 
-test('subscription cancel requires subscription code', function () {
+test('subscription cancel requires subscription code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->cancel();
 })->throws(PaymentException::class, 'Subscription code is required');
 
-test('subscription cancel without a token fails at the paystack driver, not the fluent API', function () {
+test('subscription cancel without a token fails at the paystack driver, not the fluent API', function (): void {
     // Whether a token is required is a Paystack-specific rule (see
     // ADR-0006), so the generic Subscription::cancel() no longer gates on
     // it upfront - the provider-agnostic terminal-state validation still
@@ -402,7 +402,7 @@ test('subscription cancel without a token fails at the paystack driver, not the 
     $subscription->code('SUB_123')->cancel();
 })->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
-test('subscription cancel accepts token as parameter', function () {
+test('subscription cancel accepts token as parameter', function (): void {
     // Disable validation to avoid extra HTTP calls
     config(['payments.subscriptions.validation.enabled' => false]);
     app()->forgetInstance('payments.config');
@@ -428,7 +428,7 @@ test('subscription cancel accepts token as parameter', function () {
         ->and($result->status)->toBe('cancelled');
 });
 
-test('subscription cancel uses fluent token method', function () {
+test('subscription cancel uses fluent token method', function (): void {
     // Disable validation to avoid extra HTTP calls
     config(['payments.subscriptions.validation.enabled' => false]);
     app()->forgetInstance('payments.config');
@@ -455,7 +455,7 @@ test('subscription cancel uses fluent token method', function () {
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription cancel handles invalid token', function () {
+test('subscription cancel handles invalid token', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -466,7 +466,7 @@ test('subscription cancel handles invalid token', function () {
     $subscription->code('SUB_123')->cancel('invalid_token');
 })->throws(SubscriptionException::class);
 
-test('subscription cancel handles already cancelled subscription', function () {
+test('subscription cancel handles already cancelled subscription', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -479,13 +479,13 @@ test('subscription cancel handles already cancelled subscription', function () {
 
 // ==================== Subscription Enable Tests ====================
 
-test('subscription enable requires subscription code', function () {
+test('subscription enable requires subscription code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
     $subscription->enable();
 })->throws(PaymentException::class, 'Subscription code is required');
 
-test('subscription enable without a token fails at the paystack driver, not the fluent API', function () {
+test('subscription enable without a token fails at the paystack driver, not the fluent API', function (): void {
     // enable() calls no validator (unlike cancel()), so this fails directly
     // inside PaystackDriver::enableSubscription() with no HTTP call made.
     $subscription = SubscriptionTestHelper::createWithMock([]);
@@ -493,7 +493,7 @@ test('subscription enable without a token fails at the paystack driver, not the 
     $subscription->code('SUB_123')->enable();
 })->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
-test('subscription enable handles invalid token', function () {
+test('subscription enable handles invalid token', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -504,7 +504,7 @@ test('subscription enable handles invalid token', function () {
     $subscription->code('SUB_123')->enable('invalid_token');
 })->throws(SubscriptionException::class);
 
-test('subscription enable handles already active subscription', function () {
+test('subscription enable handles already active subscription', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -517,7 +517,7 @@ test('subscription enable handles already active subscription', function () {
 
 // ==================== Subscription Listing Tests ====================
 
-test('subscription list handles empty results', function () {
+test('subscription list handles empty results', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -530,7 +530,7 @@ test('subscription list handles empty results', function () {
     expect($result)->toBe(['data' => [], 'meta' => null]);
 });
 
-test('subscription list filters by customer', function () {
+test('subscription list filters by customer', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         // Paystack filters by its customer id, so the email is looked up first.
         new Response(200, [], json_encode(['status' => true, 'data' => ['id' => 42]])),
@@ -548,7 +548,7 @@ test('subscription list filters by customer', function () {
         ->and($result['data'][0]->subscriptionCode)->toBe('SUB_1');
 });
 
-test('subscription list respects pagination', function () {
+test('subscription list respects pagination', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -561,7 +561,7 @@ test('subscription list respects pagination', function () {
     expect($result)->toBeArray();
 });
 
-test('subscription list handles invalid pagination parameters', function () {
+test('subscription list handles invalid pagination parameters', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -577,7 +577,7 @@ test('subscription list handles invalid pagination parameters', function () {
 
 // ==================== Security Tests ====================
 
-test('subscription prevents unauthorized plan access', function () {
+test('subscription prevents unauthorized plan access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -588,7 +588,7 @@ test('subscription prevents unauthorized plan access', function () {
     $subscription->plan('PLN_123')->fetchPlan();
 })->throws(PlanException::class);
 
-test('subscription prevents unauthorized subscription access', function () {
+test('subscription prevents unauthorized subscription access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -599,7 +599,7 @@ test('subscription prevents unauthorized subscription access', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription validates token before cancel operation', function () {
+test('subscription validates token before cancel operation', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(401, [], json_encode([
             'status' => false,
@@ -610,7 +610,7 @@ test('subscription validates token before cancel operation', function () {
     $subscription->code('SUB_123')->cancel('expired_token');
 })->throws(SubscriptionException::class);
 
-test('subscription prevents token reuse attacks', function () {
+test('subscription prevents token reuse attacks', function (): void {
     // First cancel should succeed
     $subscription1 = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
@@ -643,7 +643,7 @@ test('subscription prevents token reuse attacks', function () {
     $subscription2->code('SUB_123')->cancel('token_12345');
 })->throws(SubscriptionException::class);
 
-test('subscription sanitizes metadata before sending', function () {
+test('subscription sanitizes metadata before sending', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -670,7 +670,7 @@ test('subscription sanitizes metadata before sending', function () {
 
 // ==================== Edge Cases Tests ====================
 
-test('subscription handles very large amounts', function () {
+test('subscription handles very large amounts', function (): void {
     $planDTO = new SubscriptionPlanDTO(
         name: 'Premium Plan',
         amount: 999999999.99,  // Very large amount
@@ -690,10 +690,10 @@ test('subscription handles very large amounts', function () {
 
     $result = $subscription->planData($planDTO)->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
-test('subscription handles very long plan names', function () {
+test('subscription handles very long plan names', function (): void {
     $longName = str_repeat('A', 1000);
     $planDTO = new SubscriptionPlanDTO(
         name: $longName,
@@ -710,10 +710,10 @@ test('subscription handles very long plan names', function () {
 
     $result = $subscription->planData($planDTO)->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
-test('subscription handles special characters in metadata', function () {
+test('subscription handles special characters in metadata', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -741,7 +741,7 @@ test('subscription handles special characters in metadata', function () {
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles null values in response', function () {
+test('subscription handles null values in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -763,7 +763,7 @@ test('subscription handles null values in response', function () {
     expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription handles missing optional fields gracefully', function () {
+test('subscription handles missing optional fields gracefully', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -782,7 +782,7 @@ test('subscription handles missing optional fields gracefully', function () {
         ->and($result->plan)->toBe('');
 });
 
-test('subscription handles concurrent creation attempts', function () {
+test('subscription handles concurrent creation attempts', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(409, [], json_encode([
             'status' => false,
@@ -797,7 +797,7 @@ test('subscription handles concurrent creation attempts', function () {
 
 // ==================== Status Check Tests ====================
 
-test('subscription response isActive returns true for active status', function () {
+test('subscription response isActive returns true for active status', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -819,7 +819,7 @@ test('subscription response isActive returns true for active status', function (
         ->and($result->isCompleted())->toBeFalse();
 });
 
-test('subscription response isCancelled returns true for cancelled status', function () {
+test('subscription response isCancelled returns true for cancelled status', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -840,7 +840,7 @@ test('subscription response isCancelled returns true for cancelled status', func
         ->and($result->isActive())->toBeFalse();
 });
 
-test('subscription response isCompleted returns true for completed status', function () {
+test('subscription response isCompleted returns true for completed status', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -861,7 +861,7 @@ test('subscription response isCompleted returns true for completed status', func
         ->and($result->isActive())->toBeFalse();
 });
 
-test('subscription response handles non-renewing status', function () {
+test('subscription response handles non-renewing status', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -883,7 +883,7 @@ test('subscription response handles non-renewing status', function () {
 
 // ==================== DTO Validation Tests ====================
 
-test('subscription plan DTO validates empty name', function () {
+test('subscription plan DTO validates empty name', function (): void {
     new SubscriptionPlanDTO(
         name: '',
         amount: 1000.00,
@@ -891,7 +891,7 @@ test('subscription plan DTO validates empty name', function () {
     );
 })->throws(InvalidArgumentException::class, 'Plan name is required');
 
-test('subscription plan DTO validates negative amount', function () {
+test('subscription plan DTO validates negative amount', function (): void {
     new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: -100.00,
@@ -899,7 +899,7 @@ test('subscription plan DTO validates negative amount', function () {
     );
 })->throws(InvalidArgumentException::class, 'Amount must be greater than zero');
 
-test('subscription plan DTO validates zero amount', function () {
+test('subscription plan DTO validates zero amount', function (): void {
     new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 0.00,
@@ -907,7 +907,7 @@ test('subscription plan DTO validates zero amount', function () {
     );
 })->throws(InvalidArgumentException::class, 'Amount must be greater than zero');
 
-test('subscription plan DTO validates invalid interval', function () {
+test('subscription plan DTO validates invalid interval', function (): void {
     new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 1000.00,
@@ -915,21 +915,21 @@ test('subscription plan DTO validates invalid interval', function () {
     );
 })->throws(InvalidArgumentException::class, 'Interval must be one of');
 
-test('subscription request DTO validates empty customer', function () {
+test('subscription request DTO validates empty customer', function (): void {
     new SubscriptionRequestDTO(
         customer: '',
         plan: 'PLN_123'
     );
 })->throws(InvalidArgumentException::class, 'Customer is required');
 
-test('subscription request DTO validates empty plan', function () {
+test('subscription request DTO validates empty plan', function (): void {
     new SubscriptionRequestDTO(
         customer: 'test@example.com',
         plan: ''
     );
 })->throws(InvalidArgumentException::class, 'Plan is required');
 
-test('subscription request DTO validates zero quantity', function () {
+test('subscription request DTO validates zero quantity', function (): void {
     new SubscriptionRequestDTO(
         customer: 'test@example.com',
         plan: 'PLN_123',
@@ -937,7 +937,7 @@ test('subscription request DTO validates zero quantity', function () {
     );
 })->throws(InvalidArgumentException::class, 'Quantity must be at least 1');
 
-test('subscription request DTO validates negative quantity', function () {
+test('subscription request DTO validates negative quantity', function (): void {
     new SubscriptionRequestDTO(
         customer: 'test@example.com',
         plan: 'PLN_123',
@@ -945,7 +945,7 @@ test('subscription request DTO validates negative quantity', function () {
     );
 })->throws(InvalidArgumentException::class, 'Quantity must be at least 1');
 
-test('subscription request DTO validates negative trial days', function () {
+test('subscription request DTO validates negative trial days', function (): void {
     new SubscriptionRequestDTO(
         customer: 'test@example.com',
         plan: 'PLN_123',
@@ -955,7 +955,7 @@ test('subscription request DTO validates negative trial days', function () {
 
 // ==================== Integration Tests ====================
 
-test('subscription complete workflow: create plan, create subscription, cancel', function () {
+test('subscription complete workflow: create plan, create subscription, cancel', function (): void {
     // Disable validation to avoid extra HTTP calls
     config(['payments.subscriptions.validation.enabled' => false]);
     app()->forgetInstance('payments.config');
@@ -1030,7 +1030,7 @@ test('subscription complete workflow: create plan, create subscription, cancel',
     expect($cancelled->status)->toBe('cancelled');
 });
 
-test('subscription handles provider fallback scenario', function () {
+test('subscription handles provider fallback scenario', function (): void {
     $driver2 = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -1041,7 +1041,6 @@ test('subscription handles provider fallback scenario', function () {
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $driver2;
     $driversProperty->setValue($manager, $drivers);
@@ -1052,12 +1051,12 @@ test('subscription handles provider fallback scenario', function () {
 
     $result = $subscription->planData($planDTO)->with('paystack')->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
 // ==================== Error Recovery Tests ====================
 
-test('subscription handles temporary network failures gracefully', function () {
+test('subscription handles temporary network failures gracefully', function (): void {
     $mock = new MockHandler([
         new ConnectException('Connection timeout', new Request('POST', '/subscription')),
     ]);
@@ -1069,7 +1068,6 @@ test('subscription handles temporary network failures gracefully', function () {
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $driver;
     $driversProperty->setValue($manager, $drivers);
@@ -1082,7 +1080,7 @@ test('subscription handles temporary network failures gracefully', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription handles malformed JSON response', function () {
+test('subscription handles malformed JSON response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], 'not json {invalid}'),
     ]);
@@ -1090,7 +1088,7 @@ test('subscription handles malformed JSON response', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription handles empty response body', function () {
+test('subscription handles empty response body', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], ''),
     ]);
@@ -1098,7 +1096,7 @@ test('subscription handles empty response body', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription handles HTTP 500 errors', function () {
+test('subscription handles HTTP 500 errors', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(500, [], json_encode([
             'status' => false,
@@ -1109,7 +1107,7 @@ test('subscription handles HTTP 500 errors', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription handles HTTP 502 Bad Gateway', function () {
+test('subscription handles HTTP 502 Bad Gateway', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(502, [], json_encode([
             'status' => false,
@@ -1120,7 +1118,7 @@ test('subscription handles HTTP 502 Bad Gateway', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription handles HTTP 503 Service Unavailable', function () {
+test('subscription handles HTTP 503 Service Unavailable', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(503, [], json_encode([
             'status' => false,
@@ -1133,7 +1131,7 @@ test('subscription handles HTTP 503 Service Unavailable', function () {
 
 // ==================== Amount Conversion Tests ====================
 
-test('subscription correctly converts amount from kobo to naira', function () {
+test('subscription correctly converts amount from kobo to naira', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -1153,7 +1151,7 @@ test('subscription correctly converts amount from kobo to naira', function () {
     expect($result->amount)->toBe(50505.0);
 });
 
-test('subscription plan DTO correctly converts amount to minor units', function () {
+test('subscription plan DTO correctly converts amount to minor units', function (): void {
     $planDTO = new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 1234.56,
@@ -1163,7 +1161,7 @@ test('subscription plan DTO correctly converts amount to minor units', function 
     expect($planDTO->getAmountInMinorUnits())->toBe(123456);
 });
 
-test('subscription handles zero amount in response', function () {
+test('subscription handles zero amount in response', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -1185,7 +1183,7 @@ test('subscription handles zero amount in response', function () {
 
 // ==================== Provider Selection Tests ====================
 
-test('subscription uses default provider when not specified', function () {
+test('subscription uses default provider when not specified', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -1196,7 +1194,6 @@ test('subscription uses default provider when not specified', function () {
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $driver;
     $driversProperty->setValue($manager, $drivers);
@@ -1207,10 +1204,10 @@ test('subscription uses default provider when not specified', function () {
 
     $result = $subscription->planData($planDTO)->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });
 
-test('subscription uses first provider from array', function () {
+test('subscription uses first provider from array', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -1221,7 +1218,6 @@ test('subscription uses first provider from array', function () {
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $driver;
     $driversProperty->setValue($manager, $drivers);
@@ -1234,5 +1230,5 @@ test('subscription uses first provider from array', function () {
         ->with(['paystack', 'stripe'])
         ->createPlan();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class);
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class);
 });

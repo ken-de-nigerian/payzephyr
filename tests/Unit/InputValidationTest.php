@@ -4,49 +4,49 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 
-test('it rejects emails with double dots', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects emails with double dots', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'user..name@example.com',
     ]))->toThrow(InvalidArgumentException::class, 'Invalid email address');
 });
 
-test('it rejects emails with trailing dots', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects emails with trailing dots', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'user@example.com.',
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it rejects emails with leading dots', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects emails with leading dots', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => '.user@example.com',
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it rejects emails with dot after at symbol', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects emails with dot after at symbol', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'user@.example.com',
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it rejects emails with local part exceeding 64 characters', function () {
+test('it rejects emails with local part exceeding 64 characters', function (): void {
     $longLocal = str_repeat('a', 65).'@example.com';
 
-    expect(fn () => ChargeRequestDTO::fromArray([
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => $longLocal,
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it accepts valid email addresses', function () {
+test('it accepts valid email addresses', function (): void {
     $validEmails = [
         'user@example.com',
         'user.name@example.com',
@@ -66,12 +66,12 @@ test('it accepts valid email addresses', function () {
     }
 });
 
-test('it rejects http callback urls in production', function () {
+test('it rejects http callback urls in production', function (): void {
     $originalEnv = app()->environment();
 
-    app()->detectEnvironment(fn () => 'production');
+    app()->detectEnvironment(fn (): string => 'production');
 
-    expect(fn () => ChargeRequestDTO::fromArray([
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -81,10 +81,10 @@ test('it rejects http callback urls in production', function () {
     app()->detectEnvironment(fn () => $originalEnv);
 });
 
-test('it accepts https callback urls in production', function () {
+test('it accepts https callback urls in production', function (): void {
     $originalEnv = app()->environment();
 
-    app()->detectEnvironment(fn () => 'production');
+    app()->detectEnvironment(fn (): string => 'production');
 
     $dto = ChargeRequestDTO::fromArray([
         'amount' => 10000,
@@ -98,8 +98,8 @@ test('it accepts https callback urls in production', function () {
     app()->detectEnvironment(fn () => $originalEnv);
 });
 
-test('it accepts http callback urls in non-production', function () {
-    app()->detectEnvironment(fn () => 'local');
+test('it accepts http callback urls in non-production', function (): void {
+    app()->detectEnvironment(fn (): string => 'local');
 
     $dto = ChargeRequestDTO::fromArray([
         'amount' => 10000,
@@ -111,8 +111,8 @@ test('it accepts http callback urls in non-production', function () {
     expect($dto->callbackUrl)->toBe('http://localhost:8000/callback');
 });
 
-test('it rejects invalid urls', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects invalid urls', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -120,8 +120,8 @@ test('it rejects invalid urls', function () {
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it rejects references with special characters', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects references with special characters', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -129,8 +129,8 @@ test('it rejects references with special characters', function () {
     ]))->toThrow(\InvalidArgumentException::class, 'Invalid reference format');
 });
 
-test('it rejects references with spaces', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects references with spaces', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -138,8 +138,8 @@ test('it rejects references with spaces', function () {
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it rejects references with at symbols', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects references with at symbols', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -147,7 +147,7 @@ test('it rejects references with at symbols', function () {
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it accepts valid reference formats', function () {
+test('it accepts valid reference formats', function (): void {
     $validReferences = [
         'ORDER_123',
         'ORDER-123-ABC',
@@ -168,10 +168,10 @@ test('it accepts valid reference formats', function () {
     }
 });
 
-test('it rejects references exceeding 255 characters', function () {
+test('it rejects references exceeding 255 characters', function (): void {
     $longReference = str_repeat('A', 256);
 
-    expect(fn () => ChargeRequestDTO::fromArray([
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
@@ -179,7 +179,7 @@ test('it rejects references exceeding 255 characters', function () {
     ]))->toThrow(\InvalidArgumentException::class);
 });
 
-test('it accepts valid international currencies', function () {
+test('it accepts valid international currencies', function (): void {
     $validCurrencies = ['NGN', 'USD', 'EUR', 'GBP', 'JPY', 'CNY', 'CAD', 'AUD'];
 
     foreach ($validCurrencies as $currency) {
@@ -193,40 +193,40 @@ test('it accepts valid international currencies', function () {
     }
 });
 
-test('it rejects numeric currency codes', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects numeric currency codes', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => '566',
         'email' => 'test@example.com',
     ]))->toThrow(\InvalidArgumentException::class, 'Currency must contain only letters');
 });
 
-test('it rejects currency codes with wrong length', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects currency codes with wrong length', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'US',
         'email' => 'test@example.com',
     ]))->toThrow(\InvalidArgumentException::class, 'Currency must be a 3-letter ISO code');
 });
 
-test('it rejects negative amounts', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects negative amounts', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => -1000,
         'currency' => 'NGN',
         'email' => 'test@example.com',
     ]))->toThrow(\InvalidArgumentException::class, 'Amount must be greater than zero');
 });
 
-test('it rejects zero amounts', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects zero amounts', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 0,
         'currency' => 'NGN',
         'email' => 'test@example.com',
     ]))->toThrow(\InvalidArgumentException::class, 'Amount must be greater than zero');
 });
 
-test('it rejects amounts exceeding maximum', function () {
-    expect(fn () => ChargeRequestDTO::fromArray([
+test('it rejects amounts exceeding maximum', function (): void {
+    expect(fn (): ChargeRequestDTO => ChargeRequestDTO::fromArray([
         'amount' => 1000000000.00,
         'currency' => 'NGN',
         'email' => 'test@example.com',

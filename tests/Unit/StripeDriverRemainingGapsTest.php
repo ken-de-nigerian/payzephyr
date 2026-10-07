@@ -32,7 +32,7 @@ function stripeGapsDriverWithMock(object $stripeMock, array $configOverrides = [
 // Covers StripeDriver::getIdempotencyHeader() (line 90) - Stripe's own override
 // of the AbstractDriver default, which is not exercised by charge()/verify()
 // since those go through the native Stripe SDK rather than makeRequest().
-test('stripe driver getIdempotencyHeader returns Idempotency-Key header', function () {
+test('stripe driver getIdempotencyHeader returns Idempotency-Key header', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -40,7 +40,6 @@ test('stripe driver getIdempotencyHeader returns Idempotency-Key header', functi
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('getIdempotencyHeader');
-    $method->setAccessible(true);
 
     $result = $method->invoke($driver, 'idem_key_123');
 
@@ -48,7 +47,7 @@ test('stripe driver getIdempotencyHeader returns Idempotency-Key header', functi
 });
 
 // Covers the cs_ prefixed branch of verify() (lines ~193-198).
-test('stripe verify retrieves checkout session directly for cs_ prefixed reference', function () {
+test('stripe verify retrieves checkout session directly for cs_ prefixed reference', function (): void {
     $sessionMock = (object) [
         'id' => 'cs_test_456',
         'client_reference_id' => 'ref_456',
@@ -66,7 +65,7 @@ test('stripe verify retrieves checkout session directly for cs_ prefixed referen
     {
         public function __construct(private readonly object $session) {}
 
-        public function retrieve()
+        public function retrieve(): object
         {
             return $this->session;
         }
@@ -92,7 +91,7 @@ test('stripe verify retrieves checkout session directly for cs_ prefixed referen
 
 // Covers the fallback loop finding a matching checkout session by
 // client_reference_id (lines ~213-225).
-test('stripe verify falls back to matching checkout session by client_reference_id', function () {
+test('stripe verify falls back to matching checkout session by client_reference_id', function (): void {
     $matchingSession = (object) ['id' => 'cs_found_789', 'client_reference_id' => 'my_ref_789'];
 
     $fullSession = (object) [
@@ -112,12 +111,12 @@ test('stripe verify falls back to matching checkout session by client_reference_
     {
         public function __construct(private readonly object $matching, private readonly object $full) {}
 
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => [$this->matching]];
         }
 
-        public function retrieve()
+        public function retrieve(): object
         {
             return $this->full;
         }
@@ -131,7 +130,7 @@ test('stripe verify falls back to matching checkout session by client_reference_
     // The search, tried first, finds nothing.
     $paymentIntents = new class
     {
-        public function search(): object
+        public function search(): \stdClass
         {
             return (object) ['data' => []];
         }
@@ -151,10 +150,10 @@ test('stripe verify falls back to matching checkout session by client_reference_
 });
 
 // Covers the fallback search finding a PaymentIntent by metadata['reference'].
-test('stripe verify falls back to searching payment intents by metadata reference', function () {
+test('stripe verify falls back to searching payment intents by metadata reference', function (): void {
     $sessionsService = new class
     {
-        public function all(): object
+        public function all(): \stdClass
         {
             return (object) ['data' => [], 'has_more' => false];
         }
@@ -180,7 +179,7 @@ test('stripe verify falls back to searching payment intents by metadata referenc
     {
         public function __construct(private readonly object $intent) {}
 
-        public function search(): object
+        public function search(): \stdClass
         {
             return (object) ['data' => [$this->intent]];
         }
@@ -200,7 +199,7 @@ test('stripe verify falls back to searching payment intents by metadata referenc
 });
 
 // Covers the "no signature header at all" branch of validateWebhook().
-test('stripe driver rejects webhook when no signature header is present', function () {
+test('stripe driver rejects webhook when no signature header is present', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'webhook_secret' => 'whsec_test_secret',
@@ -213,7 +212,7 @@ test('stripe driver rejects webhook when no signature header is present', functi
 });
 
 // Covers the "webhook secret not configured" branch of validateWebhook().
-test('stripe driver rejects webhook when webhook secret is not configured', function () {
+test('stripe driver rejects webhook when webhook secret is not configured', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -230,7 +229,7 @@ test('stripe driver rejects webhook when webhook secret is not configured', func
 // Stripe's own Webhook::constructEvent() throws Exception\UnexpectedValueException
 // (which extends the base SPL \Exception rather than SignatureVerificationException)
 // when the payload is not valid JSON, even if the signature itself is valid.
-test('stripe driver rejects webhook with valid signature but malformed json payload', function () {
+test('stripe driver rejects webhook with valid signature but malformed json payload', function (): void {
     $secret = 'whsec_test_secret';
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
@@ -251,7 +250,7 @@ test('stripe driver rejects webhook with valid signature but malformed json payl
 });
 
 // Covers the immediate success path of healthCheck() (no exception thrown at all).
-test('stripe driver healthCheck returns true when balance retrieval succeeds', function () {
+test('stripe driver healthCheck returns true when balance retrieval succeeds', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],
@@ -269,7 +268,7 @@ test('stripe driver healthCheck returns true when balance retrieval succeeds', f
 });
 
 // Covers the branch where ApiErrorException::getHttpStatus() returns null (line ~328).
-test('stripe driver healthCheck returns false when api error has no http status', function () {
+test('stripe driver healthCheck returns false when api error has no http status', function (): void {
     $driver = new StripeDriver([
         'secret_key' => 'sk_test_xxx',
         'currencies' => ['USD'],

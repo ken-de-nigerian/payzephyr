@@ -3,13 +3,14 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use KenDeNigerian\PayZephyr\Events\WebhookReceived;
 use KenDeNigerian\PayZephyr\Http\Controllers\WebhookController;
 use KenDeNigerian\PayZephyr\Http\Requests\WebhookRequest;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
 uses(RefreshDatabase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -37,7 +38,7 @@ beforeEach(function () {
     ]);
 });
 
-test('webhook controller routes monnify requests correctly', function () {
+test('webhook controller routes monnify requests correctly', function (): void {
     $manager = app(PaymentManager::class);
     $controller = app(WebhookController::class);
 
@@ -47,8 +48,6 @@ test('webhook controller routes monnify requests correctly', function () {
     $body = json_encode($payload);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -61,7 +60,6 @@ test('webhook controller routes monnify requests correctly', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -80,10 +78,10 @@ test('webhook controller routes monnify requests correctly', function () {
     $response = $controller->handle($request, 'monnify');
 
     expect($response->getStatusCode())->toBe(202);
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class);
+    Event::assertDispatched(WebhookReceived::class);
 });
 
-test('webhook controller routes stripe requests correctly', function () {
+test('webhook controller routes stripe requests correctly', function (): void {
     $manager = app(PaymentManager::class);
     $controller = app(WebhookController::class);
 
@@ -98,8 +96,6 @@ test('webhook controller routes stripe requests correctly', function () {
     $body = json_encode($payload);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -112,7 +108,6 @@ test('webhook controller routes stripe requests correctly', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -131,10 +126,10 @@ test('webhook controller routes stripe requests correctly', function () {
     $response = $controller->handle($request, 'stripe');
 
     expect($response->getStatusCode())->toBe(202);
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class);
+    Event::assertDispatched(WebhookReceived::class);
 });
 
-test('webhook controller routes paypal requests correctly', function () {
+test('webhook controller routes paypal requests correctly', function (): void {
     $manager = app(PaymentManager::class);
     $controller = app(WebhookController::class);
 
@@ -144,8 +139,6 @@ test('webhook controller routes paypal requests correctly', function () {
     $body = json_encode($payload);
     $request = new class($baseRequest, $body) extends WebhookRequest
     {
-        private string $body;
-
         public function __construct($request, string $body)
         {
             parent::__construct(
@@ -158,7 +151,6 @@ test('webhook controller routes paypal requests correctly', function () {
                 $body
             );
             $this->headers->replace($request->headers->all());
-            $this->body = $body;
         }
 
         public function route($param = null, $default = null)
@@ -177,5 +169,5 @@ test('webhook controller routes paypal requests correctly', function () {
     $response = $controller->handle($request, 'paypal');
 
     expect($response->getStatusCode())->toBe(202);
-    Event::assertDispatched(\KenDeNigerian\PayZephyr\Events\WebhookReceived::class);
+    Event::assertDispatched(WebhookReceived::class);
 });

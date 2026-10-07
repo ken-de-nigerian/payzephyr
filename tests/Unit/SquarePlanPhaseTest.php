@@ -48,7 +48,7 @@ function squareIntroPlan(int $regularAmount): Response
     ]));
 }
 
-test('a plan with an introductory phase reports the phase it bills on indefinitely', function () {
+test('a plan with an introductory phase reports the phase it bills on indefinitely', function (): void {
     $history = [];
     $plan = squareRecordingDriver([squareIntroPlan(12000)], $history)->fetchPlan('VAR_1');
 
@@ -58,7 +58,7 @@ test('a plan with an introductory phase reports the phase it bills on indefinite
         ->and($plan->metadata)->toBe(['plan_id' => 'PLAN_1']);
 });
 
-test('repricing a plan with an introductory phase reprices the indefinite phase', function () {
+test('repricing a plan with an introductory phase reprices the indefinite phase', function (): void {
     $history = [];
     $driver = squareRecordingDriver([squareIntroPlan(12000), new Response(200, [], '{}'), squareIntroPlan(15000)], $history);
 
@@ -71,7 +71,7 @@ test('repricing a plan with an introductory phase reprices the indefinite phase'
         ->and($plan->amount)->toBe(150.0);
 });
 
-test('listing subscriptions looks each customer up once, not once per subscription', function () {
+test('listing subscriptions looks each customer up once, not once per subscription', function (): void {
     $history = [];
     $driver = squareRecordingDriver([
         new Response(200, [], json_encode(['subscriptions' => [
@@ -84,11 +84,11 @@ test('listing subscriptions looks each customer up once, not once per subscripti
     $listing = $driver->listSubscriptions();
 
     expect($history)->toHaveCount(2)
-        ->and(array_map(fn ($s) => [$s->subscriptionCode, $s->customer, $s->status], $listing['data']))
+        ->and(array_map(fn ($s): array => [$s->subscriptionCode, $s->customer, $s->status], $listing['data']))
         ->toBe([['SUB_1', 'a@b.com', 'active'], ['SUB_2', 'a@b.com', 'non-renewing']]);
 });
 
-test('listing one customer\'s subscriptions uses the customer it already found', function () {
+test('listing one customer\'s subscriptions uses the customer it already found', function (): void {
     $history = [];
     $driver = squareRecordingDriver([
         new Response(200, [], json_encode(['customers' => [['id' => 'CUST_1', 'email_address' => 'a@b.com']]])),
@@ -103,7 +103,7 @@ test('listing one customer\'s subscriptions uses the customer it already found',
         ->and($listing['data'][0]->customer)->toBe('a@b.com');
 });
 
-test('a plan whose every phase ends reports its last phase', function () {
+test('a plan whose every phase ends reports its last phase', function (): void {
     $history = [];
     $driver = squareRecordingDriver([new Response(200, [], json_encode(['object' => [
         'type' => 'SUBSCRIPTION_PLAN_VARIATION',

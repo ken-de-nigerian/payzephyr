@@ -43,7 +43,7 @@ function traceCommandOutput(array $options = []): string
     return Artisan::output();
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.features.trace' => true]);
 });
@@ -52,7 +52,7 @@ beforeEach(function () {
 // Reading a timeline back
 // ---------------------------------------------------------------------------
 
-test('a fallback-recovered payment reads as one story', function () {
+test('a fallback-recovered payment reads as one story', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_INITIATED);
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_SKIPPED, provider: 'paystack');
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_ERROR, provider: 'monnify');
@@ -70,7 +70,7 @@ test('a fallback-recovered payment reads as one story', function () {
         ->and($output)->toContain('Outcome:  payment.completed');
 });
 
-test('http status and timing are shown against the step they belong to', function () {
+test('http status and timing are shown against the step they belong to', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_RESPONSE_RECEIVED,
         provider: 'stripe', responseTimeMs: 1234, httpStatusCode: 200);
 
@@ -79,13 +79,13 @@ test('http status and timing are shown against the step they belong to', functio
     expect($output)->toContain('HTTP 200')->and($output)->toContain('1234ms');
 });
 
-test('a payment with no terminal event is reported as still open', function () {
+test('a payment with no terminal event is reported as still open', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_INITIATED);
 
     expect(traceCommandOutput(['reference' => 'PZ_1_a']))->toContain('still open');
 });
 
-test('the provider filter narrows the timeline', function () {
+test('the provider filter narrows the timeline', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_ERROR, provider: 'paystack');
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_COMPLETED, provider: 'stripe');
 
@@ -99,7 +99,7 @@ test('the provider filter narrows the timeline', function () {
 // Nothing found is not an error
 // ---------------------------------------------------------------------------
 
-test('an unknown reference explains itself rather than failing', function () {
+test('an unknown reference explains itself rather than failing', function (): void {
     $exit = Artisan::call('payzephyr:trace', ['reference' => 'PZ_nothing_here']);
     $output = Artisan::output();
 
@@ -108,7 +108,7 @@ test('an unknown reference explains itself rather than failing', function () {
         ->and($output)->toContain('predates it or was never traced');
 });
 
-test('with tracing off the empty result says so instead of blaming the reference', function () {
+test('with tracing off the empty result says so instead of blaming the reference', function (): void {
     config(['payments.features.trace' => false]);
     app()->forgetInstance('payments.config');
 
@@ -116,7 +116,7 @@ test('with tracing off the empty result says so instead of blaming the reference
         ->toContain('PAYZEPHYR_FEATURE_TRACE=true');
 });
 
-test('an over-narrow provider filter points at the filter', function () {
+test('an over-narrow provider filter points at the filter', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_COMPLETED, provider: 'stripe');
 
     expect(traceCommandOutput(['reference' => 'PZ_1_a', '--provider' => 'paypal']))
@@ -127,7 +127,7 @@ test('an over-narrow provider filter points at the filter', function () {
 // --json
 // ---------------------------------------------------------------------------
 
-test('json output carries the whole timeline in a machine-readable shape', function () {
+test('json output carries the whole timeline in a machine-readable shape', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_INITIATED);
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_COMPLETED,
         provider: 'stripe', payload: ['status' => 'pending']);
@@ -144,7 +144,7 @@ test('json output carries the whole timeline in a machine-readable shape', funct
         ->and($decoded['events'][0]['recorded_at'])->not->toBeNull();
 });
 
-test('json output for an unknown reference is still valid json', function () {
+test('json output for an unknown reference is still valid json', function (): void {
     $decoded = json_decode(traceCommandOutput(['reference' => 'PZ_nothing', '--json' => true]), true);
 
     expect($decoded)->toBe(['reference' => 'PZ_nothing', 'events' => []]);
@@ -154,7 +154,7 @@ test('json output for an unknown reference is still valid json', function () {
 // --detailed: one analyser, one vocabulary
 // ---------------------------------------------------------------------------
 
-test('an ambiguous charge is the loudest thing the analyser reports', function () {
+test('an ambiguous charge is the loudest thing the analyser reports', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::CHARGE_AMBIGUOUS, provider: 'paystack');
 
     $output = traceCommandOutput(['reference' => 'PZ_1_a', '--detailed' => true]);
@@ -163,7 +163,7 @@ test('an ambiguous charge is the loudest thing the analyser reports', function (
         ->and($output)->toContain('may have taken the money');
 });
 
-test('a clean timeline says so rather than inventing findings', function () {
+test('a clean timeline says so rather than inventing findings', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_INITIATED);
     recordTraceStep('PZ_1_a', TraceEvent::PAYMENT_COMPLETED, provider: 'stripe');
 
@@ -171,13 +171,13 @@ test('a clean timeline says so rather than inventing findings', function () {
         ->toContain('Nothing worth flagging');
 });
 
-test('findings are not shown unless asked for', function () {
+test('findings are not shown unless asked for', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::CHARGE_AMBIGUOUS);
 
     expect(traceCommandOutput(['reference' => 'PZ_1_a']))->not->toContain('critical');
 });
 
-test('a request with no reply in its correlation group is reported as orphaned', function () {
+test('a request with no reply in its correlation group is reported as orphaned', function (): void {
     // The point of correlation ids: one group is one provider round trip, so a
     // group holding a request and no reply is a call that went out and vanished.
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_REQUEST_SENT,
@@ -187,7 +187,7 @@ test('a request with no reply in its correlation group is reported as orphaned',
         ->toContain('sent and no response was ever recorded');
 });
 
-test('a request that was answered is not reported as orphaned', function () {
+test('a request that was answered is not reported as orphaned', function (): void {
     $group = 'f0000000-0000-4000-8000-000000000002';
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_REQUEST_SENT, provider: 'stripe', correlationId: $group);
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_RESPONSE_RECEIVED, provider: 'stripe', correlationId: $group);
@@ -196,7 +196,7 @@ test('a request that was answered is not reported as orphaned', function () {
         ->not->toContain('orphaned');
 });
 
-test('a slow provider is reported against the configured threshold', function () {
+test('a slow provider is reported against the configured threshold', function (): void {
     config(['payments.trace.slow_response_ms' => 500]);
     app()->forgetInstance('payments.config');
 
@@ -207,7 +207,7 @@ test('a slow provider is reported against the configured threshold', function ()
     expect($output)->toContain('900ms to respond')->and($output)->toContain('500ms threshold');
 });
 
-test('a response inside the threshold is not called slow', function () {
+test('a response inside the threshold is not called slow', function (): void {
     config(['payments.trace.slow_response_ms' => 5000]);
     app()->forgetInstance('payments.config');
 
@@ -217,7 +217,7 @@ test('a response inside the threshold is not called slow', function () {
         ->not->toContain('to respond');
 });
 
-test('repeated problems are counted rather than listed one by one', function () {
+test('repeated problems are counted rather than listed one by one', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::WEBHOOK_DUPLICATE, provider: 'stripe');
     recordTraceStep('PZ_1_a', TraceEvent::WEBHOOK_DUPLICATE, provider: 'stripe');
     recordTraceStep('PZ_1_a', TraceEvent::WEBHOOK_DUPLICATE, provider: 'stripe');
@@ -226,7 +226,7 @@ test('repeated problems are counted rather than listed one by one', function () 
         ->toContain('(3 occurrences)');
 });
 
-test('json output includes the same findings the detailed view shows', function () {
+test('json output includes the same findings the detailed view shows', function (): void {
     recordTraceStep('PZ_1_a', TraceEvent::VERIFICATION_NOT_PERSISTED);
 
     $decoded = json_decode(traceCommandOutput(['reference' => 'PZ_1_a', '--json' => true]), true);
@@ -236,7 +236,7 @@ test('json output includes the same findings the detailed view shows', function 
         ->and($decoded['findings'][0]['type'])->toBe('not_persisted');
 });
 
-test('a correlation group holding no request at all is not mistaken for an orphan', function () {
+test('a correlation group holding no request at all is not mistaken for an orphan', function (): void {
     // Correlation ids group a provider round trip, but not every group starts
     // with a request - a group that never contains one has nothing to orphan.
     recordTraceStep('PZ_1_a', TraceEvent::PROVIDER_RESPONSE_RECEIVED,

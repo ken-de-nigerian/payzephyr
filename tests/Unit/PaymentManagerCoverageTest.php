@@ -9,7 +9,7 @@ use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 
-beforeEach(function () {
+beforeEach(function (): void {
     DB::setDefaultConnection('testing');
 
     try {
@@ -17,7 +17,7 @@ beforeEach(function () {
     } catch (Exception) {
     }
 
-    Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference');
         $table->string('provider');
@@ -35,7 +35,7 @@ beforeEach(function () {
     Cache::flush();
 });
 
-test('payment manager cacheSessionData stores session data', function () {
+test('payment manager cacheSessionData stores session data', function (): void {
     $manager = new PaymentManager(
         app(ProviderDetector::class),
         app(DriverFactory::class)
@@ -53,7 +53,7 @@ test('payment manager cacheSessionData stores session data', function () {
         ->and($cached['id'])->toBe('provider_id_123');
 });
 
-test('payment manager resolveVerificationContext uses cache first', function () {
+test('payment manager resolveVerificationContext uses cache first', function (): void {
     Cache::put('payzephyr:session:ref_123', [
         'provider' => 'paystack',
         'id' => 'provider_id_123',
@@ -73,7 +73,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
         ->and($result['id'])->toBe('ref_123'); // Paystack uses reference, not cached id
 });
 
-test('payment manager resolveVerificationContext uses database when cache miss', function () {
+test('payment manager resolveVerificationContext uses database when cache miss', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -100,7 +100,7 @@ test('payment manager resolveVerificationContext uses database when cache miss',
         ->and($result['id'])->toBe('ref_123'); // Paystack uses reference, not database id
 });
 
-test('payment manager resolveVerificationContext uses provider detector when no cache or db', function () {
+test('payment manager resolveVerificationContext uses provider detector when no cache or db', function (): void {
     config(['payments.logging.enabled' => false]);
 
     $manager = new PaymentManager(
@@ -117,7 +117,7 @@ test('payment manager resolveVerificationContext uses provider detector when no 
         ->and($result['id'])->toBe('PAYSTACK_ref_123');
 });
 
-test('payment manager resolveVerificationContext uses explicit provider when provided', function () {
+test('payment manager resolveVerificationContext uses explicit provider when provided', function (): void {
     $manager = new PaymentManager(
         app(ProviderDetector::class),
         app(DriverFactory::class)
@@ -132,7 +132,7 @@ test('payment manager resolveVerificationContext uses explicit provider when pro
         ->and($result['id'])->toBe('ref_123');
 });
 
-test('payment manager updateTransactionFromVerification updates transaction successfully', function () {
+test('payment manager updateTransactionFromVerification updates transaction successfully', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -170,7 +170,7 @@ test('payment manager updateTransactionFromVerification updates transaction succ
         ->and($transaction->paid_at)->not->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification handles failed payment', function () {
+test('payment manager updateTransactionFromVerification handles failed payment', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -206,7 +206,7 @@ test('payment manager updateTransactionFromVerification handles failed payment',
         ->and($transaction->paid_at)->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification handles database error gracefully', function () {
+test('payment manager updateTransactionFromVerification handles database error gracefully', function (): void {
     config(['payments.logging.enabled' => true]);
 
     $response = new VerificationResponseDTO(
@@ -229,7 +229,7 @@ test('payment manager updateTransactionFromVerification handles database error g
     expect(true)->toBeTrue(); // If we get here, no exception was thrown
 });
 
-test('payment manager updateTransactionFromVerification skips when logging disabled', function () {
+test('payment manager updateTransactionFromVerification skips when logging disabled', function (): void {
     config(['payments.logging.enabled' => false]);
 
     $response = new VerificationResponseDTO(

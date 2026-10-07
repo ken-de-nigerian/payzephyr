@@ -32,11 +32,11 @@ function makeSubscriptionResponse(): SubscriptionResponseDTO
     );
 }
 
-afterEach(function () {
+afterEach(function (): void {
     app()->forgetInstance('payments.config');
 });
 
-test('logSubscriptionFromResponse returns early without touching the repository when logging is disabled', function () {
+test('logSubscriptionFromResponse returns early without touching the repository when logging is disabled', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.subscriptions.logging.enabled' => false]);
 
@@ -54,7 +54,7 @@ test('logSubscriptionFromResponse returns early without touching the repository 
     expect(true)->toBeTrue();
 });
 
-test('logSubscriptionFromResponse falls back to the top-level logging.enabled flag when subscriptions.logging is not set', function () {
+test('logSubscriptionFromResponse falls back to the top-level logging.enabled flag when subscriptions.logging is not set', function (): void {
     app()->forgetInstance('payments.config');
     config([
         'payments.subscriptions' => [],
@@ -75,7 +75,7 @@ test('logSubscriptionFromResponse falls back to the top-level logging.enabled fl
     expect(true)->toBeTrue();
 });
 
-test('logSubscriptionFromResponse logs and swallows an exception raised by the repository', function () {
+test('logSubscriptionFromResponse logs and swallows an exception raised by the repository', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.subscriptions.logging.enabled' => true]);
 

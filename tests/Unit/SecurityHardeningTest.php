@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 // Some of these assert production-only behaviour. The environment is restored
 // afterwards because RefreshDatabase tears the database down after the test
 // body, and it will stop to ask for confirmation if it believes it is live.
-afterEach(function () {
+afterEach(function (): void {
     app()['env'] = 'testing';
 });
 
@@ -25,13 +25,12 @@ afterEach(function () {
 // The health endpoint's token is a secret, so it is compared like one
 // ---------------------------------------------------------------------------
 
-test('the health token is compared in constant time', function () {
+test('the health token is compared in constant time', function (): void {
     // in_array() with strict comparison stops at the first differing byte,
     // which leaks a valid token's length and prefix to anyone who can time the
     // response. The package verifies every webhook signature with hash_equals;
     // this is the same problem and now gets the same treatment.
     $method = (new ReflectionClass(HealthEndpointMiddleware::class))->getMethod('tokenIsAllowed');
-    $method->setAccessible(true);
     $middleware = new HealthEndpointMiddleware;
 
     expect($method->invoke($middleware, 'right-token', ['right-token']))->toBeTrue()
@@ -43,7 +42,7 @@ test('the health token is compared in constant time', function () {
         ->and($method->invoke($middleware, 'anything', []))->toBeFalse();
 });
 
-test('the health endpoint refuses a wrong token and accepts the right one', function () {
+test('the health endpoint refuses a wrong token and accepts the right one', function (): void {
     config([
         'payments.health_check.require_auth' => true,
         'payments.health_check.allowed_tokens' => ['s3cret-health-token'],
@@ -58,7 +57,7 @@ test('the health endpoint refuses a wrong token and accepts the right one', func
 // Disabling signature verification must never be silent
 // ---------------------------------------------------------------------------
 
-test('disabling webhook signature verification is logged as an error in production', function () {
+test('disabling webhook signature verification is logged as an error in production', function (): void {
     // With verification off, anyone who can reach the webhook URL can POST a
     // charge.success for a reference they guessed or observed. The switch stays
     // supported for local replay, but it must announce itself.
@@ -69,7 +68,7 @@ test('disabling webhook signature verification is logged as an error in producti
 
     $logged = [];
     Log::shouldReceive('channel')->andReturnSelf();
-    Log::shouldReceive('error')->andReturnUsing(function ($message, $context = []) use (&$logged) {
+    Log::shouldReceive('error')->andReturnUsing(function ($message, $context = []) use (&$logged): true {
         $logged[] = $message;
 
         return true;
@@ -79,7 +78,7 @@ test('disabling webhook signature verification is logged as an error in producti
 
     $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
     $request->setContainer(app());
-    $request->setRouteResolver(fn () => new class
+    $request->setRouteResolver(fn (): object => new class
     {
         public function parameter(string $name): string
         {
@@ -91,7 +90,7 @@ test('disabling webhook signature verification is logged as an error in producti
         ->and(implode(' ', $logged))->toContain('DISABLED');
 });
 
-test('the warning is rate limited so an active site does not drown its log', function () {
+test('the warning is rate limited so an active site does not drown its log', function (): void {
     app()['env'] = 'production';
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
@@ -99,7 +98,7 @@ test('the warning is rate limited so an active site does not drown its log', fun
 
     $errors = 0;
     Log::shouldReceive('channel')->andReturnSelf();
-    Log::shouldReceive('error')->andReturnUsing(function () use (&$errors) {
+    Log::shouldReceive('error')->andReturnUsing(function () use (&$errors): true {
         $errors++;
 
         return true;
@@ -107,10 +106,10 @@ test('the warning is rate limited so an active site does not drown its log', fun
     Log::shouldReceive('info')->andReturnTrue();
     Log::shouldReceive('warning')->andReturnTrue();
 
-    $make = function () {
+    $make = function (): WebhookRequest {
         $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
         $request->setContainer(app());
-        $request->setRouteResolver(fn () => new class
+        $request->setRouteResolver(fn (): object => new class
         {
             public function parameter(string $name): string
             {
@@ -128,7 +127,7 @@ test('the warning is rate limited so an active site does not drown its log', fun
     expect($errors)->toBe(1);
 });
 
-test('the warning stays quiet in local and testing', function () {
+test('the warning stays quiet in local and testing', function (): void {
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
     Cache::flush();
@@ -140,7 +139,7 @@ test('the warning stays quiet in local and testing', function () {
 
     $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
     $request->setContainer(app());
-    $request->setRouteResolver(fn () => new class
+    $request->setRouteResolver(fn (): object => new class
     {
         public function parameter(string $name): string
         {
@@ -151,7 +150,7 @@ test('the warning stays quiet in local and testing', function () {
     expect($request->authorize())->toBeTrue();
 });
 
-test('the disabled-verification warning is still logged when the cache cannot answer', function () {
+test('the disabled-verification warning is still logged when the cache cannot answer', function (): void {
     // The rate limit lives in the cache. A cache that is down must not be
     // read as "already warned recently" - that would silence the one alert
     // that says forged webhooks are being accepted.
@@ -163,7 +162,7 @@ test('the disabled-verification warning is still logged when the cache cannot an
 
     $logged = [];
     Log::shouldReceive('channel')->andReturnSelf();
-    Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$logged) {
+    Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$logged): true {
         $logged[] = $message;
 
         return true;
@@ -171,7 +170,7 @@ test('the disabled-verification warning is still logged when the cache cannot an
 
     $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
     $request->setContainer(app());
-    $request->setRouteResolver(fn () => new class
+    $request->setRouteResolver(fn (): object => new class
     {
         public function parameter(string $name): string
         {
@@ -183,7 +182,7 @@ test('the disabled-verification warning is still logged when the cache cannot an
         ->and(implode(' ', $logged))->toContain('DISABLED');
 });
 
-test('the disabled-verification warning repeats after an hour, not before', function () {
+test('the disabled-verification warning repeats after an hour, not before', function (): void {
     app()['env'] = 'production';
     config(['payments.webhook.verify_signature' => false]);
     app()->forgetInstance('payments.config');
@@ -191,7 +190,7 @@ test('the disabled-verification warning repeats after an hour, not before', func
 
     $errors = 0;
     Log::shouldReceive('channel')->andReturnSelf();
-    Log::shouldReceive('error')->andReturnUsing(function () use (&$errors) {
+    Log::shouldReceive('error')->andReturnUsing(function () use (&$errors): true {
         $errors++;
 
         return true;
@@ -201,7 +200,7 @@ test('the disabled-verification warning repeats after an hour, not before', func
     $authorize = function (): void {
         $request = WebhookRequest::create('/payments/webhook/paystack', 'POST', [], [], [], [], '{}');
         $request->setContainer(app());
-        $request->setRouteResolver(fn () => new class
+        $request->setRouteResolver(fn (): object => new class
         {
             public function parameter(string $name): string
             {

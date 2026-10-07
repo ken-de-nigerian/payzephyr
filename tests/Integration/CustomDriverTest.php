@@ -8,7 +8,9 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\Facades\Payment;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
 use KenDeNigerian\PayZephyr\Tests\Fixtures\CustomTestDriver;
@@ -55,7 +57,7 @@ class CustomDriverTest extends TestCase
     public function test_custom_driver_can_be_registered_without_core_modifications(): void
     {
         // Registration should work using only public APIs
-        $factory = app(DriverFactory::class);
+        app(DriverFactory::class);
 
         // Custom driver should be registered
         $this->assertTrue(true); // Registration happens in setUp()
@@ -101,9 +103,7 @@ class CustomDriverTest extends TestCase
 
         // Ensure Payment facade uses the same manager
         $this->app->instance(PaymentManager::class, $manager);
-        $this->app->bind(\KenDeNigerian\PayZephyr\Payment::class, function ($app) use ($manager) {
-            return new \KenDeNigerian\PayZephyr\Payment($manager);
-        });
+        $this->app->bind(\KenDeNigerian\PayZephyr\Payment::class, fn ($app): \KenDeNigerian\PayZephyr\Payment => new \KenDeNigerian\PayZephyr\Payment($manager));
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\Payment::class);
 
         // IDENTICAL code - should work with custom driver
@@ -115,7 +115,7 @@ class CustomDriverTest extends TestCase
             ->charge();
 
         // Should work exactly like any other provider
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $response);
         $this->assertEquals('custom_test', $response->provider);
     }
 
@@ -193,9 +193,7 @@ class CustomDriverTest extends TestCase
 
         // Ensure Payment facade uses the same manager
         $this->app->instance(PaymentManager::class, $manager);
-        $this->app->bind(\KenDeNigerian\PayZephyr\Payment::class, function ($app) use ($manager) {
-            return new \KenDeNigerian\PayZephyr\Payment($manager);
-        });
+        $this->app->bind(\KenDeNigerian\PayZephyr\Payment::class, fn ($app): \KenDeNigerian\PayZephyr\Payment => new \KenDeNigerian\PayZephyr\Payment($manager));
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\Payment::class);
 
         // Transaction should be logged automatically
@@ -207,7 +205,7 @@ class CustomDriverTest extends TestCase
             ->charge();
 
         // Check if transaction was logged
-        $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', $response->reference)
+        $transaction = PaymentTransaction::where('reference', $response->reference)
             ->where('provider', 'custom_test')
             ->first();
 

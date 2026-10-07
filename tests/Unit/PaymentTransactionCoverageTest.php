@@ -1,17 +1,19 @@
 <?php
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
-beforeEach(function () {
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
+beforeEach(function (): void {
+    DB::setDefaultConnection('testing');
 
     try {
-        \Illuminate\Support\Facades\Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+        Schema::connection('testing')->dropIfExists('payment_transactions');
+    } catch (\Exception) {
     }
 
-    \Illuminate\Support\Facades\Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference');
         $table->string('provider');
@@ -27,7 +29,7 @@ beforeEach(function () {
     });
 });
 
-test('payment transaction isSuccessful uses container when available', function () {
+test('payment transaction isSuccessful uses container when available', function (): void {
     $normalizer = new StatusNormalizer;
     app()->instance(StatusNormalizer::class, $normalizer);
 
@@ -36,13 +38,13 @@ test('payment transaction isSuccessful uses container when available', function 
     expect($transaction->isSuccessful())->toBeTrue();
 });
 
-test('payment transaction isSuccessful falls back to static when container unavailable', function () {
+test('payment transaction isSuccessful falls back to static when container unavailable', function (): void {
     $transaction = new PaymentTransaction(['status' => 'completed']);
 
     expect($transaction->isSuccessful())->toBeTrue();
 });
 
-test('payment transaction isFailed uses container when available', function () {
+test('payment transaction isFailed uses container when available', function (): void {
     $normalizer = new StatusNormalizer;
     app()->instance(StatusNormalizer::class, $normalizer);
 
@@ -51,13 +53,13 @@ test('payment transaction isFailed uses container when available', function () {
     expect($transaction->isFailed())->toBeTrue();
 });
 
-test('payment transaction isFailed falls back to static when container unavailable', function () {
+test('payment transaction isFailed falls back to static when container unavailable', function (): void {
     $transaction = new PaymentTransaction(['status' => 'rejected']);
 
     expect($transaction->isFailed())->toBeTrue();
 });
 
-test('payment transaction isPending uses container when available', function () {
+test('payment transaction isPending uses container when available', function (): void {
     $normalizer = new StatusNormalizer;
     app()->instance(StatusNormalizer::class, $normalizer);
 
@@ -66,7 +68,7 @@ test('payment transaction isPending uses container when available', function () 
     expect($transaction->isPending())->toBeTrue();
 });
 
-test('payment transaction isPending falls back to static when container unavailable', function () {
+test('payment transaction isPending falls back to static when container unavailable', function (): void {
     $transaction = new PaymentTransaction(['status' => 'approved']);
 
     expect($transaction->isPending())->toBeTrue();

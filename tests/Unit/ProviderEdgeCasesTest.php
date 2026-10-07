@@ -10,7 +10,7 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('paystack handles zero decimal currencies correctly', function () {
+test('paystack handles zero decimal currencies correctly', function (): void {
     $config = [
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -40,7 +40,7 @@ test('paystack handles zero decimal currencies correctly', function () {
     expect($response->reference)->not->toBeEmpty();
 });
 
-test('it handles unsupported currencies gracefully', function () {
+test('it handles unsupported currencies gracefully', function (): void {
     $manager = app(PaymentManager::class);
 
     config([
@@ -60,7 +60,7 @@ test('it handles unsupported currencies gracefully', function () {
     expect($usdSupported)->toBeBool();
 });
 
-test('it handles empty metadata gracefully', function () {
+test('it handles empty metadata gracefully', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -72,19 +72,17 @@ test('it handles empty metadata gracefully', function () {
         ->and($request->metadata)->toBeEmpty();
 });
 
-test('it handles null callback url when not required', function () {
+test('it handles null callback url when not required', function (): void {
     $request = new ChargeRequestDTO(
         10000,
         'NGN',
-        'test@example.com',
-        null,
-        null // No callback URL
+        'test@example.com' // No callback URL
     );
 
     expect($request->callbackUrl)->toBeNull();
 });
 
-test('it handles very large amounts', function () {
+test('it handles very large amounts', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 999999999.99, // Maximum allowed
         'currency' => 'NGN',
@@ -94,7 +92,7 @@ test('it handles very large amounts', function () {
     expect($request->amount)->toBe(999999999.99);
 });
 
-test('it handles special characters in metadata', function () {
+test('it handles special characters in metadata', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -110,7 +108,7 @@ test('it handles special characters in metadata', function () {
         ->and($request->metadata['description'])->toContain('Special');
 });
 
-test('it handles multiple payment channels', function () {
+test('it handles multiple payment channels', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -123,7 +121,7 @@ test('it handles multiple payment channels', function () {
         ->and($request->channels)->toContain('card', 'bank', 'ussd', 'qr');
 });
 
-test('it handles null channels when not specified', function () {
+test('it handles null channels when not specified', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -133,7 +131,7 @@ test('it handles null channels when not specified', function () {
     expect($request->channels)->toBeNull();
 });
 
-test('it handles custom reference generation', function () {
+test('it handles custom reference generation', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -144,7 +142,7 @@ test('it handles custom reference generation', function () {
     expect($request->reference)->toBe('CUSTOM_REF_123');
 });
 
-test('it handles idempotency keys', function () {
+test('it handles idempotency keys', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -155,7 +153,7 @@ test('it handles idempotency keys', function () {
     expect($request->idempotencyKey)->toBe('idempotent_key_123');
 });
 
-test('it auto-generates idempotency keys when not provided', function () {
+test('it auto-generates idempotency keys when not provided', function (): void {
     $request1 = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -173,7 +171,7 @@ test('it auto-generates idempotency keys when not provided', function () {
         ->and($request1->idempotencyKey)->not->toBe($request2->idempotencyKey);
 });
 
-test('it handles customer details', function () {
+test('it handles customer details', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',
@@ -189,7 +187,7 @@ test('it handles customer details', function () {
         ->and($request->customer['phone'])->toBe('+2348012345678');
 });
 
-test('it handles null customer when not provided', function () {
+test('it handles null customer when not provided', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 10000,
         'currency' => 'NGN',

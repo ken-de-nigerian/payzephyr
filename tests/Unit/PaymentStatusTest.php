@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 
-test('payment status enum has all cases', function () {
+test('payment status enum has all cases', function (): void {
     expect(PaymentStatus::cases())->toHaveCount(4)
         ->and(PaymentStatus::SUCCESS->value)->toBe('success')
         ->and(PaymentStatus::FAILED->value)->toBe('failed')
@@ -10,26 +10,26 @@ test('payment status enum has all cases', function () {
         ->and(PaymentStatus::CANCELLED->value)->toBe('cancelled');
 });
 
-test('payment status all method returns all values', function () {
+test('payment status all method returns all values', function (): void {
     $all = PaymentStatus::all();
 
     expect($all)->toHaveCount(4)
         ->and($all)->toContain('success', 'failed', 'pending', 'cancelled');
 });
 
-test('payment status fromString creates enum from valid string', function () {
+test('payment status fromString creates enum from valid string', function (): void {
     expect(PaymentStatus::fromString('success'))->toBe(PaymentStatus::SUCCESS)
         ->and(PaymentStatus::fromString('FAILED'))->toBe(PaymentStatus::FAILED)
         ->and(PaymentStatus::fromString('  PENDING  '))->toBe(PaymentStatus::PENDING)
         ->and(PaymentStatus::fromString('CANCELLED'))->toBe(PaymentStatus::CANCELLED);
 });
 
-test('payment status fromString throws ValueError for invalid string', function () {
-    expect(fn () => PaymentStatus::fromString('invalid'))
+test('payment status fromString throws ValueError for invalid string', function (): void {
+    expect(fn (): PaymentStatus => PaymentStatus::fromString('invalid'))
         ->toThrow(\ValueError::class);
 });
 
-test('payment status isValid checks if string is valid', function () {
+test('payment status isValid checks if string is valid', function (): void {
     expect(PaymentStatus::isValid('success'))->toBeTrue()
         ->and(PaymentStatus::isValid('failed'))->toBeTrue()
         ->and(PaymentStatus::isValid('pending'))->toBeTrue()
@@ -38,7 +38,7 @@ test('payment status isValid checks if string is valid', function () {
         ->and(PaymentStatus::isValid(''))->toBeFalse();
 });
 
-test('payment status isSuccessfulString checks string status', function () {
+test('payment status isSuccessfulString checks string status', function (): void {
     expect(PaymentStatus::isSuccessfulString('success'))->toBeTrue()
         ->and(PaymentStatus::isSuccessfulString('SUCCESS'))->toBeTrue()
         ->and(PaymentStatus::isSuccessfulString('failed'))->toBeFalse()
@@ -46,7 +46,7 @@ test('payment status isSuccessfulString checks string status', function () {
         ->and(PaymentStatus::isSuccessfulString('invalid'))->toBeFalse();
 });
 
-test('payment status isFailedString checks string status', function () {
+test('payment status isFailedString checks string status', function (): void {
     expect(PaymentStatus::isFailedString('failed'))->toBeTrue()
         ->and(PaymentStatus::isFailedString('cancelled'))->toBeTrue()
         ->and(PaymentStatus::isFailedString('CANCELLED'))->toBeTrue()
@@ -55,7 +55,7 @@ test('payment status isFailedString checks string status', function () {
         ->and(PaymentStatus::isFailedString('invalid'))->toBeFalse();
 });
 
-test('payment status isPendingString checks string status', function () {
+test('payment status isPendingString checks string status', function (): void {
     expect(PaymentStatus::isPendingString('pending'))->toBeTrue()
         ->and(PaymentStatus::isPendingString('PENDING'))->toBeTrue()
         ->and(PaymentStatus::isPendingString('success'))->toBeFalse()
@@ -63,35 +63,35 @@ test('payment status isPendingString checks string status', function () {
         ->and(PaymentStatus::isPendingString('invalid'))->toBeFalse();
 });
 
-test('payment status isSuccessful method works correctly', function () {
+test('payment status isSuccessful method works correctly', function (): void {
     expect(PaymentStatus::SUCCESS->isSuccessful())->toBeTrue()
         ->and(PaymentStatus::FAILED->isSuccessful())->toBeFalse()
         ->and(PaymentStatus::PENDING->isSuccessful())->toBeFalse()
         ->and(PaymentStatus::CANCELLED->isSuccessful())->toBeFalse();
 });
 
-test('payment status isFailed method works correctly', function () {
+test('payment status isFailed method works correctly', function (): void {
     expect(PaymentStatus::FAILED->isFailed())->toBeTrue()
         ->and(PaymentStatus::CANCELLED->isFailed())->toBeTrue()
         ->and(PaymentStatus::SUCCESS->isFailed())->toBeFalse()
         ->and(PaymentStatus::PENDING->isFailed())->toBeFalse();
 });
 
-test('payment status isPending method works correctly', function () {
+test('payment status isPending method works correctly', function (): void {
     expect(PaymentStatus::PENDING->isPending())->toBeTrue()
         ->and(PaymentStatus::SUCCESS->isPending())->toBeFalse()
         ->and(PaymentStatus::FAILED->isPending())->toBeFalse()
         ->and(PaymentStatus::CANCELLED->isPending())->toBeFalse();
 });
 
-test('payment status tryFromString returns enum for valid values', function () {
+test('payment status tryFromString returns enum for valid values', function (): void {
     expect(PaymentStatus::tryFromString('success'))->toBe(PaymentStatus::SUCCESS)
         ->and(PaymentStatus::tryFromString('FAILED'))->toBe(PaymentStatus::FAILED)
         ->and(PaymentStatus::tryFromString('  PENDING  '))->toBe(PaymentStatus::PENDING)
         ->and(PaymentStatus::tryFromString('CANCELLED'))->toBe(PaymentStatus::CANCELLED);
 });
 
-test('payment status tryFromString returns null for invalid values', function () {
+test('payment status tryFromString returns null for invalid values', function (): void {
     expect(PaymentStatus::tryFromString('invalid'))->toBeNull()
         ->and(PaymentStatus::tryFromString(''))->toBeNull()
         ->and(PaymentStatus::tryFromString('unknown'))->toBeNull();

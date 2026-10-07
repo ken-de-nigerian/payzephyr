@@ -2,8 +2,11 @@
 
 declare(strict_types=1);
 
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
@@ -11,6 +14,7 @@ use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use Stripe\Collection;
 use Stripe\Customer;
 use Stripe\Price;
+use Stripe\Product;
 use Stripe\Refund;
 use Stripe\Subscription;
 
@@ -65,8 +69,8 @@ function sdkSubscription(array $overrides = []): Subscription
     ], $overrides));
 }
 
-test('a subscription the SDK returns is mapped from its data, not its internals', function () {
-    $driver = stripeSdkDriver(['subscriptions' => stripeSdkResource(['retrieve' => fn () => sdkSubscription()])]);
+test('a subscription the SDK returns is mapped from its data, not its internals', function (): void {
+    $driver = stripeSdkDriver(['subscriptions' => stripeSdkResource(['retrieve' => fn (): Subscription => sdkSubscription()])]);
 
     $subscription = $driver->fetchSubscription('sub_1');
 
@@ -80,13 +84,13 @@ test('a subscription the SDK returns is mapped from its data, not its internals'
         ->and($subscription->metadata)->toBe(['tier' => 'gold']);
 });
 
-test('a subscription whose customer and price were not expanded still maps', function () {
+test('a subscription whose customer and price were not expanded still maps', function (): void {
     $sdk = sdkSubscription([
         'customer' => 'cus_1',
         'items' => ['object' => 'list', 'data' => [['id' => 'si_1', 'object' => 'subscription_item', 'price' => 'price_1']]],
         'current_period_end' => null,
     ]);
-    $driver = stripeSdkDriver(['subscriptions' => stripeSdkResource(['retrieve' => fn () => $sdk])]);
+    $driver = stripeSdkDriver(['subscriptions' => stripeSdkResource(['retrieve' => fn (): Subscription => $sdk])]);
 
     $subscription = $driver->fetchSubscription('sub_1');
 
@@ -97,16 +101,16 @@ test('a subscription whose customer and price were not expanded still maps', fun
         ->and($subscription->nextPaymentDate)->toBeNull();
 });
 
-test('a subscription response without an id is refused, not mapped with an empty code', function () {
+test('a subscription response without an id is refused, not mapped with an empty code', function (): void {
     $driver = stripeSdkDriver(['subscriptions' => stripeSdkResource([
         'retrieve' => fn () => Subscription::constructFrom(['object' => 'subscription', 'status' => 'active']),
     ])]);
 
-    expect(fn () => $driver->fetchSubscription('sub_1'))
+    expect(fn (): SubscriptionResponseDTO => $driver->fetchSubscription('sub_1'))
         ->toThrow(ChargeException::class, '[stripe] omitted the required field [id] from its subscription response');
 });
 
-test('listing subscriptions maps each SDK object and filters by the found customer', function () {
+test('listing subscriptions maps each SDK object and filters by the found customer', function (): void {
     $subscriptions = stripeSdkResource(['all' => fn () => Collection::constructFrom([
         'object' => 'list', 'has_more' => false, 'data' => [sdkSubscription()->toArray()],
     ])]);
@@ -122,8 +126,8 @@ test('listing subscriptions maps each SDK object and filters by the found custom
         ->and($subscriptions->calls[0][1][0]['customer'])->toBe('cus_1');
 });
 
-test('creating a subscription sends flat metadata and the found customer id', function () {
-    $subscriptions = stripeSdkResource(['create' => fn () => sdkSubscription(['customer' => 'cus_9'])]);
+test('creating a subscription sends flat metadata and the found customer id', function (): void {
+    $subscriptions = stripeSdkResource(['create' => fn (): Subscription => sdkSubscription(['customer' => 'cus_9'])]);
     $customers = stripeSdkResource([
         'all' => fn () => Collection::constructFrom(['object' => 'list', 'data' => []]),
         'create' => fn () => Customer::constructFrom(['id' => 'cus_9', 'object' => 'customer', 'email' => 'new@b.com']),
@@ -144,7 +148,7 @@ test('creating a subscription sends flat metadata and the found customer id', fu
         ->and($response->customer)->toBe('new@b.com');
 });
 
-test('a plan the SDK returns is mapped from its data, with the product expanded on it', function () {
+test('a plan the SDK returns is mapped from its data, with the product expanded on it', function (): void {
     $price = Price::constructFrom([
         'id' => 'price_1', 'object' => 'price', 'unit_amount' => 1999, 'currency' => 'usd',
         'recurring' => ['interval' => 'year'],
@@ -164,7 +168,7 @@ test('a plan the SDK returns is mapped from its data, with the product expanded 
         ->and($plan->metadata)->toBe(['audience' => 'teams']);
 });
 
-test('updating a plan whose product was not expanded uses the product id', function () {
+test('updating a plan whose product was not expanded uses the product id', function (): void {
     $price = Price::constructFrom([
         'id' => 'price_1', 'object' => 'price', 'unit_amount' => 1000, 'currency' => 'usd',
         'recurring' => ['interval' => 'month'], 'metadata' => ['audience' => 'teams'], 'product' => 'prod_7',
@@ -174,7 +178,7 @@ test('updating a plan whose product was not expanded uses the product id', funct
         'create' => fn (array $params) => Price::constructFrom(['id' => 'price_2', 'object' => 'price'] + $params),
     ]);
     $products = stripeSdkResource([
-        'retrieve' => fn (string $id) => Stripe\Product::constructFrom(['id' => $id, 'object' => 'product', 'name' => 'Team']),
+        'retrieve' => fn (string $id) => Product::constructFrom(['id' => $id, 'object' => 'product', 'name' => 'Team']),
     ]);
     $driver = stripeSdkDriver(['prices' => $prices, 'products' => $products]);
 
@@ -193,14 +197,14 @@ test('updating a plan whose product was not expanded uses the product id', funct
         ->and($plan->planCode)->toBe('price_2');
 });
 
-test('a plan is switched off by any value that is a switch', function (mixed $off) {
+test('a plan is switched off by any value that is a switch', function (mixed $off): void {
     $price = Price::constructFrom([
         'id' => 'price_1', 'object' => 'price', 'unit_amount' => 1000, 'currency' => 'usd',
         'recurring' => ['interval' => 'month'], 'product' => 'prod_7',
     ]);
     $prices = stripeSdkResource(['retrieve' => fn () => $price, 'update' => fn () => $price]);
     $products = stripeSdkResource([
-        'retrieve' => fn (string $id) => Stripe\Product::constructFrom(['id' => $id, 'object' => 'product', 'name' => 'Team']),
+        'retrieve' => fn (string $id) => Product::constructFrom(['id' => $id, 'object' => 'product', 'name' => 'Team']),
     ]);
 
     stripeSdkDriver(['prices' => $prices, 'products' => $products])->updatePlan('price_1', ['active' => $off]);
@@ -208,15 +212,15 @@ test('a plan is switched off by any value that is a switch', function (mixed $of
     expect($prices->calls[1][1][1])->toBe(['active' => false]);
 })->with([false, 0, '0', 'false', 'off']);
 
-test('a plan update whose active is not a switch is refused before Stripe is called', function () {
+test('a plan update whose active is not a switch is refused before Stripe is called', function (): void {
     $prices = stripeSdkResource([]);
 
-    expect(fn () => stripeSdkDriver(['prices' => $prices])->updatePlan('price_1', ['active' => 'archived']))
+    expect(fn (): PlanResponseDTO => stripeSdkDriver(['prices' => $prices])->updatePlan('price_1', ['active' => 'archived']))
         ->toThrow(PlanException::class, 'Plan active must be true or false. Nothing was updated.')
         ->and($prices->calls)->toBe([]);
 });
 
-test('a refund the SDK returns is mapped from its data, not its internals', function () {
+test('a refund the SDK returns is mapped from its data, not its internals', function (): void {
     $refunds = stripeSdkResource(['create' => fn () => Refund::constructFrom([
         'id' => 're_1', 'object' => 'refund', 'status' => 'succeeded', 'amount' => 5000, 'currency' => 'usd',
         'payment_intent' => 'pi_1', 'metadata' => ['ticket' => '4411'],
@@ -237,7 +241,7 @@ test('a refund the SDK returns is mapped from its data, not its internals', func
         ->and($refunds->calls[0][1][0]['metadata'])->toBe(['ticket' => '4411', 'lines' => '["a","b"]']);
 });
 
-test('a refund with its payment intent expanded reports the intent id', function () {
+test('a refund with its payment intent expanded reports the intent id', function (): void {
     $driver = stripeSdkDriver(['refunds' => stripeSdkResource(['retrieve' => fn () => Refund::constructFrom([
         'id' => 're_1', 'object' => 'refund', 'status' => 'succeeded', 'amount' => 5000, 'currency' => 'usd',
         'payment_intent' => ['id' => 'pi_9', 'object' => 'payment_intent', 'amount' => 5000],
@@ -246,11 +250,11 @@ test('a refund with its payment intent expanded reports the intent id', function
     expect($driver->fetchRefund('re_1')->transactionReference)->toBe('pi_9');
 });
 
-test('a refund response without a status is reported as unreadable, not mapped', function () {
+test('a refund response without a status is reported as unreadable, not mapped', function (): void {
     $driver = stripeSdkDriver(['refunds' => stripeSdkResource(['retrieve' => fn () => Refund::constructFrom([
         'id' => 're_1', 'object' => 'refund', 'amount' => 5000, 'currency' => 'usd',
     ])])]);
 
-    expect(fn () => $driver->fetchRefund('re_1'))
+    expect(fn (): RefundResponseDTO => $driver->fetchRefund('re_1'))
         ->toThrow(RefundException::class, 'omitted the required field [status] from its refund response');
 });

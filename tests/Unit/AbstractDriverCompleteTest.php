@@ -7,7 +7,7 @@ use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
-test('abstract driver setStatusNormalizer sets custom normalizer', function () {
+test('abstract driver setStatusNormalizer sets custom normalizer', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -54,7 +54,7 @@ test('abstract driver setStatusNormalizer sets custom normalizer', function () {
     expect($result)->toBe($driver);
 });
 
-test('abstract driver setChannelMapper sets custom mapper', function () {
+test('abstract driver setChannelMapper sets custom mapper', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -101,7 +101,7 @@ test('abstract driver setChannelMapper sets custom mapper', function () {
     expect($result)->toBe($driver);
 });
 
-test('abstract driver mapChannels returns null when provider does not support channels', function () {
+test('abstract driver mapChannels returns null when provider does not support channels', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -150,7 +150,7 @@ test('abstract driver mapChannels returns null when provider does not support ch
     expect($result)->toBeNull();
 });
 
-test('abstract driver mapChannels returns null when no channels provided', function () {
+test('abstract driver mapChannels returns null when no channels provided', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -199,7 +199,7 @@ test('abstract driver mapChannels returns null when no channels provided', funct
     expect($result)->toBeNull();
 });
 
-test('abstract driver mapChannels returns mapped channels when provided', function () {
+test('abstract driver mapChannels returns mapped channels when provided', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -248,7 +248,7 @@ test('abstract driver mapChannels returns mapped channels when provided', functi
     expect($result)->toBe(['card', 'bank_transfer']);
 });
 
-test('abstract driver getStatusNormalizer creates instance if not set', function () {
+test('abstract driver getStatusNormalizer creates instance if not set', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -288,7 +288,7 @@ test('abstract driver getStatusNormalizer creates instance if not set', function
             return ['NGN'];
         }
 
-        public function testGetStatusNormalizer()
+        public function testGetStatusNormalizer(): StatusNormalizer
         {
             return $this->getStatusNormalizer();
         }
@@ -299,7 +299,7 @@ test('abstract driver getStatusNormalizer creates instance if not set', function
     expect($normalizer)->toBeInstanceOf(StatusNormalizer::class);
 });
 
-test('abstract driver getChannelMapper creates instance if not set', function () {
+test('abstract driver getChannelMapper creates instance if not set', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -339,7 +339,7 @@ test('abstract driver getChannelMapper creates instance if not set', function ()
             return ['NGN'];
         }
 
-        public function testGetChannelMapper()
+        public function testGetChannelMapper(): ChannelMapper
         {
             return $this->getChannelMapper();
         }
@@ -350,7 +350,7 @@ test('abstract driver getChannelMapper creates instance if not set', function ()
     expect($mapper)->toBeInstanceOf(ChannelMapper::class);
 });
 
-test('abstract driver normalizeStatus uses status normalizer', function () {
+test('abstract driver normalizeStatus uses status normalizer', function (): void {
     $driver = new class(['currencies' => ['NGN']]) extends AbstractDriver
     {
         public function getName(): string
@@ -390,7 +390,7 @@ test('abstract driver normalizeStatus uses status normalizer', function () {
             return ['NGN'];
         }
 
-        public function testNormalizeStatus(string $status)
+        public function testNormalizeStatus(string $status): string
         {
             return $this->normalizeStatus($status);
         }

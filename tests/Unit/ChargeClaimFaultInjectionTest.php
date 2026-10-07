@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -38,7 +40,7 @@ function claimTestDriver(string $name, ?Throwable $throws = null): DriverInterfa
 
         public function charge(ChargeRequestDTO $request): ChargeResponseDTO
         {
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -112,13 +114,12 @@ function claimTestManager(array $drivers): PaymentManager
 {
     $manager = new PaymentManager;
     $property = (new ReflectionClass($manager))->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -135,7 +136,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a cache that cannot release the claim does not replace the real failure', function () {
+test('a cache that cannot release the claim does not replace the real failure', function (): void {
     // The caller asked why the charge failed. "Could not forget a cache key"
     // is PayZephyr talking about itself, and would bury the provider's answer.
     $manager = claimTestManager([
@@ -146,11 +147,11 @@ test('a cache that cannot release the claim does not replace the real failure', 
     Cache::shouldReceive('forget')->andThrow(new RuntimeException('cache backend unreachable'));
 
     $logged = [];
-    Log::listen(function (MessageLogged $message) use (&$logged) {
+    Log::listen(function (MessageLogged $message) use (&$logged): void {
         $logged[] = $message;
     });
 
-    expect(fn () => $manager->chargeWithFallback(claimTestRequest('order_release_fault')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(claimTestRequest('order_release_fault')))
         ->toThrow(ProviderException::class, 'All payment providers failed');
 
     $entry = collect($logged)->firstWhere('message', 'Failed to release charge in-flight claim');
@@ -160,20 +161,20 @@ test('a cache that cannot release the claim does not replace the real failure', 
         ->and($entry->context['error'])->toBe('cache backend unreachable');
 });
 
-test('an ambiguous outcome keeps its claim, so nothing can retry it', function () {
+test('an ambiguous outcome keeps its claim, so nothing can retry it', function (): void {
     // The single most safety-critical branch in the class. Releasing the claim
     // here would reopen the reference for a retry against a provider that may
     // already have taken the customer's money.
-    $ambiguous = ChargeException::withContext('read timed out', [], new GuzzleHttp\Exception\RequestException(
+    $ambiguous = ChargeException::withContext('read timed out', [], new RequestException(
         'read timed out',
-        new GuzzleHttp\Psr7\Request('POST', 'https://api.primary.test/charge'),
+        new Request('POST', 'https://api.primary.test/charge'),
     ));
 
     $manager = claimTestManager([
         'primary' => claimTestDriver('primary', throws: $ambiguous),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(claimTestRequest('order_ambiguous_claim')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(claimTestRequest('order_ambiguous_claim')))
         ->toThrow(ProviderException::class);
 
     // The claim is still held, so a second submission is turned away rather
@@ -182,18 +183,18 @@ test('an ambiguous outcome keeps its claim, so nothing can retry it', function (
         'primary' => claimTestDriver('primary'),
     ]);
 
-    expect(fn () => $second->chargeWithFallback(claimTestRequest('order_ambiguous_claim')))
+    expect(fn (): ChargeResponseDTO => $second->chargeWithFallback(claimTestRequest('order_ambiguous_claim')))
         ->toThrow(ProviderException::class, 'already in progress');
 });
 
-test('a definitive failure releases its claim, so a legitimate retry is allowed', function () {
+test('a definitive failure releases its claim, so a legitimate retry is allowed', function (): void {
     // The other side of the same decision, asserted alongside it: a charge
     // that provably did not happen must not leave its reference unusable.
     $manager = claimTestManager([
         'primary' => claimTestDriver('primary', throws: new ChargeException('card declined')),
     ]);
 
-    expect(fn () => $manager->chargeWithFallback(claimTestRequest('order_definitive')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(claimTestRequest('order_definitive')))
         ->toThrow(ProviderException::class);
 
     $retry = claimTestManager(['primary' => claimTestDriver('primary')]);
@@ -202,7 +203,7 @@ test('a definitive failure releases its claim, so a legitimate retry is allowed'
         ->toBe('order_definitive');
 });
 
-test('a logger that fails after a successful charge still reports the charge as successful', function () {
+test('a logger that fails after a successful charge still reports the charge as successful', function (): void {
     // The last guard in completeSuccessfulCharge(). The money has moved; the
     // caller must hear that, whatever state PayZephyr's logging is in.
     //
@@ -223,7 +224,7 @@ test('a logger that fails after a successful charge still reports the charge as 
         ->and($response->provider)->toBe('primary');
 });
 
-test('a raw ambiguous ChargeException is recognised even unwrapped', function () {
+test('a raw ambiguous ChargeException is recognised even unwrapped', function (): void {
     // Reached by reflection on purpose. attemptChargeChain() always rewraps an
     // ambiguous ChargeException as a ProviderException before chargeWithFallback
     // sees it, so this branch is unreachable from the only current caller.
@@ -231,9 +232,9 @@ test('a raw ambiguous ChargeException is recognised even unwrapped', function ()
     // It is not dead weight: the whole method answers "is retrying unsafe?",
     // and a future caller handed the unwrapped exception must get the same
     // answer. Saying "safe to retry" here would permit a double charge.
-    $ambiguous = ChargeException::withContext('read timed out', [], new GuzzleHttp\Exception\RequestException(
+    $ambiguous = ChargeException::withContext('read timed out', [], new RequestException(
         'read timed out',
-        new GuzzleHttp\Psr7\Request('POST', 'https://api.primary.test/charge'),
+        new Request('POST', 'https://api.primary.test/charge'),
     ));
 
     $manager = claimTestManager(['primary' => claimTestDriver('primary')]);

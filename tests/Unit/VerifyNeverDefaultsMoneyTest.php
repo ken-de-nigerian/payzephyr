@@ -143,7 +143,7 @@ dataset('drivers with an amount and currency to lose', [
     'paddle totals block' => ['paddle', 'data.details.totals', 'totals'],
 ]);
 
-test('the complete response verifies, so the fixture is sound', function (string $provider) {
+test('the complete response verifies, so the fixture is sound', function (string $provider): void {
     [$driver, $reference] = verifyScenario($provider);
 
     $result = $driver->verify($reference);
@@ -152,7 +152,7 @@ test('the complete response verifies, so the fixture is sound', function (string
         ->and($result->currency)->not->toBe('');
 })->with(['paystack', 'flutterwave', 'monnify', 'opay', 'paypal', 'mollie', 'paddle', 'razorpay']);
 
-test('a verify response missing a money field is refused, never reported', function (string $provider, string $omit, string $field) {
+test('a verify response missing a money field is refused, never reported', function (string $provider, string $omit, string $field): void {
     [$driver, $reference] = verifyScenario($provider, $omit);
 
     $reported = null;

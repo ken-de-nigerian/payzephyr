@@ -30,11 +30,11 @@ function makeRefundValidator(
     return new RefundValidator($refundRepository, $transactionRepository);
 }
 
-afterEach(function () {
+afterEach(function (): void {
     app()->forgetInstance('payments.config');
 });
 
-test('validateRefund passes silently when the original transaction cannot be found', function () {
+test('validateRefund passes silently when the original transaction cannot be found', function (): void {
     $validator = makeRefundValidator(null);
 
     $validator->validateRefund(new RefundRequestDTO(transactionReference: 'txn_unknown', amount: 100.0));
@@ -42,7 +42,7 @@ test('validateRefund passes silently when the original transaction cannot be fou
     expect(true)->toBeTrue();
 });
 
-test('validateRefund passes silently when the transaction lookup itself throws', function () {
+test('validateRefund passes silently when the transaction lookup itself throws', function (): void {
     $validator = makeRefundValidator(null, lookupThrows: true);
 
     $validator->validateRefund(new RefundRequestDTO(transactionReference: 'txn_unknown', amount: 100.0));
@@ -50,7 +50,7 @@ test('validateRefund passes silently when the transaction lookup itself throws',
     expect(true)->toBeTrue();
 });
 
-test('validateRefund allows a full refund within the remaining balance', function () {
+test('validateRefund allows a full refund within the remaining balance', function (): void {
     $transaction = new PaymentTransaction(['amount' => 100.0]);
     $validator = makeRefundValidator($transaction, alreadyRefunded: 0.0);
 
@@ -59,7 +59,7 @@ test('validateRefund allows a full refund within the remaining balance', functio
     expect(true)->toBeTrue();
 });
 
-test('validateRefund allows a partial refund within the remaining balance', function () {
+test('validateRefund allows a partial refund within the remaining balance', function (): void {
     $transaction = new PaymentTransaction(['amount' => 100.0]);
     $validator = makeRefundValidator($transaction, alreadyRefunded: 30.0);
 
@@ -68,21 +68,21 @@ test('validateRefund allows a partial refund within the remaining balance', func
     expect(true)->toBeTrue();
 });
 
-test('validateRefund rejects a refund exceeding the remaining balance', function () {
+test('validateRefund rejects a refund exceeding the remaining balance', function (): void {
     $transaction = new PaymentTransaction(['amount' => 100.0]);
     $validator = makeRefundValidator($transaction, alreadyRefunded: 30.0);
 
     $validator->validateRefund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 90.0));
 })->throws(RefundException::class, 'exceeds the remaining refundable balance');
 
-test('validateRefund rejects any refund once the transaction is already fully refunded', function () {
+test('validateRefund rejects any refund once the transaction is already fully refunded', function (): void {
     $transaction = new PaymentTransaction(['amount' => 100.0]);
     $validator = makeRefundValidator($transaction, alreadyRefunded: 100.0);
 
     $validator->validateRefund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 1.0));
 })->throws(RefundException::class, 'already been fully refunded');
 
-test('validateRefund rejects a second refund attempt while an earlier one is still in flight, by default', function () {
+test('validateRefund rejects a second refund attempt while an earlier one is still in flight, by default', function (): void {
     // Guards against a double-clicked "refund" button or an accidental
     // duplicate ->refund() call firing two requests for the same
     // transaction before the first one's webhook confirms - independent of
@@ -94,7 +94,7 @@ test('validateRefund rejects a second refund attempt while an earlier one is sti
     $validator->validateRefund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 50.0));
 })->throws(RefundException::class, 'already in progress');
 
-test('validateRefund allows a new refund once prior refunds on the transaction have all resolved', function () {
+test('validateRefund allows a new refund once prior refunds on the transaction have all resolved', function (): void {
     // hasInFlightRefund() only reports true for pending/processing rows -
     // once a prior refund is completed/failed/cancelled, a genuinely new
     // (sequential, not concurrent) partial refund must still be allowed.
@@ -106,7 +106,7 @@ test('validateRefund allows a new refund once prior refunds on the transaction h
     expect(true)->toBeTrue();
 });
 
-test('validateRefund skips the in-flight duplicate guard when prevent_duplicates is disabled', function () {
+test('validateRefund skips the in-flight duplicate guard when prevent_duplicates is disabled', function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.refunds.prevent_duplicates' => false]);
 

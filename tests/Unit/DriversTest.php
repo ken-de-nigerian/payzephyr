@@ -7,7 +7,7 @@ use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 
-test('flutterwave driver initializes correctly', function () {
+test('flutterwave driver initializes correctly', function (): void {
     $config = [
         'secret_key' => 'test_secret',
         'public_key' => 'test_public',
@@ -24,11 +24,11 @@ test('flutterwave driver initializes correctly', function () {
         ->and($driver->isCurrencySupported('GBP'))->toBeFalse();
 });
 
-test('flutterwave driver requires secret key', function () {
+test('flutterwave driver requires secret key', function (): void {
     new FlutterwaveDriver(['public_key' => 'test']);
 })->throws(InvalidConfigurationException::class);
 
-test('flutterwave driver validates webhook with correct signature', function () {
+test('flutterwave driver validates webhook with correct signature', function (): void {
     $config = [
         'secret_key' => 'test_secret',
         'webhook_secret' => 'webhook_secret',
@@ -42,7 +42,7 @@ test('flutterwave driver validates webhook with correct signature', function () 
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('flutterwave driver rejects invalid webhook signature', function () {
+test('flutterwave driver rejects invalid webhook signature', function (): void {
     $config = [
         'secret_key' => 'test_secret',
         'webhook_secret' => 'webhook_secret',
@@ -55,7 +55,7 @@ test('flutterwave driver rejects invalid webhook signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('stripe driver initializes correctly', function () {
+test('stripe driver initializes correctly', function (): void {
     $config = [
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -69,11 +69,11 @@ test('stripe driver initializes correctly', function () {
         ->and($driver->isCurrencySupported('USD'))->toBeTrue();
 });
 
-test('stripe driver requires secret key', function () {
+test('stripe driver requires secret key', function (): void {
     new StripeDriver(['public_key' => 'test']);
 })->throws(InvalidConfigurationException::class);
 
-test('monnify driver initializes correctly', function () {
+test('monnify driver initializes correctly', function (): void {
     $config = [
         'api_key' => 'test_api',
         'secret_key' => 'test_secret',
@@ -90,18 +90,18 @@ test('monnify driver initializes correctly', function () {
         ->and($driver->isCurrencySupported('USD'))->toBeFalse();
 });
 
-test('monnify driver requires api key and secret', function () {
+test('monnify driver requires api key and secret', function (): void {
     new MonnifyDriver(['contract_code' => 'test']);
 })->throws(InvalidConfigurationException::class);
 
-test('monnify driver requires contract code', function () {
+test('monnify driver requires contract code', function (): void {
     new MonnifyDriver([
         'api_key' => 'test',
         'secret_key' => 'test',
     ]);
 })->throws(InvalidConfigurationException::class);
 
-test('monnify driver validates webhook signature', function () {
+test('monnify driver validates webhook signature', function (): void {
     $config = [
         'api_key' => 'test_api',
         'secret_key' => 'test_secret',
@@ -117,7 +117,7 @@ test('monnify driver validates webhook signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('paypal driver initializes correctly', function () {
+test('paypal driver initializes correctly', function (): void {
     $config = [
         'client_id' => 'test_client',
         'client_secret' => 'test_secret',
@@ -132,11 +132,11 @@ test('paypal driver initializes correctly', function () {
         ->and($driver->getSupportedCurrencies())->toContain('USD');
 });
 
-test('paypal driver requires client id and secret', function () {
+test('paypal driver requires client id and secret', function (): void {
     new PayPalDriver(['mode' => 'sandbox']);
 })->throws(InvalidConfigurationException::class);
 
-test('paystack driver validates correct webhook signature', function () {
+test('paystack driver validates correct webhook signature', function (): void {
     $config = ['secret_key' => 'test_secret'];
     $driver = new PaystackDriver($config);
 
@@ -149,7 +149,7 @@ test('paystack driver validates correct webhook signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('paystack driver rejects invalid webhook signature', function () {
+test('paystack driver rejects invalid webhook signature', function (): void {
     $config = ['secret_key' => 'test_secret'];
     $driver = new PaystackDriver($config);
 
@@ -159,7 +159,7 @@ test('paystack driver rejects invalid webhook signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('paystack driver rejects webhook without signature', function () {
+test('paystack driver rejects webhook without signature', function (): void {
     $config = ['secret_key' => 'test_secret'];
     $driver = new PaystackDriver($config);
 
@@ -169,7 +169,7 @@ test('paystack driver rejects webhook without signature', function () {
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('all drivers check currency support correctly', function () {
+test('all drivers check currency support correctly', function (): void {
     $paystackDriver = new PaystackDriver([
         'secret_key' => 'test',
         'currencies' => ['NGN', 'USD'],
@@ -186,7 +186,7 @@ test('all drivers check currency support correctly', function () {
         ->and($stripeDriver->isCurrencySupported('NGN'))->toBeFalse();
 });
 
-test('drivers return correct supported currencies list', function () {
+test('drivers return correct supported currencies list', function (): void {
     $config = [
         'secret_key' => 'test',
         'currencies' => ['USD', 'EUR', 'GBP'],
@@ -199,7 +199,7 @@ test('drivers return correct supported currencies list', function () {
         ->and($driver->getSupportedCurrencies())->toHaveCount(3);
 });
 
-test('all drivers return correct names', function () {
+test('all drivers return correct names', function (): void {
     $drivers = [
         new PaystackDriver(['secret_key' => 'test']),
         new FlutterwaveDriver(['secret_key' => 'test']),

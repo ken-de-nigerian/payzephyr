@@ -56,7 +56,7 @@ function makeReferenceRecordingDriver(string $name, ?Throwable $throws = null): 
             $this->chargeCalls++;
             $this->seenReferences[] = $request->reference;
 
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -73,7 +73,7 @@ function makeReferenceRecordingDriver(string $name, ?Throwable $throws = null): 
         {
             $this->verifyCalls++;
 
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -136,7 +136,6 @@ function makeReferenceTestManager(array $drivers): PaymentManager
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
@@ -151,7 +150,7 @@ function referencelessChargeRequest(): ChargeRequestDTO
     ]);
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -171,7 +170,7 @@ beforeEach(function () {
 // One payment, one reference
 // ---------------------------------------------------------------------------
 
-test('a charge with no caller-supplied reference is given one before any driver sees it', function () {
+test('a charge with no caller-supplied reference is given one before any driver sees it', function (): void {
     $primary = makeReferenceRecordingDriver('primary');
     $manager = makeReferenceTestManager(['primary' => $primary]);
 
@@ -183,7 +182,7 @@ test('a charge with no caller-supplied reference is given one before any driver 
         ->and($response->reference)->not->toStartWith('GENERATED_BY_');
 });
 
-test('every provider in the fallback chain is handed the same reference', function () {
+test('every provider in the fallback chain is handed the same reference', function (): void {
     // The regression this whole change exists for: without a caller-supplied
     // reference, the failed attempt and the successful one used to be
     // completely unrelatable.
@@ -201,7 +200,7 @@ test('every provider in the fallback chain is handed the same reference', functi
         ->and($response->reference)->toBe($primary->seenReferences[0]);
 });
 
-test('a caller-supplied reference is passed through untouched', function () {
+test('a caller-supplied reference is passed through untouched', function (): void {
     $primary = makeReferenceRecordingDriver('primary');
     $manager = makeReferenceTestManager(['primary' => $primary]);
 
@@ -222,7 +221,7 @@ test('a caller-supplied reference is passed through untouched', function () {
 // Shape of a generated reference
 // ---------------------------------------------------------------------------
 
-test('a generated reference carries the provider-neutral prefix, not a provider name', function () {
+test('a generated reference carries the provider-neutral prefix, not a provider name', function (): void {
     // A reference minted before the chain runs cannot know which provider will
     // fulfil it. Naming one would make ProviderDetector resolve it confidently
     // and wrongly the moment a fallback wins.
@@ -236,7 +235,7 @@ test('a generated reference carries the provider-neutral prefix, not a provider 
         ->and($reference)->not->toContain('SECONDARY');
 });
 
-test('a generated reference is valid input to ChargeRequestDTO', function () {
+test('a generated reference is valid input to ChargeRequestDTO', function (): void {
     // Whatever PayZephyr mints must survive being handed straight back to it,
     // which is exactly what a caller re-submitting or verifying will do.
     $primary = makeReferenceRecordingDriver('primary');
@@ -252,10 +251,10 @@ test('a generated reference is valid input to ChargeRequestDTO', function () {
     ]);
 
     expect($roundTripped->reference)->toBe($reference)
-        ->and(strlen((string) $reference))->toBeLessThanOrEqual(PaymentConstants::MAX_REFERENCE_LENGTH);
+        ->and(strlen($reference))->toBeLessThanOrEqual(PaymentConstants::MAX_REFERENCE_LENGTH);
 });
 
-test('two referenceless charges are given different references', function () {
+test('two referenceless charges are given different references', function (): void {
     $primary = makeReferenceRecordingDriver('primary');
     $manager = makeReferenceTestManager(['primary' => $primary]);
 
@@ -269,7 +268,7 @@ test('two referenceless charges are given different references', function () {
 // The in-flight claim, now that there is something to claim
 // ---------------------------------------------------------------------------
 
-test('a referenceless charge now takes an in-flight claim it can be held to', function () {
+test('a referenceless charge now takes an in-flight claim it can be held to', function (): void {
     // claimChargeInFlight() returns early on a null reference, so before this
     // change an auto-referenced charge took no claim at all and re-submitting
     // the reference PayZephyr had just handed back charged the customer again.
@@ -285,19 +284,19 @@ test('a referenceless charge now takes an in-flight claim it can be held to', fu
         'reference' => $reference,
     ]);
 
-    expect(fn () => $manager->chargeWithFallback($resubmission))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback($resubmission))
         ->toThrow(ProviderException::class, 'already in progress');
 
     expect($primary->chargeCalls)->toBe(1);
 });
 
-test('a referenceless charge that definitively fails releases its claim', function () {
+test('a referenceless charge that definitively fails releases its claim', function (): void {
     // The claim is now taken for these charges, so it must also be given back -
     // otherwise a failed auto-referenced charge would poison its own reference.
     $failing = makeReferenceRecordingDriver('primary', throws: new ChargeException('card declined'));
     $manager = makeReferenceTestManager(['primary' => $failing]);
 
-    expect(fn () => $manager->chargeWithFallback(referencelessChargeRequest()))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(referencelessChargeRequest()))
         ->toThrow(ProviderException::class);
 
     $reference = $failing->seenReferences[0];
@@ -319,7 +318,7 @@ test('a referenceless charge that definitively fails releases its claim', functi
 // ChargeRequestDTO::withReference()
 // ---------------------------------------------------------------------------
 
-test('withReference preserves every other field, including the idempotency key', function () {
+test('withReference preserves every other field, including the idempotency key', function (): void {
     $original = ChargeRequestDTO::fromArray([
         'amount' => 250.50,
         'currency' => 'NGN',
@@ -350,7 +349,7 @@ test('withReference preserves every other field, including the idempotency key',
         ->and($stamped->channels)->toBe($original->channels);
 });
 
-test('withReference leaves the original request untouched', function () {
+test('withReference leaves the original request untouched', function (): void {
     $original = referencelessChargeRequest();
 
     $original->withReference('PZ_1_abc');
@@ -358,12 +357,12 @@ test('withReference leaves the original request untouched', function () {
     expect($original->reference)->toBeNull();
 });
 
-test('withReference rejects a reference the DTO would not have accepted', function () {
-    expect(fn () => referencelessChargeRequest()->withReference('has spaces and !'))
+test('withReference rejects a reference the DTO would not have accepted', function (): void {
+    expect(fn (): ChargeRequestDTO => referencelessChargeRequest()->withReference('has spaces and !'))
         ->toThrow(InvalidArgumentException::class, 'Invalid reference format');
 });
 
-test('the unreferenced-request guard on the in-flight claim still refuses to claim', function () {
+test('the unreferenced-request guard on the in-flight claim still refuses to claim', function (): void {
     // Reached by reflection on purpose. resolveChargeReference() makes this
     // branch unreachable from chargeWithFallback(), but it is not dead code:
     // it is the only thing standing between a future second call site and a
@@ -382,7 +381,7 @@ test('the unreferenced-request guard on the in-flight claim still refuses to cla
 // Documented consequence: a neutral prefix is not provider-detectable
 // ---------------------------------------------------------------------------
 
-test('verifying a generated reference with no stored context falls through the enabled providers', function () {
+test('verifying a generated reference with no stored context falls through the enabled providers', function (): void {
     // ProviderDetector resolves a provider from a reference *prefix*, so a
     // neutral prefix yields null - by design. With no cached session and no
     // transaction row, verify() then tries every enabled provider in turn.

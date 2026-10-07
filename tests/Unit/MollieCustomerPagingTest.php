@@ -35,7 +35,7 @@ function mollieDriverRecording(array $responses, array &$history): MollieDriver
     return $driver;
 }
 
-test('a customer past the first page is found, and their subscriptions listed', function () {
+test('a customer past the first page is found, and their subscriptions listed', function (): void {
     $history = [];
     $driver = mollieDriverRecording([
         mollieCustomerPage([['id' => 'cst_1', 'email' => 'someone@else.com']], 'cst_2'),
@@ -55,7 +55,7 @@ test('a customer past the first page is found, and their subscriptions listed', 
         ->and((string) $history[2]['request']->getUri())->toContain('/v2/customers/cst_2/subscriptions');
 });
 
-test('a customer on no page is not found', function () {
+test('a customer on no page is not found', function (): void {
     $history = [];
     $driver = mollieDriverRecording([
         mollieCustomerPage([['id' => 'cst_1', 'email' => 'someone@else.com']], null),
@@ -65,7 +65,7 @@ test('a customer on no page is not found', function () {
         ->and($history)->toHaveCount(1);
 });
 
-test('past the last page searched, the lookup refuses rather than answering not found', function () {
+test('past the last page searched, the lookup refuses rather than answering not found', function (): void {
     $history = [];
     $pages = [];
     for ($i = 1; $i <= 20; $i++) {
@@ -74,7 +74,7 @@ test('past the last page searched, the lookup refuses rather than answering not 
 
     $driver = mollieDriverRecording($pages, $history);
 
-    expect(fn () => $driver->listSubscriptions(customer: 'a@b.com'))->toThrow(
+    expect(fn (): array => $driver->listSubscriptions(customer: 'a@b.com'))->toThrow(
         SubscriptionException::class,
         'Could not tell whether a Mollie customer exists for [a@b.com]: it is not among the first 5000 customers'
     )->and($history)->toHaveCount(20);

@@ -38,7 +38,7 @@ function makePayPalRefundDriver(array $responses, ?array &$history = null, array
     return $driver;
 }
 
-test('paypal refund succeeds against a capture id', function () {
+test('paypal refund succeeds against a capture id', function (): void {
     $driver = makePayPalRefundDriver([
         new Response(200, [], json_encode([
             'id' => '1JU08902781691411',
@@ -57,7 +57,7 @@ test('paypal refund succeeds against a capture id', function () {
         ->and($result->provider)->toBe('paypal');
 });
 
-test('paypal refund formats a zero-decimal currency amount without decimal places', function () {
+test('paypal refund formats a zero-decimal currency amount without decimal places', function (): void {
     // Regression: the refund payload used to hardcode number_format($amount,
     // 2, ...) regardless of currency. PayPal's API rejects a value like
     // "5000.00" for zero-decimal currencies (JPY, KRW, ...) - it expects
@@ -81,7 +81,7 @@ test('paypal refund formats a zero-decimal currency amount without decimal place
         ->and($sentBody['amount']['value'])->not->toContain('.');
 });
 
-test('paypal refund throws exception on api error', function () {
+test('paypal refund throws exception on api error', function (): void {
     $driver = makePayPalRefundDriver([
         new Response(422, [], json_encode(['name' => 'UNPROCESSABLE_ENTITY', 'message' => 'Capture not found'])),
     ]);
@@ -89,7 +89,7 @@ test('paypal refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'invalid'));
 })->throws(RefundException::class);
 
-test('paypal fetchRefund resolves the capture id from the "up" link', function () {
+test('paypal fetchRefund resolves the capture id from the "up" link', function (): void {
     $driver = makePayPalRefundDriver([
         new Response(200, [], json_encode([
             'id' => 're_123',

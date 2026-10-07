@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment idempotency method sets idempotency key', function () {
+test('payment idempotency method sets idempotency key', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -12,7 +14,7 @@ test('payment idempotency method sets idempotency key', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment idempotency can be chained', function () {
+test('payment idempotency can be chained', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -25,7 +27,7 @@ test('payment idempotency can be chained', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment channels method sets channels array', function () {
+test('payment channels method sets channels array', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -34,7 +36,7 @@ test('payment channels method sets channels array', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment channels can be chained', function () {
+test('payment channels can be chained', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -47,7 +49,7 @@ test('payment channels can be chained', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment charge uses channels from data', function () {
+test('payment charge uses channels from data', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -71,7 +73,7 @@ test('payment charge uses channels from data', function () {
     expect($data['channels'])->toBe(['card', 'bank_transfer']);
 });
 
-test('payment charge merges channels with default currency', function () {
+test('payment charge merges channels with default currency', function (): void {
     config([
         'payments.currency.default' => 'NGN',
         'payments.providers.paystack' => [
@@ -95,7 +97,7 @@ test('payment charge merges channels with default currency', function () {
     }
 });
 
-test('payment redirect uses channels from data', function () {
+test('payment redirect uses channels from data', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -118,7 +120,7 @@ test('payment redirect uses channels from data', function () {
     }
 });
 
-test('payment with empty channels array', function () {
+test('payment with empty channels array', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -127,7 +129,7 @@ test('payment with empty channels array', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment idempotency with empty string', function () {
+test('payment idempotency with empty string', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -136,7 +138,7 @@ test('payment idempotency with empty string', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment idempotency with long key', function () {
+test('payment idempotency with long key', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 

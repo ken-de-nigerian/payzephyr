@@ -1,9 +1,12 @@
 <?php
 
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment manager skips provider when currency not supported', function () {
+test('payment manager skips provider when currency not supported', function (): void {
     $manager = app(PaymentManager::class);
 
     config(['payments.providers.paystack.currencies' => ['NGN']]);
@@ -12,10 +15,10 @@ test('payment manager skips provider when currency not supported', function () {
     $request = new ChargeRequestDTO(10000, 'EUR', 'test@example.com', null, 'https://example.com/callback');
 
     expect(fn () => $manager->chargeWithFallback($request, ['paystack', 'stripe']))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ProviderException::class);
+        ->toThrow(ProviderException::class);
 });
 
-test('payment manager logs error when all providers fail', function () {
+test('payment manager logs error when all providers fail', function (): void {
     $manager = app(PaymentManager::class);
 
     config(['payments.providers.paystack.enabled' => true]);
@@ -24,10 +27,10 @@ test('payment manager logs error when all providers fail', function () {
     $request = new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback');
 
     expect(fn () => $manager->chargeWithFallback($request, ['paystack', 'stripe']))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ProviderException::class);
+        ->toThrow(ProviderException::class);
 });
 
-test('payment manager handles database error during transaction logging', function () {
+test('payment manager handles database error during transaction logging', function (): void {
     $manager = app(PaymentManager::class);
 
     config(['payments.logging.enabled' => true]);
@@ -35,15 +38,15 @@ test('payment manager handles database error during transaction logging', functi
     $request = new ChargeRequestDTO(10000, 'NGN', 'test@example.com', null, 'https://example.com/callback');
 
     expect(fn () => $manager->chargeWithFallback($request, ['paystack']))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\ProviderException::class);
+        ->toThrow(ProviderException::class);
 });
 
-test('payment manager handles database error during verification update', function () {
+test('payment manager handles database error during verification update', function (): void {
     $manager = app(PaymentManager::class);
 
     config(['payments.logging.enabled' => true]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -59,27 +62,24 @@ test('payment manager handles database error during verification update', functi
     }
 });
 
-test('payment manager getCacheContext returns null when no auth or request', function () {
+test('payment manager getCacheContext returns null when no auth or request', function (): void {
     $manager = app(PaymentManager::class);
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('getCacheContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager);
 
     expect($result)->toBeNull();
 });
 
-test('payment manager cacheKey includes context when available', function () {
+test('payment manager cacheKey includes context when available', function (): void {
     $manager = app(PaymentManager::class);
 
     $reflection = new ReflectionClass($manager);
     $cacheKeyMethod = $reflection->getMethod('cacheKey');
-    $cacheKeyMethod->setAccessible(true);
 
     $getCacheContextMethod = $reflection->getMethod('getCacheContext');
-    $getCacheContextMethod->setAccessible(true);
 
     mockAuthGuard(check: true, id: 123);
 
@@ -88,10 +88,10 @@ test('payment manager cacheKey includes context when available', function () {
     expect($key)->toContain('user_123');
 });
 
-test('payment manager resolveVerificationContext handles array metadata', function () {
+test('payment manager resolveVerificationContext handles array metadata', function (): void {
     $manager = app(PaymentManager::class);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -103,7 +103,6 @@ test('payment manager resolveVerificationContext handles array metadata', functi
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager, 'TEST_123', null);
 
@@ -111,10 +110,10 @@ test('payment manager resolveVerificationContext handles array metadata', functi
         ->and($result)->toHaveKey('id');
 });
 
-test('payment manager resolveVerificationContext handles ArrayObject metadata', function () {
+test('payment manager resolveVerificationContext handles ArrayObject metadata', function (): void {
     $manager = app(PaymentManager::class);
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    $transaction = PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -128,7 +127,6 @@ test('payment manager resolveVerificationContext handles ArrayObject metadata', 
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager, 'TEST_123', null);
 
@@ -136,10 +134,10 @@ test('payment manager resolveVerificationContext handles ArrayObject metadata', 
         ->and($result)->toHaveKey('id');
 });
 
-test('payment manager resolveVerificationContext handles string metadata', function () {
+test('payment manager resolveVerificationContext handles string metadata', function (): void {
     $manager = app(PaymentManager::class);
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    $transaction = PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -153,7 +151,6 @@ test('payment manager resolveVerificationContext handles string metadata', funct
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager, 'TEST_123', null);
 
@@ -161,10 +158,10 @@ test('payment manager resolveVerificationContext handles string metadata', funct
         ->and($result)->toHaveKey('id');
 });
 
-test('payment manager resolveVerificationContext handles DriverNotFoundException', function () {
+test('payment manager resolveVerificationContext handles DriverNotFoundException', function (): void {
     $manager = app(PaymentManager::class);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'nonexistent',
         'status' => 'pending',
@@ -176,7 +173,6 @@ test('payment manager resolveVerificationContext handles DriverNotFoundException
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('resolveVerificationContext');
-    $method->setAccessible(true);
 
     $result = $method->invoke($manager, 'TEST_123', null);
 
@@ -184,12 +180,12 @@ test('payment manager resolveVerificationContext handles DriverNotFoundException
         ->and($result)->toHaveKey('id');
 });
 
-test('payment manager updateTransactionFromVerification handles null paid_at', function () {
+test('payment manager updateTransactionFromVerification handles null paid_at', function (): void {
     $manager = app(PaymentManager::class);
 
     config(['payments.logging.enabled' => true]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -198,21 +194,19 @@ test('payment manager updateTransactionFromVerification handles null paid_at', f
         'email' => 'test@example.com',
     ]);
 
-    $verification = new \KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO(
+    $verification = new VerificationResponseDTO(
         reference: 'TEST_123',
         status: 'failed',
         amount: 100.0,
         currency: 'NGN',
-        paidAt: null,
     );
 
     $reflection = new ReflectionClass($manager);
     $method = $reflection->getMethod('updateTransactionFromVerification');
-    $method->setAccessible(true);
 
     $method->invoke($manager, 'TEST_123', $verification);
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'TEST_123')->first();
 
     expect($transaction->paid_at)->toBeNull();
 });

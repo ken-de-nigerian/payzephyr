@@ -8,6 +8,8 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\MonnifyDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 
 function createMonnifyRemainingGapsDriver(array $responses): MonnifyDriver
 {
@@ -29,7 +31,7 @@ function createMonnifyRemainingGapsDriver(array $responses): MonnifyDriver
     return $driver;
 }
 
-test('monnify reuses cached access token across multiple calls', function () {
+test('monnify reuses cached access token across multiple calls', function (): void {
     $driver = createMonnifyRemainingGapsDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -61,7 +63,7 @@ test('monnify reuses cached access token across multiple calls', function () {
         ->and($second->reference)->toBe('mn_ref_second');
 });
 
-test('monnify getAccessToken throws when auth response reports requestSuccessful false with 200 status', function () {
+test('monnify getAccessToken throws when auth response reports requestSuccessful false with 200 status', function (): void {
     $driver = createMonnifyRemainingGapsDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => false,
@@ -72,7 +74,7 @@ test('monnify getAccessToken throws when auth response reports requestSuccessful
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'Monnify authentication failed');
 
-test('monnify charge throws when init-transaction reports requestSuccessful false with 200 status', function () {
+test('monnify charge throws when init-transaction reports requestSuccessful false with 200 status', function (): void {
     $driver = createMonnifyRemainingGapsDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -87,7 +89,7 @@ test('monnify charge throws when init-transaction reports requestSuccessful fals
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'Merchant is not permitted for this operation');
 
-test('monnify charge names the field when a success response carries no checkout url', function () {
+test('monnify charge names the field when a success response carries no checkout url', function (): void {
     // This used to reach the DTO as a null and come back as a TypeError wrapped
     // in "Monnify charge failed". It now says which field Monnify left out.
     $driver = createMonnifyRemainingGapsDriver([
@@ -107,7 +109,7 @@ test('monnify charge names the field when a success response carries no checkout
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, '[monnify] omitted the required field [checkoutUrl] from its charge response');
 
-test('monnify verify throws when query reports requestSuccessful false with 200 status', function () {
+test('monnify verify throws when query reports requestSuccessful false with 200 status', function (): void {
     $driver = createMonnifyRemainingGapsDriver([
         new Response(200, [], json_encode([
             'requestSuccessful' => true,
@@ -122,7 +124,7 @@ test('monnify verify throws when query reports requestSuccessful false with 200 
     $driver->verify('mn_bad_ref');
 })->throws(VerificationException::class, 'Transaction reference is invalid');
 
-test('monnify validateWebhook returns false when no signature header is present', function () {
+test('monnify validateWebhook returns false when no signature header is present', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -135,7 +137,7 @@ test('monnify validateWebhook returns false when no signature header is present'
     expect($driver->validateWebhook([], $body))->toBeFalse();
 });
 
-test('monnify validateWebhook returns false when signature does not match', function () {
+test('monnify validateWebhook returns false when signature does not match', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -148,7 +150,7 @@ test('monnify validateWebhook returns false when signature does not match', func
     expect($driver->validateWebhook(['monnify-signature' => ['not-the-real-signature']], $body))->toBeFalse();
 });
 
-test('monnify extractWebhookStatus defaults to unknown when paymentStatus is absent', function () {
+test('monnify extractWebhookStatus defaults to unknown when paymentStatus is absent', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -159,7 +161,7 @@ test('monnify extractWebhookStatus defaults to unknown when paymentStatus is abs
     expect($driver->extractWebhookStatus(['eventType' => 'SUCCESSFUL_TRANSACTION']))->toBe('unknown');
 });
 
-test('monnify resolveVerificationId returns the provider id as-is', function () {
+test('monnify resolveVerificationId returns the provider id as-is', function (): void {
     $driver = new MonnifyDriver([
         'api_key' => 'test_key',
         'secret_key' => 'test_secret',
@@ -170,7 +172,7 @@ test('monnify resolveVerificationId returns the provider id as-is', function () 
     expect($driver->resolveVerificationId('MON_REF_123', 'provider_tx_456'))->toBe('provider_tx_456');
 });
 
-test('monnify refuses a login that reports success but carries no access token', function () {
+test('monnify refuses a login that reports success but carries no access token', function (): void {
     // Without this the null was stored as the token and returned from a
     // method declared to return a string.
     $driver = createMonnifyRemainingGapsDriver([
@@ -180,7 +182,7 @@ test('monnify refuses a login that reports success but carries no access token',
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class, 'returned no access token');
 
-test('monnify reads the reference, status and channel from eventData in a current-format webhook', function () {
+test('monnify reads the reference, status and channel from eventData in a current-format webhook', function (): void {
     // The three extractors read the top level, where Monnify's current format
     // has only eventType and eventData - so the reference was null, the status
     // "unknown", and the transaction was never updated from a webhook.
@@ -197,7 +199,7 @@ test('monnify reads the reference, status and channel from eventData in a curren
         ->and($driver->extractWebhookChannel($payload))->toBe('ACCOUNT_TRANSFER');
 });
 
-test('monnify still reads a legacy flat webhook, and falls back to the transaction reference', function () {
+test('monnify still reads a legacy flat webhook, and falls back to the transaction reference', function (): void {
     $driver = new MonnifyDriver(['api_key' => 'k', 'secret_key' => 's', 'contract_code' => 'c', 'currencies' => ['NGN']]);
 
     expect($driver->extractWebhookReference(['paymentReference' => 'LEGACY_1', 'paymentStatus' => 'PAID']))->toBe('LEGACY_1')
@@ -206,20 +208,20 @@ test('monnify still reads a legacy flat webhook, and falls back to the transacti
         ->and($driver->extractWebhookChannel([]))->toBeNull();
 });
 
-test('a monnify webhook updates the transaction it names', function () {
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+test('a monnify webhook updates the transaction it names', function (): void {
+    PaymentTransaction::create([
         'reference' => 'ORDER_2002', 'provider' => 'monnify', 'status' => 'pending',
         'amount' => 5000, 'currency' => 'NGN', 'email' => 'a@b.test',
     ]);
 
-    app()->call([new \KenDeNigerian\PayZephyr\Jobs\ProcessWebhook('monnify', ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => [
+    app()->call([new ProcessWebhook('monnify', ['eventType' => 'SUCCESSFUL_TRANSACTION', 'eventData' => [
         'paymentReference' => 'ORDER_2002', 'paymentStatus' => 'PAID', 'paymentMethod' => 'CARD',
     ]]), 'handle']);
 
-    expect(\KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'ORDER_2002')->value('status'))->toBe('success');
+    expect(PaymentTransaction::where('reference', 'ORDER_2002')->value('status'))->toBe('success');
 });
 
-test('monnify charge wraps a failure that is not an http error in a charge exception', function () {
+test('monnify charge wraps a failure that is not an http error in a charge exception', function (): void {
     // The login succeeds; the charge request then fails beneath the HTTP call
     // with something that is not a Guzzle exception.
     $driver = createMonnifyRemainingGapsDriver([

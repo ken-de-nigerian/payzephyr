@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Tests\Integration;
 
 use GuzzleHttp\Psr7\Response;
+use Illuminate\Support\Facades\Cache;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\Facades\Payment;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Group;
@@ -67,7 +72,7 @@ class ProviderSwitchingTest extends TestCase
                 ->charge(); // No ->with() needed - uses default
 
             // Results should be functionally equivalent
-            $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+            $this->assertInstanceOf(ChargeResponseDTO::class, $response);
             $this->assertEquals($provider, $response->provider);
         }
     }
@@ -111,7 +116,7 @@ class ProviderSwitchingTest extends TestCase
                 ->with($provider) // Only this changes
                 ->charge();
 
-            $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+            $this->assertInstanceOf(ChargeResponseDTO::class, $response);
             $this->assertEquals($provider, $response->provider);
         }
     }
@@ -147,7 +152,7 @@ class ProviderSwitchingTest extends TestCase
             ->charge();
 
         // Should work with either provider (depending on which succeeds)
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $response);
     }
 
     /**
@@ -173,7 +178,7 @@ class ProviderSwitchingTest extends TestCase
         ]);
 
         // IDENTICAL subscription code
-        $planDTO = new \KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO(
+        $planDTO = new SubscriptionPlanDTO(
             name: 'Test Plan',
             amount: 100.00,
             interval: 'monthly',
@@ -184,7 +189,7 @@ class ProviderSwitchingTest extends TestCase
             ->planData($planDTO)
             ->createPlan(); // Uses default provider
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class, $plan);
+        $this->assertInstanceOf(PlanResponseDTO::class, $plan);
     }
 
     /**
@@ -221,7 +226,7 @@ class ProviderSwitchingTest extends TestCase
             ->callback('https://example.com/callback')
             ->charge();
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $response);
     }
 
     /**
@@ -245,7 +250,7 @@ class ProviderSwitchingTest extends TestCase
             $this->app->forgetInstance('payments.config');
 
             // Clear any caches
-            \Illuminate\Support\Facades\Cache::flush();
+            Cache::flush();
 
             // Setup mocked provider
             $this->setupMockedProvider($provider, [
@@ -319,7 +324,7 @@ class ProviderSwitchingTest extends TestCase
 
         // All responses should have same structure
         foreach ($responses as $provider => $response) {
-            $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+            $this->assertInstanceOf(ChargeResponseDTO::class, $response);
             $this->assertNotEmpty($response->reference);
             $this->assertNotEmpty($response->authorizationUrl);
             $this->assertEquals($provider, $response->provider);
@@ -344,7 +349,7 @@ class ProviderSwitchingTest extends TestCase
         try {
             $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
 
-            return $driver instanceof \KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+            return $driver instanceof SupportsSubscriptionsInterface;
         } catch (\Exception) {
             return false;
         }

@@ -10,12 +10,11 @@ function sanitizeObjectViaDriver(mixed $data): mixed
 
     $reflection = new ReflectionClass($driver);
     $method = $reflection->getMethod('sanitizeLogContext');
-    $method->setAccessible(true);
 
     return $method->invoke($driver, $data);
 }
 
-test('an object with toArray() is converted and recursively sanitized', function () {
+test('an object with toArray() is converted and recursively sanitized', function (): void {
     $object = new class
     {
         public function toArray(): array
@@ -34,7 +33,7 @@ test('an object with toArray() is converted and recursively sanitized', function
         ->and($result['reference'])->toBe('ORDER_123');
 });
 
-test('a plain object without toArray() is cast to an array and recursively sanitized', function () {
+test('a plain object without toArray() is cast to an array and recursively sanitized', function (): void {
     $object = new class
     {
         public string $token = 'sk_test_plain_object_token';
@@ -49,7 +48,7 @@ test('a plain object without toArray() is cast to an array and recursively sanit
         ->and($result['reference'])->toBe('ORDER_456');
 });
 
-test('a stdClass instance is cast to an array and sanitized', function () {
+test('a stdClass instance is cast to an array and sanitized', function (): void {
     $object = new stdClass;
     $object->secret = 'top-secret-value';
     $object->reference = 'ORDER_789';

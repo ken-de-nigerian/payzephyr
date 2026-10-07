@@ -10,6 +10,8 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\FlutterwaveDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -51,7 +53,7 @@ function flutterwaveCharge(array $overrides = []): ChargeRequestDTO
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Flutterwave its full payload, authenticated, as JSON', function () {
+test('a charge sends Flutterwave its full payload, authenticated, as JSON', function (): void {
     $history = [];
     $driver = flutterwaveContractDriver([flutterwaveLink()], $history);
 
@@ -76,7 +78,7 @@ test('a charge sends Flutterwave its full payload, authenticated, as JSON', func
         ->and($request->getHeaderLine('Idempotency-Key'))->toBe('idem-1');
 });
 
-test('a charge without a name or description says so in Flutterwave\'s own words', function () {
+test('a charge without a name or description says so in Flutterwave\'s own words', function (): void {
     $history = [];
     flutterwaveContractDriver([flutterwaveLink()], $history)->charge(flutterwaveCharge());
 
@@ -86,14 +88,14 @@ test('a charge without a name or description says so in Flutterwave\'s own words
         ->and($sent)->not->toHaveKey('payment_options');
 });
 
-test('a charge without a callback URL is refused, saying how to set one', function () {
-    expect(fn () => flutterwaveContractDriver([])->charge(flutterwaveCharge(['callbackUrl' => null])))->toThrow(
+test('a charge without a callback URL is refused, saying how to set one', function (): void {
+    expect(fn (): ChargeResponseDTO => flutterwaveContractDriver([])->charge(flutterwaveCharge(['callbackUrl' => null])))->toThrow(
         InvalidConfigurationException::class,
         'Flutterwave requires a callback URL for its redirect flow. Please use ->callback() in your payment chain to set the callback URL.'
     );
 });
 
-test('an initialized charge is logged with its reference and whether it was idempotent', function (?string $key, bool $idempotent) {
+test('an initialized charge is logged with its reference and whether it was idempotent', function (?string $key, bool $idempotent): void {
     $logs = captureLogs();
 
     flutterwaveContractDriver([flutterwaveLink()])->charge(flutterwaveCharge(['idempotencyKey' => $key]));
@@ -104,15 +106,15 @@ test('an initialized charge is logged with its reference and whether it was idem
     'without' => [null, false],
 ]);
 
-test('a charge Flutterwave does not answer with success is refused with its message', function (string $body) {
-    expect(fn () => flutterwaveContractDriver([new Response(200, [], $body)])->charge(flutterwaveCharge()))
+test('a charge Flutterwave does not answer with success is refused with its message', function (string $body): void {
+    expect(fn (): ChargeResponseDTO => flutterwaveContractDriver([new Response(200, [], $body)])->charge(flutterwaveCharge()))
         ->toThrow(ChargeException::class, 'Invalid amount');
 })->with([
     'error' => ['{"status":"error","message":"Invalid amount"}'],
     'no status' => ['{"message":"Invalid amount"}'],
 ]);
 
-test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function () {
+test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = flutterwaveContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
@@ -139,7 +141,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0, and 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a payment is verified by its reference and read in full', function () {
+test('a payment is verified by its reference and read in full', function (): void {
     $logs = captureLogs();
     $history = [];
     $driver = flutterwaveContractDriver([new Response(200, [], (string) json_encode(['status' => 'success', 'data' => [
@@ -159,15 +161,15 @@ test('a payment is verified by its reference and read in full', function () {
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'FLW_V', 'status' => 'successful']);
 });
 
-test('a verification Flutterwave does not answer with success is refused with its message', function (string $body) {
-    expect(fn () => flutterwaveContractDriver([new Response(200, [], $body)])->verify('FLW_X'))
+test('a verification Flutterwave does not answer with success is refused with its message', function (string $body): void {
+    expect(fn (): VerificationResponseDTO => flutterwaveContractDriver([new Response(200, [], $body)])->verify('FLW_X'))
         ->toThrow(VerificationException::class, 'No transaction found');
 })->with([
     'error' => ['{"status":"error","message":"No transaction found"}'],
     'no status' => ['{"message":"No transaction found"}'],
 ]);
 
-test('a verification that fails on the way is logged and wrapped, coded 0', function () {
+test('a verification that fails on the way is logged and wrapped, coded 0', function (): void {
     $logs = captureLogs();
 
     try {
@@ -185,11 +187,11 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
 // Webhooks, health, extraction
 // ---------------------------------------------------------------------------
 
-test('the verif-hash header is read in either case', function (string $header) {
+test('the verif-hash header is read in either case', function (string $header): void {
     expect(flutterwaveContractDriver([])->validateWebhook([$header => ['hash-1']], '{}'))->toBeTrue();
 })->with(['verif-hash', 'Verif-Hash']);
 
-test('each webhook outcome is logged with what an operator needs', function () {
+test('each webhook outcome is logged with what an operator needs', function (): void {
     $logs = captureLogs();
     $driver = flutterwaveContractDriver([]);
 
@@ -210,7 +212,7 @@ test('each webhook outcome is logged with what an operator needs', function () {
         ->and(loggedEntry($logs, 'Webhook validated successfully')['level'])->toBe('info');
 });
 
-test('the health check counts the 400 and 404 Flutterwave answers with as healthy, and says so', function (int $status) {
+test('the health check counts the 400 and 404 Flutterwave answers with as healthy, and says so', function (int $status): void {
     $logs = captureLogs();
     $driver = flutterwaveContractDriver([new ClientException('Client error', new Request('GET', 'banks/NG'), new Response($status))]);
 
@@ -218,13 +220,13 @@ test('the health check counts the 400 and 404 Flutterwave answers with as health
         ->and(loggedEntry($logs, 'Health check successful')['level'])->toBe('info');
 })->with([400, 404]);
 
-test('the health check counts a client error it did not wrap itself as down', function () {
+test('the health check counts a client error it did not wrap itself as down', function (): void {
     $cause = new ClientException('Client error', new Request('GET', 'banks/NG'), new Response(400));
 
     expect(flutterwaveContractDriver([fn () => throw new RuntimeException('not ours', 0, $cause)])->healthCheck())->toBeFalse();
 });
 
-test('a webhook\'s status and channel are read from its data', function () {
+test('a webhook\'s status and channel are read from its data', function (): void {
     $driver = flutterwaveContractDriver([]);
 
     expect($driver->extractWebhookStatus(['data' => ['status' => 'successful']]))->toBe('successful')

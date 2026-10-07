@@ -6,6 +6,7 @@ use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
+use KenDeNigerian\PayZephyr\Enums\SubscriptionStatus;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 
 function stripeObj(array $data): object
@@ -21,17 +22,17 @@ function makeStripeDriverWithClient(object $client): StripeDriver
     return $driver;
 }
 
-test('stripe createPlan creates a product and a price', function () {
+test('stripe createPlan creates a product and a price', function (): void {
     $productsResource = new class
     {
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj(['id' => 'prod_123', 'name' => $params['name'], 'description' => $params['description'] ?? null]);
         }
     };
     $pricesResource = new class
     {
-        public function create(array $params)
+        public function create(array $params): object
         {
             return stripeObj([
                 'id' => 'price_123',
@@ -60,10 +61,10 @@ test('stripe createPlan creates a product and a price', function () {
         ->and($result->currency)->toBe('USD');
 });
 
-test('stripe fetchPlan retrieves and maps a price with its product', function () {
+test('stripe fetchPlan retrieves and maps a price with its product', function (): void {
     $pricesResource = new class
     {
-        public function retrieve($id, $params = [])
+        public function retrieve($id, $params = []): object
         {
             return stripeObj([
                 'id' => $id,
@@ -90,7 +91,7 @@ test('stripe fetchPlan retrieves and maps a price with its product', function ()
         ->and($result->currency)->toBe('USD');
 });
 
-test('stripe createSubscription requires an authorization (payment method)', function () {
+test('stripe createSubscription requires an authorization (payment method)', function (): void {
     $client = new class {};
     $driver = makeStripeDriverWithClient($client);
 
@@ -99,17 +100,17 @@ test('stripe createSubscription requires an authorization (payment method)', fun
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Stripe requires an existing PaymentMethod ID');
 
-test('stripe createSubscription succeeds with an authorization and finds an existing customer', function () {
+test('stripe createSubscription succeeds with an authorization and finds an existing customer', function (): void {
     $customersResource = new class
     {
-        public function all(array $params)
+        public function all(array $params): object
         {
             return stripeObj(['data' => [['id' => 'cus_123', 'email' => $params['email']]]]);
         }
     };
     $subscriptionsResource = new class
     {
-        public function create(array $params, array $options = [])
+        public function create(array $params, array $options = []): object
         {
             return stripeObj([
                 'id' => 'sub_123',
@@ -140,15 +141,15 @@ test('stripe createSubscription succeeds with an authorization and finds an exis
 
     expect($result->subscriptionCode)->toBe('sub_123')
         ->and($result->status)->toBe('active')
-        ->and($result->getStatus())->toBe(\KenDeNigerian\PayZephyr\Enums\SubscriptionStatus::ACTIVE)
+        ->and($result->getStatus())->toBe(SubscriptionStatus::ACTIVE)
         ->and($result->plan)->toBe('price_123')
         ->and($result->amount)->toBe(20.0);
 });
 
-test('stripe cancelSubscription cancels immediately by default', function () {
+test('stripe cancelSubscription cancels immediately by default', function (): void {
     $subscriptionsResource = new class
     {
-        public function cancel($id)
+        public function cancel($id): object
         {
             return stripeObj([
                 'id' => $id,
@@ -171,14 +172,14 @@ test('stripe cancelSubscription cancels immediately by default', function () {
     // is what interprets it via Enums\SubscriptionStatus, which already
     // recognizes both spellings.
     expect($result->status)->toBe('canceled')
-        ->and($result->getStatus())->toBe(\KenDeNigerian\PayZephyr\Enums\SubscriptionStatus::CANCELLED)
+        ->and($result->getStatus())->toBe(SubscriptionStatus::CANCELLED)
         ->and($result->isCancelled())->toBeTrue();
 });
 
-test('stripe cancelSubscription schedules cancellation at period end when requested', function () {
+test('stripe cancelSubscription schedules cancellation at period end when requested', function (): void {
     $subscriptionsResource = new class
     {
-        public function update($id, array $params)
+        public function update($id, array $params): object
         {
             expect($params)->toBe(['cancel_at_period_end' => true]);
 
@@ -195,10 +196,10 @@ test('stripe cancelSubscription schedules cancellation at period end when reques
     $driver->cancelSubscription(new SubscriptionActionDTO('sub_123', ['at_period_end' => true]));
 });
 
-test('stripe enableSubscription throws when the subscription is already fully cancelled', function () {
+test('stripe enableSubscription throws when the subscription is already fully cancelled', function (): void {
     $subscriptionsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj(['id' => $id, 'status' => 'canceled']);
         }
@@ -213,15 +214,15 @@ test('stripe enableSubscription throws when the subscription is already fully ca
     $driver->enableSubscription(new SubscriptionActionDTO('sub_123'));
 })->throws(SubscriptionException::class, 'cannot be reactivated on Stripe');
 
-test('stripe enableSubscription resumes a subscription pending cancel_at_period_end', function () {
+test('stripe enableSubscription resumes a subscription pending cancel_at_period_end', function (): void {
     $subscriptionsResource = new class
     {
-        public function retrieve($id)
+        public function retrieve($id): object
         {
             return stripeObj(['id' => $id, 'status' => 'active']);
         }
 
-        public function update($id, array $params)
+        public function update($id, array $params): object
         {
             expect($params)->toBe(['cancel_at_period_end' => false]);
 

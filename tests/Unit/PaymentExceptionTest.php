@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
@@ -8,21 +10,21 @@ use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 
-test('payment exception sets and gets context', function () {
+test('payment exception sets and gets context', function (): void {
     $exception = new PaymentException('Test error');
     $exception->setContext(['key' => 'value']);
 
     expect($exception->getContext())->toBe(['key' => 'value']);
 });
 
-test('payment exception creates with context', function () {
+test('payment exception creates with context', function (): void {
     $exception = PaymentException::withContext('Test error', ['key' => 'value']);
 
     expect($exception->getMessage())->toBe('Test error')
         ->and($exception->getContext())->toBe(['key' => 'value']);
 });
 
-test('payment exception can chain setContext', function () {
+test('payment exception can chain setContext', function (): void {
     $exception = (new PaymentException('Test error'))
         ->setContext(['key' => 'value']);
 
@@ -30,13 +32,13 @@ test('payment exception can chain setContext', function () {
         ->and($exception->getContext())->toBe(['key' => 'value']);
 });
 
-test('payment exception handles empty context', function () {
+test('payment exception handles empty context', function (): void {
     $exception = new PaymentException('Test error');
 
     expect($exception->getContext())->toBe([]);
 });
 
-test('payment exception handles complex context', function () {
+test('payment exception handles complex context', function (): void {
     $context = [
         'provider' => 'paystack',
         'reference' => 'ref_123',
@@ -49,44 +51,44 @@ test('payment exception handles complex context', function () {
     expect($exception->getContext())->toBe($context);
 });
 
-test('charge exception is instance of payment exception', function () {
+test('charge exception is instance of payment exception', function (): void {
     $exception = new ChargeException('Charge failed');
 
     expect($exception)->toBeInstanceOf(PaymentException::class)
         ->and($exception->getMessage())->toBe('Charge failed');
 });
 
-test('verification exception is instance of payment exception', function () {
+test('verification exception is instance of payment exception', function (): void {
     $exception = new VerificationException('Verification failed');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });
 
-test('driver not found exception is instance of payment exception', function () {
+test('driver not found exception is instance of payment exception', function (): void {
     $exception = new DriverNotFoundException('Driver not found');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });
 
-test('invalid configuration exception is instance of payment exception', function () {
+test('invalid configuration exception is instance of payment exception', function (): void {
     $exception = new InvalidConfigurationException('Invalid config');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });
 
-test('webhook exception is instance of payment exception', function () {
+test('webhook exception is instance of payment exception', function (): void {
     $exception = new WebhookException('Webhook failed');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });
 
-test('provider exception is instance of payment exception', function () {
+test('provider exception is instance of payment exception', function (): void {
     $exception = new ProviderException('All providers failed');
 
     expect($exception)->toBeInstanceOf(PaymentException::class);
 });
 
-test('payment exception can be thrown and caught', function () {
+test('payment exception can be thrown and caught', function (): void {
     try {
         throw new PaymentException('Test error');
     } catch (PaymentException $e) {
@@ -94,7 +96,7 @@ test('payment exception can be thrown and caught', function () {
     }
 });
 
-test('charge exception with context can be caught', function () {
+test('charge exception with context can be caught', function (): void {
     try {
         throw ChargeException::withContext('Charge failed', ['provider' => 'paystack']);
     } catch (ChargeException $e) {
@@ -103,7 +105,7 @@ test('charge exception with context can be caught', function () {
     }
 });
 
-test('provider exception with multiple provider errors', function () {
+test('provider exception with multiple provider errors', function (): void {
     $context = [
         'exceptions' => [
             'paystack' => 'Connection timeout',
@@ -117,7 +119,7 @@ test('provider exception with multiple provider errors', function () {
     expect($exception->getContext()['exceptions'])->toHaveCount(3);
 });
 
-test('exception preserves previous exception', function () {
+test('exception preserves previous exception', function (): void {
     $previous = new Exception('Previous error');
     $exception = new PaymentException('Payment error', 0, $previous);
 

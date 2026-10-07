@@ -13,7 +13,7 @@ use KenDeNigerian\PayZephyr\Events\SubscriptionCreated;
 use KenDeNigerian\PayZephyr\Events\SubscriptionPaymentFailed;
 use KenDeNigerian\PayZephyr\Events\SubscriptionRenewed;
 
-test('SubscriptionCreated exposes its constructor arguments as readonly properties', function () {
+test('SubscriptionCreated exposes its constructor arguments as readonly properties', function (): void {
     $event = new SubscriptionCreated('SUB_1', 'paystack', ['plan' => 'PLN_1']);
 
     expect($event->subscriptionCode)->toBe('SUB_1')
@@ -21,7 +21,7 @@ test('SubscriptionCreated exposes its constructor arguments as readonly properti
         ->and($event->data)->toBe(['plan' => 'PLN_1']);
 });
 
-test('SubscriptionRenewed exposes its constructor arguments as readonly properties', function () {
+test('SubscriptionRenewed exposes its constructor arguments as readonly properties', function (): void {
     $event = new SubscriptionRenewed('SUB_1', 'stripe', 'INV_1', ['amount' => 1000]);
 
     expect($event->subscriptionCode)->toBe('SUB_1')
@@ -30,7 +30,7 @@ test('SubscriptionRenewed exposes its constructor arguments as readonly properti
         ->and($event->data)->toBe(['amount' => 1000]);
 });
 
-test('SubscriptionCancelled exposes its constructor arguments as readonly properties', function () {
+test('SubscriptionCancelled exposes its constructor arguments as readonly properties', function (): void {
     $event = new SubscriptionCancelled('SUB_1', 'flutterwave', ['reason' => 'user request']);
 
     expect($event->subscriptionCode)->toBe('SUB_1')
@@ -38,7 +38,7 @@ test('SubscriptionCancelled exposes its constructor arguments as readonly proper
         ->and($event->data)->toBe(['reason' => 'user request']);
 });
 
-test('SubscriptionPaymentFailed exposes its constructor arguments as readonly properties', function () {
+test('SubscriptionPaymentFailed exposes its constructor arguments as readonly properties', function (): void {
     $event = new SubscriptionPaymentFailed('SUB_1', 'square', 'card_declined', ['attempt' => 2]);
 
     expect($event->subscriptionCode)->toBe('SUB_1')
@@ -47,10 +47,10 @@ test('SubscriptionPaymentFailed exposes its constructor arguments as readonly pr
         ->and($event->data)->toBe(['attempt' => 2]);
 });
 
-test('PaymentVerificationFailed exposes its constructor arguments as readonly properties', function () {
+test('PaymentVerificationFailed exposes its constructor arguments as readonly properties', function (): void {
     $verification = new VerificationResponseDTO(
-        status: 'failed',
         reference: 'REF_1',
+        status: 'failed',
         amount: 100.0,
         currency: 'USD',
     );
@@ -62,10 +62,10 @@ test('PaymentVerificationFailed exposes its constructor arguments as readonly pr
         ->and($event->provider)->toBe('mollie');
 });
 
-test('PaymentVerificationSuccess exposes its constructor arguments as readonly properties', function () {
+test('PaymentVerificationSuccess exposes its constructor arguments as readonly properties', function (): void {
     $verification = new VerificationResponseDTO(
-        status: 'success',
         reference: 'REF_2',
+        status: 'success',
         amount: 250.0,
         currency: 'NGN',
     );
@@ -77,7 +77,7 @@ test('PaymentVerificationSuccess exposes its constructor arguments as readonly p
         ->and($event->provider)->toBe('paystack');
 });
 
-test('PaymentInitiated exposes its constructor arguments as readonly properties', function () {
+test('PaymentInitiated exposes its constructor arguments as readonly properties', function (): void {
     $request = new ChargeRequestDTO(amount: 5000.0, currency: 'NGN', email: 'a@b.com');
     $response = new ChargeResponseDTO(
         reference: 'REF_3',

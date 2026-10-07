@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Route;
 use KenDeNigerian\PayZephyr\PaymentManager;
+use KenDeNigerian\PayZephyr\PaymentServiceProvider;
 
 /**
  * Covers PaymentServiceProvider::registerRoutes()'s per-provider
@@ -15,7 +18,7 @@ use KenDeNigerian\PayZephyr\PaymentManager;
  * catch block is never reached. Forgetting both the config singleton and the
  * PaymentManager singleton here forces both to pick up the broken provider.
  */
-test('health route catches and reports a driver resolution failure for a misconfigured provider', function () {
+test('health route catches and reports a driver resolution failure for a misconfigured provider', function (): void {
     config([
         'payments.providers.broken.enabled' => true,
         'payments.providers.broken.driver' => 'totally_nonexistent_driver',
@@ -35,22 +38,22 @@ test('health route catches and reports a driver resolution failure for a misconf
         ->and($data['providers']['broken'])->toHaveKey('error');
 });
 
-test('routes are not registered again when the application has cached its routes', function () {
+test('routes are not registered again when the application has cached its routes', function (): void {
     // With `php artisan route:cache`, Laravel loads every route - including
     // this package's - from the cache file. Registering them again on boot
     // would duplicate them and defeat the cache.
-    $app = Mockery::mock(Illuminate\Foundation\Application::class);
+    $app = Mockery::mock(Application::class);
     $app->shouldReceive('routesAreCached')->once()->andReturn(true);
 
-    Illuminate\Support\Facades\Route::shouldReceive('group')->never();
-    Illuminate\Support\Facades\Route::shouldReceive('get')->never();
+    Route::shouldReceive('group')->never();
+    Route::shouldReceive('get')->never();
 
-    $provider = new KenDeNigerian\PayZephyr\PaymentServiceProvider($app);
+    $provider = new PaymentServiceProvider($app);
     $method = new ReflectionMethod($provider, 'registerRoutes');
     $method->invoke($provider);
 });
 
-test('the health route reports a provider configured without an enabled key, as the manager charges it', function () {
+test('the health route reports a provider configured without an enabled key, as the manager charges it', function (): void {
     // The manager reads a missing `enabled` as on; the route read it as off,
     // so a provider that was taking payments was absent from the health report.
     config([

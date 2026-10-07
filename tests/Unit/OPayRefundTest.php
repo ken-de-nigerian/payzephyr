@@ -27,7 +27,7 @@ function makeOPayRefundDriver(array $responses): OPayDriver
     return $driver;
 }
 
-test('opay refund succeeds with valid response', function () {
+test('opay refund succeeds with valid response', function (): void {
     $driver = makeOPayRefundDriver([
         new Response(200, [], json_encode([
             'code' => '00000',
@@ -50,7 +50,7 @@ test('opay refund succeeds with valid response', function () {
         ->and($result->provider)->toBe('opay');
 });
 
-test('opay refund throws exception on api error', function () {
+test('opay refund throws exception on api error', function (): void {
     $driver = makeOPayRefundDriver([
         new Response(200, [], json_encode(['code' => '90001', 'message' => 'Order not found'])),
     ]);
@@ -58,7 +58,7 @@ test('opay refund throws exception on api error', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'invalid'));
 })->throws(RefundException::class, 'Order not found');
 
-test('opay refund throws when secret key missing', function () {
+test('opay refund throws when secret key missing', function (): void {
     $driver = new OPayDriver([
         'merchant_id' => 'MERCHANT123',
         'public_key' => 'PUBLIC_KEY_123',
@@ -69,7 +69,7 @@ test('opay refund throws when secret key missing', function () {
     $driver->refund(new RefundRequestDTO(transactionReference: 'opay_order_123'));
 })->throws(RefundException::class);
 
-test('opay fetchRefund succeeds with valid response', function () {
+test('opay fetchRefund succeeds with valid response', function (): void {
     $driver = makeOPayRefundDriver([
         new Response(200, [], json_encode([
             'code' => '00000',

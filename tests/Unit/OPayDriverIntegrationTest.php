@@ -31,7 +31,7 @@ function createOPayDriverWithMock(array $responses): OPayDriver
     return $driver;
 }
 
-test('opay charges successfully and returns cashierUrl', function () {
+test('opay charges successfully and returns cashierUrl', function (): void {
     $driver = createOPayDriverWithMock([
         new Response(200, [], json_encode([
             'code' => '00000',
@@ -51,7 +51,7 @@ test('opay charges successfully and returns cashierUrl', function () {
         ->and($response->status)->toBe('pending');
 });
 
-test('opay charge throws exception when code is not 00000', function () {
+test('opay charge throws exception when code is not 00000', function (): void {
     $driver = createOPayDriverWithMock([
         new Response(200, [], json_encode([
             'code' => '00001',
@@ -62,7 +62,7 @@ test('opay charge throws exception when code is not 00000', function () {
     $driver->charge(new ChargeRequestDTO(10000, 'NGN', 'test@example.com'));
 })->throws(ChargeException::class);
 
-test('opay charge handles network error', function () {
+test('opay charge handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/api/v3/international/cashier/create')),
     ]);
@@ -80,7 +80,7 @@ test('opay charge handles network error', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('opay verify returns success for code 00000', function () {
+test('opay verify returns success for code 00000', function (): void {
     $driver = createOPayDriverWithMock([
         new Response(200, [], json_encode([
             'code' => '00000',
@@ -107,7 +107,7 @@ test('opay verify returns success for code 00000', function () {
         ->and($result->currency)->toBe('NGN');
 });
 
-test('opay verify returns pending for PENDING status', function () {
+test('opay verify returns pending for PENDING status', function (): void {
     $driver = createOPayDriverWithMock([
         new Response(200, [], json_encode([
             'code' => '00000',
@@ -134,7 +134,7 @@ test('opay verify returns pending for PENDING status', function () {
         ->and($result->currency)->toBe('NGN');
 });
 
-test('opay verify throws exception when code is not 00000', function () {
+test('opay verify throws exception when code is not 00000', function (): void {
     $driver = createOPayDriverWithMock([
         new Response(200, [], json_encode([
             'code' => '00001',
@@ -145,7 +145,7 @@ test('opay verify throws exception when code is not 00000', function () {
     $driver->verify('OPAY_123');
 })->throws(VerificationException::class);
 
-test('opay verify handles network error', function () {
+test('opay verify handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/api/v3/international/cashier/query')),
     ]);

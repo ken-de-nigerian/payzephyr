@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
+use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
 /**
@@ -37,15 +40,15 @@ function paypalRemainingGapsDriver(array $responses): PayPalDriver
     return $driver;
 }
 
-test('paypal driver charge throws invalid configuration exception when callback url is missing', function () {
+test('paypal driver charge throws invalid configuration exception when callback url is missing', function (): void {
     // Let through as the configuration error it is, as on every other
     // driver; it used to be re-wrapped as a ChargeException.
     $driver = new PayPalDriver(paypalRemainingGapsConfig());
 
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com'));
-})->throws(KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException::class, 'PayPal requires a callback URL for its redirect flow');
+})->throws(InvalidConfigurationException::class, 'PayPal requires a callback URL for its redirect flow');
 
-test('paypal driver charge throws when order id missing from creation response', function () {
+test('paypal driver charge throws when order id missing from creation response', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(201, [], json_encode(['status' => 'CREATED'])),
@@ -54,7 +57,7 @@ test('paypal driver charge throws when order id missing from creation response',
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class, 'Failed to create PayPal order');
 
-test('paypal driver charge falls back to payer-action link when approve link is absent', function () {
+test('paypal driver charge falls back to payer-action link when approve link is absent', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(201, [], json_encode([
@@ -71,7 +74,7 @@ test('paypal driver charge falls back to payer-action link when approve link is 
     expect($response->authorizationUrl)->toBe('https://www.paypal.com/payer-action');
 });
 
-test('paypal driver charge throws when no approval link is present at all', function () {
+test('paypal driver charge throws when no approval link is present at all', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(201, [], json_encode([
@@ -86,7 +89,7 @@ test('paypal driver charge throws when no approval link is present at all', func
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class, 'No approval link found in PayPal response');
 
-test('paypal charge names the field when an order response carries no status', function () {
+test('paypal charge names the field when an order response carries no status', function (): void {
     // Order response has an 'id' and an approvable link, but is missing
     // 'status'. That used to reach normalizeStatus() as a null and come back
     // as a TypeError wrapped in "Payment initialization failed"; it now says
@@ -104,7 +107,7 @@ test('paypal charge names the field when an order response carries no status', f
     $driver->charge(new ChargeRequestDTO(1000, 'USD', 'test@example.com', null, 'https://example.com/callback'));
 })->throws(ChargeException::class, '[paypal] omitted the required field [status] from its charge response');
 
-test('paypal driver verify throws when order id missing from lookup response', function () {
+test('paypal driver verify throws when order id missing from lookup response', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(200, [], json_encode(['status' => 'CREATED'])),
@@ -113,7 +116,7 @@ test('paypal driver verify throws when order id missing from lookup response', f
     $driver->verify('ORDER_MISSING');
 })->throws(VerificationException::class, 'PayPal order not found: ORDER_MISSING');
 
-test('paypal driver verify captures an approved order with no existing capture', function () {
+test('paypal driver verify captures an approved order with no existing capture', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(200, [], json_encode([
@@ -145,7 +148,7 @@ test('paypal driver verify captures an approved order with no existing capture',
         ->and($result->paidAt)->toBe('2024-01-01T00:00:00Z');
 });
 
-test('paypal driver verify propagates a verification exception when the auto-capture call fails', function () {
+test('paypal driver verify propagates a verification exception when the auto-capture call fails', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
         new Response(200, [], json_encode([
@@ -161,7 +164,7 @@ test('paypal driver verify propagates a verification exception when the auto-cap
     $driver->verify('ORDER_CAPTURE_FAILS');
 })->throws(VerificationException::class);
 
-test('paypal driver healthCheck returns true when access token retrieval succeeds', function () {
+test('paypal driver healthCheck returns true when access token retrieval succeeds', function (): void {
     $driver = paypalRemainingGapsDriver([
         new Response(200, [], json_encode(['access_token' => 'tok', 'expires_in' => 3600])),
     ]);
@@ -169,7 +172,7 @@ test('paypal driver healthCheck returns true when access token retrieval succeed
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('paypal driver healthCheck returns true for a 401 auth failure - API is reachable, just misconfigured', function () {
+test('paypal driver healthCheck returns true for a 401 auth failure - API is reachable, just misconfigured', function (): void {
     // Regression: healthCheck() previously had no getPrevious() check at
     // all, so every failure (bad credentials or genuinely unreachable API)
     // fell through to the generic catch and returned false. A 401 here
@@ -183,18 +186,18 @@ test('paypal driver healthCheck returns true for a 401 auth failure - API is rea
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('paypal driver healthCheck returns false for a non-HTTP connection failure', function () {
+test('paypal driver healthCheck returns false for a non-HTTP connection failure', function (): void {
     $driver = paypalRemainingGapsDriver([
-        new \GuzzleHttp\Exception\ConnectException(
+        new ConnectException(
             'Connection timed out',
-            new \GuzzleHttp\Psr7\Request('POST', '/v1/oauth2/token')
+            new Request('POST', '/v1/oauth2/token')
         ),
     ]);
 
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('paypal refuses to charge when the token endpoint answers 200 without an access token', function () {
+test('paypal refuses to charge when the token endpoint answers 200 without an access token', function (): void {
     // A 200 that carries no token is still a failed authentication; sending
     // the charge with "Bearer " and nothing after it would only move the
     // failure somewhere harder to diagnose.

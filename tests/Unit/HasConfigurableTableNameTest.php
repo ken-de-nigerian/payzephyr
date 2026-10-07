@@ -5,12 +5,12 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Log;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 
-afterEach(function () {
+afterEach(function (): void {
     config(['payments.logging.table' => null]);
     app()->forgetInstance('payments.config');
 });
 
-test('getTable returns the configured table name when it is valid', function () {
+test('getTable returns the configured table name when it is valid', function (): void {
     config(['payments.logging.table' => 'custom_payment_transactions']);
     app()->forgetInstance('payments.config');
 
@@ -19,7 +19,7 @@ test('getTable returns the configured table name when it is valid', function () 
     expect($model->getTable())->toBe('custom_payment_transactions');
 });
 
-test('getTable falls back to the default and logs a warning when the configured name contains invalid characters', function () {
+test('getTable falls back to the default and logs a warning when the configured name contains invalid characters', function (): void {
     config(['payments.logging.table' => 'bad-table-name!']);
     app()->forgetInstance('payments.config');
 
@@ -34,7 +34,7 @@ test('getTable falls back to the default and logs a warning when the configured 
     expect($model->getTable())->toBe('payment_transactions');
 });
 
-test('getTable falls back to the default and logs a warning when the configured name starts with a digit', function () {
+test('getTable falls back to the default and logs a warning when the configured name starts with a digit', function (): void {
     config(['payments.logging.table' => '1payment_transactions']);
     app()->forgetInstance('payments.config');
 
@@ -49,7 +49,7 @@ test('getTable falls back to the default and logs a warning when the configured 
     expect($model->getTable())->toBe('payment_transactions');
 });
 
-test('getTable falls back to the default and logs a warning when the configured name is too long', function () {
+test('getTable falls back to the default and logs a warning when the configured name is too long', function (): void {
     $tooLong = str_repeat('a', 65);
     config(['payments.logging.table' => $tooLong]);
     app()->forgetInstance('payments.config');
@@ -65,7 +65,7 @@ test('getTable falls back to the default and logs a warning when the configured 
     expect($model->getTable())->toBe('payment_transactions');
 });
 
-test('getTable falls back to the default when the configured name is not a string, instead of raising a TypeError', function () {
+test('getTable falls back to the default when the configured name is not a string, instead of raising a TypeError', function (): void {
     config(['payments.logging.table' => ['payment_transactions']]);
     app()->forgetInstance('payments.config');
 

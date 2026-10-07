@@ -23,7 +23,7 @@ function minorUnitsFor(float $amount): int
     ])->getAmountInMinorUnits();
 }
 
-test('minor-unit conversion is exact for values that are not representable in binary floating point', function (float $amount, int $expected) {
+test('minor-unit conversion is exact for values that are not representable in binary floating point', function (float $amount, int $expected): void {
     expect(minorUnitsFor($amount))->toBe($expected);
 })->with([
     'smallest unit' => [0.01, 1],
@@ -40,7 +40,7 @@ test('minor-unit conversion is exact for values that are not representable in bi
     'whole number' => [100.0, 10000],
 ]);
 
-test('refund minor-unit conversion matches charge minor-unit conversion exactly', function (float $amount) {
+test('refund minor-unit conversion matches charge minor-unit conversion exactly', function (float $amount): void {
     $refund = RefundRequestDTO::fromArray([
         'transaction_reference' => 'txn_1',
         'amount' => $amount,
@@ -49,7 +49,7 @@ test('refund minor-unit conversion matches charge minor-unit conversion exactly'
     expect($refund->getAmountInMinorUnits())->toBe(minorUnitsFor($amount));
 })->with([[0.01], [0.10], [1.99], [19.99], [999.99], [12345.67]]);
 
-test('a full round trip through minor units and back preserves the amount', function (float $amount) {
+test('a full round trip through minor units and back preserves the amount', function (float $amount): void {
     $minor = minorUnitsFor($amount);
 
     // This is the shape drivers use when mapping a provider response back
@@ -57,7 +57,7 @@ test('a full round trip through minor units and back preserves the amount', func
     expect(round($minor / 100, 2))->toBe($amount);
 })->with([[0.01], [0.10], [1.99], [19.99], [0.29], [999.99], [12345.67]]);
 
-test('input amounts are normalised to two decimal places', function () {
+test('input amounts are normalised to two decimal places', function (): void {
     // Sub-minor-unit precision cannot be represented at any provider, so it is
     // resolved once on the way in rather than left to differ per driver.
     $request = ChargeRequestDTO::fromArray([
@@ -70,7 +70,7 @@ test('input amounts are normalised to two decimal places', function () {
         ->and($request->getAmountInMinorUnits())->toBe(1100);
 });
 
-test('a chain of partial refund subtractions does not drift', function () {
+test('a chain of partial refund subtractions does not drift', function (): void {
     // The over-refund guard computes remaining = captured - sum(refunded) in
     // float arithmetic. Repeated subtraction of values that are inexact in
     // binary must not accumulate enough error to let the total exceed the
@@ -87,14 +87,14 @@ test('a chain of partial refund subtractions does not drift', function () {
         ->and(round(array_sum($refunds), 2))->toBe($captured);
 });
 
-test('summing many small refunds stays within one minor unit of the captured amount', function () {
+test('summing many small refunds stays within one minor unit of the captured amount', function (): void {
     // 100 refunds of 0.01 must total exactly 1.00, not 1.0000000000000007.
     $refunds = array_fill(0, 100, 0.01);
 
     expect(round(array_sum($refunds), 2))->toBe(1.00);
 });
 
-test('the maximum permitted amount converts without overflowing to a negative int', function () {
+test('the maximum permitted amount converts without overflowing to a negative int', function (): void {
     // 999,999,999.99 is the DTO's documented ceiling. In minor units that is
     // 99,999,999,999 - which overflows 32-bit int but is fine on 64-bit.
     // Asserted so a 32-bit regression surfaces here rather than as a negative

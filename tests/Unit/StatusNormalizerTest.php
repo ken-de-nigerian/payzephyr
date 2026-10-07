@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
-test('status normalizer normalizes success statuses', function () {
+test('status normalizer normalizes success statuses', function (): void {
     $normalizer = new StatusNormalizer;
 
     expect($normalizer->normalize('SUCCESS'))->toBe('success')
@@ -13,7 +13,7 @@ test('status normalizer normalizes success statuses', function () {
         ->and($normalizer->normalize('CAPTURED'))->toBe('success');
 });
 
-test('status normalizer normalizes failed statuses', function () {
+test('status normalizer normalizes failed statuses', function (): void {
     $normalizer = new StatusNormalizer;
 
     expect($normalizer->normalize('FAILED'))->toBe('failed')
@@ -26,7 +26,7 @@ test('status normalizer normalizes failed statuses', function () {
         ->and($normalizer->normalize('EXPIRED'))->toBe('failed');
 });
 
-test('status normalizer normalizes pending statuses', function () {
+test('status normalizer normalizes pending statuses', function (): void {
     $normalizer = new StatusNormalizer;
 
     expect($normalizer->normalize('PENDING'))->toBe('pending')
@@ -36,7 +36,7 @@ test('status normalizer normalizes pending statuses', function () {
         ->and($normalizer->normalize('SAVED'))->toBe('pending');
 });
 
-test('status normalizer handles provider-specific mappings', function () {
+test('status normalizer handles provider-specific mappings', function (): void {
     $normalizer = new StatusNormalizer;
 
     $normalizer->registerProviderMappings('custom', [
@@ -48,7 +48,7 @@ test('status normalizer handles provider-specific mappings', function () {
         ->and($normalizer->normalize('CUSTOM_FAILED', 'custom'))->toBe('failed');
 });
 
-test('status normalizer falls back to default mappings when provider mapping not found', function () {
+test('status normalizer falls back to default mappings when provider mapping not found', function (): void {
     $normalizer = new StatusNormalizer;
 
     $normalizer->registerProviderMappings('custom', [
@@ -59,21 +59,21 @@ test('status normalizer falls back to default mappings when provider mapping not
         ->and($normalizer->normalize('FAILED', 'custom'))->toBe('failed');
 });
 
-test('status normalizer returns lowercase for unknown status', function () {
+test('status normalizer returns lowercase for unknown status', function (): void {
     $normalizer = new StatusNormalizer;
 
     expect($normalizer->normalize('UNKNOWN_STATUS'))->toBe('unknown_status')
         ->and($normalizer->normalize('SOME_OTHER_STATUS'))->toBe('some_other_status');
 });
 
-test('status normalizer trims whitespace', function () {
+test('status normalizer trims whitespace', function (): void {
     $normalizer = new StatusNormalizer;
 
     expect($normalizer->normalize('  SUCCESS  '))->toBe('success')
         ->and($normalizer->normalize("\tFAILED\n"))->toBe('failed');
 });
 
-test('status normalizer getProviderMappings returns registered mappings', function () {
+test('status normalizer getProviderMappings returns registered mappings', function (): void {
     $normalizer = new StatusNormalizer;
 
     $normalizer->registerProviderMappings('custom', [
@@ -86,7 +86,7 @@ test('status normalizer getProviderMappings returns registered mappings', functi
         ->and($mappings['custom'])->toHaveKey('success');
 });
 
-test('status normalizer getDefaultMappings returns default mappings', function () {
+test('status normalizer getDefaultMappings returns default mappings', function (): void {
     $normalizer = new StatusNormalizer;
 
     $mappings = $normalizer->getDefaultMappings();
@@ -97,7 +97,7 @@ test('status normalizer getDefaultMappings returns default mappings', function (
         ->and($mappings['pending'])->toContain('PENDING', 'APPROVED');
 });
 
-test('status normalizer normalizeStatic works without container', function () {
+test('status normalizer normalizeStatic works without container', function (): void {
     expect(StatusNormalizer::normalizeStatic('SUCCESS'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('FAILED'))->toBe('failed')
         ->and(StatusNormalizer::normalizeStatic('PENDING'))->toBe('pending')
@@ -105,13 +105,13 @@ test('status normalizer normalizeStatic works without container', function () {
         ->and(StatusNormalizer::normalizeStatic('UNKNOWN'))->toBe('unknown');
 });
 
-test('status normalizer normalizeStatic trims and handles case', function () {
+test('status normalizer normalizeStatic trims and handles case', function (): void {
     expect(StatusNormalizer::normalizeStatic('  success  '))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('Success'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('FAILED'))->toBe('failed');
 });
 
-test('status normalizer registerProviderMappings allows chaining', function () {
+test('status normalizer registerProviderMappings allows chaining', function (): void {
     $normalizer = new StatusNormalizer;
 
     $result = $normalizer->registerProviderMappings('custom1', ['success' => ['CUSTOM1']])
@@ -121,7 +121,7 @@ test('status normalizer registerProviderMappings allows chaining', function () {
         ->and($normalizer->getProviderMappings())->toHaveKeys(['custom1', 'custom2']);
 });
 
-test('status normalizer normalizeStatic handles all status variations', function () {
+test('status normalizer normalizeStatic handles all status variations', function (): void {
     expect(StatusNormalizer::normalizeStatic('SUCCESS'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('SUCCEEDED'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('COMPLETED'))->toBe('success')
@@ -149,12 +149,12 @@ test('status normalizer normalizeStatic handles all status variations', function
         ->and(StatusNormalizer::normalizeStatic('REQUIRES_CONFIRMATION'))->toBe('pending');
 });
 
-test('status normalizer normalizeStatic returns lowercase for unknown status', function () {
+test('status normalizer normalizeStatic returns lowercase for unknown status', function (): void {
     expect(StatusNormalizer::normalizeStatic('UNKNOWN_STATUS'))->toBe('unknown_status')
         ->and(StatusNormalizer::normalizeStatic('CUSTOM_STATUS'))->toBe('custom_status');
 });
 
-test('status normalizer normalizeStatic handles whitespace', function () {
+test('status normalizer normalizeStatic handles whitespace', function (): void {
     expect(StatusNormalizer::normalizeStatic('  SUCCESS  '))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic("\tFAILED\n"))->toBe('failed')
         ->and(StatusNormalizer::normalizeStatic('  PENDING  '))->toBe('pending');

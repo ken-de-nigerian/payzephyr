@@ -3,16 +3,21 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
+use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
+use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Subscription;
 use Tests\Helpers\SubscriptionTestHelper;
 
 // ==================== Input Validation Security Tests ====================
 
-test('subscription prevents SQL injection in customer field', function () {
+test('subscription prevents SQL injection in customer field', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -26,7 +31,7 @@ test('subscription prevents SQL injection in customer field', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription prevents XSS in metadata', function () {
+test('subscription prevents XSS in metadata', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -59,7 +64,7 @@ test('subscription prevents XSS in metadata', function () {
         ])
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 
     // The actual assertion: what landed in subscription_transactions.metadata
     // must be sanitized, exactly like payment_transactions.metadata already
@@ -67,7 +72,7 @@ test('subscription prevents XSS in metadata', function () {
     // sanitization applied on the subscription-logging path, this column
     // stores raw attacker-influenced markup verbatim - a stored-XSS vector
     // for any admin panel that renders it without independently escaping.
-    $logged = \KenDeNigerian\PayZephyr\Models\SubscriptionTransaction::where('subscription_code', 'SUB_123')->first();
+    $logged = SubscriptionTransaction::where('subscription_code', 'SUB_123')->first();
 
     expect($logged)->not->toBeNull();
     $metadata = $logged->metadata instanceof \ArrayObject ? $logged->metadata->getArrayCopy() : (array) $logged->metadata;
@@ -76,7 +81,7 @@ test('subscription prevents XSS in metadata', function () {
         ->and($metadata['html'] ?? '')->not->toContain('onerror=');
 });
 
-test('subscription prevents path traversal in plan code', function () {
+test('subscription prevents path traversal in plan code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -89,7 +94,7 @@ test('subscription prevents path traversal in plan code', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription prevents command injection in subscription code', function () {
+test('subscription prevents command injection in subscription code', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -101,7 +106,7 @@ test('subscription prevents command injection in subscription code', function ()
         ->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription validates email format in customer field', function () {
+test('subscription validates email format in customer field', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -117,7 +122,7 @@ test('subscription validates email format in customer field', function () {
 
 // ==================== Authorization Security Tests ====================
 
-test('subscription prevents unauthorized plan creation', function () {
+test('subscription prevents unauthorized plan creation', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -130,7 +135,7 @@ test('subscription prevents unauthorized plan creation', function () {
     $subscription->planData($planDTO)->createPlan();
 })->throws(PlanException::class);
 
-test('subscription prevents unauthorized plan access', function () {
+test('subscription prevents unauthorized plan access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -141,7 +146,7 @@ test('subscription prevents unauthorized plan access', function () {
     $subscription->plan('PLN_123')->fetchPlan();
 })->throws(PlanException::class);
 
-test('subscription prevents unauthorized subscription access', function () {
+test('subscription prevents unauthorized subscription access', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -152,7 +157,7 @@ test('subscription prevents unauthorized subscription access', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription validates token ownership before cancel', function () {
+test('subscription validates token ownership before cancel', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(403, [], json_encode([
             'status' => false,
@@ -165,7 +170,7 @@ test('subscription validates token ownership before cancel', function () {
         ->cancel();
 })->throws(SubscriptionException::class);
 
-test('subscription prevents token reuse after cancellation', function () {
+test('subscription prevents token reuse after cancellation', function (): void {
     // First cancellation succeeds
     $subscription1 = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
@@ -200,7 +205,7 @@ test('subscription prevents token reuse after cancellation', function () {
 
 // ==================== Rate Limiting Security Tests ====================
 
-test('subscription handles rate limiting on create', function () {
+test('subscription handles rate limiting on create', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(429, [], json_encode([
@@ -214,7 +219,7 @@ test('subscription handles rate limiting on create', function () {
         ->create();
 })->throws(SubscriptionException::class);
 
-test('subscription handles rate limiting on plan creation', function () {
+test('subscription handles rate limiting on plan creation', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(429, [], json_encode([
             'status' => false,
@@ -229,7 +234,7 @@ test('subscription handles rate limiting on plan creation', function () {
 
 // ==================== Data Integrity Security Tests ====================
 
-test('subscription prevents amount tampering', function () {
+test('subscription prevents amount tampering', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -251,7 +256,7 @@ test('subscription prevents amount tampering', function () {
     expect($result->amount)->toBe(1000.0);
 });
 
-test('subscription validates currency consistency', function () {
+test('subscription validates currency consistency', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -266,7 +271,7 @@ test('subscription validates currency consistency', function () {
 
 // ==================== Token Security Tests ====================
 
-test('subscription token cannot be empty string', function () {
+test('subscription token cannot be empty string', function (): void {
     // Whether a token is required is Paystack-specific (ADR-0006), so this
     // is now enforced by PaystackDriver rather than the generic Subscription
     // fluent API. Validation is disabled here to isolate that check from the
@@ -280,16 +285,16 @@ test('subscription token cannot be empty string', function () {
     $subscription->code('SUB_123')->token('')->cancel();
 })->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
-test('subscription token cannot be null', function () {
+test('subscription token cannot be null', function (): void {
     config(['payments.subscriptions.validation.enabled' => false]);
     app()->forgetInstance('payments.config');
 
     $subscription = SubscriptionTestHelper::createWithMock([]);
 
-    $subscription->code('SUB_123')->cancel(null);
+    $subscription->code('SUB_123')->cancel();
 })->throws(SubscriptionException::class, 'Paystack requires a valid email confirmation token');
 
-test('subscription validates token format', function () {
+test('subscription validates token format', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -302,7 +307,7 @@ test('subscription validates token format', function () {
         ->cancel();
 })->throws(SubscriptionException::class);
 
-test('subscription prevents token brute force', function () {
+test('subscription prevents token brute force', function (): void {
     // Multiple failed attempts should be handled by provider
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
@@ -318,7 +323,7 @@ test('subscription prevents token brute force', function () {
 
 // ==================== Metadata Security Tests ====================
 
-test('subscription prevents sensitive data in metadata', function () {
+test('subscription prevents sensitive data in metadata', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(200, [], json_encode([
@@ -344,10 +349,10 @@ test('subscription prevents sensitive data in metadata', function () {
         ])
         ->create();
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription limits metadata size', function () {
+test('subscription limits metadata size', function (): void {
     $largeMetadata = [];
     for ($i = 0; $i < 10000; $i++) {
         $largeMetadata["key_$i"] = str_repeat('x', 1000);
@@ -369,7 +374,7 @@ test('subscription limits metadata size', function () {
 
 // ==================== Provider Validation Security Tests ====================
 
-test('subscription prevents provider spoofing', function () {
+test('subscription prevents provider spoofing', function (): void {
     // This test verifies that invalid providers are rejected
     // Since we can't easily mock PaymentManager to throw, we'll test with a real manager
     // that doesn't have the fake_provider configured
@@ -382,16 +387,15 @@ test('subscription prevents provider spoofing', function () {
     $subscription->planData($planDTO)
         ->with('fake_provider')
         ->createPlan();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException::class);
+})->throws(DriverNotFoundException::class);
 
-test('subscription validates provider supports subscriptions', function () {
+test('subscription validates provider supports subscriptions', function (): void {
     // Create a driver that doesn't support subscriptions
-    $nonSubscriptionDriver = Mockery::mock('KenDeNigerian\PayZephyr\Contracts\DriverInterface');
+    $nonSubscriptionDriver = Mockery::mock(DriverInterface::class);
 
     $manager = new PaymentManager;
     $reflection = new \ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $drivers = $driversProperty->getValue($manager);
     $drivers['paystack'] = $nonSubscriptionDriver;
     $driversProperty->setValue($manager, $drivers);
@@ -401,11 +405,11 @@ test('subscription validates provider supports subscriptions', function () {
     $planDTO = new SubscriptionPlanDTO('Test', 1000.00, 'monthly');
 
     $subscription->planData($planDTO)->createPlan();
-})->throws(\KenDeNigerian\PayZephyr\Exceptions\PaymentException::class, 'does not support subscriptions');
+})->throws(PaymentException::class, 'does not support subscriptions');
 
 // ==================== Response Validation Security Tests ====================
 
-test('subscription validates response signature', function () {
+test('subscription validates response signature', function (): void {
     // This is handled by webhook validation, but we test the response structure
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
@@ -421,10 +425,10 @@ test('subscription validates response signature', function () {
     $result = $subscription->code('SUB_123')->fetch();
 
     // Should handle missing fields gracefully
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO::class);
+    expect($result)->toBeInstanceOf(SubscriptionResponseDTO::class);
 });
 
-test('subscription prevents response manipulation', function () {
+test('subscription prevents response manipulation', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -448,7 +452,7 @@ test('subscription prevents response manipulation', function () {
 
 // ==================== Error Message Security Tests ====================
 
-test('subscription does not expose sensitive info in error messages', function () {
+test('subscription does not expose sensitive info in error messages', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(500, [], json_encode([
             'status' => false,
@@ -466,7 +470,7 @@ test('subscription does not expose sensitive info in error messages', function (
     }
 });
 
-test('subscription sanitizes error context', function () {
+test('subscription sanitizes error context', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         SubscriptionTestHelper::planMock('PLN_123'),
         new Response(400, [], json_encode([
@@ -492,7 +496,7 @@ test('subscription sanitizes error context', function () {
         expect($e->getMessage())->not->toContain('secret');
 
         // If context exists, verify it doesn't contain sensitive data
-        if (! empty($context)) {
+        if ($context !== []) {
             expect($contextJson)->not->toContain('secret');
         }
 
@@ -503,7 +507,7 @@ test('subscription sanitizes error context', function () {
 
 // ==================== Timing Attack Prevention Tests ====================
 
-test('subscription response time is consistent for invalid tokens', function () {
+test('subscription response time is consistent for invalid tokens', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -515,7 +519,7 @@ test('subscription response time is consistent for invalid tokens', function () 
 
     try {
         $subscription->code('SUB_123')->cancel('invalid_token_1');
-    } catch (SubscriptionException $e) {
+    } catch (SubscriptionException) {
         // Ignore
     }
 
@@ -525,7 +529,7 @@ test('subscription response time is consistent for invalid tokens', function () 
 
     try {
         $subscription->code('SUB_123')->cancel('invalid_token_2');
-    } catch (SubscriptionException $e) {
+    } catch (SubscriptionException) {
         // Ignore
     }
 
@@ -539,7 +543,7 @@ test('subscription response time is consistent for invalid tokens', function () 
 
 // ==================== CSRF Protection Tests ====================
 
-test('subscription operations require proper authentication', function () {
+test('subscription operations require proper authentication', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(401, [], json_encode([
             'status' => false,
@@ -550,7 +554,7 @@ test('subscription operations require proper authentication', function () {
     $subscription->code('SUB_123')->fetch();
 })->throws(SubscriptionException::class);
 
-test('subscription cancel requires valid token (CSRF protection)', function () {
+test('subscription cancel requires valid token (CSRF protection)', function (): void {
     $subscription = SubscriptionTestHelper::createWithMock([
         new Response(401, [], json_encode([
             'status' => false,

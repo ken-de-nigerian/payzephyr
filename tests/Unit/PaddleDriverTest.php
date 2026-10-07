@@ -5,6 +5,7 @@ declare(strict_types=1);
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
@@ -14,7 +15,7 @@ use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->config = [
         'api_key' => 'pdl_sdbx_apikey_test',
         'webhook_secret' => 'pdl_ntfset_test_secret',
@@ -31,7 +32,7 @@ function paddleDriverWith(array $config, array $responses): PaddleDriver
     return $driver;
 }
 
-test('paddle driver initializes correctly', function () {
+test('paddle driver initializes correctly', function (): void {
     $driver = new PaddleDriver($this->config);
 
     expect($driver->getName())->toBe('paddle')
@@ -39,13 +40,13 @@ test('paddle driver initializes correctly', function () {
         ->and($driver->isCurrencySupported('NGN'))->toBeFalse();
 });
 
-test('paddle driver throws exception for missing api key', function () {
+test('paddle driver throws exception for missing api key', function (): void {
     unset($this->config['api_key']);
 
     new PaddleDriver($this->config);
 })->throws(InvalidConfigurationException::class, 'Paddle API key is required');
 
-test('paddle driver charges successfully and returns the hosted checkout url', function () {
+test('paddle driver charges successfully and returns the hosted checkout url', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(201, [], json_encode([
             'data' => [
@@ -71,9 +72,9 @@ test('paddle driver charges successfully and returns the hosted checkout url', f
         ->and($response->metadata['paddle_transaction_id'])->toBe('txn_01hv8wptq8987qeep44cyrewp9');
 });
 
-test('paddle driver sends the amount in minor units and carries the reference in custom_data', function () {
+test('paddle driver sends the amount in minor units and carries the reference in custom_data', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(201, [], json_encode([
             'data' => ['id' => 'txn_x', 'status' => 'ready', 'checkout' => ['url' => 'https://example.com/pay']],
@@ -99,9 +100,9 @@ test('paddle driver sends the amount in minor units and carries the reference in
         ->and($body['collection_mode'])->toBe('automatic');
 });
 
-test('paddle driver does not multiply zero-decimal currencies by 100', function () {
+test('paddle driver does not multiply zero-decimal currencies by 100', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(201, [], json_encode([
             'data' => ['id' => 'txn_x', 'status' => 'ready', 'checkout' => ['url' => 'https://example.com/pay']],
@@ -119,7 +120,7 @@ test('paddle driver does not multiply zero-decimal currencies by 100', function 
     expect($body['items'][0]['price']['unit_price']['amount'])->toBe('1200');
 });
 
-test('paddle driver fails the charge when paddle returns no checkout url', function () {
+test('paddle driver fails the charge when paddle returns no checkout url', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(201, [], json_encode(['data' => ['id' => 'txn_x', 'status' => 'draft']])),
     ]);
@@ -127,7 +128,7 @@ test('paddle driver fails the charge when paddle returns no checkout url', funct
     $driver->charge(new ChargeRequestDTO(amount: 10.0, currency: 'USD', email: 'test@example.com'));
 })->throws(ChargeException::class, 'No checkout URL returned by Paddle');
 
-test('paddle driver fails the charge when paddle returns no transaction id', function () {
+test('paddle driver fails the charge when paddle returns no transaction id', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(201, [], json_encode([
             'data' => ['status' => 'ready', 'checkout' => ['url' => 'https://example.com/pay']],
@@ -137,7 +138,7 @@ test('paddle driver fails the charge when paddle returns no transaction id', fun
     $driver->charge(new ChargeRequestDTO(amount: 10.0, currency: 'USD', email: 'test@example.com'));
 })->throws(ChargeException::class, 'without an id');
 
-test('paddle driver verifies a transaction successfully', function () {
+test('paddle driver verifies a transaction successfully', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(200, [], json_encode([
             'data' => [
@@ -170,13 +171,13 @@ test('paddle driver verifies a transaction successfully', function () {
         ->and($verification->isSuccessful())->toBeTrue();
 });
 
-test('paddle driver wraps verification failures', function () {
+test('paddle driver wraps verification failures', function (): void {
     $driver = paddleDriverWith($this->config, [new Response(500, [], 'boom')]);
 
     $driver->verify('txn_x');
 })->throws(VerificationException::class);
 
-test('paddle driver validates a correctly signed webhook', function () {
+test('paddle driver validates a correctly signed webhook', function (): void {
     $driver = new PaddleDriver($this->config);
 
     $body = json_encode(['event_id' => 'evt_1', 'event_type' => 'transaction.completed', 'data' => ['id' => 'txn_1']]);
@@ -188,7 +189,7 @@ test('paddle driver validates a correctly signed webhook', function () {
     expect($driver->validateWebhook($headers, $body))->toBeTrue();
 });
 
-test('paddle driver rejects a webhook signed with the wrong secret', function () {
+test('paddle driver rejects a webhook signed with the wrong secret', function (): void {
     $driver = new PaddleDriver($this->config);
 
     $body = json_encode(['event_id' => 'evt_1']);
@@ -198,7 +199,7 @@ test('paddle driver rejects a webhook signed with the wrong secret', function ()
     expect($driver->validateWebhook($headers, $body))->toBeFalse();
 });
 
-test('paddle driver rejects a webhook whose signature covers a different timestamp', function () {
+test('paddle driver rejects a webhook whose signature covers a different timestamp', function (): void {
     // The HMAC is over "<ts>:<body>", so replaying an old-but-validly-signed
     // event with a fresh ts must fail both checks, not just the clock one.
     $driver = new PaddleDriver($this->config);
@@ -211,7 +212,7 @@ test('paddle driver rejects a webhook whose signature covers a different timesta
         ->and($driver->validateWebhook(['paddle-signature' => ['ts='.time().';h1='.$signature]], $body))->toBeFalse();
 });
 
-test('paddle driver rejects webhooks with a missing or malformed signature header', function () {
+test('paddle driver rejects webhooks with a missing or malformed signature header', function (): void {
     $driver = new PaddleDriver($this->config);
 
     expect($driver->validateWebhook([], '{}'))->toBeFalse()
@@ -219,7 +220,7 @@ test('paddle driver rejects webhooks with a missing or malformed signature heade
         ->and($driver->validateWebhook(['paddle-signature' => ['ts=notanumber;h1=abc']], '{}'))->toBeFalse();
 });
 
-test('paddle driver rejects webhooks when no webhook secret is configured', function () {
+test('paddle driver rejects webhooks when no webhook secret is configured', function (): void {
     unset($this->config['webhook_secret']);
     $driver = new PaddleDriver($this->config);
 
@@ -229,7 +230,7 @@ test('paddle driver rejects webhooks when no webhook secret is configured', func
     expect($driver->validateWebhook(['paddle-signature' => ['ts='.$ts.';h1='.hash_hmac('sha256', $ts.':'.$body, 'anything')]], $body))->toBeFalse();
 });
 
-test('paddle driver extracts webhook fields from the event envelope', function () {
+test('paddle driver extracts webhook fields from the event envelope', function (): void {
     $driver = new PaddleDriver($this->config);
 
     $payload = [
@@ -251,13 +252,13 @@ test('paddle driver extracts webhook fields from the event envelope', function (
         ->and($driver->extractWebhookEventId($payload))->toBe('evt_01h');
 });
 
-test('paddle driver falls back to the transaction id when no reference was stored', function () {
+test('paddle driver falls back to the transaction id when no reference was stored', function (): void {
     $driver = new PaddleDriver($this->config);
 
     expect($driver->extractWebhookReference(['data' => ['id' => 'txn_01h']]))->toBe('txn_01h');
 });
 
-test('paddle driver only reads a payment status from transaction events', function () {
+test('paddle driver only reads a payment status from transaction events', function (): void {
     // Paddle delivers transaction, subscription and adjustment events to the
     // same endpoint, and Paddle copies custom_data from a transaction onto the
     // subscription it creates - so a subscription event can resolve to a known
@@ -284,21 +285,21 @@ test('paddle driver only reads a payment status from transaction events', functi
         ]))->toBe('completed');
 });
 
-test('paddle driver health check succeeds against event types', function () {
+test('paddle driver health check succeeds against event types', function (): void {
     $driver = paddleDriverWith($this->config, [new Response(200, [], json_encode(['data' => []]))]);
 
     expect($driver->healthCheck())->toBeTrue();
 });
 
-test('paddle driver health check fails on server errors', function () {
+test('paddle driver health check fails on server errors', function (): void {
     $driver = paddleDriverWith($this->config, [new Response(500, [], 'boom')]);
 
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('paddle driver creates a full refund as a full adjustment', function () {
+test('paddle driver creates a full refund as a full adjustment', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(201, [], json_encode([
             'data' => [
@@ -338,9 +339,9 @@ test('paddle driver creates a full refund as a full adjustment', function () {
         ->and($response->isPending())->toBeTrue();
 });
 
-test('paddle driver creates a partial refund against the resolved line item', function () {
+test('paddle driver creates a partial refund against the resolved line item', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
             'data' => [
@@ -382,13 +383,13 @@ test('paddle driver creates a partial refund against the resolved line item', fu
         ->and($response->amount)->toBe(25.0);
 });
 
-test('paddle driver converts a partial refund using the transaction currency, not the configured one', function () {
+test('paddle driver converts a partial refund using the transaction currency, not the configured one', function (): void {
     // The guard this covers: JPY has no minor unit, so if the multiplier were
     // taken from the configured currency list (whose first entry here is JPY)
     // a $25.50 USD refund would be sent as 25 minor units - a $0.25 refund
     // Paddle accepts silently, because it is under the line-item total.
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
             'data' => [
@@ -412,9 +413,9 @@ test('paddle driver converts a partial refund using the transaction currency, no
     expect($body['items'][0]['amount'])->toBe('2550');
 });
 
-test('paddle driver honours a zero-decimal transaction currency on a partial refund', function () {
+test('paddle driver honours a zero-decimal transaction currency on a partial refund', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
             'data' => [
@@ -442,7 +443,7 @@ test('paddle driver honours a zero-decimal transaction currency on a partial ref
         ->and($response->currency)->toBe('JPY');
 });
 
-test('paddle driver refuses a partial refund when the transaction reports no currency', function () {
+test('paddle driver refuses a partial refund when the transaction reports no currency', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(200, [], json_encode([
             'data' => ['details' => ['line_items' => [['id' => 'txnitm_1']]]],
@@ -452,9 +453,9 @@ test('paddle driver refuses a partial refund when the transaction reports no cur
     $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 5.0));
 })->throws(RefundException::class, 'did not report a currency_code');
 
-test('paddle driver url-encodes references interpolated into request paths', function () {
+test('paddle driver url-encodes references interpolated into request paths', function (): void {
     $container = [];
-    $history = GuzzleHttp\Middleware::history($container);
+    $history = Middleware::history($container);
     $stack = HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode(['data' => ['id' => 'txn_1', 'currency_code' => 'USD', 'details' => ['totals' => ['grand_total' => '100']]]])),
     ]));
@@ -468,7 +469,7 @@ test('paddle driver url-encodes references interpolated into request paths', fun
     expect($container[0]['request']->getUri()->getPath())->toBe('/transactions/txn_1%2F..%2F..%2Fevents');
 });
 
-test('paddle driver refuses a partial refund on a multi-item transaction', function () {
+test('paddle driver refuses a partial refund on a multi-item transaction', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(200, [], json_encode([
             'data' => ['details' => ['line_items' => [['id' => 'txnitm_1'], ['id' => 'txnitm_2']]]],
@@ -478,7 +479,7 @@ test('paddle driver refuses a partial refund on a multi-item transaction', funct
     $driver->refund(new RefundRequestDTO(transactionReference: 'txn_1', amount: 5.0, currency: 'USD'));
 })->throws(RefundException::class, 'expected exactly one line item');
 
-test('paddle driver fetches a refund by filtering the adjustments list', function () {
+test('paddle driver fetches a refund by filtering the adjustments list', function (): void {
     $driver = paddleDriverWith($this->config, [
         new Response(200, [], json_encode([
             'data' => [[
@@ -502,7 +503,7 @@ test('paddle driver fetches a refund by filtering the adjustments list', functio
         ->and($response->reason)->toBe('duplicate');
 });
 
-test('paddle driver reports a missing adjustment as a refund failure', function () {
+test('paddle driver reports a missing adjustment as a refund failure', function (): void {
     $driver = paddleDriverWith($this->config, [new Response(200, [], json_encode(['data' => []]))]);
 
     $driver->fetchRefund('adj_missing');

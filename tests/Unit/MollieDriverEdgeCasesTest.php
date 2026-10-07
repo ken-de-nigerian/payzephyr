@@ -5,6 +5,7 @@ declare(strict_types=1);
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Request;
@@ -13,8 +14,9 @@ use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->config = [
         'api_key' => 'test_mollie_api_key',
         'base_url' => 'https://api.mollie.com',
@@ -22,7 +24,7 @@ beforeEach(function () {
     ];
 });
 
-test('mollie driver handles charge with zero amount', function () {
+test('mollie driver handles charge with zero amount', function (): void {
     new ChargeRequestDTO(
         amount: 0.00,
         currency: 'EUR',
@@ -31,7 +33,7 @@ test('mollie driver handles charge with zero amount', function () {
     );
 })->throws(\InvalidArgumentException::class, 'Amount must be greater than zero');
 
-test('mollie driver handles charge with unsupported currency', function () {
+test('mollie driver handles charge with unsupported currency', function (): void {
     $mock = new MockHandler([
         new Response(422, [], json_encode([
             'status' => 422,
@@ -53,7 +55,7 @@ test('mollie driver handles charge with unsupported currency', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('mollie driver handles network timeout during charge', function () {
+test('mollie driver handles network timeout during charge', function (): void {
     $mock = new MockHandler([
         new ConnectException(
             'Connection timeout',
@@ -74,7 +76,7 @@ test('mollie driver handles network timeout during charge', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('mollie driver handles network timeout during verify', function () {
+test('mollie driver handles network timeout during verify', function (): void {
     $mock = new MockHandler([
         new ConnectException(
             'Connection timeout',
@@ -88,7 +90,7 @@ test('mollie driver handles network timeout during verify', function () {
     $driver->verify('tr_test');
 })->throws(VerificationException::class);
 
-test('mollie driver handles charge with missing callback url', function () {
+test('mollie driver handles charge with missing callback url', function (): void {
     $mock = new MockHandler([
         new Response(422, [], json_encode([
             'status' => 422,
@@ -109,7 +111,7 @@ test('mollie driver handles charge with missing callback url', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('mollie driver handles verify with unauthorized access', function () {
+test('mollie driver handles verify with unauthorized access', function (): void {
     $mock = new MockHandler([
         new Response(401, [], json_encode([
             'status' => 401,
@@ -124,7 +126,7 @@ test('mollie driver handles verify with unauthorized access', function () {
     $driver->verify('tr_test');
 })->throws(VerificationException::class);
 
-test('mollie driver handles verify with malformed response', function () {
+test('mollie driver handles verify with malformed response', function (): void {
     $mock = new MockHandler([
         new Response(200, [], 'invalid json'),
     ]);
@@ -135,7 +137,7 @@ test('mollie driver handles verify with malformed response', function () {
     $driver->verify('tr_test');
 })->throws(VerificationException::class);
 
-test('mollie driver throws rather than rejecting when the API times out during webhook validation', function () {
+test('mollie driver throws rather than rejecting when the API times out during webhook validation', function (): void {
     // Validation runs in the queued job, after Mollie has been answered. A
     // false here would discard a genuine delivery; throwing lets the job retry.
     $mock = new MockHandler([
@@ -153,11 +155,11 @@ test('mollie driver throws rather than rejecting when the API times out during w
         'createdAt' => date('c'),
     ]);
 
-    expect(fn () => $driver->validateWebhook([], $payload))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook([], $payload))
+        ->toThrow(WebhookException::class);
 });
 
-test('mollie driver handles webhook validation with payment ID mismatch', function () {
+test('mollie driver handles webhook validation with payment ID mismatch', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_DIFFERENT',
@@ -178,7 +180,7 @@ test('mollie driver handles webhook validation with payment ID mismatch', functi
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver handles charge with empty description', function () {
+test('mollie driver handles charge with empty description', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -211,7 +213,7 @@ test('mollie driver handles charge with empty description', function () {
     expect($response->status)->toBe('pending');
 });
 
-test('mollie driver handles verify with null paidAt', function () {
+test('mollie driver handles verify with null paidAt', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -231,7 +233,7 @@ test('mollie driver handles verify with null paidAt', function () {
     expect($verification->paidAt)->toBeNull();
 });
 
-test('mollie driver handles verify with missing method field', function () {
+test('mollie driver handles verify with missing method field', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -251,7 +253,7 @@ test('mollie driver handles verify with missing method field', function () {
     expect($verification->channel)->toBeNull();
 });
 
-test('mollie driver handles charge with very long description', function () {
+test('mollie driver handles charge with very long description', function (): void {
     $longDescription = str_repeat('A', 1000);
     $mock = new MockHandler([
         new Response(422, [], json_encode([
@@ -275,7 +277,7 @@ test('mollie driver handles charge with very long description', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('mollie driver handles charge with special characters in metadata', function () {
+test('mollie driver handles charge with special characters in metadata', function (): void {
     $mock = new MockHandler([
         new Response(201, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -313,7 +315,7 @@ test('mollie driver handles charge with special characters in metadata', functio
         ->and($response->metadata['special'])->toBe('Value with "quotes" & <tags>');
 });
 
-test('mollie rejects a webhook whose payment id does not exist on the account', function () {
+test('mollie rejects a webhook whose payment id does not exist on the account', function (): void {
     // A 404 is Mollie answering: this id is not ours. That is what a forged
     // ping looks like, and retrying would get the same answer.
     $mock = new MockHandler([
@@ -330,9 +332,9 @@ test('mollie rejects a webhook whose payment id does not exist on the account', 
     expect($driver->validateWebhook([], '{"id":"tr_forged"}'))->toBeFalse();
 });
 
-test('mollie throws rather than rejecting when the API answers with a server error', function () {
+test('mollie throws rather than rejecting when the API answers with a server error', function (): void {
     $mock = new MockHandler([
-        new \GuzzleHttp\Exception\ServerException(
+        new ServerException(
             'Service Unavailable',
             new Request('GET', '/v2/payments/tr_test'),
             new Response(503),
@@ -342,11 +344,11 @@ test('mollie throws rather than rejecting when the API answers with a server err
     $driver = new MollieDriver($this->config);
     $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
 
-    expect(fn () => $driver->validateWebhook([], '{"id":"tr_test"}'))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook([], '{"id":"tr_test"}'))
+        ->toThrow(WebhookException::class);
 });
 
-test('mollie throws rather than rejecting when its own API key is refused', function () {
+test('mollie throws rather than rejecting when its own API key is refused', function (): void {
     // A 401 is about our credentials, not the sender. Every genuine delivery
     // would be discarded until someone noticed; a failing job gets noticed.
     $mock = new MockHandler([
@@ -360,6 +362,6 @@ test('mollie throws rather than rejecting when its own API key is refused', func
     $driver = new MollieDriver($this->config);
     $driver->setClient(new Client(['handler' => HandlerStack::create($mock)]));
 
-    expect(fn () => $driver->validateWebhook([], '{"id":"tr_test"}'))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn (): bool => $driver->validateWebhook([], '{"id":"tr_test"}'))
+        ->toThrow(WebhookException::class);
 });

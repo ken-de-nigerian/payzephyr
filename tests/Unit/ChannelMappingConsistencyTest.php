@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Tests\Unit;
 
+use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\Facades\Payment;
+use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -85,7 +89,7 @@ class ChannelMappingConsistencyTest extends TestCase
                     // Provider doesn't support this channel - that's OK
                     $assertionsMade = true;
                 }
-            } catch (\Exception $e) {
+            } catch (\Exception) {
                 // Some providers may throw exceptions - that's OK
                 // Just ensure we tested something
                 $assertionsMade = true;
@@ -125,7 +129,7 @@ class ChannelMappingConsistencyTest extends TestCase
         }
 
         // Ensure at least one assertion was made
-        $this->assertTrue($assertionsMade || empty($providerChannels), 'No channels tested');
+        $this->assertTrue($assertionsMade || $providerChannels === [], 'No channels tested');
     }
 
     /**
@@ -179,7 +183,7 @@ class ChannelMappingConsistencyTest extends TestCase
         // Ensure provider is enabled and configured
         config(["payments.providers.{$provider}.enabled" => true]);
         $this->app->forgetInstance('payments.config');
-        $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+        $this->app->forgetInstance(PaymentManager::class);
 
         // A hard failure, not a skip: a provider that is not configured would
         // otherwise drop out of this consistency check without anyone noticing.
@@ -187,7 +191,7 @@ class ChannelMappingConsistencyTest extends TestCase
 
         // Use proper setup method with provider-specific response
         $mockResponse = match ($provider) {
-            'paystack' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'paystack' => new Response(200, [], json_encode([
                 'status' => true,
                 'data' => [
                     'reference' => "ref_{$provider}_123",
@@ -195,60 +199,60 @@ class ChannelMappingConsistencyTest extends TestCase
                     'access_code' => 'access_123',
                 ],
             ])),
-            'flutterwave' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'flutterwave' => new Response(200, [], json_encode([
                 'status' => 'success',
                 'data' => [
                     'link' => "https://checkout.{$provider}.com/abc123",
                     'tx_ref' => "ref_{$provider}_123",
                 ],
             ])),
-            'monnify' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'monnify' => new Response(200, [], json_encode([
                 'requestSuccessful' => true,
                 'responseBody' => [
                     'checkoutUrl' => "https://checkout.{$provider}.com/abc123",
                     'transactionReference' => "ref_{$provider}_123",
                 ],
             ])),
-            'opay' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'opay' => new Response(200, [], json_encode([
                 'code' => '00000',
                 'data' => [
                     'cashierUrl' => "https://checkout.{$provider}.com/abc123",
                     'orderNo' => "ref_{$provider}_123",
                 ],
             ])),
-            'square' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'square' => new Response(200, [], json_encode([
                 'payment_link' => [
                     'id' => 'payment_link_123',
                     'url' => "https://checkout.{$provider}.com/abc123",
                 ],
             ])),
-            'paddle' => new \GuzzleHttp\Psr7\Response(201, [], json_encode([
+            'paddle' => new Response(201, [], json_encode([
                 'data' => [
                     'id' => "txn_{$provider}_123",
                     'status' => 'ready',
                     'checkout' => ['url' => "https://checkout.{$provider}.com/abc123"],
                 ],
             ])),
-            'razorpay' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'razorpay' => new Response(200, [], json_encode([
                 'id' => 'plink_test123',
                 'status' => 'created',
                 'short_url' => "https://checkout.{$provider}.com/abc123",
             ])),
-            'mollie' => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            'mollie' => new Response(200, [], json_encode([
                 'id' => "ref_{$provider}_123",
                 'status' => 'open',
                 '_links' => [
                     'checkout' => ['href' => "https://checkout.{$provider}.com/abc123"],
                 ],
             ])),
-            'paypal' => new \GuzzleHttp\Psr7\Response(201, [], json_encode([
+            'paypal' => new Response(201, [], json_encode([
                 'id' => 'ORDER_ID_123',
                 'status' => 'CREATED',
                 'links' => [
                     ['rel' => 'approve', 'href' => "https://checkout.{$provider}.com/abc123"],
                 ],
             ])),
-            default => new \GuzzleHttp\Psr7\Response(200, [], json_encode([
+            default => new Response(200, [], json_encode([
                 'status' => true,
                 'data' => [
                     'reference' => "ref_{$provider}_123",
@@ -269,7 +273,7 @@ class ChannelMappingConsistencyTest extends TestCase
         };
 
         // IDENTICAL code for all providers
-        $response = \KenDeNigerian\PayZephyr\Facades\Payment::amount(100.00)
+        $response = Payment::amount(100.00)
             ->currency($currency)
             ->email('test@example.com')
             ->callback('https://example.com/callback')
@@ -278,7 +282,7 @@ class ChannelMappingConsistencyTest extends TestCase
             ->charge();
 
         // Should work without provider-specific code
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $response);
     }
 
     /**
@@ -290,13 +294,13 @@ class ChannelMappingConsistencyTest extends TestCase
         // Ensure provider is enabled and configured
         config(["payments.providers.{$provider}.enabled" => true]);
         $this->app->forgetInstance('payments.config');
-        $this->app->forgetInstance(\KenDeNigerian\PayZephyr\PaymentManager::class);
+        $this->app->forgetInstance(PaymentManager::class);
 
         // A hard failure, not a skip: a provider that is not configured would
         // otherwise drop out of this consistency check without anyone noticing.
         $this->assertTrue($this->isProviderEnabled($provider), "Provider {$provider} is not enabled in the test configuration");
 
-        $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
+        $driver = app(PaymentManager::class)->driver($provider);
 
         $webhookPayload = $this->getProviderWebhookPayload($provider);
         $channel = $driver->extractWebhookChannel($webhookPayload);

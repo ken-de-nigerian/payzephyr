@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Services\ProviderDetector;
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -30,7 +30,7 @@ beforeEach(function () {
     app()->forgetInstance('payments.config');
 });
 
-test('provider detector detects paystack from reference', function () {
+test('provider detector detects paystack from reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('PAYSTACK_ref_123'))->toBe('paystack')
@@ -38,35 +38,35 @@ test('provider detector detects paystack from reference', function () {
         ->and($detector->detectFromReference('PAYSTACK_abc'))->toBe('paystack');
 });
 
-test('provider detector detects flutterwave from reference', function () {
+test('provider detector detects flutterwave from reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('FLW_ref_123'))->toBe('flutterwave')
         ->and($detector->detectFromReference('flw_ref_123'))->toBe('flutterwave');
 });
 
-test('provider detector detects monnify from reference', function () {
+test('provider detector detects monnify from reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('MON_ref_123'))->toBe('monnify')
         ->and($detector->detectFromReference('mon_ref_123'))->toBe('monnify');
 });
 
-test('provider detector detects stripe from reference', function () {
+test('provider detector detects stripe from reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('STRIPE_ref_123'))->toBe('stripe')
         ->and($detector->detectFromReference('stripe_ref_123'))->toBe('stripe');
 });
 
-test('provider detector detects paypal from reference', function () {
+test('provider detector detects paypal from reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('PAYPAL_ref_123'))->toBe('paypal')
         ->and($detector->detectFromReference('paypal_ref_123'))->toBe('paypal');
 });
 
-test('provider detector returns null for unknown reference', function () {
+test('provider detector returns null for unknown reference', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('unknown_ref_123'))->toBeNull()
@@ -74,7 +74,7 @@ test('provider detector returns null for unknown reference', function () {
         ->and($detector->detectFromReference(''))->toBeNull();
 });
 
-test('provider detector registerPrefix adds custom prefix', function () {
+test('provider detector registerPrefix adds custom prefix', function (): void {
     $detector = new ProviderDetector;
 
     $detector->registerPrefix('SQUARE', 'square');
@@ -83,7 +83,7 @@ test('provider detector registerPrefix adds custom prefix', function () {
         ->and($detector->detectFromReference('square_ref_123'))->toBe('square');
 });
 
-test('provider detector registerPrefix allows chaining', function () {
+test('provider detector registerPrefix allows chaining', function (): void {
     $detector = new ProviderDetector;
 
     $result = $detector->registerPrefix('CUSTOM', 'custom');
@@ -92,7 +92,7 @@ test('provider detector registerPrefix allows chaining', function () {
         ->and($detector->detectFromReference('CUSTOM_ref_123'))->toBe('custom');
 });
 
-test('provider detector getPrefixes returns all prefixes', function () {
+test('provider detector getPrefixes returns all prefixes', function (): void {
     $detector = new ProviderDetector;
 
     $prefixes = $detector->getPrefixes();
@@ -102,7 +102,7 @@ test('provider detector getPrefixes returns all prefixes', function () {
         ->and($prefixes['FLW'])->toBe('flutterwave');
 });
 
-test('provider detector registerPrefix is case insensitive for prefix', function () {
+test('provider detector registerPrefix is case insensitive for prefix', function (): void {
     $detector = new ProviderDetector;
 
     $detector->registerPrefix('custom', 'custom');
@@ -111,7 +111,7 @@ test('provider detector registerPrefix is case insensitive for prefix', function
         ->and($detector->detectFromReference('custom_ref_123'))->toBe('custom');
 });
 
-test('provider detector requires underscore after prefix', function () {
+test('provider detector requires underscore after prefix', function (): void {
     $detector = new ProviderDetector;
 
     expect($detector->detectFromReference('PAYSTACKref123'))->toBeNull()

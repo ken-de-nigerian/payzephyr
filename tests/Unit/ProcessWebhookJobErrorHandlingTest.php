@@ -1,10 +1,15 @@
 <?php
 
 use Illuminate\Support\Facades\Log;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
+use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
+use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
+use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('process webhook job handles database error during transaction update', function () {
+test('process webhook job handles database error during transaction update', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'charge.success',
         'data' => [
@@ -13,7 +18,7 @@ test('process webhook job handles database error during transaction update', fun
         ],
     ]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -22,28 +27,27 @@ test('process webhook job handles database error during transaction update', fun
         'email' => 'test@example.com',
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'TEST_123')->first();
     expect($transaction)->not->toBeNull();
 });
 
-test('process webhook job handles driver not found exception in extractReference', function () {
+test('process webhook job handles driver not found exception in extractReference', function (): void {
     $job = new ProcessWebhook('nonexistent', ['data' => ['reference' => 'TEST_123']]);
 
     $reflection = new ReflectionClass($job);
     $method = $reflection->getMethod('extractReference');
-    $method->setAccessible(true);
 
     $result = $method->invoke($job, app(PaymentManager::class));
 
     expect($result)->toBeNull();
 });
 
-test('process webhook job handles driver not found exception in updateTransactionFromWebhook', function () {
+test('process webhook job handles driver not found exception in updateTransactionFromWebhook', function (): void {
     $job = new ProcessWebhook('nonexistent', ['data' => ['reference' => 'TEST_123']]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'nonexistent',
         'status' => 'pending',
@@ -54,26 +58,25 @@ test('process webhook job handles driver not found exception in updateTransactio
 
     $reflection = new ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
     try {
         $method->invoke(
             $job,
             app(PaymentManager::class),
-            app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class),
-            app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class),
+            app(StatusNormalizerInterface::class),
+            app(TransactionRepositoryInterface::class),
             'TEST_123'
         );
-    } catch (\KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException $e) {
-        expect($e)->toBeInstanceOf(\KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException::class);
+    } catch (DriverNotFoundException $e) {
+        expect($e)->toBeInstanceOf(DriverNotFoundException::class);
     }
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'TEST_123')->first();
 
     expect($transaction)->not->toBeNull();
 });
 
-test('process webhook job logs error when exception occurs', function () {
+test('process webhook job logs error when exception occurs', function (): void {
     Log::shouldReceive('channel')
         ->with('payments')
         ->andReturnSelf();
@@ -83,39 +86,37 @@ test('process webhook job logs error when exception occurs', function () {
     $job = new ProcessWebhook('paystack', ['data' => ['reference' => 'TEST_123']]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = \Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = \Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookReference')
         ->andThrow(new \Exception('Driver error'));
 
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    expect(fn () => app()->call([$job, 'handle']))->toThrow(\Exception::class);
+    expect(fn () => app()->call($job->handle(...)))->toThrow(\Exception::class);
 });
 
-test('process webhook job handles missing transaction gracefully', function () {
+test('process webhook job handles missing transaction gracefully', function (): void {
     $job = new ProcessWebhook('paystack', ['data' => ['reference' => 'NONEXISTENT']]);
 
     $reflection = new ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
     $method->invoke(
         $job,
         app(PaymentManager::class),
-        app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class),
-        app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class),
+        app(StatusNormalizerInterface::class),
+        app(TransactionRepositoryInterface::class),
         'NONEXISTENT'
     );
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'NONEXISTENT')->first();
+    $transaction = PaymentTransaction::where('reference', 'NONEXISTENT')->first();
 
     expect($transaction)->toBeNull();
 });
 
-test('process webhook job updates transaction with channel when available', function () {
+test('process webhook job updates transaction with channel when available', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'charge.success',
         'data' => [
@@ -125,7 +126,7 @@ test('process webhook job updates transaction with channel when available', func
         ],
     ]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -134,15 +135,15 @@ test('process webhook job updates transaction with channel when available', func
         'email' => 'test@example.com',
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'TEST_123')->first();
 
     expect($transaction)->not->toBeNull()
         ->and($transaction->status)->not->toBe('pending');
 });
 
-test('process webhook job sets paid_at for successful status', function () {
+test('process webhook job sets paid_at for successful status', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'charge.success',
         'data' => [
@@ -151,7 +152,7 @@ test('process webhook job sets paid_at for successful status', function () {
         ],
     ]);
 
-    \KenDeNigerian\PayZephyr\Models\PaymentTransaction::create([
+    PaymentTransaction::create([
         'reference' => 'TEST_123',
         'provider' => 'paystack',
         'status' => 'pending',
@@ -160,9 +161,9 @@ test('process webhook job sets paid_at for successful status', function () {
         'email' => 'test@example.com',
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    $transaction = \KenDeNigerian\PayZephyr\Models\PaymentTransaction::where('reference', 'TEST_123')->first();
+    $transaction = PaymentTransaction::where('reference', 'TEST_123')->first();
 
     expect($transaction->paid_at)->not->toBeNull();
 });

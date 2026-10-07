@@ -8,7 +8,7 @@ use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 use Psr\Http\Message\ResponseInterface;
 
-test('abstract driver setStatusNormalizer allows custom normalizer', function () {
+test('abstract driver setStatusNormalizer allows custom normalizer', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -25,7 +25,7 @@ test('abstract driver setStatusNormalizer allows custom normalizer', function ()
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('abstract driver setChannelMapper allows custom mapper', function () {
+test('abstract driver setChannelMapper allows custom mapper', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -38,7 +38,7 @@ test('abstract driver setChannelMapper allows custom mapper', function () {
     expect($driver)->toBeInstanceOf(PaystackDriver::class);
 });
 
-test('abstract driver mapChannels returns null when provider does not support channels', function () {
+test('abstract driver mapChannels returns null when provider does not support channels', function (): void {
     $paypalDriver = new PayPalDriver([
         'client_id' => 'test',
         'client_secret' => 'test',
@@ -56,7 +56,7 @@ test('abstract driver mapChannels returns null when provider does not support ch
     expect($result)->toBeNull();
 });
 
-test('abstract driver mapChannels returns mapped channels when provider supports them', function () {
+test('abstract driver mapChannels returns mapped channels when provider supports them', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -73,7 +73,7 @@ test('abstract driver mapChannels returns mapped channels when provider supports
     expect($result)->toBe(['card', 'bank_transfer']);
 });
 
-test('abstract driver mapChannels returns null when no channels provided', function () {
+test('abstract driver mapChannels returns null when no channels provided', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -90,7 +90,7 @@ test('abstract driver mapChannels returns null when no channels provided', funct
     expect($result)->toBeNull();
 });
 
-test('abstract driver makeRequest injects idempotency key when available', function () {
+test('abstract driver makeRequest injects idempotency key when available', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -101,14 +101,7 @@ test('abstract driver makeRequest injects idempotency key when available', funct
         amount: 10000,
         currency: 'NGN',
         email: 'test@example.com',
-        reference: null,
-        callbackUrl: null,
         metadata: [],
-        description: null,
-        customer: null,
-        customFields: null,
-        split: null,
-        channels: null,
         idempotencyKey: 'test_idempotency_key'
     );
 
@@ -119,10 +112,8 @@ test('abstract driver makeRequest injects idempotency key when available', funct
     $client = Mockery::mock(Client::class);
     $client->shouldReceive('request')
         ->once()
-        ->with('POST', '/test', Mockery::on(function ($options) {
-            return isset($options['headers']['Idempotency-Key'])
-                && $options['headers']['Idempotency-Key'] === 'test_idempotency_key';
-        }))
+        ->with('POST', '/test', Mockery::on(fn ($options): bool => isset($options['headers']['Idempotency-Key'])
+            && $options['headers']['Idempotency-Key'] === 'test_idempotency_key'))
         ->andReturn(Mockery::mock(ResponseInterface::class));
 
     $driver->setClient($client);
@@ -134,7 +125,7 @@ test('abstract driver makeRequest injects idempotency key when available', funct
     expect(true)->toBeTrue(); // If we get here, the mock was called correctly
 });
 
-test('abstract driver makeRequest does not override existing idempotency headers', function () {
+test('abstract driver makeRequest does not override existing idempotency headers', function (): void {
     $driver = new PaystackDriver([
         'secret_key' => 'sk_test_xxx',
         'public_key' => 'pk_test_xxx',
@@ -145,14 +136,7 @@ test('abstract driver makeRequest does not override existing idempotency headers
         amount: 10000,
         currency: 'NGN',
         email: 'test@example.com',
-        reference: null,
-        callbackUrl: null,
         metadata: [],
-        description: null,
-        customer: null,
-        customFields: null,
-        split: null,
-        channels: null,
         idempotencyKey: 'test_idempotency_key'
     );
 
@@ -163,10 +147,8 @@ test('abstract driver makeRequest does not override existing idempotency headers
     $client = Mockery::mock(Client::class);
     $client->shouldReceive('request')
         ->once()
-        ->with('POST', '/test', Mockery::on(function ($options) {
-            return isset($options['headers']['Idempotency-Key'])
-                && $options['headers']['Idempotency-Key'] === 'existing_key';
-        }))
+        ->with('POST', '/test', Mockery::on(fn ($options): bool => isset($options['headers']['Idempotency-Key'])
+            && $options['headers']['Idempotency-Key'] === 'existing_key'))
         ->andReturn(Mockery::mock(ResponseInterface::class));
 
     $driver->setClient($client);

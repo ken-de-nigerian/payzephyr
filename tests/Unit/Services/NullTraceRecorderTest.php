@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\QueryException;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -44,25 +45,25 @@ function freshRecorderBinding(): TraceRecorderInterface
 // The switch
 // ---------------------------------------------------------------------------
 
-test('with tracing off the container hands out the do-nothing recorder', function () {
+test('with tracing off the container hands out the do-nothing recorder', function (): void {
     config(['payments.features.trace' => false]);
 
     expect(freshRecorderBinding())->toBeInstanceOf(NullTraceRecorder::class);
 });
 
-test('with tracing on the container hands out the real recorder', function () {
+test('with tracing on the container hands out the real recorder', function (): void {
     config(['payments.features.trace' => true]);
 
     expect(freshRecorderBinding())->toBeInstanceOf(TraceRecorder::class);
 });
 
-test('tracing is off unless it has been switched on', function () {
+test('tracing is off unless it has been switched on', function (): void {
     config(['payments.features' => []]);
 
     expect(freshRecorderBinding())->toBeInstanceOf(NullTraceRecorder::class);
 });
 
-test('the disabled recorder issues no queries at all', function () {
+test('the disabled recorder issues no queries at all', function (): void {
     // The point of a separate implementation rather than an early return: with
     // tracing off there is no config lookup and no database round trip, so the
     // feature costs nothing on a hot path it is not participating in.
@@ -70,7 +71,7 @@ test('the disabled recorder issues no queries at all', function () {
     $recorder = freshRecorderBinding();
 
     $queries = [];
-    DB::listen(function ($query) use (&$queries) {
+    DB::listen(function ($query) use (&$queries): void {
         $queries[] = $query->sql;
     });
 
@@ -80,12 +81,12 @@ test('the disabled recorder issues no queries at all', function () {
     expect($queries)->toBeEmpty();
 });
 
-test('the disabled recorder returns nothing to depend on', function () {
+test('the disabled recorder returns nothing to depend on', function (): void {
     expect((new NullTraceRecorder)->record(nullTraceEvent()))->toBeNull()
         ->and((new NullTraceRecorder)->startCorrelation())->toBe('');
 });
 
-test('an empty correlation id from the disabled recorder never reaches the database', function () {
+test('an empty correlation id from the disabled recorder never reaches the database', function (): void {
     $dto = new TraceEventDTO(
         reference: 'PZ_1755000000_abcdef01',
         event: TraceEvent::PAYMENT_INITIATED,
@@ -101,7 +102,7 @@ test('an empty correlation id from the disabled recorder never reaches the datab
 // Recording can fail. Payments cannot fail because of it.
 // ---------------------------------------------------------------------------
 
-test('recording against a trace table that was never migrated does not throw', function () {
+test('recording against a trace table that was never migrated does not throw', function (): void {
     // The exit criterion for this phase, and the realistic failure: the
     // feature flag is on but nobody ran `payzephyr:install --features=trace`.
     config(['payments.features.trace' => true]);
@@ -115,14 +116,14 @@ test('recording against a trace table that was never migrated does not throw', f
         ->and(Schema::hasTable('payment_trace_events'))->toBeFalse();
 });
 
-test('a dropped trace event is reported to the payment log channel', function () {
+test('a dropped trace event is reported to the payment log channel', function (): void {
     config(['payments.features.trace' => true]);
     app()->forgetInstance('payments.config');
 
     Schema::drop('payment_trace_events');
 
     $logged = [];
-    Log::listen(function (MessageLogged $message) use (&$logged) {
+    Log::listen(function (MessageLogged $message) use (&$logged): void {
         $logged[] = $message;
     });
 
@@ -134,10 +135,10 @@ test('a dropped trace event is reported to the payment log channel', function ()
         ->and($entry->level)->toBe('error')
         ->and($entry->context['reference'])->toBe('PZ_1755000000_abcdef01')
         ->and($entry->context['event'])->toBe('payment.initiated')
-        ->and($entry->context['error_class'])->toBe(Illuminate\Database\QueryException::class);
+        ->and($entry->context['error_class'])->toBe(QueryException::class);
 });
 
-test('a logger that is itself broken on top of a broken write still does not throw', function () {
+test('a logger that is itself broken on top of a broken write still does not throw', function (): void {
     // Both guards failing at once is exactly when a payment is most at risk of
     // being reported as failed when it actually succeeded. LogsToPaymentChannel
     // already falls back to the default channel on a bad channel name, so this
@@ -152,7 +153,7 @@ test('a logger that is itself broken on top of a broken write still does not thr
     expect((new TraceRecorder(new PayloadRedactor))->record(nullTraceEvent()))->toBeNull();
 });
 
-test('a queue backend that cannot be reached does not take the payment with it', function () {
+test('a queue backend that cannot be reached does not take the payment with it', function (): void {
     config([
         'payments.features.trace' => true,
         'payments.trace.async' => true,

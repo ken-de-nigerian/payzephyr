@@ -7,6 +7,7 @@ use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ProviderException;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
@@ -117,7 +118,6 @@ function managerWithBareDriver(DriverInterface $driver): PaymentManager
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, ['primary' => $driver]);
 
     return $manager;
@@ -133,7 +133,7 @@ function bareChargeRequest(string $reference, string $currency = 'NGN'): ChargeR
     ]);
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -148,7 +148,7 @@ beforeEach(function () {
     ]);
 });
 
-test('a driver implementing only DriverInterface can complete a charge', function () {
+test('a driver implementing only DriverInterface can complete a charge', function (): void {
     $driver = makeBareInterfaceDriver('primary');
 
     $response = managerWithBareDriver($driver)->chargeWithFallback(bareChargeRequest('order_bare_1'));
@@ -157,7 +157,7 @@ test('a driver implementing only DriverInterface can complete a charge', functio
         ->and($driver->chargeCalls)->toBe(1);
 });
 
-test('the health check still runs for a driver without getCachedHealthCheck', function () {
+test('the health check still runs for a driver without getCachedHealthCheck', function (): void {
     // The fallback must actually perform the check, not silently skip it -
     // skipping would route payments to a provider known to be down.
     $driver = makeBareInterfaceDriver('primary');
@@ -167,24 +167,24 @@ test('the health check still runs for a driver without getCachedHealthCheck', fu
     expect($driver->healthCheckCalls)->toBeGreaterThanOrEqual(1);
 });
 
-test('currency support is still enforced for a driver without isCurrencySupported', function () {
+test('currency support is still enforced for a driver without isCurrencySupported', function (): void {
     // The fallback must not degrade to "assume every currency is supported" -
     // that would send a charge to a provider that cannot process it.
     $driver = makeBareInterfaceDriver('primary', ['NGN']);
 
     // USD is unsupported, so the provider is skipped and the chain is
     // exhausted - the charge must never reach the driver.
-    expect(fn () => managerWithBareDriver($driver)->chargeWithFallback(bareChargeRequest('order_bare_3', 'USD')))
+    expect(fn (): ChargeResponseDTO => managerWithBareDriver($driver)->chargeWithFallback(bareChargeRequest('order_bare_3', 'USD')))
         ->toThrow(ProviderException::class);
 
     expect($driver->chargeCalls)->toBe(0);
 });
 
-test('a driver that does provide getCachedHealthCheck still uses the cached path', function () {
+test('a driver that does provide getCachedHealthCheck still uses the cached path', function (): void {
     // The guard must prefer the driver's own cached implementation when it
     // exists, not always fall back - otherwise every AbstractDriver-based
     // provider would lose health-check caching and hit its API on each charge.
-    $driver = new class extends KenDeNigerian\PayZephyr\Drivers\AbstractDriver
+    $driver = new class extends AbstractDriver
     {
         public int $cachedCalls = 0;
 
@@ -259,7 +259,7 @@ test('a driver that does provide getCachedHealthCheck still uses the cached path
     expect($driver->cachedCalls)->toBe(1);
 });
 
-test('currency matching is case-insensitive for a bare interface driver, matching AbstractDriver', function () {
+test('currency matching is case-insensitive for a bare interface driver, matching AbstractDriver', function (): void {
     $driver = makeBareInterfaceDriver('primary', ['ngn']);
 
     $response = managerWithBareDriver($driver)->chargeWithFallback(bareChargeRequest('order_bare_4', 'NGN'));

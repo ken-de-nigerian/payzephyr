@@ -5,7 +5,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment manager caches session data', function () {
+test('payment manager caches session data', function (): void {
     Cache::flush();
 
     $manager = app(PaymentManager::class);
@@ -23,7 +23,7 @@ test('payment manager caches session data', function () {
     ]);
 });
 
-test('payment manager resolveVerificationContext uses cache first', function () {
+test('payment manager resolveVerificationContext uses cache first', function (): void {
     Cache::flush();
     Cache::put('payzephyr:session:test_ref', [
         'provider' => 'paystack',
@@ -43,7 +43,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
     ]);
 });
 
-test('payment manager resolveVerificationContext uses database when cache miss', function () {
+test('payment manager resolveVerificationContext uses database when cache miss', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -70,7 +70,7 @@ test('payment manager resolveVerificationContext uses database when cache miss',
     ]);
 });
 
-test('payment manager resolveVerificationContext uses session_id from metadata', function () {
+test('payment manager resolveVerificationContext uses session_id from metadata', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -96,7 +96,7 @@ test('payment manager resolveVerificationContext uses session_id from metadata',
     ]);
 });
 
-test('payment manager resolveVerificationContext uses order_id from metadata', function () {
+test('payment manager resolveVerificationContext uses order_id from metadata', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -122,7 +122,7 @@ test('payment manager resolveVerificationContext uses order_id from metadata', f
     ]);
 });
 
-test('payment manager resolveVerificationContext uses provider_id for square', function () {
+test('payment manager resolveVerificationContext uses provider_id for square', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -148,7 +148,7 @@ test('payment manager resolveVerificationContext uses provider_id for square', f
     ]);
 });
 
-test('payment manager resolveVerificationContext falls back to reference when no metadata', function () {
+test('payment manager resolveVerificationContext falls back to reference when no metadata', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -174,7 +174,7 @@ test('payment manager resolveVerificationContext falls back to reference when no
     ]);
 });
 
-test('payment manager resolveVerificationContext uses explicit provider when provided', function () {
+test('payment manager resolveVerificationContext uses explicit provider when provided', function (): void {
     Cache::flush();
 
     $manager = app(PaymentManager::class);
@@ -190,7 +190,7 @@ test('payment manager resolveVerificationContext uses explicit provider when pro
     ]);
 });
 
-test('payment manager detectProviderFromReference delegates to ProviderDetector', function () {
+test('payment manager detectProviderFromReference delegates to ProviderDetector', function (): void {
     $manager = app(PaymentManager::class);
 
     $reflection = new ReflectionClass($manager);
@@ -201,7 +201,7 @@ test('payment manager detectProviderFromReference delegates to ProviderDetector'
         ->and($method->invoke($manager, 'unknown_ref'))->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification handles successful payment', function () {
+test('payment manager updateTransactionFromVerification handles successful payment', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'verify_ref',
         'provider' => 'paystack',
@@ -234,7 +234,7 @@ test('payment manager updateTransactionFromVerification handles successful payme
         ->and($transaction->channel)->toBe('card');
 });
 
-test('payment manager updateTransactionFromVerification handles failed payment', function () {
+test('payment manager updateTransactionFromVerification handles failed payment', function (): void {
     $transaction = PaymentTransaction::create([
         'reference' => 'failed_ref',
         'provider' => 'paystack',

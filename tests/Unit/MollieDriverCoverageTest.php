@@ -10,7 +10,7 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->config = [
         'api_key' => 'test_mollie_api_key',
         'base_url' => 'https://api.mollie.com',
@@ -18,7 +18,7 @@ beforeEach(function () {
     ];
 });
 
-test('mollie driver getIdempotencyHeader returns correct header', function () {
+test('mollie driver getIdempotencyHeader returns correct header', function (): void {
     $driver = new MollieDriver($this->config);
 
     $reflection = new ReflectionClass($driver);
@@ -29,7 +29,7 @@ test('mollie driver getIdempotencyHeader returns correct header', function () {
     expect($result)->toBe(['Idempotency-Key' => 'test_key']);
 });
 
-test('mollie driver getDefaultHeaders includes authorization', function () {
+test('mollie driver getDefaultHeaders includes authorization', function (): void {
     $driver = new MollieDriver($this->config);
 
     $reflection = new ReflectionClass($driver);
@@ -43,7 +43,7 @@ test('mollie driver getDefaultHeaders includes authorization', function () {
         ->and($headers['Content-Type'])->toBe('application/json');
 });
 
-test('mollie driver verify handles all payment statuses correctly', function () {
+test('mollie driver verify handles all payment statuses correctly', function (): void {
     $statuses = [
         ['status' => 'paid', 'expected' => 'success'],
         ['status' => 'authorized', 'expected' => 'success'],
@@ -75,7 +75,7 @@ test('mollie driver verify handles all payment statuses correctly', function () 
     }
 });
 
-test('mollie driver verify handles customer data correctly', function () {
+test('mollie driver verify handles customer data correctly', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -104,7 +104,7 @@ test('mollie driver verify handles customer data correctly', function () {
         ->and($verification->customer['name'])->toBe('John');
 });
 
-test('mollie driver verify handles card type and bank information', function () {
+test('mollie driver verify handles card type and bank information', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_WDqYK6vllg',
@@ -130,7 +130,7 @@ test('mollie driver verify handles card type and bank information', function () 
         ->and($verification->bank)->toBe('J. Doe');
 });
 
-test('mollie driver webhook validation handles payment ID mismatch', function () {
+test('mollie driver webhook validation handles payment ID mismatch', function (): void {
     $mock = new MockHandler([
         new Response(200, [], json_encode([
             'id' => 'tr_DIFFERENT_ID',
@@ -151,7 +151,7 @@ test('mollie driver webhook validation handles payment ID mismatch', function ()
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver webhook validation handles 4xx errors gracefully', function () {
+test('mollie driver webhook validation handles 4xx errors gracefully', function (): void {
     $mock = new MockHandler([
         new ClientException(
             'Bad Request',
@@ -176,7 +176,7 @@ test('mollie driver webhook validation handles 4xx errors gracefully', function 
     expect($isValid)->toBeFalse();
 });
 
-test('mollie driver healthCheck returns false for 5xx errors', function () {
+test('mollie driver healthCheck returns false for 5xx errors', function (): void {
     $mock = new MockHandler([
         new Response(500, [], json_encode([
             'status' => 500,
@@ -190,7 +190,7 @@ test('mollie driver healthCheck returns false for 5xx errors', function () {
     expect($driver->healthCheck())->toBeFalse();
 });
 
-test('mollie driver extractWebhookTimestamp handles various timestamp formats', function () {
+test('mollie driver extractWebhookTimestamp handles various timestamp formats', function (): void {
     $driver = new MollieDriver($this->config);
 
     $reflection = new ReflectionClass($driver);

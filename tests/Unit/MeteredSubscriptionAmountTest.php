@@ -18,7 +18,7 @@ uses(RefreshDatabase::class);
  * on metered billing appeared, in PayZephyr's own records, to be paying
  * nothing. The amount is nullable so the difference survives.
  */
-test('a plan with no fixed price reports no amount rather than a free one', function () {
+test('a plan with no fixed price reports no amount rather than a free one', function (): void {
     $metered = PlanResponseDTO::fromArray([
         'plan_code' => 'price_metered',
         'name' => 'Usage based',
@@ -37,19 +37,19 @@ test('a plan with no fixed price reports no amount rather than a free one', func
         ->and($metered->amount)->not->toBe($free->amount);
 });
 
-test('a subscription with no reported amount is distinguishable from a zero one', function () {
+test('a subscription with no reported amount is distinguishable from a zero one', function (): void {
     expect(SubscriptionResponseDTO::fromArray(['subscription_code' => 'sub_1'])->amount)->toBeNull()
         ->and(SubscriptionResponseDTO::fromArray(['subscription_code' => 'sub_2', 'amount' => 0])->amount)->toBe(0.0);
 });
 
-test('an explicit zero still round-trips as zero', function () {
+test('an explicit zero still round-trips as zero', function (): void {
     // The change is about absence. A provider reporting a genuine zero is
     // telling us something real and must not be turned into null.
     expect(PlanResponseDTO::fromArray(['amount' => 0])->amount)->toBe(0.0)
         ->and(PlanResponseDTO::fromArray(['amount' => 500])->amount)->toBe(5.0);
 });
 
-test('a null amount serializes as null rather than zero', function () {
+test('a null amount serializes as null rather than zero', function (): void {
     $dto = PlanResponseDTO::fromArray(['plan_code' => 'price_metered']);
 
     expect($dto->toArray()['amount'])->toBeNull()
@@ -57,7 +57,7 @@ test('a null amount serializes as null rather than zero', function () {
         ->and($dto->getAmountInMajorUnits())->toBeNull();
 });
 
-test('a subscription with no amount can actually be stored', function () {
+test('a subscription with no amount can actually be stored', function (): void {
     // The half of this change that would otherwise fail at runtime rather
     // than at the type level: subscription_transactions.amount was NOT NULL,
     // so a metered subscription would have thrown on insert.

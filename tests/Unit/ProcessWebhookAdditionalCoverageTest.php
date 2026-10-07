@@ -25,13 +25,12 @@ function injectFakeDriver(PaymentManager $manager, string $provider, object $dri
 {
     $reflection = new ReflectionClass($manager);
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $current = $driversProperty->getValue($manager);
     $current[$provider] = $driver;
     $driversProperty->setValue($manager, $current);
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.logging.enabled' => true,
         'payments.providers.paystack' => [
@@ -43,7 +42,7 @@ beforeEach(function () {
     Event::fake();
 });
 
-test('process webhook job treats an unresolvable provider as verified and still processes the webhook', function () {
+test('process webhook job treats an unresolvable provider as verified and still processes the webhook', function (): void {
     // Covers verifyDeferredSignature()'s DriverNotFoundException catch (returns
     // true - skip deferred verification) and resolveEventKey()'s equivalent
     // catch (falls back to the content-hash idempotency key).
@@ -52,14 +51,12 @@ test('process webhook job treats an unresolvable provider as verified and still 
         'data' => ['reference' => 'ref_missing_driver'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(WebhookReceived::class, function ($event) {
-        return $event->provider === 'does-not-exist';
-    });
+    Event::assertDispatched(WebhookReceived::class, fn ($event): bool => $event->provider === 'does-not-exist');
 });
 
-test('process webhook job swallows a non-driver-not-found exception raised while updating the transaction', function () {
+test('process webhook job swallows a non-driver-not-found exception raised while updating the transaction', function (): void {
     // Covers updateTransactionFromWebhook()'s catch (Throwable $e) block: the
     // exception is logged, not rethrown, so handle() completes normally.
     $job = new ProcessWebhook('paystack', [
@@ -74,14 +71,12 @@ test('process webhook job swallows a non-driver-not-found exception raised while
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(WebhookReceived::class, function ($event) {
-        return $event->reference === 'ref_status_boom';
-    });
+    Event::assertDispatched(WebhookReceived::class, fn ($event): bool => $event->reference === 'ref_status_boom');
 });
 
-test('process webhook job dispatches SubscriptionCreated for a subscription-create event', function () {
+test('process webhook job dispatches SubscriptionCreated for a subscription-create event', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'subscription.create',
         'data' => ['subscription_code' => 'SUB_CREATE_1', 'plan' => 'gold'],
@@ -93,14 +88,12 @@ test('process webhook job dispatches SubscriptionCreated for a subscription-crea
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionCreated::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_CREATE_1' && $event->provider === 'paystack';
-    });
+    Event::assertDispatched(SubscriptionCreated::class, fn ($event): bool => $event->subscriptionCode === 'SUB_CREATE_1' && $event->provider === 'paystack');
 });
 
-test('process webhook job dispatches SubscriptionRenewed and calls the driver lifecycle hooks', function () {
+test('process webhook job dispatches SubscriptionRenewed and calls the driver lifecycle hooks', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'subscription.renewed',
         'data' => ['subscription_code' => 'SUB_RENEW_1', 'reference' => 'INV_RENEW_1'],
@@ -114,16 +107,14 @@ test('process webhook job dispatches SubscriptionRenewed and calls the driver li
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionRenewed::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_RENEW_1'
-            && $event->provider === 'paystack'
-            && $event->invoiceReference === 'INV_RENEW_1';
-    });
+    Event::assertDispatched(SubscriptionRenewed::class, fn ($event): bool => $event->subscriptionCode === 'SUB_RENEW_1'
+        && $event->provider === 'paystack'
+        && $event->invoiceReference === 'INV_RENEW_1');
 });
 
-test('process webhook job dispatches SubscriptionCancelled for a subscription-cancel event', function () {
+test('process webhook job dispatches SubscriptionCancelled for a subscription-cancel event', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'subscription.cancel',
         'data' => ['subscription_code' => 'SUB_CANCEL_1'],
@@ -135,14 +126,12 @@ test('process webhook job dispatches SubscriptionCancelled for a subscription-ca
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionCancelled::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_CANCEL_1' && $event->provider === 'paystack';
-    });
+    Event::assertDispatched(SubscriptionCancelled::class, fn ($event): bool => $event->subscriptionCode === 'SUB_CANCEL_1' && $event->provider === 'paystack');
 });
 
-test('process webhook job dispatches SubscriptionPaymentFailed and calls the driver failure hook', function () {
+test('process webhook job dispatches SubscriptionPaymentFailed and calls the driver failure hook', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'invoice.payment_failed',
         'data' => ['subscription_code' => 'SUB_FAIL_1', 'reason' => 'Card declined'],
@@ -155,16 +144,14 @@ test('process webhook job dispatches SubscriptionPaymentFailed and calls the dri
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionPaymentFailed::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_FAIL_1'
-            && $event->provider === 'paystack'
-            && $event->reason === 'Card declined';
-    });
+    Event::assertDispatched(SubscriptionPaymentFailed::class, fn ($event): bool => $event->subscriptionCode === 'SUB_FAIL_1'
+        && $event->provider === 'paystack'
+        && $event->reason === 'Card declined');
 });
 
-test('process webhook job logs a warning and dispatches nothing when subscription_code is missing', function () {
+test('process webhook job logs a warning and dispatches nothing when subscription_code is missing', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'subscription.create',
         'data' => [],
@@ -176,13 +163,13 @@ test('process webhook job logs a warning and dispatches nothing when subscriptio
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertNotDispatched(SubscriptionCreated::class);
     Event::assertDispatched(WebhookReceived::class);
 });
 
-test('process webhook job dispatches nothing subscription-specific for an unmatched subscription event type', function () {
+test('process webhook job dispatches nothing subscription-specific for an unmatched subscription event type', function (): void {
     $job = new ProcessWebhook('paystack', [
         'event' => 'subscription.updated',
         'data' => ['subscription_code' => 'SUB_UNMATCHED_1'],
@@ -194,7 +181,7 @@ test('process webhook job dispatches nothing subscription-specific for an unmatc
 
     injectFakeDriver($manager, 'paystack', $mockDriver);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertNotDispatched(SubscriptionCreated::class);
     Event::assertNotDispatched(SubscriptionRenewed::class);
@@ -203,7 +190,7 @@ test('process webhook job dispatches nothing subscription-specific for an unmatc
     Event::assertDispatched(WebhookReceived::class);
 });
 
-test('process webhook job still dispatches SubscriptionRenewed when the provider driver cannot be resolved', function () {
+test('process webhook job still dispatches SubscriptionRenewed when the provider driver cannot be resolved', function (): void {
     // Covers the DriverNotFoundException catch inside the "renewed" branch of
     // processSubscriptionWebhook() - the lifecycle hook call is skipped, but
     // the domain event still fires.
@@ -212,14 +199,12 @@ test('process webhook job still dispatches SubscriptionRenewed when the provider
         'data' => ['subscription_code' => 'SUB_RENEW_NO_DRIVER', 'reference' => 'INV_ND'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionRenewed::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_RENEW_NO_DRIVER';
-    });
+    Event::assertDispatched(SubscriptionRenewed::class, fn ($event): bool => $event->subscriptionCode === 'SUB_RENEW_NO_DRIVER');
 });
 
-test('process webhook job still dispatches SubscriptionPaymentFailed when the provider driver cannot be resolved', function () {
+test('process webhook job still dispatches SubscriptionPaymentFailed when the provider driver cannot be resolved', function (): void {
     // Covers the DriverNotFoundException catch inside the "payment failed"
     // branch of processSubscriptionWebhook().
     $job = new ProcessWebhook('unknown-provider', [
@@ -227,9 +212,7 @@ test('process webhook job still dispatches SubscriptionPaymentFailed when the pr
         'data' => ['subscription_code' => 'SUB_FAIL_NO_DRIVER', 'reason' => 'timeout'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
-    Event::assertDispatched(SubscriptionPaymentFailed::class, function ($event) {
-        return $event->subscriptionCode === 'SUB_FAIL_NO_DRIVER';
-    });
+    Event::assertDispatched(SubscriptionPaymentFailed::class, fn ($event): bool => $event->subscriptionCode === 'SUB_FAIL_NO_DRIVER');
 });

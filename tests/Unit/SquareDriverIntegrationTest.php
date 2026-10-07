@@ -30,7 +30,7 @@ function createSquareDriverWithMock(array $responses): SquareDriver
     return $driver;
 }
 
-test('square charge succeeds with valid response', function () {
+test('square charge succeeds with valid response', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment_link' => [
@@ -52,7 +52,7 @@ test('square charge succeeds with valid response', function () {
         ->and($response->metadata)->toHaveKeys(['payment_link_id', 'order_id']);
 });
 
-test('square charge generates reference when not provided', function () {
+test('square charge generates reference when not provided', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment_link' => [
@@ -71,7 +71,7 @@ test('square charge generates reference when not provided', function () {
         ->and($response->authorizationUrl)->toBe('https://square.link/checkout/abc123');
 });
 
-test('square charge includes metadata in payload', function () {
+test('square charge includes metadata in payload', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment_link' => [
@@ -89,7 +89,7 @@ test('square charge includes metadata in payload', function () {
     expect($response->metadata)->toHaveKey('order_id');
 });
 
-test('square charge throws exception on api error', function () {
+test('square charge throws exception on api error', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(400, [], json_encode([
             'errors' => [
@@ -103,7 +103,7 @@ test('square charge throws exception on api error', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('square charge throws exception when payment_link missing', function () {
+test('square charge throws exception when payment_link missing', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'data' => [],
@@ -115,7 +115,7 @@ test('square charge throws exception when payment_link missing', function () {
     $driver->charge($request);
 })->throws(ChargeException::class, 'Failed to create Square payment link');
 
-test('square charge handles network error', function () {
+test('square charge handles network error', function (): void {
     $mock = new MockHandler([
         new ConnectException('Timeout', new Request('POST', '/v2/online-checkout/payment-links')),
     ]);
@@ -129,7 +129,7 @@ test('square charge handles network error', function () {
     $driver->charge($request);
 })->throws(ChargeException::class);
 
-test('square verify by payment ID returns success', function () {
+test('square verify by payment ID returns success', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment' => [
@@ -160,7 +160,7 @@ test('square verify by payment ID returns success', function () {
         ->and($result->reference)->toBe('SQUARE_1234567890_abc123');
 });
 
-test('square verify by reference_id searches orders', function () {
+test('square verify by reference_id searches orders', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(404, [], json_encode(['errors' => [['category' => 'NOT_FOUND_ERROR', 'code' => 'NOT_FOUND', 'detail' => 'Not found']]])),
         new Response(200, [], json_encode([
@@ -206,7 +206,7 @@ test('square verify by reference_id searches orders', function () {
         ->and($result->reference)->toBe('SQUARE_1234567890_abc123');
 });
 
-test('square verify returns failed status', function () {
+test('square verify returns failed status', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment' => [
@@ -226,7 +226,7 @@ test('square verify returns failed status', function () {
     expect($result->isFailed())->toBeTrue();
 });
 
-test('square verify handles payment not found', function () {
+test('square verify handles payment not found', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(404, [], json_encode(['errors' => [['category' => 'NOT_FOUND_ERROR', 'code' => 'NOT_FOUND', 'detail' => 'Not found']]])),
         new Response(200, [], json_encode(['orders' => []])),
@@ -235,7 +235,7 @@ test('square verify handles payment not found', function () {
     $driver->verify('SQUARE_nonexistent');
 })->throws(VerificationException::class);
 
-test('square verify handles order without payment', function () {
+test('square verify handles order without payment', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(404, [], json_encode(['errors' => [['category' => 'NOT_FOUND_ERROR', 'code' => 'NOT_FOUND', 'detail' => 'Not found']]])),
         new Response(200, [], json_encode([
@@ -261,7 +261,7 @@ test('square verify handles order without payment', function () {
     $driver->verify('SQUARE_123');
 })->throws(VerificationException::class, 'No payment found for order');
 
-test('square verify converts cents to dollars', function () {
+test('square verify converts cents to dollars', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment' => [
@@ -282,7 +282,7 @@ test('square verify converts cents to dollars', function () {
     expect($result->amount)->toBe(5050.50);
 });
 
-test('square verify includes customer email', function () {
+test('square verify includes customer email', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment' => [
@@ -304,7 +304,7 @@ test('square verify includes customer email', function () {
     expect($result->customer['email'])->toBe('customer@example.com');
 });
 
-test('square verify includes card brand when available', function () {
+test('square verify includes card brand when available', function (): void {
     $driver = createSquareDriverWithMock([
         new Response(200, [], json_encode([
             'payment' => [

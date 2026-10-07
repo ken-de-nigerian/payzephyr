@@ -22,7 +22,7 @@ final class SkipOrderDriver extends AbstractDriver
     public int $healthCheckCalls = 0;
 
     /** @param array<int, string> $currencies */
-    public function __construct(private string $providerName, private array $currencies)
+    public function __construct(private readonly string $providerName, array $currencies)
     {
         parent::__construct(['currencies' => $currencies]);
         $this->name = $providerName;
@@ -81,11 +81,9 @@ function skipOrderManager(array $drivers, array $config): PaymentManager
     $reflection = new ReflectionClass($manager);
 
     $driversProperty = $reflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, $drivers);
 
     $configProperty = $reflection->getProperty('config');
-    $configProperty->setAccessible(true);
     $configProperty->setValue($manager, array_replace(
         $configProperty->getValue($manager),
         $config,
@@ -94,7 +92,7 @@ function skipOrderManager(array $drivers, array $config): PaymentManager
     return $manager;
 }
 
-test('a provider that cannot take the currency is skipped without a health check', function () {
+test('a provider that cannot take the currency is skipped without a health check', function (): void {
     $wrongCurrency = new SkipOrderDriver('wrong_currency', ['USD']);
     $usable = new SkipOrderDriver('usable', ['NGN']);
 
@@ -114,7 +112,7 @@ test('a provider that cannot take the currency is skipped without a health check
         ->and($usable->healthCheckCalls)->toBe(1);
 });
 
-test('health_check.enabled is declared in the shipped config', function () {
+test('health_check.enabled is declared in the shipped config', function (): void {
     // PaymentManager reads this with a `?? true` fallback. The key went
     // undeclared for long enough that the default could only be discovered by
     // reading the source, so its presence is asserted rather than assumed.
@@ -124,7 +122,7 @@ test('health_check.enabled is declared in the shipped config', function () {
         ->and($shipped['health_check']['enabled'])->toBeTrue();
 });
 
-test('the manager honours health_check.enabled being switched off', function () {
+test('the manager honours health_check.enabled being switched off', function (): void {
     $driver = new SkipOrderDriver('only', ['NGN']);
 
     $manager = skipOrderManager(

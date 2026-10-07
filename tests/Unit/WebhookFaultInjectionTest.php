@@ -16,7 +16,7 @@ use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
  * already handling a first failure - precisely when a silent swallow would be
  * hardest to notice in production.
  */
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
     config([
@@ -30,7 +30,7 @@ beforeEach(function () {
     Event::fake();
 });
 
-test('a failure while clearing the idempotency marker does not mask the original error', function () {
+test('a failure while clearing the idempotency marker does not mask the original error', function (): void {
     // The delivery failed, and then the cleanup of its "seen" marker failed
     // too. The original processing error is what the queue needs to see and
     // retry on - the cleanup failure must be logged, not substituted.
@@ -40,7 +40,7 @@ test('a failure while clearing the idempotency marker does not mask the original
     app()->instance(WebhookEventRepositoryInterface::class, $repository);
 
     Event::fakeExcept([WebhookReceived::class]);
-    Event::listen(WebhookReceived::class, function () {
+    Event::listen(WebhookReceived::class, function (): void {
         throw new RuntimeException('original processing failure');
     });
 
@@ -49,11 +49,11 @@ test('a failure while clearing the idempotency marker does not mask the original
         'data' => ['id' => 4242, 'reference' => 'ref_marker_fail'],
     ]);
 
-    expect(fn () => app()->call([$job, 'handle']))
+    expect(fn () => app()->call($job->handle(...)))
         ->toThrow(RuntimeException::class, 'original processing failure');
 });
 
-test('a refund-status write failure does not fail webhook processing', function () {
+test('a refund-status write failure does not fail webhook processing', function (): void {
     // Persisting refund status is bookkeeping. The webhook itself was
     // delivered and verified; failing the whole job over a local write would
     // make the provider retry a delivery that was actually fine.
@@ -69,12 +69,12 @@ test('a refund-status write failure does not fail webhook processing', function 
         'data' => ['id' => 5150, 'reference' => 'ref_refund_write_fail', 'status' => 'processed'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 });
 
-test('refund status is not persisted at all when refund logging is disabled', function () {
+test('refund status is not persisted at all when refund logging is disabled', function (): void {
     config(['payments.refunds.logging.enabled' => false]);
     app()->forgetInstance('payments.config');
 
@@ -89,7 +89,7 @@ test('refund status is not persisted at all when refund logging is disabled', fu
         'data' => ['id' => 5151, 'reference' => 'ref_logging_off', 'status' => 'processed'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 });

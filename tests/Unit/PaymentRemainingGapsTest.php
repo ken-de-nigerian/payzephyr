@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 use Illuminate\Http\Request;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\SubscriptionQuery;
 
-test('getRateLimitKey falls back to an ip-based key when request is bound and there is no auth user or email', function () {
+test('getRateLimitKey falls back to an ip-based key when request is bound and there is no auth user or email', function (): void {
     $request = Request::create('/charge', 'POST', [], [], [], ['REMOTE_ADDR' => '203.0.113.5']);
     app()->instance('request', $request);
 
@@ -23,7 +25,7 @@ test('getRateLimitKey falls back to an ip-based key when request is bound and th
     }
 });
 
-test('subscriptions returns a new SubscriptionQuery instance', function () {
+test('subscriptions returns a new SubscriptionQuery instance', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 

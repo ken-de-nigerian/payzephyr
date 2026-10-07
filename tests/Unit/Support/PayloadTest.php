@@ -29,7 +29,7 @@ function samplePayload(): Payload
     ]);
 }
 
-test('get walks a path segment by segment and answers null for a missing one', function () {
+test('get walks a path segment by segment and answers null for a missing one', function (): void {
     $payload = samplePayload();
 
     expect($payload->get('data', 'customer', 'email'))->toBe('a@b.test')
@@ -39,14 +39,14 @@ test('get walks a path segment by segment and answers null for a missing one', f
         ->and($payload->get())->toBe($payload->all());
 });
 
-test('a key containing a dot is one segment, not a path', function () {
+test('a key containing a dot is one segment, not a path', function (): void {
     // Flutterwave sends a top-level "event.type"; a dotted-path reader would
     // look for ['event']['type'] and find nothing.
     expect(samplePayload()->string('event.type'))->toBe('CARD_TRANSACTION')
         ->and(samplePayload()->string('event', 'type'))->toBeNull();
 });
 
-test('has is true only for a value that is present and not null', function () {
+test('has is true only for a value that is present and not null', function (): void {
     $payload = samplePayload();
 
     expect($payload->has('data', 'reference'))->toBeTrue()
@@ -55,7 +55,7 @@ test('has is true only for a value that is present and not null', function () {
         ->and($payload->has('data', 'missing'))->toBeFalse();
 });
 
-test('string accepts strings and numbers, and nothing else', function () {
+test('string accepts strings and numbers, and nothing else', function (): void {
     $payload = samplePayload();
 
     expect($payload->string('data', 'reference'))->toBe('REF_1')
@@ -68,7 +68,7 @@ test('string accepts strings and numbers, and nothing else', function () {
         ->and($payload->string('data', 'missing'))->toBeNull();
 });
 
-test('int accepts integers and numeric values that are whole', function () {
+test('int accepts integers and numeric values that are whole', function (): void {
     $payload = samplePayload();
 
     expect($payload->int('data', 'id'))->toBe(12345)
@@ -80,7 +80,7 @@ test('int accepts integers and numeric values that are whole', function () {
         ->and($payload->int('data', 'paid'))->toBeNull();
 });
 
-test('float accepts anything numeric', function () {
+test('float accepts anything numeric', function (): void {
     $payload = samplePayload();
 
     expect($payload->float('data', 'amount'))->toBe(1500.5)
@@ -89,7 +89,7 @@ test('float accepts anything numeric', function () {
         ->and($payload->float('data', 'paid'))->toBeNull();
 });
 
-test('bool is null for anything that is not a boolean, so absent is not read as false', function () {
+test('bool is null for anything that is not a boolean, so absent is not read as false', function (): void {
     $payload = samplePayload();
 
     expect($payload->bool('data', 'paid'))->toBeTrue()
@@ -98,7 +98,7 @@ test('bool is null for anything that is not a boolean, so absent is not read as 
         ->and($payload->bool('data', 'id'))->toBeNull();
 });
 
-test('array answers an empty array for anything that is not one', function () {
+test('array answers an empty array for anything that is not one', function (): void {
     $payload = samplePayload();
 
     expect($payload->array('data', 'customer', 'tags'))->toBe(['vip', 'new'])
@@ -106,7 +106,7 @@ test('array answers an empty array for anything that is not one', function () {
         ->and($payload->array('data', 'missing'))->toBe([]);
 });
 
-test('at reads into a branch, and into a missing one without failing', function () {
+test('at reads into a branch, and into a missing one without failing', function (): void {
     $payload = samplePayload();
 
     expect($payload->at('data', 'customer')->string('email'))->toBe('a@b.test')
@@ -114,20 +114,20 @@ test('at reads into a branch, and into a missing one without failing', function 
         ->and($payload->at('data', 'reference')->all())->toBe([]);
 });
 
-test('of wraps an array and reads anything else as empty', function (mixed $value) {
+test('of wraps an array and reads anything else as empty', function (mixed $value): void {
     expect(Payload::of($value)->all())->toBe([]);
 })->with([
     'null' => [null],
     'a string' => ['not an array'],
     'a number' => [42],
-    'an object' => [fn () => new stdClass],
+    'an object' => [fn (): \stdClass => new stdClass],
 ]);
 
-test('of keeps an array as it is', function () {
+test('of keeps an array as it is', function (): void {
     expect(Payload::of(['a' => 1])->int('a'))->toBe(1);
 });
 
-test('flag reads a switch the way it arrives from an env file', function (mixed $value, bool $expected) {
+test('flag reads a switch the way it arrives from an env file', function (mixed $value, bool $expected): void {
     // env() makes "true"/"false" booleans, but "0", "1", "off" and "yes" stay
     // strings. Reading those by strict type would turn "0" into "not set" and
     // quietly switch the feature back on.
@@ -150,7 +150,7 @@ test('flag reads a switch the way it arrives from an env file', function (mixed 
     'float 0.0' => [0.0, false],
 ]);
 
-test('flag answers the default for anything that is not a switch', function (mixed $value) {
+test('flag answers the default for anything that is not a switch', function (mixed $value): void {
     expect((new Payload(['switch' => $value]))->flag(true, 'switch'))->toBeTrue()
         ->and((new Payload(['switch' => $value]))->flag(false, 'switch'))->toBeFalse();
 })->with([
@@ -159,12 +159,12 @@ test('flag answers the default for anything that is not a switch', function (mix
     'a word that is not a switch' => ['sometimes'],
 ]);
 
-test('flag answers the default for a missing path', function () {
+test('flag answers the default for a missing path', function (): void {
     expect((new Payload([]))->flag(true, 'a', 'b'))->toBeTrue()
         ->and((new Payload([]))->flag(false, 'a', 'b'))->toBeFalse();
 });
 
-test('arrayOrNull tells an absent array from an empty one', function () {
+test('arrayOrNull tells an absent array from an empty one', function (): void {
     $payload = new Payload(['customer' => ['email' => 'a@b.test'], 'split' => [], 'note' => 'text']);
 
     expect($payload->arrayOrNull('customer'))->toBe(['email' => 'a@b.test'])
@@ -173,7 +173,7 @@ test('arrayOrNull tells an absent array from an empty one', function () {
         ->and($payload->arrayOrNull('missing'))->toBeNull();
 });
 
-test('onOff reads a switch, and answers null for anything that is not one', function (mixed $value, ?bool $expected) {
+test('onOff reads a switch, and answers null for anything that is not one', function (mixed $value, ?bool $expected): void {
     expect((new Payload(['switch' => $value]))->onOff('switch'))->toBe($expected);
 })->with([
     [true, true], [false, false], [1, true], [0, false], [0.0, false],
@@ -181,6 +181,6 @@ test('onOff reads a switch, and answers null for anything that is not one', func
     ['archived', null], [['on'], null], [null, null],
 ]);
 
-test('onOff answers null for a missing path', function () {
+test('onOff answers null for a missing path', function (): void {
     expect((new Payload([]))->onOff('a', 'b'))->toBeNull();
 });

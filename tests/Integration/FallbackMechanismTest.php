@@ -8,6 +8,11 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
+use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Facades\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 use KenDeNigerian\PayZephyr\Tests\TestCase;
@@ -61,7 +66,7 @@ class FallbackMechanismTest extends TestCase
             ->charge();
 
         // Should work regardless of which provider succeeds
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO::class, $response);
+        $this->assertInstanceOf(ChargeResponseDTO::class, $response);
     }
 
     /**
@@ -87,7 +92,7 @@ class FallbackMechanismTest extends TestCase
                 ->charge();
 
             $this->fail('Should have thrown exception');
-        } catch (\KenDeNigerian\PayZephyr\Exceptions\PaymentException $e) {
+        } catch (PaymentException $e) {
             // Error message should be provider-agnostic
             $message = $e->getMessage();
 
@@ -131,7 +136,7 @@ class FallbackMechanismTest extends TestCase
         $this->app->forgetInstance(\KenDeNigerian\PayZephyr\Payment::class);
 
         // IDENTICAL subscription code
-        $planDTO = new \KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO(
+        $planDTO = new SubscriptionPlanDTO(
             name: 'Test Plan',
             amount: 100.00,
             interval: 'monthly',
@@ -142,7 +147,7 @@ class FallbackMechanismTest extends TestCase
             ->planData($planDTO)
             ->createPlan();
 
-        $this->assertInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class, $plan);
+        $this->assertInstanceOf(PlanResponseDTO::class, $plan);
     }
 
     /**
@@ -151,9 +156,9 @@ class FallbackMechanismTest extends TestCase
     protected function providerSupportsSubscriptions(string $provider): bool
     {
         try {
-            $driver = app(\KenDeNigerian\PayZephyr\PaymentManager::class)->driver($provider);
+            $driver = app(PaymentManager::class)->driver($provider);
 
-            return $driver instanceof \KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+            return $driver instanceof SupportsSubscriptionsInterface;
         } catch (\Exception) {
             return false;
         }

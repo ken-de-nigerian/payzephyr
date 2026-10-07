@@ -12,9 +12,12 @@ use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
+use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
+use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 
 /*
  * What SquareDriver sends to Square, what it makes of the answers, and what
@@ -64,7 +67,7 @@ function squarePayment(array $overrides = []): array
 // charge()
 // ---------------------------------------------------------------------------
 
-test('a charge sends Square a full payment link, authenticated and versioned', function () {
+test('a charge sends Square a full payment link, authenticated and versioned', function (): void {
     $history = [];
     $result = squareContractDriver([squareLinkCreated()], $history)->charge(squareCharge(['description' => 'Order 9', 'idempotencyKey' => 'idem-1']));
 
@@ -85,7 +88,7 @@ test('a charge sends Square a full payment link, authenticated and versioned', f
         ->and($result->metadata)->toBe(['payment_link_id' => 'PL_1', 'order_id' => 'ORD_1']);
 });
 
-test('a charge without a key of its own gets a fresh one, and without a description says "Payment"', function () {
+test('a charge without a key of its own gets a fresh one, and without a description says "Payment"', function (): void {
     $history = [];
     squareContractDriver([squareLinkCreated()], $history)->charge(squareCharge());
 
@@ -94,7 +97,7 @@ test('a charge without a key of its own gets a fresh one, and without a descript
         ->and($sent['order']['line_items'][0]['name'])->toBe('Payment');
 });
 
-test('an initialized charge is logged with its reference and whether it was idempotent', function (?string $key, bool $idempotent) {
+test('an initialized charge is logged with its reference and whether it was idempotent', function (?string $key, bool $idempotent): void {
     $logs = captureLogs();
     squareContractDriver([squareLinkCreated()])->charge(squareCharge(['idempotencyKey' => $key]));
 
@@ -104,17 +107,17 @@ test('an initialized charge is logged with its reference and whether it was idem
     'without' => [null, false],
 ]);
 
-test('a link Square does not return is refused with its error detail, and logged', function (string $body, string $message, array $errors) {
+test('a link Square does not return is refused with its error detail, and logged', function (string $body, string $message, array $errors): void {
     $logs = captureLogs();
 
-    expect(fn () => squareContractDriver([new Response(200, [], $body)])->charge(squareCharge()))->toThrow(ChargeException::class, $message)
+    expect(fn (): ChargeResponseDTO => squareContractDriver([new Response(200, [], $body)])->charge(squareCharge()))->toThrow(ChargeException::class, $message)
         ->and(loggedEntry($logs, 'Failed to create payment link')['context'])->toBe(['reference' => 'SQUARE_1', 'errors' => $errors]);
 })->with([
     'detail' => ['{"errors":[{"detail":"Invalid location"}]}', 'Invalid location', [['detail' => 'Invalid location']]],
     'nothing' => ['{}', 'Failed to create Square payment link', []],
 ]);
 
-test('a charge Square refuses is raised with its detail and a hint for the environment, coded 0, and logged', function (string $baseUrl, int $status, string $body, string $message) {
+test('a charge Square refuses is raised with its detail and a hint for the environment, coded 0, and logged', function (string $baseUrl, int $status, string $body, string $message): void {
     $logs = captureLogs();
 
     try {
@@ -137,7 +140,7 @@ test('a charge Square refuses is raised with its detail and a hint for the envir
     'not auth' => ['https://connect.squareup.com', 400, '{}', 'Client error 400'],
 ]);
 
-test('a charge refused without a base URL is raised without a hint', function () {
+test('a charge refused without a base URL is raised without a hint', function (): void {
     try {
         squareContractDriver([squareClientError(401)], config: ['base_url' => null])->charge(squareCharge());
         test()->fail('Expected a ChargeException.');
@@ -146,7 +149,7 @@ test('a charge refused without a base URL is raised without a hint', function ()
     }
 });
 
-test('a charge failing for any other reason is rethrown as it was, or logged and wrapped', function () {
+test('a charge failing for any other reason is rethrown as it was, or logged and wrapped', function (): void {
     $logs = captureLogs();
     $down = new ServerException('Service Unavailable', new Request('POST', '/x'), new Response(503));
 
@@ -168,7 +171,7 @@ test('a charge failing for any other reason is rethrown as it was, or logged and
         ->toBe(['reference' => 'SQUARE_1', 'error' => 'handler blew up', 'error_class' => LogicException::class]);
 });
 
-test('a charge does not leave its key behind for the next request', function () {
+test('a charge does not leave its key behind for the next request', function (): void {
     $history = [];
     $driver = squareContractDriver([squareLinkCreated(), new Response(200, [], (string) json_encode(['payment' => squarePayment()]))], $history);
 
@@ -182,7 +185,7 @@ test('a charge does not leave its key behind for the next request', function () 
 // verify()
 // ---------------------------------------------------------------------------
 
-test('a payment id is looked up directly, and read in full', function (string $reference) {
+test('a payment id is looked up directly, and read in full', function (string $reference): void {
     $history = [];
     $result = squareContractDriver([new Response(200, [], (string) json_encode(['payment' => squarePayment([
         'id' => $reference, 'reference_id' => 'SQUARE_V', 'status' => ' approved ', 'updated_at' => '2026-10-01T10:00:00Z',
@@ -204,7 +207,7 @@ test('a payment id is looked up directly, and read in full', function (string $r
     'a 32-character id' => [str_repeat('p', 32)],
 ]);
 
-test('a reference neither prefixed nor 32 characters long is not tried as a payment id', function (int $length) {
+test('a reference neither prefixed nor 32 characters long is not tried as a payment id', function (int $length): void {
     $history = [];
     squareContractDriver([
         new Response(200, [], '{"payment_link":{"order_id":"ORD_1"}}'),
@@ -215,7 +218,7 @@ test('a reference neither prefixed nor 32 characters long is not tried as a paym
     expect((string) $history[0]['request']->getUri())->toContain('/v2/online-checkout/payment-links/');
 })->with([31, 33]);
 
-test('a payment link is followed to its order and payment, under the order\'s reference', function () {
+test('a payment link is followed to its order and payment, under the order\'s reference', function (): void {
     $history = [];
     $result = squareContractDriver([
         new Response(200, [], '{"payment_link":{"order_id":"ORD 1"}}'),
@@ -233,7 +236,7 @@ test('a payment link is followed to its order and payment, under the order\'s re
         ->and($result->paidAt)->toBeNull();
 });
 
-test('a payment link whose order has no reference of its own is read by the one asked for', function () {
+test('a payment link whose order has no reference of its own is read by the one asked for', function (): void {
     $result = squareContractDriver([
         new Response(200, [], '{"payment_link":{"order_id":"ORD_1"}}'),
         new Response(200, [], '{"order":{"tenders":[{"payment_id":"pay_1"}]}}'),
@@ -243,7 +246,7 @@ test('a payment link whose order has no reference of its own is read by the one 
     expect($result->reference)->toBe('PL_ASKED');
 });
 
-test('a reference is searched for among recent orders, then followed to its payment', function () {
+test('a reference is searched for among recent orders, then followed to its payment', function (): void {
     $history = [];
     $result = squareContractDriver([
         squareClientError(404),
@@ -265,17 +268,17 @@ test('a reference is searched for among recent orders, then followed to its paym
         ->and($result->reference)->toBe('SQUARE_R');
 });
 
-test('a reference not in the orders searched is refused, saying how far the search went', function (string $last, array $config, string $message) {
+test('a reference not in the orders searched is refused, saying how far the search went', function (string $last, array $config, string $message): void {
     $responses = [squareClientError(404), new Response(200, [], '{"orders":[{"id":"O1"}],"cursor":"c2"}'), new Response(200, [], $last)];
 
-    expect(fn () => squareContractDriver($responses, config: $config)->verify('SQUARE_GONE'))->toThrow(VerificationException::class, $message);
+    expect(fn (): VerificationResponseDTO => squareContractDriver($responses, config: $config)->verify('SQUARE_GONE'))->toThrow(VerificationException::class, $message);
 })->with([
     'no more pages' => ['{"orders":[{"id":"O2"}]}', [], 'Payment not found for reference [SQUARE_GONE]'],
     'an empty cursor' => ['{"orders":[{"id":"O2"}],"cursor":""}', [], 'Payment not found for reference [SQUARE_GONE]'],
     'page limit reached' => ['{"orders":[{"id":"O2"}],"cursor":"c3"}', ['verify_search_pages' => 2], 'Payment not found for reference [SQUARE_GONE] in the 2 most recent Square orders. Square cannot search orders by reference, so older orders are not read. Verify with the payment link id instead, or raise verify_search_pages.'],
 ]);
 
-test('a verification Square refuses is raised with its detail, coded 0, and logged', function () {
+test('a verification Square refuses is raised with its detail, coded 0, and logged', function (): void {
     $logs = captureLogs();
 
     try {
@@ -291,7 +294,7 @@ test('a verification Square refuses is raised with its detail, coded 0, and logg
     ]);
 });
 
-test('a verification failing without an answer from Square is wrapped, coded 0', function (string $kind, string $message) {
+test('a verification failing without an answer from Square is wrapped, coded 0', function (string $kind, string $message): void {
     $logs = captureLogs();
     $failure = $kind === 'unexpected'
         ? fn () => throw new LogicException('handler blew up')
@@ -313,7 +316,7 @@ test('a verification failing without an answer from Square is wrapped, coded 0',
     'unexpected' => ['unexpected', 'handler blew up'],
 ]);
 
-test('a lookup that fails for any reason but not-found is not mistaken for one', function (int $step) {
+test('a lookup that fails for any reason but not-found is not mistaken for one', function (int $step): void {
     $unreachable = new ConnectException('Connection refused', new Request('GET', '/x'));
     $responses = match ($step) {
         1 => [$unreachable],
@@ -321,7 +324,7 @@ test('a lookup that fails for any reason but not-found is not mistaken for one',
         3 => [squareClientError(404), $unreachable],
     };
 
-    expect(fn () => squareContractDriver($responses)->verify($step === 1 ? 'payment_1' : 'SQUARE_X'))
+    expect(fn (): VerificationResponseDTO => squareContractDriver($responses)->verify($step === 1 ? 'payment_1' : 'SQUARE_X'))
         ->toThrow(VerificationException::class, 'Unable to connect');
 })->with([
     'by payment id' => [1],
@@ -333,7 +336,7 @@ test('a lookup that fails for any reason but not-found is not mistaken for one',
 // Webhooks and health
 // ---------------------------------------------------------------------------
 
-test('each webhook outcome is logged, and each refusal is final', function () {
+test('each webhook outcome is logged, and each refusal is final', function (): void {
     $logs = captureLogs();
     $body = (string) json_encode(['created_at' => now()->toIso8601String(), 'type' => 'payment.updated']);
     $sign = fn (string $body): array => ['x-square-hmacsha256-signature' => [base64_encode(hash_hmac('sha256', 'https://shop.test/payments/webhook/square'.$body, 'sq_sig', true))]];
@@ -357,7 +360,7 @@ test('each webhook outcome is logged, and each refusal is final', function () {
         ->and(loggedEntry($logs, 'Webhook validation failed')['context']['hint'])->toContain('SQUARE_WEBHOOK_URL');
 });
 
-test('the health check is up on a client error, and down on no connection or anything else, and logs which', function () {
+test('the health check is up on a client error, and down on no connection or anything else, and logs which', function (): void {
     $logs = captureLogs();
     $request = new Request('GET', '/v2/locations');
 
@@ -373,11 +376,11 @@ test('the health check is up on a client error, and down on no connection or any
         ->and($failed[1]['context']['error_class'])->toBe(ChargeException::class);
 });
 
-test('a charge\'s round trip to Square is recorded on its own timeline', function () {
+test('a charge\'s round trip to Square is recorded on its own timeline', function (): void {
     config(['payments.features.trace' => true, 'payments.trace.async' => false]);
     app()->forgetInstance('payments.config');
 
     squareContractDriver([squareLinkCreated()])->charge(squareCharge());
 
-    expect(KenDeNigerian\PayZephyr\Models\PaymentTraceEvent::where('reference', 'SQUARE_1')->count())->toBe(2);
+    expect(PaymentTraceEvent::where('reference', 'SQUARE_1')->count())->toBe(2);
 });

@@ -20,7 +20,7 @@ use KenDeNigerian\PayZephyr\Services\RefundValidator;
  * the captured amount, under any interleaving of retries, concurrency, partial
  * refunds, and local failures.
  */
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -64,21 +64,21 @@ function validateRefundRequest(string $transactionReference, ?float $amount): vo
     app(RefundValidator::class)->validateRefund(RefundRequestDTO::fromArray(array_filter([
         'transaction_reference' => $transactionReference,
         'amount' => $amount,
-    ], fn ($v) => $v !== null)));
+    ], fn ($v): bool => $v !== null)));
 }
 
 // ---------------------------------------------------------------------------
 // The core invariant: total refunds never exceed the captured amount
 // ---------------------------------------------------------------------------
 
-test('a refund exceeding the captured amount is rejected', function () {
+test('a refund exceeding the captured amount is rejected', function (): void {
     seedCapturedPayment('txn_over', 1000.00);
 
     expect(fn () => validateRefundRequest('txn_over', 1500.00))
         ->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
 });
 
-test('a refund exceeding the REMAINING balance after a partial refund is rejected', function () {
+test('a refund exceeding the REMAINING balance after a partial refund is rejected', function (): void {
     seedCapturedPayment('txn_partial', 1000.00);
     seedRefund('txn_partial', 'rf_1', 600.00, 'completed');
 
@@ -87,7 +87,7 @@ test('a refund exceeding the REMAINING balance after a partial refund is rejecte
         ->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
 });
 
-test('sequential partial refunds are allowed up to exactly the captured amount', function () {
+test('sequential partial refunds are allowed up to exactly the captured amount', function (): void {
     seedCapturedPayment('txn_seq', 1000.00);
     seedRefund('txn_seq', 'rf_a', 400.00, 'completed');
     seedRefund('txn_seq', 'rf_b', 300.00, 'completed');
@@ -98,7 +98,7 @@ test('sequential partial refunds are allowed up to exactly the captured amount',
     expect(app(RefundRepositoryInterface::class)->sumRefundedAmount('txn_seq'))->toBe(700.0);
 });
 
-test('a refund against a fully refunded transaction is rejected', function () {
+test('a refund against a fully refunded transaction is rejected', function (): void {
     seedCapturedPayment('txn_full', 1000.00);
     seedRefund('txn_full', 'rf_full', 1000.00, 'completed');
 
@@ -106,7 +106,7 @@ test('a refund against a fully refunded transaction is rejected', function () {
         ->toThrow(RefundException::class, 'already been fully refunded');
 });
 
-test('pending and processing refunds count toward the refunded total, not just completed ones', function () {
+test('pending and processing refunds count toward the refunded total, not just completed ones', function (): void {
     // A pending refund is money that is on its way out. Excluding it from the
     // total would let a concurrent second refund over-spend the payment while
     // the first is still settling.
@@ -124,7 +124,7 @@ test('pending and processing refunds count toward the refunded total, not just c
         ->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
 });
 
-test('a pending refund is rejected by the in-flight guard before the over-refund guard is reached', function () {
+test('a pending refund is rejected by the in-flight guard before the over-refund guard is reached', function (): void {
     // Both guards protect the invariant; this pins down which one fires first
     // so a future change to either is caught rather than silently reordering.
     seedCapturedPayment('txn_order', 1000.00);
@@ -134,7 +134,7 @@ test('a pending refund is rejected by the in-flight guard before the over-refund
         ->toThrow(RefundException::class, 'already in progress');
 });
 
-test('a failed refund does NOT count toward the refunded total', function () {
+test('a failed refund does NOT count toward the refunded total', function (): void {
     // The mirror of the above: money that definitively did not leave must not
     // permanently reduce the refundable balance.
     seedCapturedPayment('txn_failed', 1000.00);
@@ -147,7 +147,7 @@ test('a failed refund does NOT count toward the refunded total', function () {
     expect(true)->toBeTrue();
 });
 
-test('a refund whose provider status is unrecognized still counts toward the refunded total', function () {
+test('a refund whose provider status is unrecognized still counts toward the refunded total', function (): void {
     // Regression: RefundResponseDTO::getStatus() used to fall back to FAILED
     // for an unrecognized provider status. FAILED is excluded from
     // sumRefundedAmount(), so an unknown status silently freed the entire
@@ -179,10 +179,10 @@ test('a refund whose provider status is unrecognized still counts toward the ref
         ->toThrow(RefundException::class, 'exceeds the remaining refundable balance');
 });
 
-test('the refunded-total query is derived from the enum, so a new status cannot silently escape it', function () {
+test('the refunded-total query is derived from the enum, so a new status cannot silently escape it', function (): void {
     $counted = array_values(array_map(
         fn (RefundStatus $s) => $s->value,
-        array_filter(RefundStatus::cases(), fn (RefundStatus $s) => $s->countsTowardRefundedAmount())
+        array_filter(RefundStatus::cases(), fn (RefundStatus $s): bool => $s->countsTowardRefundedAmount())
     ));
 
     seedCapturedPayment('txn_enum', 1000.00);
@@ -200,7 +200,7 @@ test('the refunded-total query is derived from the enum, so a new status cannot 
 // Duplicate / in-flight protection
 // ---------------------------------------------------------------------------
 
-test('a second refund while one is already pending is rejected by the in-flight guard', function () {
+test('a second refund while one is already pending is rejected by the in-flight guard', function (): void {
     seedCapturedPayment('txn_inflight', 1000.00);
     seedRefund('txn_inflight', 'rf_inflight', 100.00, 'pending');
 
@@ -208,7 +208,7 @@ test('a second refund while one is already pending is rejected by the in-flight 
         ->toThrow(RefundException::class, 'already in progress');
 });
 
-test('a new refund is allowed once the earlier one reaches a terminal state', function () {
+test('a new refund is allowed once the earlier one reaches a terminal state', function (): void {
     seedCapturedPayment('txn_terminal', 1000.00);
     seedRefund('txn_terminal', 'rf_terminal', 100.00, 'completed');
 
@@ -219,7 +219,7 @@ test('a new refund is allowed once the earlier one reaches a terminal state', fu
 // Local failure after a real provider refund
 // ---------------------------------------------------------------------------
 
-test('a refund row that failed to persist locally leaves the balance unprotected - guarded by the in-flight lock instead', function () {
+test('a refund row that failed to persist locally leaves the balance unprotected - guarded by the in-flight lock instead', function (): void {
     // Documents the real, unavoidable limitation honestly rather than
     // pretending it away: if the provider refunded but the local write never
     // happened (process crash), the validator alone cannot know. The
@@ -235,7 +235,7 @@ test('a refund row that failed to persist locally leaves the balance unprotected
     expect(true)->toBeTrue();
 });
 
-test('updateStatusIfExists refuses to move a refund out of a terminal state', function () {
+test('updateStatusIfExists refuses to move a refund out of a terminal state', function (): void {
     // Prevents a late/duplicate webhook from resurrecting a settled refund
     // and corrupting the refunded total the over-refund guard depends on.
     seedCapturedPayment('txn_terminalguard', 1000.00);
@@ -251,14 +251,14 @@ test('updateStatusIfExists refuses to move a refund out of a terminal state', fu
 // Validator robustness
 // ---------------------------------------------------------------------------
 
-test('a refund against an unknown transaction is allowed through (over-refund check is best-effort)', function () {
+test('a refund against an unknown transaction is allowed through (over-refund check is best-effort)', function (): void {
     // The original charge may have been logged by a different process or with
     // logging disabled. Refusing here would make refunds depend on local
     // logging being enabled, which is a worse failure mode.
     validateRefundRequest('txn_never_logged', 50.00);
 })->throwsNoExceptions();
 
-test('a full refund request with no amount is validated against the remaining balance', function () {
+test('a full refund request with no amount is validated against the remaining balance', function (): void {
     seedCapturedPayment('txn_noamount', 1000.00);
     seedRefund('txn_noamount', 'rf_prior', 999.00, 'completed');
 
@@ -266,7 +266,7 @@ test('a full refund request with no amount is validated against the remaining ba
     validateRefundRequest('txn_noamount', null);
 })->throwsNoExceptions();
 
-test('the transaction repository is the source of truth for the captured amount', function () {
+test('the transaction repository is the source of truth for the captured amount', function (): void {
     seedCapturedPayment('txn_source', 250.50);
 
     expect((float) app(TransactionRepositoryInterface::class)->findByReference('txn_source')->amount)

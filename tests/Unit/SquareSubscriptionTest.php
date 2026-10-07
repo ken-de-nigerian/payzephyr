@@ -25,7 +25,7 @@ function makeSquareSubscriptionDriver(array $responses): SquareDriver
     return $driver;
 }
 
-test('square createPlan batch-upserts a subscription plan and variation', function () {
+test('square createPlan batch-upserts a subscription plan and variation', function (): void {
     $driver = makeSquareSubscriptionDriver([
         new Response(200, [], json_encode([
             'objects' => [
@@ -61,7 +61,7 @@ test('square createPlan batch-upserts a subscription plan and variation', functi
         ->and($result->currency)->toBe('USD');
 });
 
-test('square createSubscription requires an authorization (card on file)', function () {
+test('square createSubscription requires an authorization (card on file)', function (): void {
     $driver = makeSquareSubscriptionDriver([]);
 
     $request = new SubscriptionRequestDTO(customer: 'test@example.com', plan: 'VAR123');
@@ -69,7 +69,7 @@ test('square createSubscription requires an authorization (card on file)', funct
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Square requires an existing card-on-file ID');
 
-test('square createSubscription finds or creates a customer then creates the subscription', function () {
+test('square createSubscription finds or creates a customer then creates the subscription', function (): void {
     $driver = makeSquareSubscriptionDriver([
         new Response(200, [], json_encode(['customers' => []])),
         new Response(200, [], json_encode([
@@ -100,7 +100,7 @@ test('square createSubscription finds or creates a customer then creates the sub
         ->and($result->amount)->toBe(50.0);
 });
 
-test('square cancelSubscription pauses and maps to non-renewing', function () {
+test('square cancelSubscription pauses and maps to non-renewing', function (): void {
     $driver = makeSquareSubscriptionDriver([
         new Response(200, [], json_encode([
             'subscription' => [
@@ -121,7 +121,7 @@ test('square cancelSubscription pauses and maps to non-renewing', function () {
         ->and($result->canBeResumed())->toBeTrue();
 });
 
-test('square enableSubscription resumes a paused subscription', function () {
+test('square enableSubscription resumes a paused subscription', function (): void {
     $driver = makeSquareSubscriptionDriver([
         new Response(200, [], json_encode([
             'subscription' => [
@@ -142,7 +142,7 @@ test('square enableSubscription resumes a paused subscription', function () {
         ->and($result->isActive())->toBeTrue();
 });
 
-test('square listSubscriptions filters by customer via search', function () {
+test('square listSubscriptions filters by customer via search', function (): void {
     $driver = makeSquareSubscriptionDriver([
         new Response(200, [], json_encode([
             'customers' => [['id' => 'CUST1', 'email_address' => 'test@example.com']],

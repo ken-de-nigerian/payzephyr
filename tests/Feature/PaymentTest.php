@@ -2,7 +2,7 @@
 
 use KenDeNigerian\PayZephyr\Facades\Payment;
 
-test('can create payment with fluent api', function () {
+test('can create payment with fluent api', function (): void {
     config(['payments.providers.paystack.enabled' => true]);
 
     $payment = Payment::amount(10000)
@@ -13,7 +13,7 @@ test('can create payment with fluent api', function () {
     expect($payment)->toBeInstanceOf(\KenDeNigerian\PayZephyr\Payment::class);
 });
 
-test('payment helper function works', function () {
+test('payment helper function works', function (): void {
     $payment = payment()->amount(5000)->email('test@example.com');
     expect($payment)->toBeInstanceOf(\KenDeNigerian\PayZephyr\Payment::class);
 });

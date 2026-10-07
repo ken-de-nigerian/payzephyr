@@ -3,14 +3,15 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Console\NormalizeRefundStatusCommand;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 
-test('normalize-status command is registered', function () {
+test('normalize-status command is registered', function (): void {
     expect(Artisan::all())->toHaveKey('payzephyr:refunds:normalize-status');
 });
 
-test('normalizes raw uppercase provider statuses to canonical values', function () {
+test('normalizes raw uppercase provider statuses to canonical values', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_UPPER', 'transaction_reference' => 'TXN_1',
         'provider' => 'square', 'status' => 'PENDING', 'amount' => 100, 'currency' => 'USD',
@@ -32,7 +33,7 @@ test('normalizes raw uppercase provider statuses to canonical values', function 
         ->and(RefundTransaction::where('refund_reference', 'REF_ALREADY_CANONICAL')->first()->status)->toBe('completed');
 });
 
-test('--dry-run reports changes without writing them', function () {
+test('--dry-run reports changes without writing them', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_DRY', 'transaction_reference' => 'TXN_1',
         'provider' => 'square', 'status' => 'COMPLETED', 'amount' => 100, 'currency' => 'USD',
@@ -44,7 +45,7 @@ test('--dry-run reports changes without writing them', function () {
         ->and(RefundTransaction::where('refund_reference', 'REF_DRY')->first()->status)->toBe('COMPLETED');
 });
 
-test('an unmappable status is reported and left untouched, not guessed at', function () {
+test('an unmappable status is reported and left untouched, not guessed at', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_UNKNOWN', 'transaction_reference' => 'TXN_1',
         'provider' => 'stripe', 'status' => 'some_future_status', 'amount' => 100, 'currency' => 'USD',
@@ -56,7 +57,7 @@ test('an unmappable status is reported and left untouched, not guessed at', func
         ->and(RefundTransaction::where('refund_reference', 'REF_UNKNOWN')->first()->status)->toBe('some_future_status');
 });
 
-test('running it twice is idempotent', function () {
+test('running it twice is idempotent', function (): void {
     RefundTransaction::create([
         'refund_reference' => 'REF_TWICE', 'transaction_reference' => 'TXN_1',
         'provider' => 'monnify', 'status' => 'PENDING', 'amount' => 100, 'currency' => 'NGN',
@@ -71,14 +72,14 @@ test('running it twice is idempotent', function () {
         ->and(Artisan::output())->toContain('nothing to do');
 });
 
-test('reports nothing to do when the refund_transactions table has no rows', function () {
+test('reports nothing to do when the refund_transactions table has no rows', function (): void {
     $exitCode = Artisan::call('payzephyr:refunds:normalize-status');
 
     expect($exitCode)->toBe(NormalizeRefundStatusCommand::SUCCESS)
         ->and(Artisan::output())->toContain('nothing to do');
 });
 
-test('succeeds without touching anything when the refunds table was never installed', function () {
+test('succeeds without touching anything when the refunds table was never installed', function (): void {
     // Refunds are an optional feature. An app that never installed them still
     // runs this command from a generic upgrade script, and it must not fail
     // there with "no such table".
@@ -88,5 +89,5 @@ test('succeeds without touching anything when the refunds table was never instal
         ->expectsOutput('No "refunds_never_installed" table found - nothing to do.')
         ->assertExitCode(NormalizeRefundStatusCommand::SUCCESS);
 
-    expect(Illuminate\Support\Facades\Schema::hasTable('refunds_never_installed'))->toBeFalse();
+    expect(Schema::hasTable('refunds_never_installed'))->toBeFalse();
 });

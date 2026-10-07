@@ -21,13 +21,12 @@ function makeQueryManager(string $provider, DriverInterface $driver): PaymentMan
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, [$provider => $driver]);
 
     return $manager;
 }
 
-test('get() returns Paystack subscriptions as DTOs with no filters', function () {
+test('get() returns Paystack subscriptions as DTOs with no filters', function (): void {
     $driver = new PaystackDriver(['secret_key' => 'sk_test', 'currencies' => ['NGN']]);
     $driver->setClient(new Client(['handler' => HandlerStack::create(new MockHandler([
         new Response(200, [], json_encode([
@@ -46,7 +45,7 @@ test('get() returns Paystack subscriptions as DTOs with no filters', function ()
         ->and($result['data'][0]->plan)->toBe('PLN_1');
 });
 
-test('regression: whereStatus/active/forPlan filters no longer crash on DTO-shaped results from Stripe/PayPal/Flutterwave/Square/Mollie', function () {
+test('regression: whereStatus/active/forPlan filters no longer crash on DTO-shaped results from Stripe/PayPal/Flutterwave/Square/Mollie', function (): void {
     $active = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'active',
@@ -84,7 +83,7 @@ test('regression: whereStatus/active/forPlan filters no longer crash on DTO-shap
         ->and($byPlan['data'][0]->subscriptionCode)->toBe('SUB_2');
 });
 
-test('createdAfter/createdBefore are a safe no-op against DTO-shaped results rather than crashing', function () {
+test('createdAfter/createdBefore are a safe no-op against DTO-shaped results rather than crashing', function (): void {
     $dto = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'active',
@@ -103,7 +102,7 @@ test('createdAfter/createdBefore are a safe no-op against DTO-shaped results rat
     expect($result['data'])->toHaveCount(1);
 });
 
-test('first() returns the first matching subscription as a DTO', function () {
+test('first() returns the first matching subscription as a DTO', function (): void {
     $dto = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'active',
@@ -123,7 +122,7 @@ test('first() returns the first matching subscription as a DTO', function () {
         ->and($first->subscriptionCode)->toBe('SUB_1');
 });
 
-test('first() returns null when there are no results', function () {
+test('first() returns null when there are no results', function (): void {
     $driver = Mockery::mock(CombinedSubscriptionDriver::class);
     $driver->shouldReceive('listSubscriptions')->andReturn(['data' => [], 'has_more' => false]);
 
@@ -132,7 +131,7 @@ test('first() returns null when there are no results', function () {
     expect($query->from('stripe')->first())->toBeNull();
 });
 
-test('count() and exists() reflect the number of matching subscriptions', function () {
+test('count() and exists() reflect the number of matching subscriptions', function (): void {
     $dto = new SubscriptionResponseDTO(
         subscriptionCode: 'SUB_1',
         status: 'active',
@@ -152,7 +151,7 @@ test('count() and exists() reflect the number of matching subscriptions', functi
     expect($query2->from('stripe')->exists())->toBeTrue();
 });
 
-test('exists() is false when nothing matches', function () {
+test('exists() is false when nothing matches', function (): void {
     $driver = Mockery::mock(CombinedSubscriptionDriver::class);
     $driver->shouldReceive('listSubscriptions')->andReturn(['data' => [], 'has_more' => false]);
 
@@ -161,7 +160,7 @@ test('exists() is false when nothing matches', function () {
     expect($query->from('stripe')->exists())->toBeFalse();
 });
 
-test('get() throws when the target provider does not support subscriptions', function () {
+test('get() throws when the target provider does not support subscriptions', function (): void {
     $driver = Mockery::mock(DriverInterface::class);
     $driver->shouldReceive('getName')->andReturn('monnify');
 
@@ -170,7 +169,7 @@ test('get() throws when the target provider does not support subscriptions', fun
     $query->from('monnify')->get();
 })->throws(PaymentException::class, 'does not support subscriptions');
 
-test('forCustomer, take, and page are forwarded to listSubscriptions', function () {
+test('forCustomer, take, and page are forwarded to listSubscriptions', function (): void {
     $driver = Mockery::mock(CombinedSubscriptionDriver::class);
     $driver->shouldReceive('listSubscriptions')
         ->with(5, 2, 'customer@example.com')

@@ -35,7 +35,6 @@ class RefundTestHelper
 
         $reflection = new ReflectionClass($manager);
         $configProperty = $reflection->getProperty('config');
-        $configProperty->setAccessible(true);
         $config = $configProperty->getValue($manager);
         $config['providers']['paystack']['enabled'] = true;
         $config['default'] = 'paystack';
@@ -43,7 +42,6 @@ class RefundTestHelper
         $configProperty->setValue($manager, $config);
 
         $driversProperty = $reflection->getProperty('drivers');
-        $driversProperty->setAccessible(true);
         $drivers = $driversProperty->getValue($manager);
         $drivers['paystack'] = $driver;
         $driversProperty->setValue($manager, $drivers);

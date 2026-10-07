@@ -19,7 +19,7 @@ use Tests\Helpers\PaystackDriverTestHelper;
 
 // ==================== Plan Operations Tests ====================
 
-test('paystack createPlan succeeds with valid response', function () {
+test('paystack createPlan succeeds with valid response', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -48,7 +48,7 @@ test('paystack createPlan succeeds with valid response', function () {
         ->and($result->amount)->toBe(5000.0); // Converted from 500000 kobo to 5000.0 naira
 });
 
-test('paystack createPlan throws exception on api error', function () {
+test('paystack createPlan throws exception on api error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -65,7 +65,7 @@ test('paystack createPlan throws exception on api error', function () {
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Invalid plan data');
 
-test('paystack createPlan handles network errors', function () {
+test('paystack createPlan handles network errors', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(500, [], json_encode([
             'status' => false,
@@ -82,7 +82,7 @@ test('paystack createPlan handles network errors', function () {
     $driver->createPlan($plan);
 })->throws(PlanException::class);
 
-test('paystack updatePlan succeeds', function () {
+test('paystack updatePlan succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -100,7 +100,7 @@ test('paystack updatePlan succeeds', function () {
         ->and($result->name)->toBe('Updated Plan');
 });
 
-test('paystack updatePlan throws exception on error', function () {
+test('paystack updatePlan throws exception on error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -111,7 +111,7 @@ test('paystack updatePlan throws exception on error', function () {
     $driver->updatePlan('PLN_nonexistent', ['name' => 'Test']);
 })->throws(PlanException::class, 'Plan not found');
 
-test('paystack getPlan succeeds', function () {
+test('paystack getPlan succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -132,7 +132,7 @@ test('paystack getPlan succeeds', function () {
         ->and($result->interval)->toBe('monthly');
 });
 
-test('paystack getPlan throws exception when plan not found', function () {
+test('paystack getPlan throws exception when plan not found', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -143,7 +143,7 @@ test('paystack getPlan throws exception when plan not found', function () {
     $driver->fetchPlan('PLN_nonexistent');
 })->throws(PlanException::class);
 
-test('paystack listPlans succeeds', function () {
+test('paystack listPlans succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -170,7 +170,7 @@ test('paystack listPlans succeeds', function () {
         ->and($result['meta'])->toBeNull();
 });
 
-test('paystack listPlans with pagination', function () {
+test('paystack listPlans with pagination', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -188,7 +188,7 @@ test('paystack listPlans with pagination', function () {
         ->and($result['meta'])->toBe(['total' => 11, 'page' => 2, 'perPage' => 10]);
 });
 
-test('paystack listPlans throws exception on error', function () {
+test('paystack listPlans throws exception on error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(500, [], json_encode([
             'status' => false,
@@ -201,7 +201,7 @@ test('paystack listPlans throws exception on error', function () {
 
 // ==================== Subscription Operations Tests ====================
 
-test('paystack createSubscription succeeds', function () {
+test('paystack createSubscription succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -245,7 +245,7 @@ test('paystack createSubscription succeeds', function () {
         ->and($result->isActive())->toBeTrue();
 });
 
-test('paystack createSubscription converts amount from kobo to naira', function () {
+test('paystack createSubscription converts amount from kobo to naira', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -270,7 +270,7 @@ test('paystack createSubscription converts amount from kobo to naira', function 
     expect($result->amount)->toBe(10000.0);
 });
 
-test('paystack createSubscription throws exception on api error', function () {
+test('paystack createSubscription throws exception on api error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -286,7 +286,7 @@ test('paystack createSubscription throws exception on api error', function () {
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'Invalid customer or plan');
 
-test('paystack fetchSubscription succeeds', function () {
+test('paystack fetchSubscription succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -317,7 +317,7 @@ test('paystack fetchSubscription succeeds', function () {
         ->and($result->isActive())->toBeTrue();
 });
 
-test('paystack fetchSubscription handles cancelled status', function () {
+test('paystack fetchSubscription handles cancelled status', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -339,7 +339,7 @@ test('paystack fetchSubscription handles cancelled status', function () {
         ->and($result->isActive())->toBeFalse();
 });
 
-test('paystack fetchSubscription throws exception when not found', function () {
+test('paystack fetchSubscription throws exception when not found', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(404, [], json_encode([
             'status' => false,
@@ -350,7 +350,7 @@ test('paystack fetchSubscription throws exception when not found', function () {
     $driver->fetchSubscription('SUB_nonexistent');
 })->throws(SubscriptionException::class);
 
-test('paystack cancelSubscription succeeds', function () {
+test('paystack cancelSubscription succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         // Response from disable endpoint
         new Response(200, [], json_encode([
@@ -380,7 +380,7 @@ test('paystack cancelSubscription succeeds', function () {
         ->and($result->isCancelled())->toBeTrue();
 });
 
-test('paystack cancelSubscription throws exception on error', function () {
+test('paystack cancelSubscription throws exception on error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => false,
@@ -391,7 +391,7 @@ test('paystack cancelSubscription throws exception on error', function () {
     $driver->cancelSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'invalid_token']));
 })->throws(SubscriptionException::class, 'Invalid token');
 
-test('paystack enableSubscription succeeds', function () {
+test('paystack enableSubscription succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         // Response from enable endpoint
         new Response(200, [], json_encode([
@@ -421,7 +421,7 @@ test('paystack enableSubscription succeeds', function () {
         ->and($result->isActive())->toBeTrue();
 });
 
-test('paystack enableSubscription throws exception on error', function () {
+test('paystack enableSubscription throws exception on error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(400, [], json_encode([
             'status' => false,
@@ -432,7 +432,7 @@ test('paystack enableSubscription throws exception on error', function () {
     $driver->enableSubscription(new SubscriptionActionDTO('SUB_test123', ['token' => 'invalid_token']));
 })->throws(SubscriptionException::class);
 
-test('paystack listSubscriptions succeeds', function () {
+test('paystack listSubscriptions succeeds', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -464,7 +464,7 @@ test('paystack listSubscriptions succeeds', function () {
         ->and($result['data'][1]->status)->toBe('cancelled');
 });
 
-test('paystack listSubscriptions with customer filter', function () {
+test('paystack listSubscriptions with customer filter', function (): void {
     $history = [];
     $driver = paystackWithHistory($history, [
         new Response(200, [], json_encode(['status' => true, 'data' => ['id' => 4821, 'email' => 'customer@example.com']])),
@@ -489,7 +489,7 @@ test('paystack listSubscriptions with customer filter', function () {
         ->and($history[1]['request']->getUri()->getQuery())->toContain('customer=4821');
 });
 
-test('paystack listSubscriptions passes a numeric customer id through without a lookup', function () {
+test('paystack listSubscriptions passes a numeric customer id through without a lookup', function (): void {
     $history = [];
     $driver = paystackWithHistory($history, [
         new Response(200, [], json_encode(['status' => true, 'data' => []])),
@@ -502,7 +502,7 @@ test('paystack listSubscriptions passes a numeric customer id through without a 
         ->and($history[0]['request']->getUri()->getQuery())->toContain('customer=4821');
 });
 
-test('paystack listSubscriptions for a customer paystack does not know is empty, not every subscription', function () {
+test('paystack listSubscriptions for a customer paystack does not know is empty, not every subscription', function (): void {
     $history = [];
     $driver = paystackWithHistory($history, [
         new Response(404, [], json_encode(['status' => false, 'message' => 'Customer not found'])),
@@ -512,7 +512,7 @@ test('paystack listSubscriptions for a customer paystack does not know is empty,
         ->and($history)->toHaveCount(1);
 });
 
-test('paystack listSubscriptions for a customer lookup answered without status is empty', function () {
+test('paystack listSubscriptions for a customer lookup answered without status is empty', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode(['status' => false, 'data' => ['id' => 4821]])),
     ]);
@@ -520,7 +520,7 @@ test('paystack listSubscriptions for a customer lookup answered without status i
     expect($driver->listSubscriptions(50, 1, 'customer@example.com'))->toBe(['data' => [], 'meta' => null]);
 });
 
-test('paystack listSubscriptions fails when the customer lookup fails for another reason', function () {
+test('paystack listSubscriptions fails when the customer lookup fails for another reason', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(401, [], json_encode(['status' => false, 'message' => 'Invalid key'])),
     ]);
@@ -528,7 +528,7 @@ test('paystack listSubscriptions fails when the customer lookup fails for anothe
     $driver->listSubscriptions(50, 1, 'customer@example.com');
 })->throws(SubscriptionException::class);
 
-test('paystack listSubscriptions with pagination', function () {
+test('paystack listSubscriptions with pagination', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -545,7 +545,7 @@ test('paystack listSubscriptions with pagination', function () {
         ->and($result['meta'])->toBe(['total' => 11, 'page' => 2]);
 });
 
-test('paystack listSubscriptions throws exception on error', function () {
+test('paystack listSubscriptions throws exception on error', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(500, [], json_encode([
             'status' => false,
@@ -558,7 +558,7 @@ test('paystack listSubscriptions throws exception on error', function () {
 
 // ==================== Edge Cases and Error Handling ====================
 
-test('paystack createPlan handles missing plan_code in response', function () {
+test('paystack createPlan handles missing plan_code in response', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -577,11 +577,11 @@ test('paystack createPlan handles missing plan_code in response', function () {
 
     $result = $driver->createPlan($plan);
 
-    expect($result)->toBeInstanceOf(\KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO::class)
+    expect($result)->toBeInstanceOf(PlanResponseDTO::class)
         ->and($result->name)->toBe('Test Plan');
 });
 
-test('paystack createSubscription handles missing customer email in response', function () {
+test('paystack createSubscription handles missing customer email in response', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -607,7 +607,7 @@ test('paystack createSubscription handles missing customer email in response', f
     expect($result->customer)->toBe('customer@example.com');
 });
 
-test('paystack fetchSubscription handles missing optional fields', function () {
+test('paystack fetchSubscription handles missing optional fields', function (): void {
     $driver = PaystackDriverTestHelper::createWithMock([
         new Response(200, [], json_encode([
             'status' => true,
@@ -629,38 +629,38 @@ test('paystack fetchSubscription handles missing optional fields', function () {
         ->and($result->metadata)->toBe([]);
 });
 
-test('paystack createPlan validates plan DTO', function () {
-    expect(fn () => new SubscriptionPlanDTO(
+test('paystack createPlan validates plan DTO', function (): void {
+    expect(fn (): SubscriptionPlanDTO => new SubscriptionPlanDTO(
         name: '',
         amount: 1000.00,
         interval: 'monthly'
     ))->toThrow(InvalidArgumentException::class, 'Plan name is required');
 
-    expect(fn () => new SubscriptionPlanDTO(
+    expect(fn (): SubscriptionPlanDTO => new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: -100,
         interval: 'monthly'
     ))->toThrow(InvalidArgumentException::class, 'Amount must be greater than zero');
 
-    expect(fn () => new SubscriptionPlanDTO(
+    expect(fn (): SubscriptionPlanDTO => new SubscriptionPlanDTO(
         name: 'Test Plan',
         amount: 1000.00,
         interval: 'invalid'
     ))->toThrow(InvalidArgumentException::class, 'Interval must be one of');
 });
 
-test('paystack createSubscription validates request DTO', function () {
-    expect(fn () => new SubscriptionRequestDTO(
+test('paystack createSubscription validates request DTO', function (): void {
+    expect(fn (): SubscriptionRequestDTO => new SubscriptionRequestDTO(
         customer: '',
         plan: 'PLN_test123'
     ))->toThrow(InvalidArgumentException::class, 'Customer is required');
 
-    expect(fn () => new SubscriptionRequestDTO(
+    expect(fn (): SubscriptionRequestDTO => new SubscriptionRequestDTO(
         customer: 'customer@example.com',
         plan: ''
     ))->toThrow(InvalidArgumentException::class, 'Plan is required');
 
-    expect(fn () => new SubscriptionRequestDTO(
+    expect(fn (): SubscriptionRequestDTO => new SubscriptionRequestDTO(
         customer: 'customer@example.com',
         plan: 'PLN_test123',
         quantity: 0

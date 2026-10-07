@@ -5,7 +5,7 @@ use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-test('payment manager cacheSessionData stores session data', function () {
+test('payment manager cacheSessionData stores session data', function (): void {
     Cache::flush();
 
     $manager = app(PaymentManager::class);
@@ -21,7 +21,7 @@ test('payment manager cacheSessionData stores session data', function () {
         ->and($cached['id'])->toBe('provider_id_123');
 });
 
-test('payment manager resolveVerificationContext uses cache first', function () {
+test('payment manager resolveVerificationContext uses cache first', function (): void {
     Cache::flush();
     Cache::put('payzephyr:session:test_ref', ['provider' => 'paystack', 'id' => 'provider_id'], now()->addHour());
 
@@ -36,7 +36,7 @@ test('payment manager resolveVerificationContext uses cache first', function () 
         ->and($result['id'])->toBe('test_ref'); // Paystack uses reference, not cached id
 });
 
-test('payment manager resolveVerificationContext uses database second', function () {
+test('payment manager resolveVerificationContext uses database second', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -60,7 +60,7 @@ test('payment manager resolveVerificationContext uses database second', function
         ->and($result['id'])->toBe('db_ref_123'); // Paystack uses reference, not database id
 });
 
-test('payment manager resolveVerificationContext uses provider detector third', function () {
+test('payment manager resolveVerificationContext uses provider detector third', function (): void {
     Cache::flush();
 
     $manager = app(PaymentManager::class);
@@ -74,7 +74,7 @@ test('payment manager resolveVerificationContext uses provider detector third', 
         ->and($result['id'])->toBe('PAYSTACK_ref_123');
 });
 
-test('payment manager resolveVerificationContext uses explicit provider', function () {
+test('payment manager resolveVerificationContext uses explicit provider', function (): void {
     Cache::flush();
 
     $manager = app(PaymentManager::class);
@@ -88,7 +88,7 @@ test('payment manager resolveVerificationContext uses explicit provider', functi
         ->and($result['id'])->toBe('ref_123');
 });
 
-test('payment manager resolveVerificationContext uses session_id from metadata', function () {
+test('payment manager resolveVerificationContext uses session_id from metadata', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -110,7 +110,7 @@ test('payment manager resolveVerificationContext uses session_id from metadata',
     expect($result['id'])->toBe('stripe_session_123');
 });
 
-test('payment manager resolveVerificationContext uses order_id from metadata', function () {
+test('payment manager resolveVerificationContext uses order_id from metadata', function (): void {
     Cache::flush();
 
     PaymentTransaction::create([
@@ -132,7 +132,7 @@ test('payment manager resolveVerificationContext uses order_id from metadata', f
     expect($result['id'])->toBe('paypal_order_123');
 });
 
-test('payment manager updateTransactionFromVerification updates transaction', function () {
+test('payment manager updateTransactionFromVerification updates transaction', function (): void {
     PaymentTransaction::create([
         'reference' => 'verify_ref',
         'provider' => 'paystack',
@@ -164,7 +164,7 @@ test('payment manager updateTransactionFromVerification updates transaction', fu
         ->and($transaction->paid_at)->not->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification handles failed payment', function () {
+test('payment manager updateTransactionFromVerification handles failed payment', function (): void {
     PaymentTransaction::create([
         'reference' => 'failed_ref',
         'provider' => 'paystack',
@@ -193,7 +193,7 @@ test('payment manager updateTransactionFromVerification handles failed payment',
         ->and($transaction->paid_at)->toBeNull();
 });
 
-test('payment manager updateTransactionFromVerification skips when logging disabled', function () {
+test('payment manager updateTransactionFromVerification skips when logging disabled', function (): void {
     config(['payments.logging.enabled' => false]);
 
     $manager = app(PaymentManager::class);
@@ -212,7 +212,7 @@ test('payment manager updateTransactionFromVerification skips when logging disab
     expect(true)->toBeTrue(); // Verify it doesn't throw
 });
 
-test('payment manager updateTransactionFromVerification uses now when paidAt is null', function () {
+test('payment manager updateTransactionFromVerification uses now when paidAt is null', function (): void {
     PaymentTransaction::create([
         'reference' => 'now_ref',
         'provider' => 'paystack',
@@ -230,8 +230,7 @@ test('payment manager updateTransactionFromVerification uses now when paidAt is 
         reference: 'now_ref',
         status: 'success',
         amount: 10000,
-        currency: 'NGN',
-        paidAt: null, // No paidAt provided
+        currency: 'NGN', // No paidAt provided
     );
 
     $method->invoke($manager, 'now_ref', $response);

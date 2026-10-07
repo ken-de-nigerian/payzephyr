@@ -1,9 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Payment;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.default' => 'paystack',
         'payments.currency.default' => 'NGN',
@@ -16,7 +18,7 @@ beforeEach(function () {
     ]);
 });
 
-test('payment fluent api sets amount', function () {
+test('payment fluent api sets amount', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -25,7 +27,7 @@ test('payment fluent api sets amount', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets currency', function () {
+test('payment fluent api sets currency', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -34,7 +36,7 @@ test('payment fluent api sets currency', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets email', function () {
+test('payment fluent api sets email', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -43,7 +45,7 @@ test('payment fluent api sets email', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets reference', function () {
+test('payment fluent api sets reference', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -52,7 +54,7 @@ test('payment fluent api sets reference', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets callback url', function () {
+test('payment fluent api sets callback url', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -61,7 +63,7 @@ test('payment fluent api sets callback url', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets metadata', function () {
+test('payment fluent api sets metadata', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -70,7 +72,7 @@ test('payment fluent api sets metadata', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets description', function () {
+test('payment fluent api sets description', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -79,7 +81,7 @@ test('payment fluent api sets description', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets customer', function () {
+test('payment fluent api sets customer', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -88,7 +90,7 @@ test('payment fluent api sets customer', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets single provider', function () {
+test('payment fluent api sets single provider', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -97,7 +99,7 @@ test('payment fluent api sets single provider', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api sets multiple providers', function () {
+test('payment fluent api sets multiple providers', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -106,7 +108,7 @@ test('payment fluent api sets multiple providers', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api using alias works', function () {
+test('payment fluent api using alias works', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -115,7 +117,7 @@ test('payment fluent api using alias works', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api chains multiple methods', function () {
+test('payment fluent api chains multiple methods', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -133,7 +135,7 @@ test('payment fluent api chains multiple methods', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api uses default currency from config', function () {
+test('payment fluent api uses default currency from config', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -142,7 +144,7 @@ test('payment fluent api uses default currency from config', function () {
     expect(true)->toBeTrue(); // If no exception, default was used
 });
 
-test('payment fluent api normalizes currency to uppercase', function () {
+test('payment fluent api normalizes currency to uppercase', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -151,13 +153,13 @@ test('payment fluent api normalizes currency to uppercase', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment helper function creates payment instance', function () {
+test('payment helper function creates payment instance', function (): void {
     $payment = payment();
 
     expect($payment)->toBeInstanceOf(Payment::class);
 });
 
-test('payment helper function can chain methods', function () {
+test('payment helper function can chain methods', function (): void {
     $payment = payment()
         ->amount(5000)
         ->email('test@example.com');
@@ -165,7 +167,7 @@ test('payment helper function can chain methods', function () {
     expect($payment)->toBeInstanceOf(Payment::class);
 });
 
-test('payment fluent api builds charge request correctly', function () {
+test('payment fluent api builds charge request correctly', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -190,7 +192,7 @@ test('payment fluent api builds charge request correctly', function () {
     }
 });
 
-test('payment allows complex metadata', function () {
+test('payment allows complex metadata', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 
@@ -208,7 +210,7 @@ test('payment allows complex metadata', function () {
     expect($result)->toBeInstanceOf(Payment::class);
 });
 
-test('payment allows complex customer data', function () {
+test('payment allows complex customer data', function (): void {
     $manager = new PaymentManager;
     $payment = new Payment($manager);
 

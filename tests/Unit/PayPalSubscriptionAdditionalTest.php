@@ -38,7 +38,7 @@ function makePayPalSubscriptionDriver2(array $responses): PayPalDriver
 // createPlan - error branch
 // ---------------------------------------------------------------------
 
-test('paypal createPlan throws PlanException on API error', function () {
+test('paypal createPlan throws PlanException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);
@@ -48,7 +48,7 @@ test('paypal createPlan throws PlanException on API error', function () {
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Failed to create plan');
 
-test('paypal createPlan maps daily, weekly and annually intervals', function (string $interval, string $intervalUnit) {
+test('paypal createPlan maps daily, weekly and annually intervals', function (string $interval, string $intervalUnit): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(201, [], json_encode(['id' => 'PROD-123', 'name' => 'Plan'])),
         new Response(201, [], json_encode([
@@ -76,7 +76,7 @@ test('paypal createPlan maps daily, weekly and annually intervals', function (st
 // updatePlan
 // ---------------------------------------------------------------------
 
-test('paypal updatePlan patches the description only', function () {
+test('paypal updatePlan patches the description only', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(204),
         new Response(200, [], json_encode([
@@ -95,7 +95,7 @@ test('paypal updatePlan patches the description only', function () {
     expect($result->description)->toBe('New description');
 });
 
-test('paypal updatePlan updates the pricing scheme when the amount changes with an explicit currency', function () {
+test('paypal updatePlan updates the pricing scheme when the amount changes with an explicit currency', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         // The plan, read for the sequence of the cycle to reprice
         new Response(200, [], json_encode([
@@ -123,7 +123,7 @@ test('paypal updatePlan updates the pricing scheme when the amount changes with 
         ->and($result->currency)->toBe('EUR');
 });
 
-test('paypal updatePlan falls back to the existing plan currency when the amount changes without one', function () {
+test('paypal updatePlan falls back to the existing plan currency when the amount changes without one', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         // fetchPlan() call inside updatePlan() to resolve currency
         new Response(200, [], json_encode([
@@ -153,7 +153,7 @@ test('paypal updatePlan falls back to the existing plan currency when the amount
         ->and($result->currency)->toBe('GBP');
 });
 
-test('paypal updatePlan throws PlanException on API error', function () {
+test('paypal updatePlan throws PlanException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);
@@ -165,7 +165,7 @@ test('paypal updatePlan throws PlanException on API error', function () {
 // fetchPlan - error branch
 // ---------------------------------------------------------------------
 
-test('paypal fetchPlan throws PlanException on API error', function () {
+test('paypal fetchPlan throws PlanException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(404, [], json_encode(['error' => 'not_found'])),
     ]);
@@ -173,7 +173,7 @@ test('paypal fetchPlan throws PlanException on API error', function () {
     $driver->fetchPlan('P-missing');
 })->throws(PlanException::class, 'Failed to get plan');
 
-test('paypal fetchPlan maps day and week intervals back to daily/weekly', function (string $intervalUnit, string $expected) {
+test('paypal fetchPlan maps day and week intervals back to daily/weekly', function (string $intervalUnit, string $expected): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'P-abc',
@@ -197,7 +197,7 @@ test('paypal fetchPlan maps day and week intervals back to daily/weekly', functi
 // listPlans
 // ---------------------------------------------------------------------
 
-test('paypal listPlans returns a mapped list of plans', function () {
+test('paypal listPlans returns a mapped list of plans', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(200, [], json_encode([
             'plans' => [
@@ -221,7 +221,7 @@ test('paypal listPlans returns a mapped list of plans', function () {
         ->and($result['total_items'])->toBe(1);
 });
 
-test('paypal listPlans throws PlanException on API error', function () {
+test('paypal listPlans throws PlanException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);
@@ -233,7 +233,7 @@ test('paypal listPlans throws PlanException on API error', function () {
 // createSubscription
 // ---------------------------------------------------------------------
 
-test('paypal createSubscription sends an idempotency key header when provided', function () {
+test('paypal createSubscription sends an idempotency key header when provided', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(201, [], json_encode([
             'id' => 'I-XYZ',
@@ -247,8 +247,8 @@ test('paypal createSubscription sends an idempotency key header when provided', 
     $request = new SubscriptionRequestDTO(
         customer: 'test@example.com',
         plan: 'P-123',
-        callbackUrl: 'https://example.com/callback',
-        idempotencyKey: 'idem-key-123'
+        idempotencyKey: 'idem-key-123',
+        callbackUrl: 'https://example.com/callback'
     );
 
     $result = $driver->createSubscription($request);
@@ -256,7 +256,7 @@ test('paypal createSubscription sends an idempotency key header when provided', 
     expect($result->subscriptionCode)->toBe('I-XYZ');
 });
 
-test('paypal createSubscription throws SubscriptionException on API error', function () {
+test('paypal createSubscription throws SubscriptionException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);
@@ -274,7 +274,7 @@ test('paypal createSubscription throws SubscriptionException on API error', func
 // fetchSubscription
 // ---------------------------------------------------------------------
 
-test('paypal fetchSubscription retrieves and maps a subscription', function () {
+test('paypal fetchSubscription retrieves and maps a subscription', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'I-XYZ',
@@ -292,7 +292,7 @@ test('paypal fetchSubscription retrieves and maps a subscription', function () {
         ->and($result->createdAt)->toBe('2024-12-01T00:00:00Z');
 });
 
-test('paypal fetchSubscription throws SubscriptionException on API error', function () {
+test('paypal fetchSubscription throws SubscriptionException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(404, [], json_encode(['error' => 'not_found'])),
     ]);
@@ -300,7 +300,7 @@ test('paypal fetchSubscription throws SubscriptionException on API error', funct
     $driver->fetchSubscription('I-missing');
 })->throws(SubscriptionException::class, 'Failed to fetch subscription');
 
-test('paypal fetchSubscription maps CANCELLED and EXPIRED statuses', function (string $status, string $expected) {
+test('paypal fetchSubscription maps CANCELLED and EXPIRED statuses', function (string $status, string $expected): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(200, [], json_encode([
             'id' => 'I-XYZ',
@@ -322,7 +322,7 @@ test('paypal fetchSubscription maps CANCELLED and EXPIRED statuses', function (s
 // cancelSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('paypal cancelSubscription throws SubscriptionException on API error', function () {
+test('paypal cancelSubscription throws SubscriptionException on API error', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);
@@ -330,7 +330,7 @@ test('paypal cancelSubscription throws SubscriptionException on API error', func
     $driver->cancelSubscription(new SubscriptionActionDTO('I-XYZ'));
 })->throws(SubscriptionException::class, 'Failed to cancel subscription');
 
-test('paypal cancelSubscription cancels permanently and with a custom reason when requested', function () {
+test('paypal cancelSubscription cancels permanently and with a custom reason when requested', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(204),
         new Response(200, [], json_encode([
@@ -354,7 +354,7 @@ test('paypal cancelSubscription cancels permanently and with a custom reason whe
 // enableSubscription - error branch
 // ---------------------------------------------------------------------
 
-test('paypal enableSubscription throws SubscriptionException when the PayPal API errors', function () {
+test('paypal enableSubscription throws SubscriptionException when the PayPal API errors', function (): void {
     $driver = makePayPalSubscriptionDriver2([
         new Response(500, [], json_encode(['error' => 'server_error'])),
     ]);

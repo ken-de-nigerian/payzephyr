@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Console\GenerateDocsCommand;
+use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 
 /**
  * The provider list and capability matrix are generated from src/Drivers.
@@ -15,11 +19,11 @@ function docsPath(string $relative): string
     return dirname(__DIR__, 2).DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, $relative);
 }
 
-test('the committed documentation matches the drivers on disk', function () {
+test('the committed documentation matches the drivers on disk', function (): void {
     $this->artisan('payzephyr:docs', ['--check' => true])->assertSuccessful();
 });
 
-test('the generated blocks are delimited in both documents', function () {
+test('the generated blocks are delimited in both documents', function (): void {
     // Without the markers the command cannot know what to replace, and fails
     // rather than guessing - so their presence is part of the contract.
     expect((string) file_get_contents(docsPath('docs/providers.md')))
@@ -31,10 +35,9 @@ test('the generated blocks are delimited in both documents', function () {
         ->toContain('<!-- generated:provider-list:end -->');
 });
 
-test('the matrix is derived from the capability interfaces, not from a list', function () {
+test('the matrix is derived from the capability interfaces, not from a list', function (): void {
     $command = new GenerateDocsCommand;
     $discover = (new ReflectionClass($command))->getMethod('discoverProviders');
-    $discover->setAccessible(true);
 
     /** @var array<int, array{name: string, label: string, subscriptions: bool, refunds: bool}> $providers */
     $providers = $discover->invoke($command);
@@ -48,13 +51,13 @@ test('the matrix is derived from the capability interfaces, not from a list', fu
 
         expect($provider['subscriptions'])->toBe(
             in_array(
-                KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface::class,
+                SupportsSubscriptionsInterface::class,
                 class_implements($class) ?: [],
                 true,
             )
         )->and($provider['refunds'])->toBe(
             in_array(
-                KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface::class,
+                SupportsRefundsInterface::class,
                 class_implements($class) ?: [],
                 true,
             )
@@ -62,14 +65,12 @@ test('the matrix is derived from the capability interfaces, not from a list', fu
     }
 });
 
-test('the provider list names providers and never counts them', function () {
+test('the provider list names providers and never counts them', function (): void {
     $command = new GenerateDocsCommand;
     $reflection = new ReflectionClass($command);
 
     $discover = $reflection->getMethod('discoverProviders');
-    $discover->setAccessible(true);
     $render = $reflection->getMethod('renderList');
-    $render->setAccessible(true);
 
     $line = (string) $render->invoke($command, $discover->invoke($command));
 
@@ -79,12 +80,11 @@ test('the provider list names providers and never counts them', function () {
         ->and($line)->not->toMatch('/\b(two|three|four|five|six|seven|eight|nine|ten|eleven|\d+)\s+providers?\b/i');
 });
 
-test('a driver with no name of its own is left out rather than rendered blank', function () {
+test('a driver with no name of its own is left out rather than rendered blank', function (): void {
     // Defensive: AbstractDriver has no $name, and neither would a half-written
     // driver. An empty row in the matrix would be worse than an absent one.
     $command = new GenerateDocsCommand;
     $discover = (new ReflectionClass($command))->getMethod('discoverProviders');
-    $discover->setAccessible(true);
 
     foreach ($discover->invoke($command) as $provider) {
         expect($provider['name'])->not->toBe('')
@@ -92,14 +92,13 @@ test('a driver with no name of its own is left out rather than rendered blank', 
     }
 });
 
-test('generating is idempotent and respects the document line endings', function () {
+test('generating is idempotent and respects the document line endings', function (): void {
     // The first version of this command always emitted LF. In a CRLF checkout
     // that meant every regenerated block differed from itself on the next run,
     // so --check reported drift no amount of regenerating could resolve, and
     // regenerating mixed line endings into the file.
     $command = new GenerateDocsCommand;
     $replace = (new ReflectionClass($command))->getMethod('replaceBlock');
-    $replace->setAccessible(true);
 
     $crlf = "intro\r\n<!-- s -->\r\nold\r\n<!-- e -->\r\ntail\r\n";
     $out = (string) $replace->invoke($command, $crlf, '<!-- s -->', '<!-- e -->', "a\nb");
@@ -117,10 +116,9 @@ test('generating is idempotent and respects the document line endings', function
         ->not->toContain("\r");
 });
 
-test('a document without the markers fails instead of guessing where to write', function () {
+test('a document without the markers fails instead of guessing where to write', function (): void {
     $command = new GenerateDocsCommand;
     $replace = (new ReflectionClass($command))->getMethod('replaceBlock');
-    $replace->setAccessible(true);
 
     expect($replace->invoke($command, "no markers here\n", '<!-- s -->', '<!-- e -->', 'x'))->toBeNull()
         // End before start is malformed too, and must not silently produce a
@@ -137,9 +135,9 @@ function runDocsCommandIn(string $root, array $arguments = []): array
     $command = new GenerateDocsCommand($root);
     $command->setLaravel(app());
 
-    $output = new Symfony\Component\Console\Output\BufferedOutput;
+    $output = new BufferedOutput;
     $status = $command->run(
-        new Symfony\Component\Console\Input\ArrayInput($arguments, $command->getDefinition()),
+        new ArrayInput($arguments, $command->getDefinition()),
         $output,
     );
 
@@ -173,7 +171,7 @@ function fixtureRoot(bool $withMarkers = true, bool $withDrivers = true): string
     return $root;
 }
 
-test('the command writes both blocks and reports what it regenerated', function () {
+test('the command writes both blocks and reports what it regenerated', function (): void {
     $root = fixtureRoot();
 
     [$status, $output] = runDocsCommandIn($root);
@@ -193,7 +191,7 @@ test('the command writes both blocks and reports what it regenerated', function 
     expect($status)->toBe(0)->and($output)->toContain('already up to date');
 });
 
-test('check mode fails on stale documents without writing to them', function () {
+test('check mode fails on stale documents without writing to them', function (): void {
     $root = fixtureRoot();
     $before = file_get_contents($root.'/docs/providers.md');
 
@@ -205,7 +203,7 @@ test('check mode fails on stale documents without writing to them', function () 
         ->and(file_get_contents($root.'/docs/providers.md'))->toBe($before);
 });
 
-test('check mode passes once the documents have been regenerated', function () {
+test('check mode passes once the documents have been regenerated', function (): void {
     $root = fixtureRoot();
     runDocsCommandIn($root);
 
@@ -214,7 +212,7 @@ test('check mode passes once the documents have been regenerated', function () {
     expect($status)->toBe(0)->and($output)->toContain('Documentation matches');
 });
 
-test('a document missing its markers is refused, not rewritten from scratch', function () {
+test('a document missing its markers is refused, not rewritten from scratch', function (): void {
     $root = fixtureRoot(withMarkers: false);
     $before = file_get_contents($root.'/docs/providers.md');
 
@@ -225,7 +223,7 @@ test('a document missing its markers is refused, not rewritten from scratch', fu
         ->and(file_get_contents($root.'/docs/providers.md'))->toBe($before);
 });
 
-test('finding no drivers is refused rather than publishing an empty provider list', function () {
+test('finding no drivers is refused rather than publishing an empty provider list', function (): void {
     // A build that somehow presents no drivers must not generate a README
     // announcing that PayZephyr supports nothing.
     $root = fixtureRoot(withDrivers: false);
@@ -237,7 +235,7 @@ test('finding no drivers is refused rather than publishing an empty provider lis
         ->and(file_get_contents($root.'/README.md'))->toContain('stale');
 });
 
-test('discovery skips files in src/Drivers that are not concrete, named drivers', function () {
+test('discovery skips files in src/Drivers that are not concrete, named drivers', function (): void {
     // Whatever else lands in src/Drivers - a stray file, an intermediate
     // abstract base, a driver still missing its name - must not produce a
     // row in the published provider matrix.
@@ -264,7 +262,7 @@ test('discovery skips files in src/Drivers that are not concrete, named drivers'
 
         expect(array_column($discover->invoke($command), 'name'))->toBe(['paystack']);
     } finally {
-        array_map('unlink', glob($root.'/src/Drivers/*.php') ?: []);
+        array_map(unlink(...), glob($root.'/src/Drivers/*.php') ?: []);
         rmdir($root.'/src/Drivers');
         rmdir($root.'/src');
         rmdir($root);

@@ -1,8 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
 
-test('status normalizer normalizeStatic handles all success variations', function () {
+test('status normalizer normalizeStatic handles all success variations', function (): void {
     expect(StatusNormalizer::normalizeStatic('SUCCESS'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('SUCCEEDED'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('COMPLETED'))->toBe('success')
@@ -12,7 +14,7 @@ test('status normalizer normalizeStatic handles all success variations', functio
         ->and(StatusNormalizer::normalizeStatic('CAPTURED'))->toBe('success');
 });
 
-test('status normalizer normalizeStatic handles all failed variations', function () {
+test('status normalizer normalizeStatic handles all failed variations', function (): void {
     expect(StatusNormalizer::normalizeStatic('FAILED'))->toBe('failed')
         ->and(StatusNormalizer::normalizeStatic('REJECTED'))->toBe('failed')
         ->and(StatusNormalizer::normalizeStatic('CANCELLED'))->toBe('failed')
@@ -23,7 +25,7 @@ test('status normalizer normalizeStatic handles all failed variations', function
         ->and(StatusNormalizer::normalizeStatic('EXPIRED'))->toBe('failed');
 });
 
-test('status normalizer normalizeStatic handles all pending variations', function () {
+test('status normalizer normalizeStatic handles all pending variations', function (): void {
     expect(StatusNormalizer::normalizeStatic('PENDING'))->toBe('pending')
         ->and(StatusNormalizer::normalizeStatic('PROCESSING'))->toBe('pending')
         ->and(StatusNormalizer::normalizeStatic('PARTIALLY_PAID'))->toBe('pending')
@@ -36,18 +38,18 @@ test('status normalizer normalizeStatic handles all pending variations', functio
         ->and(StatusNormalizer::normalizeStatic('REQUIRES_CONFIRMATION'))->toBe('pending');
 });
 
-test('status normalizer normalizeStatic returns lowercase for unknown status', function () {
+test('status normalizer normalizeStatic returns lowercase for unknown status', function (): void {
     expect(StatusNormalizer::normalizeStatic('UNKNOWN_STATUS'))->toBe('unknown_status')
         ->and(StatusNormalizer::normalizeStatic('CUSTOM_STATUS'))->toBe('custom_status');
 });
 
-test('status normalizer normalizeStatic trims whitespace', function () {
+test('status normalizer normalizeStatic trims whitespace', function (): void {
     expect(StatusNormalizer::normalizeStatic('  SUCCESS  '))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic("\tFAILED\n"))->toBe('failed')
         ->and(StatusNormalizer::normalizeStatic('  PENDING  '))->toBe('pending');
 });
 
-test('status normalizer normalizeStatic handles case variations', function () {
+test('status normalizer normalizeStatic handles case variations', function (): void {
     expect(StatusNormalizer::normalizeStatic('success'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('Success'))->toBe('success')
         ->and(StatusNormalizer::normalizeStatic('SUCCESS'))->toBe('success')

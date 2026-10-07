@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Psr7\Request;
 use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
@@ -39,11 +41,11 @@ function makeScriptableDriver(string $name, ?Throwable $throws = null, ?Closure 
         {
             $this->chargeCalls++;
 
-            if ($this->onCharge !== null) {
+            if ($this->onCharge instanceof \Closure) {
                 ($this->onCharge)($request);
             }
 
-            if ($this->throws !== null) {
+            if ($this->throws instanceof \Throwable) {
                 throw $this->throws;
             }
 
@@ -124,7 +126,6 @@ function makeManagerWithDrivers(array $drivers): PaymentManager
     $manager = new PaymentManager;
     $reflection = new ReflectionClass($manager);
     $property = $reflection->getProperty('drivers');
-    $property->setAccessible(true);
     $property->setValue($manager, $drivers);
 
     return $manager;
@@ -137,10 +138,10 @@ function chargeRequestWithReference(?string $reference): ChargeRequestDTO
         'currency' => 'NGN',
         'email' => 'test@example.com',
         'reference' => $reference,
-    ], fn ($v) => $v !== null));
+    ], fn ($v): bool => $v !== null));
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     Cache::flush();
 
@@ -159,7 +160,7 @@ beforeEach(function () {
 // Idempotency key identity
 // ---------------------------------------------------------------------------
 
-test('a caller-supplied reference produces a stable idempotency key across submissions', function () {
+test('a caller-supplied reference produces a stable idempotency key across submissions', function (): void {
     // Regression: fromArray() used to mint a fresh random UUID on every call
     // even when the caller supplied the same reference, so a retry of the same
     // logical payment reached the provider under a *different* idempotency
@@ -172,12 +173,12 @@ test('a caller-supplied reference produces a stable idempotency key across submi
         ->and($first->idempotencyKey)->toBe('order_12345');
 });
 
-test('two different references produce different idempotency keys', function () {
+test('two different references produce different idempotency keys', function (): void {
     expect(chargeRequestWithReference('order_a')->idempotencyKey)
         ->not->toBe(chargeRequestWithReference('order_b')->idempotencyKey);
 });
 
-test('an explicit idempotency key always overrides the reference-derived one', function () {
+test('an explicit idempotency key always overrides the reference-derived one', function (): void {
     $request = ChargeRequestDTO::fromArray([
         'amount' => 100.00,
         'currency' => 'NGN',
@@ -189,7 +190,7 @@ test('an explicit idempotency key always overrides the reference-derived one', f
     expect($request->idempotencyKey)->toBe('explicit_key_1');
 });
 
-test('with no reference and no explicit key, each submission gets a distinct key', function () {
+test('with no reference and no explicit key, each submission gets a distinct key', function (): void {
     // This is the honest limitation, asserted rather than glossed over:
     // nothing identifies these two submissions as the same logical payment,
     // so PayZephyr cannot and does not deduplicate them.
@@ -201,7 +202,7 @@ test('with no reference and no explicit key, each submission gets a distinct key
 // Concurrent / repeated submission
 // ---------------------------------------------------------------------------
 
-test('a second submission arriving while the first is still in flight never reaches a provider', function () {
+test('a second submission arriving while the first is still in flight never reaches a provider', function (): void {
     // Exercises the real race window: the second submission is issued from
     // *inside* the first submission's provider call, before the first has
     // returned and before any transaction row exists for it. This is the
@@ -209,7 +210,7 @@ test('a second submission arriving while the first is still in flight never reac
     $manager = null;
     $racingOutcome = null;
 
-    $primary = makeScriptableDriver('primary', onCharge: function () use (&$manager, &$racingOutcome) {
+    $primary = makeScriptableDriver('primary', onCharge: function () use (&$manager, &$racingOutcome): void {
         try {
             $manager->chargeWithFallback(chargeRequestWithReference('order_race'));
             $racingOutcome = 'CHARGED AGAIN';
@@ -231,27 +232,27 @@ test('a second submission arriving while the first is still in flight never reac
         ->and($response->reference)->toBe('order_race');
 });
 
-test('a repeat submission after a successful charge does not charge again', function () {
+test('a repeat submission after a successful charge does not charge again', function (): void {
     $primary = makeScriptableDriver('primary');
     $secondary = makeScriptableDriver('secondary');
     $manager = makeManagerWithDrivers(['primary' => $primary, 'secondary' => $secondary]);
 
     $manager->chargeWithFallback(chargeRequestWithReference('order_repeat'));
 
-    expect(fn () => $manager->chargeWithFallback(chargeRequestWithReference('order_repeat')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(chargeRequestWithReference('order_repeat')))
         ->toThrow(ProviderException::class);
 
     expect($primary->chargeCalls)->toBe(1)
         ->and($secondary->chargeCalls)->toBe(0);
 });
 
-test('a definitive failure releases the claim so a legitimate retry can proceed', function () {
+test('a definitive failure releases the claim so a legitimate retry can proceed', function (): void {
     // A charge that definitively did not happen must not leave the payment
     // permanently unchargeable.
     $failing = makeScriptableDriver('primary', throws: new ChargeException('card declined'));
     $manager = makeManagerWithDrivers(['primary' => $failing]);
 
-    expect(fn () => $manager->chargeWithFallback(chargeRequestWithReference('order_retry')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(chargeRequestWithReference('order_retry')))
         ->toThrow(ProviderException::class);
 
     $succeeding = makeScriptableDriver('primary');
@@ -263,16 +264,16 @@ test('a definitive failure releases the claim so a legitimate retry can proceed'
         ->and($succeeding->chargeCalls)->toBe(1);
 });
 
-test('an ambiguous outcome keeps the claim so a retry cannot double-charge', function () {
+test('an ambiguous outcome keeps the claim so a retry cannot double-charge', function (): void {
     // The provider may already have processed this charge. Unlike a definitive
     // failure, the claim is deliberately NOT released - a retry would risk
     // charging the customer twice.
     $ambiguous = new ChargeException(
         'connection timed out',
         0,
-        new GuzzleHttp\Exception\RequestException(
+        new RequestException(
             'timeout',
-            new GuzzleHttp\Psr7\Request('POST', '/charge')
+            new Request('POST', '/charge')
         )
     );
 
@@ -280,7 +281,7 @@ test('an ambiguous outcome keeps the claim so a retry cannot double-charge', fun
     $secondary = makeScriptableDriver('secondary');
     $manager = makeManagerWithDrivers(['primary' => $primary, 'secondary' => $secondary]);
 
-    expect(fn () => $manager->chargeWithFallback(chargeRequestWithReference('order_ambiguous')))
+    expect(fn (): ChargeResponseDTO => $manager->chargeWithFallback(chargeRequestWithReference('order_ambiguous')))
         ->toThrow(ProviderException::class);
 
     // The fallback provider must not have been tried for an ambiguous outcome.
@@ -290,13 +291,13 @@ test('an ambiguous outcome keeps the claim so a retry cannot double-charge', fun
     $retryPrimary = makeScriptableDriver('primary');
     $manager2 = makeManagerWithDrivers(['primary' => $retryPrimary]);
 
-    expect(fn () => $manager2->chargeWithFallback(chargeRequestWithReference('order_ambiguous')))
+    expect(fn (): ChargeResponseDTO => $manager2->chargeWithFallback(chargeRequestWithReference('order_ambiguous')))
         ->toThrow(ProviderException::class);
 
     expect($retryPrimary->chargeCalls)->toBe(0);
 });
 
-test('charges without a reference are not blocked by each other', function () {
+test('charges without a reference are not blocked by each other', function (): void {
     // No stable identity means no protection is possible - but it also must
     // not produce false positives that block genuinely different payments.
     $primary = makeScriptableDriver('primary');
@@ -308,7 +309,7 @@ test('charges without a reference are not blocked by each other', function () {
     expect($primary->chargeCalls)->toBe(2);
 });
 
-test('different references do not block each other', function () {
+test('different references do not block each other', function (): void {
     $primary = makeScriptableDriver('primary');
     $manager = makeManagerWithDrivers(['primary' => $primary]);
 

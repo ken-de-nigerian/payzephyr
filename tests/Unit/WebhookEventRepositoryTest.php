@@ -5,18 +5,18 @@ declare(strict_types=1);
 use KenDeNigerian\PayZephyr\Models\WebhookEvent;
 use KenDeNigerian\PayZephyr\Repositories\EloquentWebhookEventRepository;
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->repository = new EloquentWebhookEventRepository;
 });
 
-test('recordIfNew returns true and persists the event on first sight', function () {
+test('recordIfNew returns true and persists the event on first sight', function (): void {
     $result = $this->repository->recordIfNew('paystack', 'evt_123');
 
     expect($result)->toBeTrue()
         ->and(WebhookEvent::where('provider', 'paystack')->where('event_key', 'evt_123')->exists())->toBeTrue();
 });
 
-test('recordIfNew returns false for a duplicate (provider, event_key) pair', function () {
+test('recordIfNew returns false for a duplicate (provider, event_key) pair', function (): void {
     $this->repository->recordIfNew('paystack', 'evt_123');
 
     $result = $this->repository->recordIfNew('paystack', 'evt_123');
@@ -25,7 +25,7 @@ test('recordIfNew returns false for a duplicate (provider, event_key) pair', fun
         ->and(WebhookEvent::where('provider', 'paystack')->where('event_key', 'evt_123')->count())->toBe(1);
 });
 
-test('recordIfNew treats the same event_key as distinct across different providers', function () {
+test('recordIfNew treats the same event_key as distinct across different providers', function (): void {
     $first = $this->repository->recordIfNew('paystack', 'evt_123');
     $second = $this->repository->recordIfNew('stripe', 'evt_123');
 
@@ -34,7 +34,7 @@ test('recordIfNew treats the same event_key as distinct across different provide
         ->and(WebhookEvent::where('event_key', 'evt_123')->count())->toBe(2);
 });
 
-test('recordIfNew is idempotent under repeated duplicate-delivery-style calls', function () {
+test('recordIfNew is idempotent under repeated duplicate-delivery-style calls', function (): void {
     $successCount = 0;
     for ($i = 0; $i < 5; $i++) {
         if ($this->repository->recordIfNew('paystack', 'evt_repeat')) {

@@ -1,23 +1,28 @@
 <?php
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
+use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
+use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
 uses(RefreshDatabase::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
 
-    \Illuminate\Support\Facades\DB::setDefaultConnection('testing');
+    DB::setDefaultConnection('testing');
 
     try {
-        \Illuminate\Support\Facades\Schema::connection('testing')->dropIfExists('payment_transactions');
-    } catch (\Exception $e) {
+        Schema::connection('testing')->dropIfExists('payment_transactions');
+    } catch (\Exception) {
     }
 
-    \Illuminate\Support\Facades\Schema::connection('testing')->create('payment_transactions', function ($table) {
+    Schema::connection('testing')->create('payment_transactions', function ($table): void {
         $table->id();
         $table->string('reference');
         $table->string('provider');
@@ -33,82 +38,72 @@ beforeEach(function () {
     });
 });
 
-test('webhook controller determineStatus handles all provider status formats', function () {
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+test('webhook controller determineStatus handles all provider status formats', function (): void {
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $job = new ProcessWebhook('paystack', ['data' => ['status' => 'success']]);
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('success');
 
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
 
     $job = new ProcessWebhook('flutterwave', ['data' => ['status' => 'successful']]);
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('successful');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['flutterwave' => $mockDriver]);
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
 
     $job = new ProcessWebhook('monnify', ['paymentStatus' => 'PAID']);
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('PAID');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['monnify' => $mockDriver]);
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
 
     $job = new ProcessWebhook('stripe', ['data' => ['object' => ['status' => 'succeeded']]]);
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('succeeded');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['stripe' => $mockDriver]);
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
 
     $job = new ProcessWebhook('paypal', ['resource' => ['status' => 'COMPLETED']]);
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('COMPLETED');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paypal' => $mockDriver]);
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('determineStatus');
-    $method->setAccessible(true);
     $status = $method->invoke($job, $manager, $statusNormalizer);
     expect($status)->toBe('success');
 });
 
-test('webhook controller updateTransactionFromWebhook updates with channel', function () {
+test('webhook controller updateTransactionFromWebhook updates with channel', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -125,21 +120,19 @@ test('webhook controller updateTransactionFromWebhook updates with channel', fun
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('success');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn('card');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
@@ -148,7 +141,7 @@ test('webhook controller updateTransactionFromWebhook updates with channel', fun
         ->and($transaction->paid_at)->not->toBeNull();
 });
 
-test('webhook controller updateTransactionFromWebhook handles database error gracefully', function () {
+test('webhook controller updateTransactionFromWebhook handles database error gracefully', function (): void {
     config(['payments.logging.enabled' => true]);
 
     $job = new ProcessWebhook('paystack', [
@@ -156,26 +149,24 @@ test('webhook controller updateTransactionFromWebhook handles database error gra
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('success');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn(null);
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paystack' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'nonexistent_ref');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'nonexistent_ref');
 
     expect(true)->toBeTrue();
 });
 
-test('webhook controller updateTransactionFromWebhook handles different provider channels', function () {
+test('webhook controller updateTransactionFromWebhook handles different provider channels', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -192,28 +183,26 @@ test('webhook controller updateTransactionFromWebhook handles different provider
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('successful');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn('card');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['flutterwave' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
     expect($transaction->channel)->toBe('card');
 });
 
-test('webhook controller updateTransactionFromWebhook handles monnify channel', function () {
+test('webhook controller updateTransactionFromWebhook handles monnify channel', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -231,28 +220,26 @@ test('webhook controller updateTransactionFromWebhook handles monnify channel', 
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('PAID');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn('CARD');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['monnify' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
     expect($transaction->channel)->toBe('CARD');
 });
 
-test('webhook controller updateTransactionFromWebhook handles stripe channel', function () {
+test('webhook controller updateTransactionFromWebhook handles stripe channel', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -274,28 +261,26 @@ test('webhook controller updateTransactionFromWebhook handles stripe channel', f
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('succeeded');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn('card');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['stripe' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 
     expect($transaction->channel)->toBe('card');
 });
 
-test('webhook controller updateTransactionFromWebhook handles paypal channel', function () {
+test('webhook controller updateTransactionFromWebhook handles paypal channel', function (): void {
     config(['payments.logging.enabled' => true]);
 
     PaymentTransaction::create([
@@ -312,21 +297,19 @@ test('webhook controller updateTransactionFromWebhook handles paypal channel', f
     ]);
 
     $manager = app(PaymentManager::class);
-    $mockDriver = Mockery::mock(\KenDeNigerian\PayZephyr\Contracts\DriverInterface::class);
+    $mockDriver = Mockery::mock(DriverInterface::class);
     $mockDriver->shouldReceive('extractWebhookStatus')->andReturn('COMPLETED');
     $mockDriver->shouldReceive('extractWebhookChannel')->andReturn('paypal');
     $managerReflection = new \ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paypal' => $mockDriver]);
 
-    $statusNormalizer = app(\KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface::class);
+    $statusNormalizer = app(StatusNormalizerInterface::class);
 
     $reflection = new \ReflectionClass($job);
     $method = $reflection->getMethod('updateTransactionFromWebhook');
-    $method->setAccessible(true);
 
-    $method->invoke($job, $manager, $statusNormalizer, app(\KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface::class), 'ref_123');
+    $method->invoke($job, $manager, $statusNormalizer, app(TransactionRepositoryInterface::class), 'ref_123');
 
     $transaction = PaymentTransaction::where('reference', 'ref_123')->first();
 

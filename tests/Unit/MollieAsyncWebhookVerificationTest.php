@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 use KenDeNigerian\PayZephyr\Drivers\MollieDriver;
 
-test('mollie requires async verification when no webhook_secret is configured', function () {
+test('mollie requires async verification when no webhook_secret is configured', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_key']);
 
     expect($driver->requiresAsyncVerification())->toBeTrue();
 });
 
-test('mollie does not require async verification when webhook_secret is configured', function () {
+test('mollie does not require async verification when webhook_secret is configured', function (): void {
     $driver = new MollieDriver(['api_key' => 'test_key', 'webhook_secret' => 'whsec_test']);
 
     expect($driver->requiresAsyncVerification())->toBeFalse();
 });
 
-test('mollie webhook request defers to the queue when no webhook_secret is configured (ADR-0008)', function () {
+test('mollie webhook request defers to the queue when no webhook_secret is configured (ADR-0008)', function (): void {
     config([
         'payments.webhook.verify_signature' => true,
         'payments.providers.mollie' => [
@@ -36,7 +36,7 @@ test('mollie webhook request defers to the queue when no webhook_secret is confi
     expect($request->authorize())->toBeTrue();
 });
 
-test('mollie webhook request still verifies synchronously when webhook_secret is configured', function () {
+test('mollie webhook request still verifies synchronously when webhook_secret is configured', function (): void {
     config([
         'payments.webhook.verify_signature' => true,
         'payments.providers.mollie' => [

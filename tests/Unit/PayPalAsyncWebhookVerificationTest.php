@@ -2,14 +2,24 @@
 
 declare(strict_types=1);
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Event;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
+use KenDeNigerian\PayZephyr\Drivers\PayPalDriver;
 use KenDeNigerian\PayZephyr\Events\WebhookReceived;
+use KenDeNigerian\PayZephyr\Exceptions\WebhookException;
 use KenDeNigerian\PayZephyr\Jobs\ProcessWebhook;
+use KenDeNigerian\PayZephyr\Models\WebhookEvent;
 use KenDeNigerian\PayZephyr\PaymentManager;
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.webhook.verify_signature' => true,
         'payments.providers.paypal' => [
@@ -25,7 +35,7 @@ beforeEach(function () {
     Event::fake();
 });
 
-test('paypal webhook request authorizes without a valid signature - verification is deferred (ADR-0007)', function () {
+test('paypal webhook request authorizes without a valid signature - verification is deferred (ADR-0007)', function (): void {
     $body = json_encode(['id' => 'WH-1', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED']);
 
     // Deliberately no paypal-transmission-* headers at all - a synchronous
@@ -36,7 +46,7 @@ test('paypal webhook request authorizes without a valid signature - verification
     expect($request->authorize())->toBeTrue();
 });
 
-test('other providers still verify synchronously and are unaffected by the paypal deferral', function () {
+test('other providers still verify synchronously and are unaffected by the paypal deferral', function (): void {
     config([
         'payments.providers.paystack' => [
             'driver' => 'paystack',
@@ -52,18 +62,18 @@ test('other providers still verify synchronously and are unaffected by the paypa
     expect($request->authorize())->toBeFalse();
 });
 
-test('ProcessWebhook discards a paypal delivery that fails deferred verification', function () {
+test('ProcessWebhook discards a paypal delivery that fails deferred verification', function (): void {
     $job = new ProcessWebhook('paypal', ['id' => 'WH-1', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED'], [
         // Missing all paypal-transmission-* headers - validateWebhook() will
         // reject before ever attempting the PayPal API call.
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertNotDispatched(WebhookReceived::class);
 });
 
-test('ProcessWebhook processes a paypal delivery that passes deferred verification', function () {
+test('ProcessWebhook processes a paypal delivery that passes deferred verification', function (): void {
     $manager = app(PaymentManager::class);
 
     $mockDriver = Mockery::mock(DriverInterface::class, RequiresAsyncWebhookVerification::class);
@@ -74,14 +84,13 @@ test('ProcessWebhook processes a paypal delivery that passes deferred verificati
 
     $managerReflection = new ReflectionClass($manager);
     $driversProperty = $managerReflection->getProperty('drivers');
-    $driversProperty->setAccessible(true);
     $driversProperty->setValue($manager, ['paypal' => $mockDriver]);
 
     $job = new ProcessWebhook('paypal', ['id' => 'WH-1', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED'], [
         'paypal-transmission-id' => ['t1'],
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 });
@@ -92,12 +101,12 @@ test('ProcessWebhook processes a paypal delivery that passes deferred verificati
  *
  * @param  array<int, mixed>  $queue
  */
-function paypalDriverInManagerAnswering(array $queue): \KenDeNigerian\PayZephyr\Drivers\PayPalDriver
+function paypalDriverInManagerAnswering(array $queue): PayPalDriver
 {
     app()->forgetInstance(PaymentManager::class);
     $driver = app(PaymentManager::class)->driver('paypal');
-    $driver->setClient(new \GuzzleHttp\Client(['handler' => \GuzzleHttp\HandlerStack::create(
-        new \GuzzleHttp\Handler\MockHandler($queue)
+    $driver->setClient(new Client(['handler' => HandlerStack::create(
+        new MockHandler($queue)
     )]));
 
     return $driver;
@@ -114,53 +123,53 @@ function paypalDeliveryHeaders(): array
     ];
 }
 
-test('ProcessWebhook retries, rather than discards, a paypal delivery PayPal could not be asked about', function () {
+test('ProcessWebhook retries, rather than discards, a paypal delivery PayPal could not be asked about', function (): void {
     // PayPal has already been told 202 and will not resend. If an outage at
     // PayPal's verification endpoint were read as a forged signature, this
     // genuine delivery would be gone for good.
     paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Exception\ConnectException('timed out', new \GuzzleHttp\Psr7\Request('POST', '/v1/notifications/verify-webhook-signature')),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new ConnectException('timed out', new Request('POST', '/v1/notifications/verify-webhook-signature')),
     ]);
 
     $payload = ['id' => 'WH-RETRY', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED', 'create_time' => now()->toIso8601String()];
     $job = new ProcessWebhook('paypal', $payload, paypalDeliveryHeaders());
 
-    expect(fn () => app()->call([$job, 'handle']))
-        ->toThrow(\KenDeNigerian\PayZephyr\Exceptions\WebhookException::class);
+    expect(fn () => app()->call($job->handle(...)))
+        ->toThrow(WebhookException::class);
 
     Event::assertNotDispatched(WebhookReceived::class);
 
     // Verification precedes the idempotency claim, so a failed attempt leaves
     // nothing that would make the retry look like a duplicate.
-    expect(\KenDeNigerian\PayZephyr\Models\WebhookEvent::query()->count())->toBe(0);
+    expect(WebhookEvent::query()->count())->toBe(0);
 
     // The retry, with PayPal back, processes the delivery.
     paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new Response(200, [], '{"verification_status":"SUCCESS"}'),
     ]);
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 });
 
-test('ProcessWebhook still discards a paypal delivery PayPal reports as forged', function () {
+test('ProcessWebhook still discards a paypal delivery PayPal reports as forged', function (): void {
     paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"FAILURE"}'),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new Response(200, [], '{"verification_status":"FAILURE"}'),
     ]);
 
     $payload = ['id' => 'WH-FORGED', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED', 'create_time' => now()->toIso8601String()];
     $job = new ProcessWebhook('paypal', $payload, paypalDeliveryHeaders());
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertNotDispatched(WebhookReceived::class);
 });
 
-test('ProcessWebhook records when the delivery was received', function () {
+test('ProcessWebhook records when the delivery was received', function (): void {
     $before = time();
     $job = new ProcessWebhook('paypal', ['id' => 'WH-1']);
 
@@ -172,15 +181,15 @@ test('ProcessWebhook records when the delivery was received', function () {
     expect($restored->receivedAt)->toBe($job->receivedAt);
 });
 
-test('ProcessWebhook measures the paypal replay window from receipt, not from when a worker ran it', function () {
+test('ProcessWebhook measures the paypal replay window from receipt, not from when a worker ran it', function (): void {
     // Received ten minutes ago and only now picked up - a backed-up queue.
     // Measured from now, create_time is outside a five-minute window and the
     // delivery would be thrown away.
     config(['payments.webhook.events.replay_window' => 300]);
     app()->forgetInstance('payments.config');
     $driver = paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new Response(200, [], '{"verification_status":"SUCCESS"}'),
     ]);
 
     $receivedAt = time() - 600;
@@ -188,45 +197,45 @@ test('ProcessWebhook measures the paypal replay window from receipt, not from wh
     $job = new ProcessWebhook('paypal', $payload, paypalDeliveryHeaders());
     $job->receivedAt = $receivedAt;
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 
     // The driver outlives the job in a worker; the next delivery must be
     // measured from its own receipt, not inherit this one's.
-    $reflection = new ReflectionProperty(\KenDeNigerian\PayZephyr\Drivers\AbstractDriver::class, 'webhookReceivedAt');
+    $reflection = new ReflectionProperty(AbstractDriver::class, 'webhookReceivedAt');
     expect($reflection->getValue($driver))->toBeNull();
 });
 
-test('ProcessWebhook clears the receipt time even when verification throws', function () {
+test('ProcessWebhook clears the receipt time even when verification throws', function (): void {
     $driver = paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Exception\ConnectException('timed out', new \GuzzleHttp\Psr7\Request('POST', '/v1/notifications/verify-webhook-signature')),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new ConnectException('timed out', new Request('POST', '/v1/notifications/verify-webhook-signature')),
     ]);
 
     $job = new ProcessWebhook('paypal', ['id' => 'WH-X', 'create_time' => now()->toIso8601String()], paypalDeliveryHeaders());
 
     try {
-        app()->call([$job, 'handle']);
-    } catch (\KenDeNigerian\PayZephyr\Exceptions\WebhookException) {
+        app()->call($job->handle(...));
+    } catch (WebhookException) {
     }
 
-    $reflection = new ReflectionProperty(\KenDeNigerian\PayZephyr\Drivers\AbstractDriver::class, 'webhookReceivedAt');
+    $reflection = new ReflectionProperty(AbstractDriver::class, 'webhookReceivedAt');
     expect($reflection->getValue($driver))->toBeNull();
 });
 
-test('ProcessWebhook falls back to now for a job queued before receipt times were recorded', function () {
+test('ProcessWebhook falls back to now for a job queued before receipt times were recorded', function (): void {
     // A job serialized by an older version has no receivedAt. It must still
     // be verifiable - measured from now, exactly as before.
     paypalDriverInManagerAnswering([
-        new \GuzzleHttp\Psr7\Response(200, [], '{"access_token":"tok","expires_in":3600}'),
-        new \GuzzleHttp\Psr7\Response(200, [], '{"verification_status":"SUCCESS"}'),
+        new Response(200, [], '{"access_token":"tok","expires_in":3600}'),
+        new Response(200, [], '{"verification_status":"SUCCESS"}'),
     ]);
 
     $job = new ProcessWebhook('paypal', ['id' => 'WH-OLD', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED', 'create_time' => now()->toIso8601String()], paypalDeliveryHeaders());
     $job->receivedAt = null;
 
-    app()->call([$job, 'handle']);
+    app()->call($job->handle(...));
 
     Event::assertDispatched(WebhookReceived::class);
 });

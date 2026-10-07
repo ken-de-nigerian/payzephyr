@@ -26,7 +26,7 @@ function makeFlutterwaveSubscriptionDriver2(array $responses): FlutterwaveDriver
 // createPlan
 // ---------------------------------------------------------------------
 
-test('flutterwave createPlan throws PlanException when the API reports failure', function () {
+test('flutterwave createPlan throws PlanException when the API reports failure', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'Invalid amount'])),
     ]);
@@ -36,7 +36,7 @@ test('flutterwave createPlan throws PlanException when the API reports failure',
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Invalid amount');
 
-test('flutterwave createPlan throws PlanException on a network/API error', function () {
+test('flutterwave createPlan throws PlanException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -46,7 +46,7 @@ test('flutterwave createPlan throws PlanException on a network/API error', funct
     $driver->createPlan($plan);
 })->throws(PlanException::class, 'Failed to create plan');
 
-test('flutterwave createPlan maps annually interval to yearly', function () {
+test('flutterwave createPlan maps annually interval to yearly', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -64,7 +64,7 @@ test('flutterwave createPlan maps annually interval to yearly', function () {
 // updatePlan
 // ---------------------------------------------------------------------
 
-test('flutterwave updatePlan sends name/status changes then re-fetches the plan', function () {
+test('flutterwave updatePlan sends name/status changes then re-fetches the plan', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'success', 'data' => []])),
         new Response(200, [], json_encode([
@@ -78,7 +78,7 @@ test('flutterwave updatePlan sends name/status changes then re-fetches the plan'
     expect($result->name)->toBe('New Name');
 });
 
-test('flutterwave updatePlan skips the PUT call when there is nothing to change', function () {
+test('flutterwave updatePlan skips the PUT call when there is nothing to change', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -91,7 +91,7 @@ test('flutterwave updatePlan skips the PUT call when there is nothing to change'
     expect($result->planCode)->toBe('3807');
 });
 
-test('flutterwave updatePlan throws PlanException on a network/API error', function () {
+test('flutterwave updatePlan throws PlanException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -103,7 +103,7 @@ test('flutterwave updatePlan throws PlanException on a network/API error', funct
 // fetchPlan
 // ---------------------------------------------------------------------
 
-test('flutterwave fetchPlan retrieves and maps a plan', function () {
+test('flutterwave fetchPlan retrieves and maps a plan', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -117,7 +117,7 @@ test('flutterwave fetchPlan retrieves and maps a plan', function () {
         ->and($result->name)->toBe('Plan');
 });
 
-test('flutterwave fetchPlan throws PlanException when the API reports failure', function () {
+test('flutterwave fetchPlan throws PlanException when the API reports failure', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'plan not found'])),
     ]);
@@ -125,7 +125,7 @@ test('flutterwave fetchPlan throws PlanException when the API reports failure', 
     $driver->fetchPlan('3807-missing');
 })->throws(PlanException::class, 'plan not found');
 
-test('flutterwave fetchPlan throws PlanException on a network/API error', function () {
+test('flutterwave fetchPlan throws PlanException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -133,7 +133,7 @@ test('flutterwave fetchPlan throws PlanException on a network/API error', functi
     $driver->fetchPlan('3807');
 })->throws(PlanException::class, 'Failed to get plan');
 
-test('flutterwave fetchPlan maps yearly and quarterly intervals', function (string $flwInterval, string $expected) {
+test('flutterwave fetchPlan maps yearly and quarterly intervals', function (string $flwInterval, string $expected): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -153,7 +153,7 @@ test('flutterwave fetchPlan maps yearly and quarterly intervals', function (stri
 // listPlans
 // ---------------------------------------------------------------------
 
-test('flutterwave listPlans returns a mapped list of plans', function () {
+test('flutterwave listPlans returns a mapped list of plans', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -170,7 +170,7 @@ test('flutterwave listPlans returns a mapped list of plans', function () {
         ->and($result['data'][0]->planCode)->toBe('3807');
 });
 
-test('flutterwave listPlans throws PlanException when the API reports failure', function () {
+test('flutterwave listPlans throws PlanException when the API reports failure', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'cannot list'])),
     ]);
@@ -178,7 +178,7 @@ test('flutterwave listPlans throws PlanException when the API reports failure', 
     $driver->listPlans();
 })->throws(PlanException::class, 'cannot list');
 
-test('flutterwave listPlans throws PlanException on a network/API error', function () {
+test('flutterwave listPlans throws PlanException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -190,7 +190,7 @@ test('flutterwave listPlans throws PlanException on a network/API error', functi
 // createSubscription
 // ---------------------------------------------------------------------
 
-test('flutterwave createSubscription throws SubscriptionException when the resulting subscription cannot be located', function () {
+test('flutterwave createSubscription throws SubscriptionException when the resulting subscription cannot be located', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'success', 'data' => ['id' => 'FLW_TXN_1']])),
         new Response(200, [], json_encode(['status' => 'success', 'data' => []])),
@@ -205,7 +205,7 @@ test('flutterwave createSubscription throws SubscriptionException when the resul
     $driver->createSubscription($request);
 })->throws(SubscriptionException::class, 'could not be located');
 
-test('flutterwave createSubscription throws SubscriptionException on a network/API error', function () {
+test('flutterwave createSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -223,7 +223,7 @@ test('flutterwave createSubscription throws SubscriptionException on a network/A
 // fetchSubscription
 // ---------------------------------------------------------------------
 
-test('flutterwave fetchSubscription retrieves and maps a subscription', function () {
+test('flutterwave fetchSubscription retrieves and maps a subscription', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode([
             'status' => 'success',
@@ -247,7 +247,7 @@ test('flutterwave fetchSubscription retrieves and maps a subscription', function
         ->and($result->createdAt)->toBe('2024-12-01T00:00:00.000Z');
 });
 
-test('flutterwave fetchSubscription throws SubscriptionException when the API reports failure', function () {
+test('flutterwave fetchSubscription throws SubscriptionException when the API reports failure', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'subscription not found'])),
     ]);
@@ -255,7 +255,7 @@ test('flutterwave fetchSubscription throws SubscriptionException when the API re
     $driver->fetchSubscription('9911-missing');
 })->throws(SubscriptionException::class, 'subscription not found');
 
-test('flutterwave fetchSubscription throws SubscriptionException on a network/API error', function () {
+test('flutterwave fetchSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -267,7 +267,7 @@ test('flutterwave fetchSubscription throws SubscriptionException on a network/AP
 // cancelSubscription / enableSubscription - error branches
 // ---------------------------------------------------------------------
 
-test('flutterwave cancelSubscription throws SubscriptionException on a network/API error', function () {
+test('flutterwave cancelSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -275,7 +275,7 @@ test('flutterwave cancelSubscription throws SubscriptionException on a network/A
     $driver->cancelSubscription(new SubscriptionActionDTO('9911'));
 })->throws(SubscriptionException::class, 'Failed to cancel subscription');
 
-test('flutterwave enableSubscription throws SubscriptionException on a network/API error', function () {
+test('flutterwave enableSubscription throws SubscriptionException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);
@@ -287,7 +287,7 @@ test('flutterwave enableSubscription throws SubscriptionException on a network/A
 // listSubscriptions
 // ---------------------------------------------------------------------
 
-test('flutterwave listSubscriptions throws SubscriptionException when the API reports failure', function () {
+test('flutterwave listSubscriptions throws SubscriptionException when the API reports failure', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(200, [], json_encode(['status' => 'error', 'message' => 'cannot list'])),
     ]);
@@ -295,7 +295,7 @@ test('flutterwave listSubscriptions throws SubscriptionException when the API re
     $driver->listSubscriptions();
 })->throws(SubscriptionException::class, 'cannot list');
 
-test('flutterwave listSubscriptions throws SubscriptionException on a network/API error', function () {
+test('flutterwave listSubscriptions throws SubscriptionException on a network/API error', function (): void {
     $driver = makeFlutterwaveSubscriptionDriver2([
         new Response(500, [], json_encode(['status' => 'error', 'message' => 'server error'])),
     ]);

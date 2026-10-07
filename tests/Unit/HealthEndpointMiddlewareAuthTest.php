@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Http\Middleware\HealthEndpointMiddleware;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Covers the allowed_ips / allowed_tokens branches of HealthEndpointMiddleware
@@ -12,7 +15,7 @@ use KenDeNigerian\PayZephyr\Http\Middleware\HealthEndpointMiddleware;
  * (including CIDR matching), token resolution from the X-Health-Token header
  * and the ?token= query string, and rejection of missing/invalid tokens.
  */
-function makeHealthRequest(array $server = [], array $headers = [], array $query = []): \Symfony\Component\HttpFoundation\Response
+function makeHealthRequest(array $server = [], array $headers = [], array $query = []): Response
 {
     $middleware = new HealthEndpointMiddleware;
 
@@ -25,7 +28,7 @@ function makeHealthRequest(array $server = [], array $headers = [], array $query
     return $middleware->handle($request, fn ($req) => response()->json(['status' => 'operational']));
 }
 
-beforeEach(function () {
+beforeEach(function (): void {
     config([
         'payments.health_check.require_auth' => false,
         'payments.health_check.allowed_ips' => [],
@@ -34,7 +37,7 @@ beforeEach(function () {
     app()->forgetInstance('payments.config');
 });
 
-test('health endpoint allows a request from a whitelisted IP', function () {
+test('health endpoint allows a request from a whitelisted IP', function (): void {
     config(['payments.health_check.allowed_ips' => ['203.0.113.5']]);
     app()->forgetInstance('payments.config');
 
@@ -43,7 +46,7 @@ test('health endpoint allows a request from a whitelisted IP', function () {
     expect($response->getStatusCode())->toBe(200);
 });
 
-test('health endpoint rejects a request from a non-whitelisted IP', function () {
+test('health endpoint rejects a request from a non-whitelisted IP', function (): void {
     config(['payments.health_check.allowed_ips' => ['203.0.113.5']]);
     app()->forgetInstance('payments.config');
 
@@ -53,7 +56,7 @@ test('health endpoint rejects a request from a non-whitelisted IP', function () 
         ->and(json_decode($response->getContent(), true))->toBe(['error' => 'Unauthorized']);
 });
 
-test('health endpoint allows an IP inside an allowed CIDR range', function () {
+test('health endpoint allows an IP inside an allowed CIDR range', function (): void {
     config(['payments.health_check.allowed_ips' => ['203.0.113.0/24']]);
     app()->forgetInstance('payments.config');
 
@@ -62,7 +65,7 @@ test('health endpoint allows an IP inside an allowed CIDR range', function () {
     expect($response->getStatusCode())->toBe(200);
 });
 
-test('health endpoint rejects an IP outside an allowed CIDR range', function () {
+test('health endpoint rejects an IP outside an allowed CIDR range', function (): void {
     config(['payments.health_check.allowed_ips' => ['203.0.113.0/24']]);
     app()->forgetInstance('payments.config');
 
@@ -71,7 +74,7 @@ test('health endpoint rejects an IP outside an allowed CIDR range', function () 
     expect($response->getStatusCode())->toBe(403);
 });
 
-test('health endpoint authorizes via X-Health-Token header when bearer token is absent', function () {
+test('health endpoint authorizes via X-Health-Token header when bearer token is absent', function (): void {
     config([
         'payments.health_check.require_auth' => true,
         'payments.health_check.allowed_tokens' => ['header-token'],
@@ -83,7 +86,7 @@ test('health endpoint authorizes via X-Health-Token header when bearer token is 
     expect($response->getStatusCode())->toBe(200);
 });
 
-test('health endpoint authorizes via the token query string as a last resort', function () {
+test('health endpoint authorizes via the token query string as a last resort', function (): void {
     config([
         'payments.health_check.require_auth' => true,
         'payments.health_check.allowed_tokens' => ['query-token'],
@@ -95,7 +98,7 @@ test('health endpoint authorizes via the token query string as a last resort', f
     expect($response->getStatusCode())->toBe(200);
 });
 
-test('health endpoint rejects an invalid bearer token', function () {
+test('health endpoint rejects an invalid bearer token', function (): void {
     config([
         'payments.health_check.require_auth' => true,
         'payments.health_check.allowed_tokens' => ['the-real-token'],
@@ -108,7 +111,7 @@ test('health endpoint rejects an invalid bearer token', function () {
         ->and(json_decode($response->getContent(), true))->toBe(['error' => 'Unauthorized']);
 });
 
-test('health endpoint rejects a missing token when auth is required', function () {
+test('health endpoint rejects a missing token when auth is required', function (): void {
     config([
         'payments.health_check.require_auth' => true,
         'payments.health_check.allowed_tokens' => [],
@@ -130,7 +133,7 @@ function healthConfig(bool $requireAuth, array $ips = [], array $tokens = []): v
     app()->forgetInstance('payments.config');
 }
 
-test('with auth required, an allowed IP is enough when only an allowlist is configured', function () {
+test('with auth required, an allowed IP is enough when only an allowlist is configured', function (): void {
     // The docs say to set tokens or IPs. With IPs alone, the middleware used
     // to demand a token nobody could have configured, and refused everyone.
     healthConfig(true, ips: ['10.0.0.5']);
@@ -139,7 +142,7 @@ test('with auth required, an allowed IP is enough when only an allowlist is conf
         ->and(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.6'])->getStatusCode())->toBe(403);
 });
 
-test('with auth required and both configured, both are enforced', function () {
+test('with auth required and both configured, both are enforced', function (): void {
     healthConfig(true, ips: ['10.0.0.5'], tokens: ['health-secret']);
 
     expect(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.5'])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED)
@@ -147,13 +150,13 @@ test('with auth required and both configured, both are enforced', function () {
         ->and(makeHealthRequest(['REMOTE_ADDR' => '10.0.0.9', 'HTTP_AUTHORIZATION' => 'Bearer health-secret'])->getStatusCode())->toBe(403);
 });
 
-test('with auth required and nothing to authenticate against, every request is refused and the reason logged once', function () {
+test('with auth required and nothing to authenticate against, every request is refused and the reason logged once', function (): void {
     healthConfig(true);
-    Illuminate\Support\Facades\Cache::flush();
+    Cache::flush();
 
     $errors = [];
-    Illuminate\Support\Facades\Log::shouldReceive('channel')->andReturnSelf();
-    Illuminate\Support\Facades\Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$errors) {
+    Log::shouldReceive('channel')->andReturnSelf();
+    Log::shouldReceive('error')->andReturnUsing(function ($message) use (&$errors): true {
         $errors[] = $message;
 
         return true;
@@ -165,7 +168,7 @@ test('with auth required and nothing to authenticate against, every request is r
         ->and($errors[0])->toContain('requires authentication but has nothing to authenticate against');
 });
 
-test('the shipped default requires auth everywhere except local and testing', function (string $appEnv, bool $expected) {
+test('the shipped default requires auth everywhere except local and testing', function (string $appEnv, bool $expected): void {
     // An install that publishes config gets an explicit value it can see; one
     // that does not gets a closed endpoint in production, open only on a
     // developer's machine and in the test suite.
@@ -192,7 +195,7 @@ test('the shipped default requires auth everywhere except local and testing', fu
     'testing' => ['testing', false],
 ]);
 
-test('a token sent as an array is refused, not cast', function () {
+test('a token sent as an array is refused, not cast', function (): void {
     // ?token[]=x arrives as an array. Casting it to a string raised an
     // "Array to string conversion" warning, which Laravel turns into a 500.
     healthConfig(false, tokens: ['health-secret']);
@@ -200,7 +203,7 @@ test('a token sent as an array is refused, not cast', function () {
     expect(makeHealthRequest(query: ['token' => ['health-secret']])->getStatusCode())->toBe(HttpStatusCodes::UNAUTHORIZED);
 });
 
-test('a request with no resolvable address is refused by the allowlist, not crashed by it', function () {
+test('a request with no resolvable address is refused by the allowlist, not crashed by it', function (): void {
     healthConfig(false, ips: ['10.0.0.5']);
 
     $request = Request::create('/payments/health', 'GET');
@@ -212,7 +215,7 @@ test('a request with no resolvable address is refused by the allowlist, not cras
         ->and($response->getStatusCode())->toBe(403);
 });
 
-test('allowlist entries are trimmed, and empty ones ignored', function () {
+test('allowlist entries are trimmed, and empty ones ignored', function (): void {
     // PAYMENTS_HEALTH_CHECK_ALLOWED_IPS="203.0.113.5, 198.51.100.7," split into
     // " 198.51.100.7" and "", and the second address was refused.
     config([
@@ -225,7 +228,7 @@ test('allowlist entries are trimmed, and empty ones ignored', function () {
         ->and(makeHealthRequest(['REMOTE_ADDR' => '198.51.100.7'], ['X-Health-Token' => ''])->getStatusCode())->toBe(401);
 });
 
-test('an allowlist entry that is not a string is ignored, not a 500', function () {
+test('an allowlist entry that is not a string is ignored, not a 500', function (): void {
     // ipMatches() takes a string. A nested array in the list reached it as
     // one and raised a TypeError on every request.
     config([

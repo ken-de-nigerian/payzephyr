@@ -9,7 +9,7 @@ use KenDeNigerian\PayZephyr\Models\PaymentTraceEvent;
 use KenDeNigerian\PayZephyr\Services\Timeline;
 use KenDeNigerian\PayZephyr\Services\TraceTimelineBuilder;
 
-beforeEach(function () {
+beforeEach(function (): void {
     app()->forgetInstance('payments.config');
     config(['payments.features.trace' => true]);
 });
@@ -45,7 +45,7 @@ function timeline(): TraceTimelineBuilder
 // Building
 // ---------------------------------------------------------------------------
 
-test('a timeline returns every event recorded for its reference, oldest first', function () {
+test('a timeline returns every event recorded for its reference, oldest first', function (): void {
     traceRow(TraceEvent::PAYMENT_COMPLETED, at: '2026-08-21 12:01:10');
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:01:03');
     traceRow(TraceEvent::PROVIDER_REQUEST_SENT, at: '2026-08-21 12:01:04');
@@ -61,7 +61,7 @@ test('a timeline returns every event recorded for its reference, oldest first', 
         ]);
 });
 
-test('events recorded in the same millisecond keep their insertion order', function () {
+test('events recorded in the same millisecond keep their insertion order', function (): void {
     $first = traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:00:00.000');
     $second = traceRow(TraceEvent::PROVIDER_REQUEST_SENT, at: '2026-08-21 12:00:00.000');
 
@@ -69,14 +69,14 @@ test('events recorded in the same millisecond keep their insertion order', funct
         ->toBe([$first->id, $second->id]);
 });
 
-test('a timeline never picks up another payment\'s events', function () {
+test('a timeline never picks up another payment\'s events', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED);
     traceRow(TraceEvent::PAYMENT_FAILED, reference: 'PZ_1755000000_beefbeef');
 
     expect(timeline()->build('PZ_1755000000_abcdef01')->all())->toHaveCount(1);
 });
 
-test('a reference with nothing recorded produces an empty timeline rather than an error', function () {
+test('a reference with nothing recorded produces an empty timeline rather than an error', function (): void {
     $built = timeline()->build('PZ_1755000000_nothing1');
 
     expect($built->isEmpty())->toBeTrue()
@@ -92,7 +92,7 @@ test('a reference with nothing recorded produces an empty timeline rather than a
 // Reading a timeline
 // ---------------------------------------------------------------------------
 
-test('errors surfaces only the events worth investigating', function () {
+test('errors surfaces only the events worth investigating', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED);
     traceRow(TraceEvent::PROVIDER_TIMEOUT, provider: 'paystack');
     traceRow(TraceEvent::PROVIDER_RESPONSE_RECEIVED, provider: 'stripe');
@@ -107,7 +107,7 @@ test('errors surfaces only the events worth investigating', function () {
         ]);
 });
 
-test('forProvider narrows a fallback chain down to one provider\'s attempt', function () {
+test('forProvider narrows a fallback chain down to one provider\'s attempt', function (): void {
     traceRow(TraceEvent::PROVIDER_REQUEST_SENT, provider: 'paystack');
     traceRow(TraceEvent::PROVIDER_TIMEOUT, provider: 'paystack');
     traceRow(TraceEvent::PROVIDER_REQUEST_SENT, provider: 'stripe');
@@ -119,7 +119,7 @@ test('forProvider narrows a fallback chain down to one provider\'s attempt', fun
         ->and($built->forProvider('mollie'))->toHaveCount(0);
 });
 
-test('the terminal event is the first one that ended the payment', function () {
+test('the terminal event is the first one that ended the payment', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:00:00');
     traceRow(TraceEvent::PAYMENT_COMPLETED, at: '2026-08-21 12:00:05');
 
@@ -130,7 +130,7 @@ test('the terminal event is the first one that ended the payment', function () {
         ->and($built->failed())->toBeFalse();
 });
 
-test('a failed payment reads as failed rather than merely not succeeded', function () {
+test('a failed payment reads as failed rather than merely not succeeded', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:00:00');
     traceRow(TraceEvent::PAYMENT_FAILED, at: '2026-08-21 12:00:05');
 
@@ -140,7 +140,7 @@ test('a failed payment reads as failed rather than merely not succeeded', functi
         ->and($built->succeeded())->toBeFalse();
 });
 
-test('a payment still in flight has no terminal event and is neither succeeded nor failed', function () {
+test('a payment still in flight has no terminal event and is neither succeeded nor failed', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED);
     traceRow(TraceEvent::PROVIDER_REQUEST_SENT, provider: 'stripe');
 
@@ -151,20 +151,20 @@ test('a payment still in flight has no terminal event and is neither succeeded n
         ->and($built->failed())->toBeFalse();
 });
 
-test('duration measures first recorded event to last', function () {
+test('duration measures first recorded event to last', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:01:03.123');
     traceRow(TraceEvent::PAYMENT_COMPLETED, at: '2026-08-21 12:01:10.567');
 
     expect(timeline()->build('PZ_1755000000_abcdef01')->duration())->toBe(7444);
 });
 
-test('duration is zero, not negative, for a single recorded event', function () {
+test('duration is zero, not negative, for a single recorded event', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:01:03.123');
 
     expect(timeline()->build('PZ_1755000000_abcdef01')->duration())->toBe(0);
 });
 
-test('duration is null when timestamps are missing', function () {
+test('duration is null when timestamps are missing', function (): void {
     $row = new PaymentTraceEvent([
         'reference' => 'PZ_1755000000_abcdef01',
         'event' => TraceEvent::PAYMENT_INITIATED,
@@ -180,7 +180,7 @@ test('duration is null when timestamps are missing', function () {
 // Rendering
 // ---------------------------------------------------------------------------
 
-test('a single event renders with its time, direction icon and provider', function () {
+test('a single event renders with its time, direction icon and provider', function (): void {
     $row = traceRow(
         TraceEvent::PROVIDER_REQUEST_SENT,
         provider: 'stripe',
@@ -194,7 +194,7 @@ test('a single event renders with its time, direction icon and provider', functi
         ->and($row->isTerminal())->toBeFalse();
 });
 
-test('an event with no provider and no timestamp still renders', function () {
+test('an event with no provider and no timestamp still renders', function (): void {
     $row = new PaymentTraceEvent([
         'reference' => 'PZ_1755000000_abcdef01',
         'event' => TraceEvent::PAYMENT_INITIATED,
@@ -204,14 +204,14 @@ test('an event with no provider and no timestamp still renders', function () {
     expect($row->formatForTimeline())->toBe('--:--:--.--- • payment.initiated');
 });
 
-test('a terminal error event reports itself as both', function () {
+test('a terminal error event reports itself as both', function (): void {
     $row = traceRow(TraceEvent::PAYMENT_FAILED);
 
     expect($row->isError())->toBeTrue()
         ->and($row->isTerminal())->toBeTrue();
 });
 
-test('toText renders the whole timeline with a summary', function () {
+test('toText renders the whole timeline with a summary', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:01:03.000');
     traceRow(TraceEvent::PROVIDER_TIMEOUT, provider: 'paystack', at: '2026-08-21 12:01:05.000');
     traceRow(TraceEvent::PAYMENT_COMPLETED, at: '2026-08-21 12:01:08.000');
@@ -227,12 +227,12 @@ test('toText renders the whole timeline with a summary', function () {
         ->and($text)->toContain('- Status: payment.completed');
 });
 
-test('toText says so plainly when nothing was recorded', function () {
+test('toText says so plainly when nothing was recorded', function (): void {
     expect(timeline()->build('PZ_1755000000_nothing1')->toText())
         ->toBe('No trace events recorded for reference: PZ_1755000000_nothing1');
 });
 
-test('toText reports an unfinished payment as incomplete rather than failed', function () {
+test('toText reports an unfinished payment as incomplete rather than failed', function (): void {
     traceRow(TraceEvent::PAYMENT_INITIATED, at: '2026-08-21 12:01:03.000');
 
     expect(timeline()->build('PZ_1755000000_abcdef01')->toText())

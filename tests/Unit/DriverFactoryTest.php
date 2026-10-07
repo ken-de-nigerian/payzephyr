@@ -128,16 +128,14 @@ test('each bundled driver resolves by name to its exact class', function (string
     ['stripe', \KenDeNigerian\PayZephyr\Drivers\StripeDriver::class],
 ]);
 
-test('a name written in words resolves to the driver class those words spell', function (string $name, string $class) {
-    // Not one of the bundled names, so it reaches the naming convention:
-    // each word capitalised, joined, and "Driver" appended.
+test('a name the bundled drivers do not use is not turned into a class name', function (string $name) {
+    // These used to be spelled into PayPalDriver, OPayDriver and AbstractDriver.
+    $factory = new DriverFactory;
     $resolve = (new ReflectionClass(DriverFactory::class))->getMethod('resolveDriverClass');
 
-    expect($resolve->invoke(new DriverFactory, $name))->toBe($class);
-})->with([
-    ['pay-pal', \KenDeNigerian\PayZephyr\Drivers\PayPalDriver::class],
-    ['o_pay', \KenDeNigerian\PayZephyr\Drivers\OPayDriver::class],
-]);
+    expect($resolve->invoke($factory, $name))->toBe($name)
+        ->and(fn () => $factory->create($name, []))->toThrow(DriverNotFoundException::class, "Driver class [$name] not found for driver [$name]");
+})->with(['pay-pal', 'o_pay', 'abstract']);
 
 test('an abstract driver class is refused, by name or when registered, before PHP is asked to create it', function () {
     // AbstractDriver implements DriverInterface, so only instantiability

@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Removed
+
+- **`DriverFactory` no longer spells a driver name into a class name.** Behind the list of
+  bundled drivers, a name such as `pay-pal` or `o_pay` was capitalised word by word into
+  `PayPalDriver` or `OPayDriver`, and `abstract` into `AbstractDriver`. Only classes in this
+  package's `Drivers` namespace could be reached that way, so it made aliases of bundled
+  drivers and nothing else. Use the bundled names (`paypal`, `opay`), or `register()` /
+  `driver_class` for a driver of your own.
+
 ### Fixed
 
 - **An abstract driver class failed with a raw PHP `Error`.** `AbstractDriver` implements

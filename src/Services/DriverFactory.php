@@ -31,6 +31,11 @@ final class DriverFactory
      * autoloader looks for PaypalDriver.php, which does not exist, and a
      * config without driver_class failed to resolve the driver.
      *
+     * The same name-mangling stayed behind this map as a fallback, where it
+     * only made aliases - "pay-pal", "o_pay", "abstract" - of classes the map
+     * already names, or of AbstractDriver. A driver of your own is resolved
+     * through register() or the provider's driver_class.
+     *
      * @var array<string, class-string<DriverInterface>>
      */
     private const BUNDLED = [
@@ -84,18 +89,9 @@ final class DriverFactory
             return $configDriver;
         }
 
-        if (isset(self::BUNDLED[strtolower($name)])) {
-            return self::BUNDLED[strtolower($name)];
-        }
-
-        $className = str_replace(' ', '', ucwords(str_replace(['-', '_'], ' ', $name)));
-        $fqcn = 'KenDeNigerian\PayZephyr\Drivers\\'.$className.'Driver';
-
-        if (class_exists($fqcn)) {
-            return $fqcn;
-        }
-
-        return $name;
+        // A name no bundled driver uses is taken as a class name, and create()
+        // says if it is not one.
+        return self::BUNDLED[strtolower($name)] ?? $name;
     }
 
     /**

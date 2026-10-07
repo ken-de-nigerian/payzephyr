@@ -45,9 +45,12 @@ jobs:
       # whitelists exactly what the tool structurally cannot see, enumerated
       # rather than wildcarded: adding a new Illuminate class means editing that
       # file, which is when someone should notice the framework coupling grew.
+      # The checker is pinned: a release that reads symbols differently would
+      # otherwise fail this job on a commit that changed nothing. Raise the pin
+      # on purpose, after running the new version here.
       - name: Check for undeclared dependencies
         run: |
-          composer global require --no-interaction maglnet/composer-require-checker
+          composer global require --no-interaction maglnet/composer-require-checker:4.24.0
           "$(composer global config home)/vendor/bin/composer-require-checker" check             --config-file=composer-require-checker.json composer.json
 
       # The provider list and capability matrix are generated from src/Drivers.

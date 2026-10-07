@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Nothing yet.
 
 ---
+## [5.0.3] - 2026-10-07
+
+### Changed
+
+- **PayPal's OAuth token request no longer sets `Content-Type` itself.** It sends its body as
+  form fields, and Guzzle sets `application/x-www-form-urlencoded` for those on its own, so the
+  request PayPal receives is unchanged. The explicit header was a change no test could observe,
+  and it failed the mutation gate.
+
+---
 ## [5.0.2] - 2026-10-06
 
 ### Fixed

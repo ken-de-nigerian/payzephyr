@@ -17,6 +17,7 @@ use KenDeNigerian\PayZephyr\Drivers\SquareDriver;
 use KenDeNigerian\PayZephyr\Drivers\StripeDriver;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Support\PackageConfig;
+use ReflectionClass;
 
 final class DriverFactory
 {
@@ -65,6 +66,10 @@ final class DriverFactory
             throw new DriverNotFoundException("Driver class [$class] must implement DriverInterface");
         }
 
+        if (! (new ReflectionClass($class))->isInstantiable()) {
+            throw new DriverNotFoundException("Driver class [$class] for driver [$name] is abstract and cannot be created");
+        }
+
         return new $class($config);
     }
 
@@ -104,6 +109,10 @@ final class DriverFactory
 
         if (! is_subclass_of($class, DriverInterface::class)) {
             throw new DriverNotFoundException("Cannot register driver [$name]: class [$class] must implement DriverInterface");
+        }
+
+        if (! (new ReflectionClass($class))->isInstantiable()) {
+            throw new DriverNotFoundException("Cannot register driver [$name]: class [$class] is abstract and cannot be created");
         }
 
         $this->drivers[$name] = $class;

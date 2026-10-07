@@ -8,7 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **An abstract driver class failed with a raw PHP `Error`.** `AbstractDriver` implements
+  `DriverInterface`, so a provider whose name or `driver_class` led to it passed both of
+  `DriverFactory`'s checks, and PHP then refused to instantiate it. `create()` and `register()`
+  now throw `DriverNotFoundException` for a class that cannot be instantiated.
 
 ---
 ## [5.0.3] - 2026-10-07

@@ -1,5 +1,6 @@
 <?php
 
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Drivers\PaystackDriver;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;
 use KenDeNigerian\PayZephyr\Services\DriverFactory;
@@ -137,3 +138,17 @@ test('a name written in words resolves to the driver class those words spell', f
     ['pay-pal', \KenDeNigerian\PayZephyr\Drivers\PayPalDriver::class],
     ['o_pay', \KenDeNigerian\PayZephyr\Drivers\OPayDriver::class],
 ]);
+
+test('an abstract driver class is refused, by name or when registered, before PHP is asked to create it', function () {
+    // AbstractDriver implements DriverInterface, so only instantiability
+    // tells it apart from a driver; creating it used to throw a raw Error.
+    $factory = new DriverFactory;
+
+    expect(fn () => $factory->create(AbstractDriver::class, []))->toThrow(
+        DriverNotFoundException::class,
+        'Driver class ['.AbstractDriver::class.'] for driver ['.AbstractDriver::class.'] is abstract and cannot be created'
+    )->and(fn () => $factory->register('half', AbstractDriver::class))->toThrow(
+        DriverNotFoundException::class,
+        'Cannot register driver [half]: class ['.AbstractDriver::class.'] is abstract and cannot be created'
+    )->and($factory->getRegisteredDrivers())->toBe([]);
+});

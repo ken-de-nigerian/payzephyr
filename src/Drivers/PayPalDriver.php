@@ -131,11 +131,10 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
 
         try {
             $credentials = base64_encode($this->settings()->string('client_id').':'.$this->settings()->string('client_secret'));
+            // Guzzle sends form_params as application/x-www-form-urlencoded and
+            // sets that Content-Type itself.
             $response = $this->makeRequest('POST', '/v1/oauth2/token', [
-                'headers' => [
-                    'Authorization' => 'Basic '.$credentials,
-                    'Content-Type' => 'application/x-www-form-urlencoded',
-                ],
+                'headers' => ['Authorization' => 'Basic '.$credentials],
                 'form_params' => ['grant_type' => 'client_credentials'],
             ]);
 

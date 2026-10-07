@@ -128,9 +128,18 @@ test('stripe verify falls back to matching checkout session by client_reference_
         public function __construct(public object $sessions) {}
     };
 
-    $stripeMock = new class($checkoutService)
+    // The search, tried first, finds nothing.
+    $paymentIntents = new class
     {
-        public function __construct(public object $checkout) {}
+        public function search(): object
+        {
+            return (object) ['data' => []];
+        }
+    };
+
+    $stripeMock = new class($paymentIntents, $checkoutService)
+    {
+        public function __construct(public object $paymentIntents, public object $checkout) {}
     };
 
     $driver = stripeGapsDriverWithMock($stripeMock);

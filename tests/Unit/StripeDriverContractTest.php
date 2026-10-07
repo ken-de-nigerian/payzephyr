@@ -264,13 +264,37 @@ function stripeSessionPage(array $sessions, bool $hasMore = false): object
     return (object) ['data' => $sessions, 'has_more' => $hasMore];
 }
 
-test('a reference is looked for among recent sessions a page of 100 at a time, then fetched with its payment intent', function () {
-    [$driver, $stripe] = stripeContractDriver(['sessions' => [
-        'all' => fn (array $params) => isset($params['starting_after'])
-            ? stripeSessionPage([stripeSession(['id' => 'cs_match']), stripeSession(['id' => 'cs_older'])])
-            : stripeSessionPage([Session::constructFrom(['id' => 'cs_unnamed']), stripeSession(['id' => 'cs_other', 'client_reference_id' => 'other'])], true),
-        'retrieve' => fn (string $id) => stripeSession(['id' => $id]),
-    ]]);
+/** A search that finds nothing, as Stripe answers it. */
+function stripeNoIntents(): array
+{
+    return ['search' => (object) ['data' => []]];
+}
+
+test('a reference is searched for in payment intent metadata first, quotes escaped, and no session is read when it is found', function () {
+    [$driver, $stripe] = stripeContractDriver([
+        'paymentIntents' => ['search' => (object) ['data' => [stripeIntent(['id' => 'pi_match', 'metadata' => ['reference' => "O'Brien\\1"]]), stripeIntent(['id' => 'pi_second'])]]],
+    ]);
+
+    $result = $driver->verify("O'Brien\\1");
+
+    expect($result->reference)->toBe("O'Brien\\1")
+        ->and($stripe['paymentIntents']->calls)->toBe([['search', [[
+            'query' => "metadata['reference']:'O\\'Brien\\\\1'",
+            'limit' => 1,
+        ]]]])
+        ->and($stripe['sessions']->calls)->toBe([]);
+});
+
+test('a reference the search does not find is looked for among recent sessions a page of 100 at a time, then fetched with its payment intent', function () {
+    [$driver, $stripe] = stripeContractDriver([
+        'paymentIntents' => stripeNoIntents(),
+        'sessions' => [
+            'all' => fn (array $params) => isset($params['starting_after'])
+                ? stripeSessionPage([stripeSession(['id' => 'cs_match']), stripeSession(['id' => 'cs_older'])])
+                : stripeSessionPage([Session::constructFrom(['id' => 'cs_unnamed']), stripeSession(['id' => 'cs_other', 'client_reference_id' => 'other'])], true),
+            'retrieve' => fn (string $id) => stripeSession(['id' => $id]),
+        ],
+    ]);
 
     $driver->verify('STRIPE_1');
 
@@ -283,14 +307,12 @@ test('a reference is looked for among recent sessions a page of 100 at a time, t
 
 test('the sessions read stop at verify_search_pages pages, ten unless set, and never fewer than one', function (array $config, int $pages) {
     [$driver, $stripe] = stripeContractDriver([
+        'paymentIntents' => stripeNoIntents(),
         'sessions' => ['all' => stripeSessionPage([stripeSession(['id' => 'cs_other', 'client_reference_id' => 'other'])], true)],
-        'paymentIntents' => ['search' => (object) ['data' => [stripeIntent()]]],
     ], $config);
 
-    $driver->verify('STRIPE_PI');
-
-    expect($stripe['sessions']->calls)->toHaveCount($pages)
-        ->and($stripe['paymentIntents']->calls)->toHaveCount(1);
+    expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, "among the $pages most recent")
+        ->and($stripe['sessions']->calls)->toHaveCount($pages);
 })->with([
     'unset' => [[], 10],
     'two' => [['verify_search_pages' => 2], 2],
@@ -299,42 +321,44 @@ test('the sessions read stop at verify_search_pages pages, ten unless set, and n
 
 test('an empty page ends the sessions read even if Stripe says there are more', function () {
     [$driver, $stripe] = stripeContractDriver([
+        'paymentIntents' => stripeNoIntents(),
         'sessions' => ['all' => stripeSessionPage([], true)],
-        'paymentIntents' => ['search' => (object) ['data' => [stripeIntent()]]],
     ]);
 
-    $driver->verify('STRIPE_PI');
-
-    expect($stripe['sessions']->calls)->toBe([['all', [['limit' => 100]]]]);
+    expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(VerificationException::class, 'among the 0 most recent')
+        ->and($stripe['sessions']->calls)->toBe([['all', [['limit' => 100]]]]);
 });
 
-test('a reference no recent session names is searched for in payment intent metadata, quotes escaped', function () {
+test('where Stripe refuses the search, the sessions are read alone, and the refusal is logged', function () {
+    $logs = captureLogs();
     [$driver, $stripe] = stripeContractDriver([
-        'sessions' => ['all' => stripeSessionPage([stripeSession(['client_reference_id' => 'other'])])],
-        'paymentIntents' => ['search' => (object) ['data' => [stripeIntent(['id' => 'pi_match', 'metadata' => ['reference' => "O'Brien\\1"]]), stripeIntent(['id' => 'pi_second'])]]],
+        'paymentIntents' => ['search' => InvalidRequestException::factory('Search is not available in your region')],
+        'sessions' => [
+            'all' => stripeSessionPage([stripeSession(['id' => 'cs_match'])]),
+            'retrieve' => fn (string $id) => stripeSession(['id' => $id]),
+        ],
     ]);
 
-    $result = $driver->verify("O'Brien\\1");
-
-    expect($result->reference)->toBe("O'Brien\\1")
-        ->and($stripe['paymentIntents']->calls)->toBe([['search', [[
-            'query' => "metadata['reference']:'O\\'Brien\\\\1'",
-            'limit' => 1,
-        ]]]]);
+    expect($driver->verify('STRIPE_1')->reference)->toBe('STRIPE_1')
+        ->and($stripe['sessions']->calls[1])->toBe(['retrieve', ['cs_match', ['expand' => ['payment_intent']]]])
+        ->and(loggedEntry($logs, 'Stripe payment intent search unavailable; reading checkout sessions only'))->toMatchArray([
+            'level' => 'warning',
+            'context' => ['reference' => 'STRIPE_1', 'error' => 'Search is not available in your region'],
+        ]);
 });
 
-test('a reference nothing names is not found, saying how far the search went, and a lookup that fails is wrapped, coded 0', function () {
+test('a reference nothing names is not found, saying what was tried, and a lookup that fails is wrapped, coded 0', function (array $search, string $tried) {
     [$driver] = stripeContractDriver([
+        'paymentIntents' => $search,
         'sessions' => ['all' => fn (array $params) => isset($params['starting_after'])
             ? stripeSessionPage([stripeSession(['id' => 'cs_3', 'client_reference_id' => 'c'])])
             : stripeSessionPage([stripeSession(['id' => 'cs_1', 'client_reference_id' => 'a']), stripeSession(['id' => 'cs_2', 'client_reference_id' => 'b'])], true)],
-        'paymentIntents' => ['search' => (object) ['data' => []]],
     ]);
     [$failing] = stripeContractDriver(['paymentIntents' => ['retrieve' => ApiConnectionException::factory('Stripe is down')]]);
 
     expect(fn () => $driver->verify('STRIPE_GONE'))->toThrow(
         VerificationException::class,
-        'Payment not found for reference [STRIPE_GONE] among the 3 most recent Stripe checkout sessions, or by searching payment intents. '.
+        "Payment not found for reference [STRIPE_GONE] by searching payment intents$tried or among the 3 most recent Stripe checkout sessions. ".
         "Stripe's search can trail a new payment by a minute; verify with the cs_ or pi_ id to read it directly."
     );
 
@@ -344,7 +368,10 @@ test('a reference nothing names is not found, saying how far the search went, an
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Stripe verification failed: Stripe is down')->and($e->getCode())->toBe(0);
     }
-});
+})->with([
+    'searched' => [['search' => (object) ['data' => []]], ''],
+    'search refused' => [['search' => InvalidRequestException::factory('No search here')], ' (unavailable: No search here)'],
+]);
 
 // ---------------------------------------------------------------------------
 // Webhooks, health, extraction

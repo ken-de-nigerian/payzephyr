@@ -345,18 +345,41 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      * payment intents, so a payment that was not among the last few on the
      * account could not be verified by reference.
      *
-     * Recent checkout sessions are read first, newest first, a page of 100 at
-     * a time up to verify_search_pages (ten by default): that finds a session
-     * the customer has not paid yet, which has no payment intent. Then the
-     * payment intents are searched for the reference charge() copies into
-     * their metadata, which covers the account's whole history. Stripe's
-     * search index trails new payments by up to a minute; the sessions read
-     * first cover that gap.
+     * Payment intents are searched first for the reference charge() copies
+     * into their metadata: one call, covering the account's whole history.
+     * When that finds nothing, recent checkout sessions are read, newest
+     * first, a page of 100 at a time up to verify_search_pages (ten by
+     * default). They find what the search cannot: a session the customer has
+     * not paid yet, a payment the search index has not caught up with (it
+     * trails by up to a minute), and a payment taken before charge() copied
+     * the reference. Where Stripe's search is unavailable - it is not offered
+     * to businesses in India - the sessions are read alone.
      *
      * @throws VerificationException
      */
     private function findByReference(string $reference): VerificationResponseDTO
     {
+        try {
+            $intents = $this->stripe->paymentIntents->search([
+                // Search strings are single-quoted; a quote or backslash in the
+                // reference is escaped so it cannot end the string early.
+                'query' => "metadata['reference']:'".addcslashes($reference, "'\\")."'",
+                'limit' => 1,
+            ])->data;
+            $searchFailure = null;
+        } catch (ApiErrorException $e) {
+            $this->log('warning', 'Stripe payment intent search unavailable; reading checkout sessions only', [
+                'reference' => $reference,
+                'error' => $e->getMessage(),
+            ]);
+            $intents = [];
+            $searchFailure = $e->getMessage();
+        }
+
+        if ($intents !== []) {
+            return $this->mapFromPaymentIntent($intents[0]);
+        }
+
         $maxPages = max(1, $this->settings()->int('verify_search_pages') ?? 10);
         $params = ['limit' => 100];
         $searched = 0;
@@ -380,21 +403,11 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
             $params['starting_after'] = $sessions->data[count($sessions->data) - 1]->id;
         }
 
-        $intents = $this->stripe->paymentIntents->search([
-            // Search strings are single-quoted; a quote or backslash in the
-            // reference is escaped so it cannot end the string early.
-            'query' => "metadata['reference']:'".addcslashes($reference, "'\\")."'",
-            'limit' => 1,
-        ])->data;
-
-        if ($intents !== []) {
-            return $this->mapFromPaymentIntent($intents[0]);
-        }
-
         throw new VerificationException(
-            "Payment not found for reference [$reference] among the $searched most recent Stripe checkout sessions, ".
-            'or by searching payment intents. Stripe\'s search can trail a new payment by a minute; '.
-            'verify with the cs_ or pi_ id to read it directly.'
+            "Payment not found for reference [$reference] by searching payment intents".
+            ($searchFailure === null ? '' : " (unavailable: $searchFailure)").
+            " or among the $searched most recent Stripe checkout sessions. ".
+            "Stripe's search can trail a new payment by a minute; verify with the cs_ or pi_ id to read it directly."
         );
     }
 

@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Changed
+
+- **Stripe searches for a reference before reading checkout sessions.** 5.0.2 read up to ten
+  pages of sessions first and searched payment intents only when they held no match, so a
+  payment that was not recent cost eleven calls to Stripe. The search now comes first and
+  usually answers in one; the sessions are read when it finds nothing - an unpaid session, a
+  payment newer than Stripe's search index, or one taken before 5.0.2. Where the search is
+  unavailable (Stripe does not offer it to businesses in India), it is logged as a warning
+  and the sessions are read alone; before, the refusal failed the whole verification.
+
 ### Removed
 
 - **`DriverFactory` no longer spells a driver name into a class name.** Behind the list of

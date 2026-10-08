@@ -62,7 +62,7 @@ abstract class TestCase extends Orchestra
             }
 
             // Start from the skeleton's .env, as the tests always have.
-            $skeletonEnv = dirname(__DIR__).'/vendor/orchestra/testbench-core/laravel/.env';
+            $skeletonEnv = __DIR__.'/../vendor/orchestra/testbench-core/laravel/.env';
             if (! file_exists($path.'/.env') && file_exists($skeletonEnv)) {
                 copy($skeletonEnv, $path.'/.env');
             }

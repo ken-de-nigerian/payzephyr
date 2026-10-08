@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\Exceptions\DriverNotFoundException;

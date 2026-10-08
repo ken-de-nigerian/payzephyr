@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.1.0] - 2026-10-08
+
 ### Added
 
 - **`AbstractDriver::clientOptions()`**, the options the HTTP client is built with: default

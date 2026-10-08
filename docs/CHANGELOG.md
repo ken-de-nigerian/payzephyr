@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Nothing yet.
 
 ---
+## [5.1.1] - 2026-10-08
+
+### Changed
+
+- **Tests only: the Static Analysis job passes again.** Rector, run on Linux as CI runs it, adds
+  `declare(strict_types=1)` to five test files and rewrites one path in `tests/TestCase.php`;
+  the same Rector on Windows proposed neither change, so 5.1.0 shipped with that job failing.
+  Nothing the package ships changes.
+
+---
 ## [5.1.0] - 2026-10-08
 
 ### Added

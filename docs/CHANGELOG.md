@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+### Added
+
+- **`AbstractDriver::clientOptions()`**, the options the HTTP client is built with: default
+  headers, TLS verification, the timeout (30 seconds unless `timeout` is configured) and the
+  base URL. A driver can override it to change one option without rewriting
+  `initializeClient()`. The base URL is now set only when `base_url` is configured, which
+  sends the same requests as the empty base URL it used before.
+
 ### Changed
 
 - **Stripe searches for a reference before reading checkout sessions.** 5.0.2 read up to ten

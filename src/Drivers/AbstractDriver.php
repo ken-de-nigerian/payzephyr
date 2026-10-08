@@ -136,12 +136,29 @@ abstract class AbstractDriver implements DriverInterface
      */
     protected function initializeClient(): void
     {
-        $this->client = new Client([
-            'base_uri' => $this->config['base_url'] ?? '',
+        $this->client = new Client($this->clientOptions());
+    }
+
+    /**
+     * What the HTTP client is built with: the provider's default headers, TLS
+     * verification, a timeout (30 seconds unless configured), and the base URL
+     * when one is configured - without one, a request's URI is used as given.
+     *
+     * @return array<string, mixed>
+     */
+    protected function clientOptions(): array
+    {
+        $options = [
             'timeout' => $this->config['timeout'] ?? 30,
             'verify' => true,
             'headers' => $this->getDefaultHeaders(),
-        ]);
+        ];
+
+        if (isset($this->config['base_url'])) {
+            $options['base_uri'] = $this->config['base_url'];
+        }
+
+        return $options;
     }
 
     /**
@@ -182,7 +199,8 @@ abstract class AbstractDriver implements DriverInterface
         }
 
         $reference = $this->traceReference ?? $this->currentRequest?->reference;
-        $traceable = $reference !== null && $reference !== '';
+        // An empty reference reaches trace(), which drops it, as it does any step without one.
+        $traceable = $reference !== null;
         $withBodies = $traceable && $this->traceRecordsHttpBodies();
 
         $startedAt = $this->nowInMilliseconds();

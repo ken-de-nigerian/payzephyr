@@ -150,6 +150,27 @@ test('a failed request is recorded and logged by what failed, and raised with wh
     'transfer failure' => [new TransferException('Too many redirects'), TraceEvent::PROVIDER_EXCEPTION, 'transfer_error'],
 ]);
 
+test('the HTTP client is built with the default headers, TLS verification, the configured timeout and base URL', function (array $config, array $expected): void {
+    $driver = new PaystackDriver($config + ['secret_key' => 'sk_test_xxx', 'currencies' => ['NGN']]);
+
+    $headers = ['Authorization' => 'Bearer sk_test_xxx', 'Content-Type' => 'application/json', 'Accept' => 'application/json'];
+
+    expect(callDriver($driver, 'clientOptions'))->toBe(['timeout' => $expected['timeout'], 'verify' => true, 'headers' => $headers] + $expected);
+})->with([
+    'configured' => [['base_url' => 'https://api.paystack.co/', 'timeout' => 5], ['timeout' => 5, 'base_uri' => 'https://api.paystack.co/']],
+    'unconfigured: thirty seconds, and no base URL' => [[], ['timeout' => 30]],
+]);
+
+test('a driver logs unless logging is switched off: an unset switch means on', function (): void {
+    config(['payments.logging' => []]);
+    app()->forgetInstance('payments.config');
+    $logs = captureLogs();
+
+    callDriver(driverWith([]), 'log', 'info', 'Something happened', ['step' => 1]);
+
+    expect(loggedEntry($logs, '[paystack] Something happened')['context'])->toBe(['step' => 1]);
+});
+
 // ---------------------------------------------------------------------------
 // Reading a response
 // ---------------------------------------------------------------------------
@@ -264,4 +285,13 @@ test('a required credential that is missing fails rather than reading as an empt
 
     expect(fn (): mixed => callDriver($driver, 'requiredCredential', 'secret_key'))
         ->toThrow(InvalidConfigurationException::class, '[paystack] secret_key is not configured.');
+});
+
+test('a request whose trace reference is empty is not recorded', function (): void {
+    $driver = driverWith([new Response(200, [], '{"status":true}')]);
+    $driver->setTraceContext('');
+
+    callDriver($driver, 'makeRequest', 'GET', '/bank');
+
+    expect(PaymentTraceEvent::count())->toBe(0);
 });

@@ -19,7 +19,20 @@ declare(strict_types=1);
  * This collapses a filter that long to the covering test classes - more tests
  * than needed, never fewer - so every mutation is tried against what covers
  * it. It also lets the plugin accept absolute Windows paths, which it treats
- * as relative and doubles. Run by `composer mutation` before Pest; it changes
+ * as relative and doubles.
+ *
+ * And it gives each mutation time to run its tests. The plugin stops a
+ * mutation's tests once they have run 20% longer than the whole suite took
+ * at the start, and counts that mutation as caught. But the suite's time is
+ * measured with --parallel, and a mutation's tests run in one process, so a
+ * line that hundreds of tests cover - the HTTP client's options, a log call -
+ * ran out of time before its tests finished, and was counted as caught
+ * whether or not any of them failed. The limit is six times the suite's time
+ * now: room for the whole suite in one process while other mutations run
+ * beside it. A mutation that really never ends, such as a loop whose break
+ * became continue, still times out, later.
+ *
+ * Run by `composer mutation` before Pest; it changes
  * nothing when the plugin is already patched, and fails loudly when the
  * plugin's code no longer looks as expected, rather than letting the gate
  * run unpatched.
@@ -28,8 +41,10 @@ declare(strict_types=1);
 $root = dirname(__DIR__).'/vendor/pestphp/pest-plugin-mutate/src';
 $marker = '// payzephyr: filters collapsed to classes when too long to compile';
 
+/** @var list<array{0: string, 1: string, 2: string}> $patches file, search, replace */
 $patches = [
-    $root.'/MutationTest.php' => [
+    [
+        $root.'/MutationTest.php',
         "        \$filters = array_unique(\$filters);\n",
         "        \$filters = array_unique(\$filters);\n"
         ."        $marker\n"
@@ -37,13 +52,20 @@ $patches = [
         ."            \$filters = array_values(array_unique(array_map(fn (string \$filter): string => explode('::', \$filter)[0].'::', \$filters)));\n"
         ."        }\n",
     ],
-    $root.'/Support/FileFinder.php' => [
+    [
+        $root.'/MutationTest.php',
+        "        return (int) (\$initialTestSuiteDuration + max(5, \$initialTestSuiteDuration * 0.2));\n",
+        "        // payzephyr: the suite's time was measured in parallel; a mutation's tests run in one process\n"
+        ."        return (int) (\$initialTestSuiteDuration * 6 + 5);\n",
+    ],
+    [
+        $root.'/Support/FileFinder.php',
         'if (! str_starts_with($path, DIRECTORY_SEPARATOR)) {',
         'if (! str_starts_with($path, DIRECTORY_SEPARATOR) && ! file_exists($path)) {',
     ],
 ];
 
-foreach ($patches as $file => [$search, $replace]) {
+foreach ($patches as [$file, $search, $replace]) {
     $source = @file_get_contents($file);
 
     if ($source === false) {

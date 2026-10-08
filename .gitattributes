@@ -1,4 +1,6 @@
-* text=auto
+# LF everywhere, Windows checkouts included: Pint rejects CRLF, and a mix of
+# both in one working copy made style checks pass or fail by machine.
+* text=auto eol=lf
 
 # Exclude from export (composer package)
 /.github export-ignore

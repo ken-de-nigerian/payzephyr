@@ -119,7 +119,7 @@ final class HealthEndpointMiddleware
         $allowed = false;
 
         foreach ($allowedTokens as $candidate) {
-            if (hash_equals((string) $candidate, $token)) {
+            if (hash_equals($candidate, $token)) {
                 $allowed = true;
             }
         }

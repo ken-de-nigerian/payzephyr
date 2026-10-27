@@ -31,6 +31,8 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
     /**
      * Make sure the Paystack secret key is configured.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {
@@ -194,6 +196,8 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
      */
     /**
      * Validate webhook with timestamp check
+     *
+     * @throws InvalidConfigurationException
      */
     public function validateWebhook(array $headers, string $body): bool
     {
@@ -265,7 +269,7 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
 
             $clientException = null;
             $current = $e;
-            while ($current instanceof \Throwable) {
+            while ($current instanceof Throwable) {
                 if ($current instanceof ClientException) {
                     $clientException = $current;
                     break;

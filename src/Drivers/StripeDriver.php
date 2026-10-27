@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Drivers;
 
+use JsonException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
@@ -45,6 +46,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
     /**
      * Ensure the configuration contains the Secret Key.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {
@@ -55,6 +58,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
     /**
      * Initialize the native Stripe SDK client using the config secret.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function initializeClient(): void
     {
@@ -356,6 +361,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      * to businesses in India - the sessions are read alone.
      *
      * @throws VerificationException
+     * @throws ApiErrorException
+     * @throws ChargeException
      */
     private function findByReference(string $reference): VerificationResponseDTO
     {
@@ -413,6 +420,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
 
     /**
      * @param  Session  $session
+     *
+     * @throws ChargeException
      */
     private function mapFromCheckoutSession(object $session): VerificationResponseDTO
     {
@@ -481,6 +490,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      *
      * @param  array<array-key, mixed>  $metadata
      * @return array<string, string>
+     *
+     * @throws JsonException
      */
     private function stripeMetadata(array $metadata): array
     {
@@ -509,6 +520,8 @@ final class StripeDriver extends AbstractDriver implements SupportsRefundsInterf
      * rather than the data. Encoding it is the SDK's supported way to get the
      * plain data out, and works the same on the stdClass tree a test stands in
      * for one with.
+     *
+     * @throws JsonException
      */
     private function stripePayload(object $object): Payload
     {

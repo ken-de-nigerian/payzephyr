@@ -27,10 +27,10 @@ trait HasWebhookValidation
      *
      * Drivers that verify asynchronously do it in the queued job, which runs
      * whenever a worker gets to it. Measured from then, a queue more than a
-     * few minutes behind - a backlog, a deploy, a restarted worker - pushes
+     * few minutes behind - a backlog, a deployment, a restarted worker - pushes
      * every genuine delivery outside the window, and the job discards it for
      * good. ProcessWebhook sets this around its validateWebhook() call and
-     * clears it afterwards; pass null to measure from now again.
+     * clears it afterward; pass null to measure from now again.
      */
     public function setWebhookReceivedAt(?int $timestamp): void
     {
@@ -215,7 +215,7 @@ trait HasWebhookValidation
      */
     protected function isDefinitiveVerificationRejection(Throwable $e): bool
     {
-        for ($current = $e; $current instanceof \Throwable; $current = $current->getPrevious()) {
+        for ($current = $e; $current instanceof Throwable; $current = $current->getPrevious()) {
             if ($current instanceof ClientException) {
                 return ! in_array($current->getResponse()->getStatusCode(), [
                     HttpStatusCodes::UNAUTHORIZED,

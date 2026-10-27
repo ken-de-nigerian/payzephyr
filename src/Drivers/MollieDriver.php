@@ -237,6 +237,8 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      * @param  array<string, array<string>>  $headers  Request headers
      * @param  string  $body  Raw request body
      * @return bool True if webhook is valid
+     *
+     * @throws WebhookException|InvalidConfigurationException
      */
     public function validateWebhook(array $headers, string $body): bool
     {
@@ -256,6 +258,8 @@ final class MollieDriver extends AbstractDriver implements RequiresAsyncWebhookV
      * @param  array<string, array<string>>  $headers  Request headers
      * @param  string  $body  Raw request body
      * @return bool True if signature is valid
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateWebhookSignature(array $headers, string $body): bool
     {

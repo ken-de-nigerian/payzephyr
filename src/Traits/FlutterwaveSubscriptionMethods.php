@@ -342,7 +342,7 @@ trait FlutterwaveSubscriptionMethods
         }
 
         // A customer who subscribed to this plan before has an older,
-        // cancelled subscription to it too, and taking the first match could
+        // canceled subscription to it too, and taking the first match could
         // return that one in place of the subscription just created. Prefer
         // an active subscription, then the newest - Flutterwave's ids increase.
         usort($matches, fn (Payload $a, Payload $b): int => [$b->string('status') === 'active', $b->int('id') ?? 0]
@@ -360,6 +360,9 @@ trait FlutterwaveSubscriptionMethods
         return $subscription->string('plan', 'id') ?? $subscription->string('plan');
     }
 
+    /**
+     * @throws PlanException
+     */
     private function mapIntervalToFlutterwave(string $interval): string
     {
         return match ($interval) {
@@ -385,6 +388,8 @@ trait FlutterwaveSubscriptionMethods
      * enum's recognized vocabulary directly.
      *
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws ChargeException
      */
     private function mapFlutterwavePlanToResponse(array $data): PlanResponseDTO
     {
@@ -403,6 +408,8 @@ trait FlutterwaveSubscriptionMethods
 
     /**
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws ChargeException
      */
     private function mapFlutterwaveSubscriptionToResponse(array $data): SubscriptionResponseDTO
     {

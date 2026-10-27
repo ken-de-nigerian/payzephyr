@@ -8,7 +8,6 @@ use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Contracts\HasNoSubscriptionListing;
 use KenDeNigerian\PayZephyr\Contracts\RequiresAsyncWebhookVerification;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
-use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\VerificationResponseDTO;
@@ -29,7 +28,7 @@ use Throwable;
  * verify-webhook-signature call), so it's deferred to the queued webhook job
  * instead of running synchronously in the request cycle.
  */
-final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionListing, RequiresAsyncWebhookVerification, SupportsRefundsInterface, SupportsSubscriptionsInterface
+final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionListing, RequiresAsyncWebhookVerification, SupportsRefundsInterface
 {
     use PayPalRefundMethods;
     use PayPalSubscriptionMethods;
@@ -57,6 +56,8 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
 
     /**
      * Ensure the configuration contains the Client ID and Secret.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {
@@ -121,6 +122,8 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
      * Retrieve a valid Bearer token using Client Credentials flow.
      *
      * The token is cached in memory until it expires to reduce API overhead.
+     *
+     * @throws ChargeException
      */
     private function getAccessToken(): string
     {
@@ -164,6 +167,9 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
      *
      * Formats the amount based on currency precision and sets up the
      * application context (return/cancel URLs).
+     *
+     * @throws ChargeException
+     * @throws InvalidConfigurationException
      */
     public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
@@ -260,6 +266,8 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
      *
      * Note: PayPal 'verification' usually involves checking the Order details
      * to see if the funds have been CAPTURED or COMPLETED.
+     *
+     * @throws VerificationException
      */
     public function verify(string $reference): VerificationResponseDTO
     {
@@ -385,6 +393,8 @@ final class PayPalDriver extends AbstractDriver implements HasNoSubscriptionList
      *
      * This is the recommended approach as it delegates the complex certificate
      * validation to PayPal's servers.
+     *
+     * @throws WebhookException
      */
     private function verifyWebhookSignatureViaAPI(
         string $transmissionId,

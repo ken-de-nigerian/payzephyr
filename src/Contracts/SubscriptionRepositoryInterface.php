@@ -27,7 +27,7 @@ interface SubscriptionRepositoryInterface
 
     /**
      * The codes of the logged subscriptions $customerEmail holds to
-     * $planCode with $provider that have not ended - status not cancelled,
+     * $planCode with $provider that have not ended - status not canceled,
      * completed or expired - newest first.
      *
      * The duplicate check reads these for a provider that cannot list

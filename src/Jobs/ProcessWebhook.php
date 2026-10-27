@@ -16,6 +16,7 @@ use KenDeNigerian\PayZephyr\Contracts\StatusNormalizerInterface;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionLifecycleHooks;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Contracts\WebhookEventRepositoryInterface;
+use KenDeNigerian\PayZephyr\Drivers\AbstractDriver;
 use KenDeNigerian\PayZephyr\Enums\PaymentStatus;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
 use KenDeNigerian\PayZephyr\Enums\TraceDirection;
@@ -81,6 +82,9 @@ final class ProcessWebhook implements ShouldQueue
         $this->backoff = $webhookConfig->int('retry_backoff') ?? 60;
     }
 
+    /**
+     * @throws Throwable
+     */
     public function handle(
         PaymentManager $manager,
         StatusNormalizerInterface $statusNormalizer,
@@ -220,7 +224,7 @@ final class ProcessWebhook implements ShouldQueue
      * successful delivery.
      *
      * The first attempt of a genuine duplicate delivery is a different job, so
-     * its attempt count is 1 and it still skips, which is the behavior the
+     * its attempt count is 1, and it still skips, which is the behavior the
      * marker exists for. Only attempt two onwards may reclaim.
      *
      * The trade-off is deliberate: reprocessing may re-dispatch events a first
@@ -264,20 +268,18 @@ final class ProcessWebhook implements ShouldQueue
             return true;
         }
 
-        $measuresFromReceipt = method_exists($driver, 'setWebhookReceivedAt');
+        // setWebhookReceivedAt() comes from HasWebhookValidation, which every
+        // AbstractDriver uses; any other driver measures from now as before.
+        $receiptAware = $driver instanceof AbstractDriver ? $driver : null;
 
-        if ($measuresFromReceipt) {
-            $driver->setWebhookReceivedAt($this->receivedAt);
-        }
+        $receiptAware?->setWebhookReceivedAt($this->receivedAt);
 
         try {
             return $driver->validateWebhook($this->headers, (string) json_encode($this->payload));
         } finally {
             // Drivers live for the whole worker process; the next job must not
             // inherit this delivery's receipt time.
-            if ($measuresFromReceipt) {
-                $driver->setWebhookReceivedAt(null);
-            }
+            $receiptAware?->setWebhookReceivedAt(null);
         }
     }
 
@@ -421,6 +423,9 @@ final class ProcessWebhook implements ShouldQueue
         }
     }
 
+    /**
+     * @throws DriverNotFoundException
+     */
     protected function determineStatus(PaymentManager $manager, StatusNormalizerInterface $statusNormalizer): string
     {
         // Only called with a reference, which only a resolved driver yields;
@@ -437,7 +442,7 @@ final class ProcessWebhook implements ShouldQueue
      * (Paystack, Flutterwave, Razorpay), `eventType` (Monnify), `event_type`
      * (PayPal, Paddle) or `type` (Stripe, Square, Mollie's typed webhooks).
      *
-     * `type` was not read, so no Stripe or Square event was ever recognised
+     * `type` was not read, so no Stripe or Square event was ever recognized
      * as a refund or a subscription event.
      *
      * @param  array<string, mixed>  $payload
@@ -478,7 +483,7 @@ final class ProcessWebhook implements ShouldQueue
      * The subscription a webhook is about.
      *
      * Paystack names it: `subscription_code`, or for an invoice event
-     * `subscription.subscription_code`. Elsewhere an invoice or a payment
+     * `subscription.subscription_code`. Elsewhere, an invoice or a payment
      * points at it - Stripe's `subscription` (or, from its 2025 API,
      * `parent.subscription_details.subscription`), Square's and Paddle's
      * `subscription_id`, a PayPal sale's `billing_agreement_id` - and a

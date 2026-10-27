@@ -6,6 +6,7 @@ namespace KenDeNigerian\PayZephyr\Traits;
 
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\RefundException;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use Throwable;
@@ -146,7 +147,7 @@ trait RazorpayRefundMethods
      *
      * @return array{id: string, currency: string, refundable: int} refundable is in minor units
      *
-     * @throws RefundException
+     * @throws RefundException|ChargeException
      */
     private function resolveRefundablePayment(string $transactionReference): array
     {

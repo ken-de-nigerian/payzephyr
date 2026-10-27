@@ -24,6 +24,9 @@ trait PaystackRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
@@ -81,6 +84,9 @@ trait PaystackRefundMethods
         }
     }
 
+    /**
+     * @throws RefundException
+     */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {

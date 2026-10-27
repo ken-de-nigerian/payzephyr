@@ -336,6 +336,8 @@ final class Subscription
      * code's timeline, followed by its outcome - or the failure, rethrown.
      *
      * @param  callable(): SubscriptionResponseDTO  $operation
+     *
+     * @throws Throwable
      */
     private function traceSubscriptionOperation(
         DriverInterface $driver,

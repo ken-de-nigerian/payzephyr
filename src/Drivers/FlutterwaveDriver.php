@@ -32,6 +32,8 @@ final class FlutterwaveDriver extends AbstractDriver implements SupportsRefundsI
 
     /**
      * Ensure the configuration contains the Secret Key.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {

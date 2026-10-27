@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use JsonException;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
@@ -45,6 +46,7 @@ trait MollieSubscriptionMethods
 
     /**
      * @throws PlanException
+     * @throws JsonException
      */
     public function createPlan(SubscriptionPlanDTO $plan): PlanResponseDTO
     {
@@ -79,6 +81,7 @@ trait MollieSubscriptionMethods
      * @param  array<array-key, mixed>  $updates
      *
      * @throws PlanException
+     * @throws JsonException
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
     {
@@ -412,6 +415,9 @@ trait MollieSubscriptionMethods
         return $this->parseResponse($response);
     }
 
+    /**
+     * @throws PlanException
+     */
     private function mapIntervalToMollie(string $interval): string
     {
         return match ($interval) {
@@ -458,6 +464,9 @@ trait MollieSubscriptionMethods
         };
     }
 
+    /**
+     * @throws JsonException
+     */
     private function encodeMolliePlanData(string $name, float $amount, string $interval, string $currency): string
     {
         return base64_encode(json_encode([
@@ -499,6 +508,8 @@ trait MollieSubscriptionMethods
 
     /**
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws JsonException
      */
     private function molliePlanCodeFromSubscriptionData(array $data): string
     {
@@ -514,6 +525,9 @@ trait MollieSubscriptionMethods
 
     /**
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws ChargeException
+     * @throws JsonException
      */
     private function mapMollieSubscriptionToResponse(array $data, string $customerId, ?string $customerEmail = null): SubscriptionResponseDTO
     {

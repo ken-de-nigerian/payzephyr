@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use JsonException;
 use KenDeNigerian\PayZephyr\DataObjects\PlanResponseDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionActionDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionPlanDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\SubscriptionResponseDTO;
+use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\PlanException;
 use KenDeNigerian\PayZephyr\Exceptions\SubscriptionException;
 use KenDeNigerian\PayZephyr\Support\Payload;
@@ -27,6 +29,8 @@ trait StripeSubscriptionMethods
     use LogsSubscriptionTransactions;
 
     /**
+     * @throws ChargeException
+     * @throws JsonException
      * @throws PlanException
      */
     public function createPlan(SubscriptionPlanDTO $plan): PlanResponseDTO
@@ -69,6 +73,8 @@ trait StripeSubscriptionMethods
      *
      * @param  array<array-key, mixed>  $updates
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws PlanException
      */
     public function updatePlan(string $planCode, array $updates): PlanResponseDTO
@@ -167,6 +173,8 @@ trait StripeSubscriptionMethods
     }
 
     /**
+     * @throws ChargeException
+     * @throws JsonException
      * @throws PlanException
      */
     public function fetchPlan(string $planCode): PlanResponseDTO
@@ -191,6 +199,8 @@ trait StripeSubscriptionMethods
      *
      * @return array<array-key, mixed>
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws PlanException
      */
     public function listPlans(?int $perPage = 50, ?int $page = 1): array
@@ -228,6 +238,8 @@ trait StripeSubscriptionMethods
      * usable for the customer) - the same precondition Paystack's driver
      * already has (a prior authorization_code from a completed charge).
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws SubscriptionException
      */
     public function createSubscription(SubscriptionRequestDTO $request): SubscriptionResponseDTO
@@ -275,6 +287,8 @@ trait StripeSubscriptionMethods
     }
 
     /**
+     * @throws ChargeException
+     * @throws JsonException
      * @throws SubscriptionException
      */
     public function fetchSubscription(string $subscriptionCode): SubscriptionResponseDTO
@@ -302,6 +316,8 @@ trait StripeSubscriptionMethods
      * immediate-disable semantics) or scheduled for the end of the current
      * billing period.
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws SubscriptionException
      */
     public function cancelSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
@@ -340,6 +356,8 @@ trait StripeSubscriptionMethods
      * exception rather than silently no-op'ing or approximating incorrect
      * behavior.
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws SubscriptionException
      */
     public function enableSubscription(SubscriptionActionDTO $action): SubscriptionResponseDTO
@@ -382,6 +400,8 @@ trait StripeSubscriptionMethods
      *
      * @return array<array-key, mixed>
      *
+     * @throws ChargeException
+     * @throws JsonException
      * @throws SubscriptionException
      */
     public function listSubscriptions(?int $perPage = 50, ?int $page = 1, ?string $customer = null): array
@@ -460,6 +480,9 @@ trait StripeSubscriptionMethods
      * @param  object  $price  A Stripe Price.
      * @param  object|null  $product  Its Product when fetched separately;
      *                                otherwise the one expanded on the price.
+     *
+     * @throws ChargeException
+     * @throws JsonException
      */
     private function mapPriceToPlanResponse(object $price, ?object $product = null): PlanResponseDTO
     {
@@ -483,6 +506,9 @@ trait StripeSubscriptionMethods
      * @param  object  $subscription  A Stripe Subscription.
      * @param  Payload|null  $customer  Its Customer when already in hand;
      *                                  otherwise the one expanded on it.
+     *
+     * @throws JsonException
+     * @throws ChargeException
      */
     private function mapStripeSubscriptionToResponse(object $subscription, ?Payload $customer = null): SubscriptionResponseDTO
     {

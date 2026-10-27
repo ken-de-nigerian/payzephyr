@@ -22,6 +22,9 @@ trait PayPalRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
@@ -79,6 +82,9 @@ trait PayPalRefundMethods
         }
     }
 
+    /**
+     * @throws RefundException
+     */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {

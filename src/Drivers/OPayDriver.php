@@ -28,6 +28,8 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
 
     /**
      * Make sure all required OPay credentials are configured.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {
@@ -47,6 +49,8 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
      * and should override these headers in the verify() method.
      *
      * @return array<string, string>
+     *
+     * @throws InvalidConfigurationException
      */
     protected function getDefaultHeaders(): array
     {
@@ -309,7 +313,7 @@ final class OPayDriver extends AbstractDriver implements SupportsRefundsInterfac
         } catch (Throwable $e) {
             $clientException = null;
             $current = $e;
-            while ($current instanceof \Throwable) {
+            while ($current instanceof Throwable) {
                 if ($current instanceof ClientException) {
                     $clientException = $current;
                     break;

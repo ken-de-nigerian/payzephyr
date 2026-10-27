@@ -794,6 +794,8 @@ final class PaymentManager
 
     /**
      * @return array<int, string>
+     *
+     * @throws DriverNotFoundException
      */
     public function getFallbackChain(): array
     {

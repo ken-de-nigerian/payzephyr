@@ -24,6 +24,9 @@ trait MonnifyRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         $refundReference = $request->idempotencyKey ?? Str::uuid()->toString();
@@ -104,6 +107,9 @@ trait MonnifyRefundMethods
         }
     }
 
+    /**
+     * @throws RefundException
+     */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {

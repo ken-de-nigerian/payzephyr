@@ -10,11 +10,15 @@ use KenDeNigerian\PayZephyr\Contracts\RefundRepositoryInterface;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
 use KenDeNigerian\PayZephyr\Models\RefundTransaction;
 use KenDeNigerian\PayZephyr\Traits\DetectsUniqueConstraintViolations;
+use Throwable;
 
 final class EloquentRefundRepository implements RefundRepositoryInterface
 {
     use DetectsUniqueConstraintViolations;
 
+    /**
+     * @throws Throwable
+     */
     public function updateOrCreateAtomic(string $refundReference, array $attributes): RefundTransaction
     {
         return DB::connection()->transaction(function () use ($refundReference, $attributes): RefundTransaction {
@@ -67,7 +71,7 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
      */
     private function withoutStaleStatus(RefundTransaction $existing, array $attributes): array
     {
-        $current = RefundStatus::tryFromString((string) $existing->status);
+        $current = RefundStatus::tryFromString($existing->status);
 
         if ($current?->isTerminal() && isset($attributes['status']) && $attributes['status'] !== $current->value) {
             unset($attributes['status']);
@@ -111,6 +115,9 @@ final class EloquentRefundRepository implements RefundRepositoryInterface
             ->exists();
     }
 
+    /**
+     * @throws Throwable
+     */
     public function updateStatusIfExists(string $refundReference, string $status): bool
     {
         return DB::connection()->transaction(function () use ($refundReference, $status): bool {

@@ -298,7 +298,7 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Read a response body without consuming it for the caller.
      *
-     * parseResponse() reads the same stream immediately afterwards, so this
+     * parseResponse() reads the same stream immediately afterward, so this
      * rewinds. A non-seekable body is left untouched: draining it would break
      * the charge in order to record a description of the charge.
      *
@@ -647,7 +647,7 @@ abstract class AbstractDriver implements DriverInterface
      * a string: `PAYSTACK_SECRET_KEY=true` reaches the config as boolean true
      * from env(). The signing code then read it as a string, found none, and
      * signed with an empty key - one anyone can sign with too. A credential is
-     * a non-empty string or it is missing.
+     * a non-empty string, or it is missing.
      */
     protected function credential(string $key): ?string
     {

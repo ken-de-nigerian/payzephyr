@@ -70,7 +70,7 @@ return [
             'secret_key' => env('FLUTTERWAVE_SECRET_KEY'),
             'public_key' => env('FLUTTERWAVE_PUBLIC_KEY'),
             // The Secret Hash you set in Flutterwave's dashboard (Settings → Webhooks),
-            // which Flutterwave sends back in the verif-hash header.
+            // which Flutterwave sends back in the verify-hash header.
             'webhook_secret' => env('FLUTTERWAVE_WEBHOOK_SECRET'),
             'base_url' => env('FLUTTERWAVE_BASE_URL', 'https://api.flutterwave.com/v3/'),
             'currencies' => ['NGN', 'USD', 'EUR', 'GBP', 'KES', 'UGX', 'TZS'],
@@ -229,7 +229,7 @@ return [
     */
     'health_check' => [
         // On by default. PaymentManager has always read this with a `?? true`
-        // fallback, but the key was never declared here, so the behaviour was
+        // fallback, but the key was never declared here, so the behavior was
         // invisible in the published config and could only be found in the
         // source. Turning it off means a charge is attempted against a
         // provider without asking whether it is reachable first.
@@ -272,7 +272,7 @@ return [
         'table' => env('PAYZEPHYR_TRACE_TABLE', 'payment_trace_events'),
         'connection' => env('PAYZEPHYR_TRACE_CONNECTION'),
 
-        // Recommended in production: keeps the write off the request path.
+        // Recommended in production: keeps the write-off the request path.
         'async' => env('PAYZEPHYR_TRACE_ASYNC', false),
 
         'queue' => [

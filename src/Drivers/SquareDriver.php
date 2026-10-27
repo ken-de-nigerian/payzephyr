@@ -34,6 +34,8 @@ final class SquareDriver extends AbstractDriver implements SupportsRefundsInterf
 
     /**
      * Make sure the Square secret key and location id is configured.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {

@@ -412,6 +412,8 @@ trait PaystackSubscriptionMethods
      * token sent to the customer - this validation used to live generically
      * in SubscriptionValidator, which wrongly asserted it for every
      * provider. It belongs here: only Paystack actually needs it.
+     *
+     * @throws SubscriptionException
      */
     private function requirePaystackToken(SubscriptionActionDTO $action): string
     {

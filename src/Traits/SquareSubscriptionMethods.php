@@ -403,7 +403,7 @@ trait SquareSubscriptionMethods
 
             // Customers already looked up, by id. Each subscription names
             // only its customer's id, and looking one up per subscription
-            // made a listing of fifty one call plus fifty.
+            // made a listing of fifty-one call plus fifty.
             $customers = [];
 
             if ($customer) {
@@ -625,6 +625,8 @@ trait SquareSubscriptionMethods
     /**
      * @param  array<array-key, mixed>|null  $plan
      * @param  array<array-key, mixed>  $variation
+     *
+     * @throws ChargeException
      */
     private function mapSquareCatalogToPlanResponse(?array $plan, array $variation): PlanResponseDTO
     {
@@ -657,6 +659,8 @@ trait SquareSubscriptionMethods
      *
      * @param  array<array-key, mixed>  $subscription
      * @param  array<array-key, mixed>|null  $customer
+     *
+     * @throws ChargeException
      */
     private function mapSquareSubscriptionToResponse(array $subscription, ?array $customer = null): SubscriptionResponseDTO
     {

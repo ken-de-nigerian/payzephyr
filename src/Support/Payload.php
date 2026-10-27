@@ -111,7 +111,7 @@ final readonly class Payload
      *
      * `env()` turns "true" and "false" into booleans, but "0", "1", "off" and
      * "yes" reach a config array as strings, and an integer 0 or 1 is common in
-     * a hand-written one. All of those are read as the switch they plainly
+     * a handwritten one. All of those are read as the switch they plainly
      * mean. Anything else - absent, null, an array, a word that is not a
      * switch - answers $default, since guessing at it would turn a feature on
      * or off that nobody asked for.

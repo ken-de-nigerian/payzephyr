@@ -9,6 +9,13 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request or branch cancels the run it
+# replaces. Only the newest commit's result decides anything, and a run left
+# going holds runners the new one then queues behind.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -263,13 +270,69 @@ jobs:
         env:
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
+  # Whether this run needs mutation testing, and its shards. A push always
+  # does. A pull request does unless every file it changes is documentation
+  # or repository metadata: anything else - source, tests, config,
+  # migrations, scripts, dependencies, this workflow - can decide whether a
+  # mutation is caught. The shards come from scripts/mutate.php, the one
+  # place the mutated classes are listed.
+  mutation-plan:
+    runs-on: ubuntu-latest
+    name: Mutation Plan
+    outputs:
+      run: ${{ steps.changes.outputs.run }}
+      shards: ${{ steps.shards.outputs.shards }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: 8.4
+          coverage: none
+
+      - name: Decide whether to run
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          relevant=$(git diff --name-only "$BASE" HEAD \
+            | grep -vE '^(docs/|LICENSE$|\.gitignore$|\.gitattributes$|\.github/)|\.md$' || true)
+          if [ -n "$relevant" ] || git diff --name-only "$BASE" HEAD | grep -qx '.github/workflows/tests.yml'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Only documentation or metadata changed; mutation testing is skipped."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: List shards
+        id: shards
+        run: echo "shards=$(php scripts/mutate.php --shards)" >> "$GITHUB_OUTPUT"
+
   # Every mutation of the webhook trust boundary and the drivers must be
   # caught by a test: the code that decides whether a delivery is genuine,
   # fresh and new, and the code that turns a provider's answer into money.
-  # See ADR-0003. Pest's own mutation testing, since the suite is Pest.
+  # See ADR-0003. Pest's own mutation testing, since the suite is Pest. The
+  # classes run in shards side by side; each holds its own classes to 100%.
   mutation:
+    needs: mutation-plan
+    if: needs.mutation-plan.outputs.run == 'true'
     runs-on: ubuntu-latest
-    name: Mutation Testing
+    name: Mutation Testing (${{ matrix.shard }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.mutation-plan.outputs.shards) }}
 
     steps:
       - name: Checkout code
@@ -296,7 +359,7 @@ jobs:
         run: mkdir -p .phpunit.cache
 
       - name: Run mutation testing
-        run: composer mutation
+        run: php scripts/mutate.php "${{ matrix.shard }}"
 
   coverage:
     runs-on: ubuntu-latest

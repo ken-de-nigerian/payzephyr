@@ -29,6 +29,8 @@ final class InstallCommand extends Command
 
     /**
      * Execute command.
+     *
+     * @throws FileNotFoundException
      */
     public function handle(): int
     {

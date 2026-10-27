@@ -17,7 +17,7 @@ use JsonSerializable;
  *
  * A plain `$data['metadata'] ?? []` only catches null and missing keys, so an
  * empty string sails straight through into a typed `array` parameter and
- * fatals with a TypeError before the constructor body ever runs. That is a
+ * fatal with a TypeError before the constructor body ever runs. That is a
  * hard crash on a verify call, not a recoverable exception.
  */
 trait NormalizesMetadata

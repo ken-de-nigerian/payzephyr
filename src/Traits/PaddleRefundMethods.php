@@ -31,6 +31,9 @@ trait PaddleRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
@@ -148,6 +151,8 @@ trait PaddleRefundMethods
     /**
      * Paddle has no get-one-adjustment endpoint, so a single refund is fetched
      * by filtering the list endpoint on its id.
+     *
+     * @throws RefundException
      */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {

@@ -38,6 +38,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
     /**
      * Ensure the configuration contains the specific keys required for Monnify.
+     *
+     * @throws InvalidConfigurationException
      */
     protected function validateConfig(): void
     {
@@ -73,6 +75,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      * Monnify requires Basic Auth (base64 encoded API Key + Secret) to obtain
      * a Bearer token.
      * This method caches the token until it expires (minus a 60s buffer).
+     *
+     * @throws ChargeException
      */
     private function getAccessToken(): string
     {
@@ -113,6 +117,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
     /**
      * Initialize a transaction on Monnify.
+     *
+     * @throws ChargeException
      */
     public function charge(ChargeRequestDTO $request): ChargeResponseDTO
     {
@@ -176,6 +182,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
 
     /**
      * Verify a transaction status using the Monnify V2 API.
+     *
+     * @throws VerificationException
      */
     public function verify(string $reference): VerificationResponseDTO
     {
@@ -230,6 +238,8 @@ final class MonnifyDriver extends AbstractDriver implements SupportsRefundsInter
      *
      * Monnify uses an HMAC SHA512 hash of the request body, signed with the Secret Key.
      * This hash must match the 'monnify-signature' header.
+     *
+     * @throws InvalidConfigurationException
      */
     public function validateWebhook(array $headers, string $body): bool
     {

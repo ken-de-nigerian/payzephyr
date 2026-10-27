@@ -27,7 +27,7 @@ declare(strict_types=1);
  * measured with --parallel, and a mutation's tests run in one process, so a
  * line that hundreds of tests cover - the HTTP client's options, a log call -
  * ran out of time before its tests finished, and was counted as caught
- * whether or not any of them failed. The limit is six times the suite's time
+ * whether any of them failed. The limit is six times the suite's time
  * now: room for the whole suite in one process while other mutations run
  * beside it. A mutation that really never ends, such as a loop whose break
  * became continue, still times out, later.

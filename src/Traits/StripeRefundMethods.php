@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
+use JsonException;
 use KenDeNigerian\PayZephyr\DataObjects\RefundRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\RefundResponseDTO;
 use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
@@ -93,7 +94,7 @@ trait StripeRefundMethods
     /**
      * @param  object  $refund  A Stripe Refund.
      *
-     * @throws ChargeException
+     * @throws ChargeException|JsonException
      */
     private function mapStripeRefundToResponse(object $refund, ?string $reason = null): RefundResponseDTO
     {

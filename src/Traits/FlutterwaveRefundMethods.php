@@ -21,6 +21,9 @@ trait FlutterwaveRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         try {
@@ -77,6 +80,9 @@ trait FlutterwaveRefundMethods
         }
     }
 
+    /**
+     * @throws RefundException
+     */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {

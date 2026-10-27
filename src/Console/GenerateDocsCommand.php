@@ -215,7 +215,7 @@ final class GenerateDocsCommand extends Command
     {
         // Alphabetical here, rather than the matrix's capability order: this is
         // a sentence, and ordering it by what each provider supports would leak
-        // that ranking into prose where it reads as a judgement.
+        // that ranking into prose where it reads as a judgment.
         $labels = array_column($providers, 'label');
         sort($labels);
 

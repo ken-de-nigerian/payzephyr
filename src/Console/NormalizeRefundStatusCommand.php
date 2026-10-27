@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Enums\RefundStatus;
 use KenDeNigerian\PayZephyr\Support\Payload;
+use Throwable;
 
 /**
  * One-time, opt-in data fix for refund_transactions rows written before the
@@ -34,6 +35,9 @@ final class NormalizeRefundStatusCommand extends Command
 
     protected $description = 'One-time backfill: normalize refund_transactions.status to canonical RefundStatus values for rows written before this was fixed';
 
+    /**
+     * @throws Throwable
+     */
     public function handle(): int
     {
         $table = Payload::of(config('payments'))->string('refunds', 'logging', 'table') ?? 'refund_transactions';

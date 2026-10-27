@@ -7,9 +7,9 @@ namespace KenDeNigerian\PayZephyr\Traits;
 use Illuminate\Foundation\Application as FoundationApplication;
 
 /**
- * The .env file the install and uninstall commands write feature flags to.
+ * The .env file the installation and uninstall commands write feature flags to.
  *
- * Laravel loads the file named by environmentFilePath(), which honours
+ * Laravel loads the file named by environmentFilePath(), which honors
  * useEnvironmentPath() and --env; assuming it sits at base_path('.env') would
  * write flags to a file the application never reads. That method lives on the
  * concrete Foundation application, not the contract, so any other container

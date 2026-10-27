@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Schema;
 use KenDeNigerian\PayZephyr\Contracts\SubscriptionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Models\SubscriptionTransaction;
 use KenDeNigerian\PayZephyr\Traits\DetectsUniqueConstraintViolations;
+use Throwable;
 
 final class EloquentSubscriptionRepository implements SubscriptionRepositoryInterface
 {
@@ -18,7 +19,7 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
 
     /**
      * Whether each subscription table has the state_as_of column, keyed by
-     * table name - an install that has not run the migration adding it must
+     * table name - an installation that has not run the migration adding it must
      * keep logging subscriptions, just without ordering.
      *
      * @var array<string, bool>
@@ -47,6 +48,8 @@ final class EloquentSubscriptionRepository implements SubscriptionRepositoryInte
      * and applying it would put stale state back (ADR-0004's follow-up).
      * Writes without a `state_as_of`, or onto a row without one, are applied
      * as before.
+     *
+     * @throws Throwable
      */
     public function updateOrCreateAtomic(string $subscriptionCode, array $attributes): SubscriptionTransaction
     {

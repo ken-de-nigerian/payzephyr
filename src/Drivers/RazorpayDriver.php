@@ -443,7 +443,7 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
      */
     protected function describeFailure(Throwable $e): string
     {
-        for ($current = $e; $current instanceof \Throwable; $current = $current->getPrevious()) {
+        for ($current = $e; $current instanceof Throwable; $current = $current->getPrevious()) {
             if ($current instanceof RequestException && $current->getResponse() instanceof ResponseInterface) {
                 $error = Payload::of(json_decode((string) $current->getResponse()->getBody(), true))->get('error');
 

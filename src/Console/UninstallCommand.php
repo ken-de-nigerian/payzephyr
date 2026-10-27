@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Container\BindingResolutionException;
+use Illuminate\Contracts\Filesystem\FileNotFoundException;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -255,6 +257,8 @@ final class UninstallCommand extends Command
      *
      * A no-op if the migration repository table doesn't exist yet (e.g.
      * `php artisan migrate` was never run against this app).
+     *
+     * @throws BindingResolutionException
      */
     private function forgetMigration(string $file): void
     {
@@ -272,6 +276,8 @@ final class UninstallCommand extends Command
      * mirrors InstallCommand::updateEnvironmentFlags()'s additive-only
      * philosophy, but in reverse. A no-op, not an error, if there's no .env
      * file or the flag was never written to begin with.
+     *
+     * @throws FileNotFoundException
      */
     private function clearEnvironmentFlag(string $envVar): void
     {

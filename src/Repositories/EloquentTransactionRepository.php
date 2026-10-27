@@ -7,6 +7,7 @@ namespace KenDeNigerian\PayZephyr\Repositories;
 use Illuminate\Support\Facades\DB;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\Models\PaymentTransaction;
+use Throwable;
 
 final class EloquentTransactionRepository implements TransactionRepositoryInterface
 {
@@ -20,6 +21,9 @@ final class EloquentTransactionRepository implements TransactionRepositoryInterf
         return PaymentTransaction::where('reference', $reference)->first();
     }
 
+    /**
+     * @throws Throwable
+     */
     public function updateIfNotSuccessful(string $reference, array $attributes): bool
     {
         return DB::connection()->transaction(function () use ($reference, $attributes): bool {

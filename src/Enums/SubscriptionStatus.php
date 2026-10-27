@@ -72,8 +72,7 @@ enum SubscriptionStatus: string
             self::NON_RENEWING => [self::ACTIVE, self::CANCELLED, self::COMPLETED],
             self::ATTENTION => [self::ACTIVE, self::CANCELLED, self::EXPIRED],
             self::CANCELLED => [self::ACTIVE],
-            self::COMPLETED => [],
-            self::EXPIRED => [],
+            self::COMPLETED, self::EXPIRED => [],
         };
     }
 

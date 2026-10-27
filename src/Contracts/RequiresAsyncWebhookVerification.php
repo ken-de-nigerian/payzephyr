@@ -18,7 +18,7 @@ interface RequiresAsyncWebhookVerification
 {
     /**
      * Whether this driver instance's current configuration requires
-     * deferred (queued) webhook verification for the current request.
+     * to be deferred (queued) webhook verification for the current request.
      */
     public function requiresAsyncVerification(): bool;
 }

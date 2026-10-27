@@ -383,6 +383,8 @@ trait PayPalSubscriptionMethods
 
     /**
      * @return array<string, int|string>
+     *
+     * @throws PlanException
      */
     private function mapIntervalToPayPalFrequency(string $interval): array
     {
@@ -458,6 +460,8 @@ trait PayPalSubscriptionMethods
 
     /**
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws ChargeException
      */
     private function mapPayPalPlanToResponse(array $data): PlanResponseDTO
     {
@@ -479,6 +483,8 @@ trait PayPalSubscriptionMethods
 
     /**
      * @param  array<array-key, mixed>  $data
+     *
+     * @throws ChargeException
      */
     private function mapPayPalSubscriptionToResponse(
         array $data,

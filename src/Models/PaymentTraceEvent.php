@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -117,7 +118,8 @@ final class PaymentTraceEvent extends Model
      * @param  Builder<PaymentTraceEvent>  $query
      * @return Builder<PaymentTraceEvent>
      */
-    public function scopeTimelineFor(Builder $query, string $reference): Builder
+    #[Scope]
+    protected function timelineFor(Builder $query, string $reference): Builder
     {
         /** @var Builder<self> */
         return $query->where('reference', $reference)
@@ -135,7 +137,8 @@ final class PaymentTraceEvent extends Model
      * @param  Builder<PaymentTraceEvent>  $query
      * @return Builder<PaymentTraceEvent>
      */
-    public function scopeOlderThan(Builder $query, int $days): Builder
+    #[Scope]
+    protected function olderThan(Builder $query, int $days): Builder
     {
         /** @var Builder<self> */
         return $query->where('created_at', '<', now()->subDays($days));

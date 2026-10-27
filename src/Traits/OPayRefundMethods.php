@@ -24,6 +24,9 @@ trait OPayRefundMethods
 {
     use LogsRefundTransactions;
 
+    /**
+     * @throws RefundException
+     */
     public function refund(RefundRequestDTO $request): RefundResponseDTO
     {
         $refundReference = $request->idempotencyKey ?? Str::uuid()->toString();
@@ -93,6 +96,9 @@ trait OPayRefundMethods
         }
     }
 
+    /**
+     * @throws RefundException
+     */
     public function fetchRefund(string $refundReference): RefundResponseDTO
     {
         try {

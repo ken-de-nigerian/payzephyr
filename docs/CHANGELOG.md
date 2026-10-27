@@ -8,7 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+- **CI only: mutation testing runs in parallel shards.** One run over every class took over
+  half an hour. `scripts/mutate.php` now lists the classes in five shards that CI runs side by
+  side, each still held to 100%; `composer mutation` runs them all, as before. A pull request
+  that changes only documentation or repository metadata skips mutation testing, and a newer
+  push cancels the run it replaces. Nothing the package ships changes.
 
 ---
 ## [5.1.1] - 2026-10-08

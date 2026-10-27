@@ -32,7 +32,7 @@ declare(strict_types=1);
  * beside it. A mutation that really never ends, such as a loop whose break
  * became continue, still times out, later.
  *
- * Run by `composer mutation` before Pest; it changes
+ * Run by scripts/mutate.php before Pest; it changes
  * nothing when the plugin is already patched, and fails loudly when the
  * plugin's code no longer looks as expected, rather than letting the gate
  * run unpatched.

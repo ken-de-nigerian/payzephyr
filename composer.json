@@ -43,7 +43,7 @@
         "illuminate/bus": "^12.0|^13.0",
         "illuminate/console": "^12.0|^13.0",
         "illuminate/contracts": "^12.0|^13.0",
-        "illuminate/database": "^12.0|^13.0",
+        "illuminate/database": "^12.4|^13.0",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/queue": "^12.0|^13.0",
         "illuminate/routing": "^12.0|^13.0",

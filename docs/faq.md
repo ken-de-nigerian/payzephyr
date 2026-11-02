@@ -36,7 +36,7 @@ One caveat worth knowing rather than discovering: if the worker processing a web
 
 **Which PHP and Laravel versions are supported?**
 
-PHP 8.2+ and Laravel 12 or 13. Laravel 10 and 11 are no longer supported: both are past their upstream security-fix window. See [Installation](installation.md#before-you-start) and [Upgrade Guide](upgrade-guide.md).
+PHP 8.2+ and Laravel 12.4+ or 13. Laravel 10 and 11 are no longer supported: both are past their upstream security-fix window. See [Installation](installation.md#before-you-start) and [Upgrade Guide](upgrade-guide.md).
 
 **Is PayZephyr PCI compliant?**
 

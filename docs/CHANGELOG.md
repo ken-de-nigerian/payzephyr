@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.2.0] - 2026-11-02
+
 ### Changed
 
 - **Laravel 12 installs need 12.4 or later.** `PaymentTraceEvent`'s `timelineFor()` and

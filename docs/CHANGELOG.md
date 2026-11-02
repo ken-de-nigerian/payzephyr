@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Laravel 12 installs need 12.4 or later.** `PaymentTraceEvent`'s `timelineFor()` and
+  `olderThan()` scopes are declared with Eloquent's `#[Scope]` attribute, which Laravel added in
+  12.4.0; on 12.0 to 12.3 they would not resolve as scopes. `illuminate/database` is now
+  `^12.4|^13.0`. Laravel 13 is unaffected. `PaymentTraceEvent::timelineFor()` and `::olderThan()`
+  are called as before; the `scopeTimelineFor()` and `scopeOlderThan()` methods they replace no
+  longer exist.
+- **`ProcessWebhook` sets the receipt time only on drivers that extend `AbstractDriver`.** It
+  used to call `setWebhookReceivedAt()` on any driver with a method of that name. Every bundled
+  driver extends `AbstractDriver` and behaves as before; a custom driver that does not, but
+  defines its own `setWebhookReceivedAt()`, now has its replay window measured from when the
+  queued job validates the webhook.
+- `PayPalDriver` no longer lists `SupportsSubscriptionsInterface` itself; it still implements it
+  through `HasNoSubscriptionListing`.
 - **CI only: mutation testing runs in parallel shards.** One run over every class took over
   half an hour. `scripts/mutate.php` now lists the classes in five shards that CI runs side by
   side, each still held to 100%; `composer mutation` runs them all, as before. A pull request

@@ -7,7 +7,7 @@ This chapter walks through getting PayZephyr into a Laravel app, step by step, a
 | Requirement | Version |
 |---|---|
 | PHP | 8.2 or higher |
-| Laravel | 12.x or 13.x |
+| Laravel | 12.4 or higher, or 13.x |
 | Composer | Any recent version |
 
 If you're not sure which Laravel version your app is on, run `php artisan --version`.

@@ -64,6 +64,7 @@ PAYSTACK_ENABLED=true
 - **Channels:** card, bank transfer, USSD, mobile money, QR
 - **Subscriptions:** ✅ full support: see [Subscriptions](subscriptions.md); this is the one provider whose cancel/enable operations need an extra `emailToken`
 - **Refunds:** ✅ full support, processed asynchronously (initial response is `pending`; final status arrives via the `refund.processed`/`refund.failed` webhook)
+- **Split payments & subaccounts:** ✅ subaccounts, bank listing and account resolution; charges split to a subaccount with a platform fee, or by a split code. See [Split Payments & Subaccounts](split-payments.md)
 - The default provider out of the box, and generally the easiest to get a test payment working with quickly if you're starting from zero
 
 ### Stripe

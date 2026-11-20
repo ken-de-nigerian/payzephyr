@@ -107,6 +107,35 @@ final class Payment
     }
 
     /**
+     * Split the charge: it settles to a seller's subaccount (Subaccounts::create()
+     * returns its code), and the platform keeps `$platformFee` (in the major unit,
+     * like amount()) - omit it to use the subaccount's default percentage.
+     * `$bearer` is who pays the provider's processing fees: 'subaccount' (the
+     * seller) or 'platform'. A split charge is only ever sent to a provider
+     * that can split it.
+     */
+    public function split(string $subaccount, ?float $platformFee = null, string $bearer = 'subaccount'): Payment
+    {
+        $this->data['split'] = array_filter(
+            ['subaccount' => $subaccount, 'platform_fee' => $platformFee, 'bearer' => $bearer],
+            fn (mixed $value): bool => $value !== null,
+        );
+
+        return $this;
+    }
+
+    /**
+     * Split the charge by a split the provider already holds (a Paystack split
+     * code), e.g. one sharing it between several subaccounts.
+     */
+    public function splitCode(string $code): Payment
+    {
+        $this->data['split'] = ['split_code' => $code];
+
+        return $this;
+    }
+
+    /**
      * @param  string|array<int, string>  $providers
      */
     public function with(string|array $providers): Payment
@@ -215,6 +244,15 @@ final class Payment
     public function subscriptions(): SubscriptionQuery
     {
         return new SubscriptionQuery($this->manager);
+    }
+
+    /**
+     * Subaccounts and bank lookups (banks, resolving an account, creating and
+     * updating subaccounts), for providers that support them.
+     */
+    public function subaccounts(): Subaccounts
+    {
+        return new Subaccounts($this->manager);
     }
 
     public function refund(?string $transactionReference = null): Refund

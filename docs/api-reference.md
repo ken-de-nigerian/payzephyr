@@ -20,6 +20,8 @@ See [Your First Payment](first-payment.md) and [Understanding Payment Flow](paym
 | `description(string $description)` | Shown on the provider's payment page and the customer's statement |
 | `customer(array $customer)` | Additional customer details some providers accept (name, phone) |
 | `channels(array $channels)` | Restrict to specific payment channels (`['card', 'bank_transfer']`), where the provider supports it |
+| `split(string $subaccount, ?float $platformFee = null, string $bearer = 'subaccount')` | Settle the charge to a seller's subaccount, keeping `$platformFee`; `$bearer` (`'subaccount'` or `'platform'`) pays the provider's fees. See [Split Payments & Subaccounts](split-payments.md) |
+| `splitCode(string $code)` | Split the charge by a split the provider already holds |
 | `with(string\|array $providers)` / `using(...)` | Which provider(s) to use (identical methods, two names). A list enables [automatic fallback](providers.md#automatic-fallback) |
 
 ### Executing (terminal, call last)
@@ -106,6 +108,21 @@ See [Subscriptions](subscriptions.md#finding-subscriptions).
 
 Terminal: **`get(): array`** (of `SubscriptionResponseDTO`), **`first(): ?SubscriptionResponseDTO`**, **`count(): int`**, **`exists(): bool`**.
 
+## `Subaccounts` (returned by `Payment::subaccounts()`)
+
+See [Split Payments & Subaccounts](split-payments.md). Uses the default provider unless `with()`/`using()` names one; a provider without `SupportsSubaccountsInterface` is refused with a `SubaccountException`.
+
+| Method | Purpose |
+|---|---|
+| `with(string $provider)` / `using(...)` | Which provider to use |
+| `banks(string $currency = 'NGN'): list<BankDTO>` | The banks accounts can be held at |
+| `resolveAccount(string $accountNumber, string $bankCode): ResolvedAccountDTO` | The name an account number is registered to |
+| `create(SubaccountRequestDTO\|array $request): SubaccountDTO` | Create a subaccount |
+| `update(string $code, SubaccountRequestDTO\|array $request): SubaccountDTO` | Update a subaccount |
+| `find(string $code): SubaccountDTO` | Fetch a subaccount |
+
+*Throws:* `SubaccountException`.
+
 ## `Refund` (returned by `Payment::refund()`)
 
 See [Refunds](refunds.md) for full context and examples.
@@ -141,6 +158,18 @@ These are the typed objects PayZephyr's methods return: **always objects, access
 
 **`RefundResponseDTO`** (from refund operations); see [Refunds](refunds.md#what-you-get-back).
 
+**`BankDTO`** (from `Subaccounts::banks()`)
+`name`, `code`, `currency`.
+
+**`ResolvedAccountDTO`** (from `Subaccounts::resolveAccount()`)
+`accountNumber`, `accountName`, `bankCode`.
+
+**`SubaccountDTO`** (from `Subaccounts::create()`, `update()`, `find()`)
+`code`, `businessName`, `accountNumber`, `bankName`, `accountName`, `percentageCharge`, `active`, `provider`.
+
+**`SubaccountRequestDTO`** (input to `Subaccounts::create()` and `update()`)
+`businessName`, `bankCode`, `accountNumber`, `percentageCharge` (0 to 100), `description`, `contactEmail`, `contactName`, `contactPhone`, `metadata`.
+
 **`PlanResponseDTO`** (from plan operations)
 `planCode`, `name`, `amount`, `interval`, `currency`, `description`, `invoiceLimit`, `metadata`, `provider`.
 
@@ -170,6 +199,7 @@ Full explanation and handling patterns in [Error Handling](error-handling.md). E
 | `SubscriptionException` | Subscription create/cancel/enable/fetch/list |
 | `PlanException` | Plan create/update/fetch/list |
 | `RefundException` | Refund create/fetch |
+| `SubaccountException` | Bank listing, account resolution, subaccount create/update/fetch |
 | `InvalidConfigurationException` | Any operation on a misconfigured provider |
 | `DriverNotFoundException` | Referencing an unknown or disabled provider |
 

@@ -117,7 +117,7 @@ test('a charge Flutterwave does not answer with success is refused with its mess
 test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
-    $driver = flutterwaveContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
+    $driver = flutterwaveContractDriver([fn (): never => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
 
     try {
         $driver->charge(flutterwaveCharge(['idempotencyKey' => 'idem-3']));
@@ -173,7 +173,7 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
     $logs = captureLogs();
 
     try {
-        flutterwaveContractDriver([fn () => throw new LogicException('handler blew up')])->verify('FLW_B');
+        flutterwaveContractDriver([fn (): never => throw new LogicException('handler blew up')])->verify('FLW_B');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -223,7 +223,7 @@ test('the health check counts the 400 and 404 Flutterwave answers with as health
 test('the health check counts a client error it did not wrap itself as down', function (): void {
     $cause = new ClientException('Client error', new Request('GET', 'banks/NG'), new Response(400));
 
-    expect(flutterwaveContractDriver([fn () => throw new RuntimeException('not ours', 0, $cause)])->healthCheck())->toBeFalse();
+    expect(flutterwaveContractDriver([fn (): never => throw new RuntimeException('not ours', 0, $cause)])->healthCheck())->toBeFalse();
 });
 
 test('a webhook\'s status and channel are read from its data', function (): void {

@@ -132,7 +132,7 @@ test('a charge OPay does not accept is refused with whichever message it gave', 
 test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
-    $driver = opayContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
+    $driver = opayContractDriver([fn (): never => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
 
     try {
         $driver->charge(opayCharge(['idempotencyKey' => 'idem-2']));
@@ -220,7 +220,7 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
     $logs = captureLogs();
 
     try {
-        opayContractDriver([fn () => throw new LogicException('handler blew up')])->verify('OPAY_B');
+        opayContractDriver([fn (): never => throw new LogicException('handler blew up')])->verify('OPAY_B');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);

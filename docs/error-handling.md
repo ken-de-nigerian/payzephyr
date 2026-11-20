@@ -18,6 +18,7 @@ flowchart TD
     A --> I[ProviderException]
     A --> J[RefundException]
     A --> K[InvalidTraceDataException]
+    A --> L[SubaccountException]
 ```
 
 This means you can catch broadly (`catch (PaymentException $e)`) when you don't care which specific thing went wrong, or narrowly (`catch (ChargeException $e)`) when you need to handle one failure mode differently from another: for example, showing "your card was declined" specifically for a charge failure, versus "we couldn't process your request" for something more generic.
@@ -34,6 +35,7 @@ This means you can catch broadly (`catch (PaymentException $e)`) when you don't 
 | `InvalidConfigurationException` | A provider is missing required configuration (see [Configuration](configuration.md#provider-credentials)): this is a setup mistake, not something to catch at runtime; fix your `.env` instead |
 | `DriverNotFoundException` | You referenced a provider name PayZephyr doesn't recognize, or that isn't enabled |
 | `RefundException` | A refund operation fails: creating one, fetching one, or a guard refusing to send it (see below) |
+| `SubaccountException` | A subaccount or bank operation fails: listing banks, resolving an account number, creating, updating or fetching a subaccount, or a provider that has no subaccounts (see [Split Payments & Subaccounts](split-payments.md)) |
 | `ProviderException` | A lower-level provider-communication failure that doesn't fit the categories above. Also the duplicate in-flight charge rejection |
 | `InvalidTraceDataException` | A trace event could not be recorded because its reference was unusable. Only reachable with tracing enabled, and `TraceRecorder` catches it - tracing never breaks a payment |
 

@@ -98,7 +98,7 @@ test('an initialized charge is logged with its references and whether it was ide
 test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
-    $driver = mollieContractDriver([fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
+    $driver = mollieContractDriver([fn (): never => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
 
     try {
         $driver->charge(mollieCharge(['idempotencyKey' => 'idem-3']));
@@ -141,7 +141,7 @@ test('a verification that fails is logged and wrapped, coded 0', function (): vo
     $logs = captureLogs();
 
     try {
-        mollieContractDriver([fn () => throw new LogicException('handler blew up')])->verify('tr_b');
+        mollieContractDriver([fn (): never => throw new LogicException('handler blew up')])->verify('tr_b');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -261,7 +261,7 @@ test('the health check counts Mollie\'s 400 and 404 as healthy, and logs anythin
 
     expect(mollieContractDriver([new ClientException('Not Found', $request, new Response(404))])->healthCheck())->toBeTrue()
         ->and(loggedEntry($logs, 'Health check successful')['level'])->toBe('info')
-        ->and(mollieContractDriver([fn () => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
+        ->and(mollieContractDriver([fn (): never => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
         ->and(loggedEntry($logs, 'Health check failed')['context'])->toBe(['error' => 'not ours']);
 });
 

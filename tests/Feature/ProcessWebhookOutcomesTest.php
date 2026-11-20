@@ -129,7 +129,7 @@ test('a marker that cannot be released after a failure is logged, and the failur
     $events->shouldReceive('recordIfNew')->andReturnTrue();
     $events->shouldReceive('forget')->andThrow(new RuntimeException('database gone'));
     app()->instance(WebhookEventRepositoryInterface::class, $events);
-    Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
+    Event::listen(WebhookReceived::class, fn (): never => throw new LogicException('listener failed'));
     $payload = ['event' => 'charge.success', 'data' => ['id' => 'release-1']];
 
     expect(fn () => processWebhook($payload))->toThrow(LogicException::class, 'listener failed');
@@ -534,7 +534,7 @@ test('a processed webhook is logged with its reference and event, or "unknown" w
 
 test('a webhook that fails is logged and recorded with what went wrong and on which attempt', function (): void {
     acmeDriver('PZ_FAILING', 'unknown');
-    Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
+    Event::listen(WebhookReceived::class, fn (): never => throw new LogicException('listener failed'));
     $logs = captureLogs();
 
     expect(fn () => processWebhookOnAttempt(['event' => 'charge.success', 'n' => 'failing'], 2))->toThrow(LogicException::class);
@@ -550,7 +550,7 @@ test('a webhook that fails is logged and recorded with what went wrong and on wh
 
 test('a retry is recorded as scheduled only when one is coming', function (int $attempt, bool $scheduled): void {
     acmeDriver("PZ_RETRY_$attempt", 'unknown');
-    Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
+    Event::listen(WebhookReceived::class, fn (): never => throw new LogicException('listener failed'));
 
     expect(fn () => processWebhookOnAttempt(['event' => 'charge.success', 'n' => "retry-$attempt"], $attempt))->toThrow(LogicException::class);
 
@@ -569,7 +569,7 @@ test('a stateless delivery that fails releases no marker, because it never claim
     $events->shouldNotReceive('recordIfNew');
     $events->shouldNotReceive('forget');
     app()->instance(WebhookEventRepositoryInterface::class, $events);
-    Event::listen(WebhookReceived::class, fn () => throw new LogicException('listener failed'));
+    Event::listen(WebhookReceived::class, fn (): never => throw new LogicException('listener failed'));
     $logs = captureLogs();
 
     expect(fn () => processWebhook(['event' => 'charge.success', 'n' => 'stateless']))->toThrow(LogicException::class, 'listener failed');

@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Composer downloads packages from GitHub. Anonymous downloads share a small
+# rate limit that the matrix's parallel jobs exhaust (HTTP 429); the run's own
+# read-only token raises it.
+env:
+  COMPOSER_AUTH: '{"github-oauth": {"github.com": "${{ secrets.GITHUB_TOKEN }}"}}'
+
 # A newer push to the same pull request or branch cancels the run it
 # replaces. Only the newest commit's result decides anything, and a run left
 # going holds runners the new one then queues behind.

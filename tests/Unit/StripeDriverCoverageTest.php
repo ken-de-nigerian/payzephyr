@@ -255,7 +255,7 @@ test('stripe sends metadata as strings, with nested values as json', function ()
 
     $sent = null;
     $sessions = Mockery::mock();
-    $sessions->shouldReceive('create')->once()->andReturnUsing(function (array $params) use (&$sent) {
+    $sessions->shouldReceive('create')->once()->andReturnUsing(function (array $params) use (&$sent): \stdClass {
         $sent = $params['metadata'];
 
         return (object) ['id' => 'cs_test_meta', 'url' => 'https://checkout.stripe.com/pay/cs_test_meta'];

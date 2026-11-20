@@ -188,7 +188,7 @@ test('Razorpay\'s description is added only when it gave one, from the first ans
 
 test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no request behind', function (): void {
     $logs = captureLogs();
-    $driver = razorpayContractDriver([fn () => throw new LogicException('handler blew up')]);
+    $driver = razorpayContractDriver([fn (): never => throw new LogicException('handler blew up')]);
 
     try {
         $driver->charge(razorpayCharge());
@@ -355,7 +355,7 @@ test('the health check lists one link, counts Razorpay\'s 400 and 404 as healthy
     expect($query)->toBe(['count' => '1'])
         ->and(razorpayContractDriver([new ClientException('Not Found', $request, new Response(404))])->healthCheck())->toBeTrue()
         ->and(loggedEntry($logs, 'Health check successful')['level'])->toBe('info')
-        ->and(razorpayContractDriver([fn () => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
+        ->and(razorpayContractDriver([fn (): never => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
         ->and(loggedEntry($logs, 'Health check failed')['context'])->toBe(['error' => 'not ours']);
 });
 

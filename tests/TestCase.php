@@ -424,7 +424,7 @@ abstract class TestCase extends Orchestra
             {
                 public function __construct(private readonly object $sharedState) {}
 
-                public function create(array $params = [], array $options = [])
+                public function create(array $params = [], array $options = []): \stdClass
                 {
                     // Capture the client_reference_id from params
                     $reference = $params['client_reference_id'] ?? 'STRIPE_'.time().'_'.uniqid();
@@ -523,7 +523,7 @@ abstract class TestCase extends Orchestra
             {
                 public function __construct(private readonly object $sharedState) {}
 
-                public function retrieve(string $id)
+                public function retrieve(string $id): \stdClass
                 {
                     // Return a mock intent that matches the reference pattern
                     // Stripe verification looks for payment intents by ID or searches by metadata

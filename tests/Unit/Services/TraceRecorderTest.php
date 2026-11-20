@@ -237,7 +237,7 @@ test('the trace table name is configurable', function (): void {
 });
 
 test('the trace connection is configurable so the table can live elsewhere', function (): void {
-    expect((new PaymentTraceEvent)->getConnectionName())->toBe('testing');
+    expect((new PaymentTraceEvent)->getConnectionName())->toBeNull();
 
     config([
         'database.connections.analytics' => [

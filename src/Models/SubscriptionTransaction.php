@@ -93,11 +93,6 @@ final class SubscriptionTransaction extends Model
         );
     }
 
-    public function getConnectionName(): ?string
-    {
-        return parent::getConnectionName() ?? (app()->environment('testing') ? 'testing' : null);
-    }
-
     /**
      * Scope to filter active subscriptions.
      *

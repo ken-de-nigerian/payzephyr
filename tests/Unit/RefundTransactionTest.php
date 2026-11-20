@@ -49,10 +49,10 @@ test('it casts attributes correctly', function (): void {
         ->and($transaction->metadata['note'])->toBe('customer request');
 });
 
-test('it uses the testing connection while running under the testing environment', function (): void {
+test('it uses the app\'s default connection, under the testing environment too', function (): void {
     $model = new RefundTransaction;
 
-    expect($model->getConnectionName())->toBe('testing');
+    expect($model->getConnectionName())->toBeNull();
 });
 
 test('scope pending filters pending and processing refunds', function (): void {

@@ -37,11 +37,6 @@ final class WebhookEvent extends Model
 
     protected $table = 'webhook_events';
 
-    public function getConnectionName(): ?string
-    {
-        return parent::getConnectionName() ?? (app()->environment('testing') ? 'testing' : null);
-    }
-
     protected function configuredTableNameKey(): string
     {
         return 'webhook.events.table';

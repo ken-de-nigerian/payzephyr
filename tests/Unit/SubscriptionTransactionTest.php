@@ -64,10 +64,10 @@ test('it casts attributes correctly', function (): void {
         ->and($transaction->metadata['order_id'])->toBe(1);
 });
 
-test('it uses the testing connection while running under the testing environment', function (): void {
+test('it uses the app\'s default connection, under the testing environment too', function (): void {
     $model = new SubscriptionTransaction;
 
-    expect($model->getConnectionName())->toBe('testing');
+    expect($model->getConnectionName())->toBeNull();
 });
 
 test('scope active filters active and non-renewing subscriptions', function (): void {

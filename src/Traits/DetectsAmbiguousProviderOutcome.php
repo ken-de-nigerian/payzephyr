@@ -47,13 +47,10 @@ trait DetectsAmbiguousProviderOutcome
                 return false;
             }
 
-            // Guzzle 8: lost on the network after it may have been sent (a
-            // read timeout, a dropped connection), with no answer.
-            if (HttpFailure::isNetworkFailure($current)) {
-                return true;
-            }
-
-            if ($current instanceof RequestException) {
+            // Sent, and no answer came back: a request error without a response,
+            // or (Guzzle 8) a network failure after sending, such as a read
+            // timeout or a dropped connection.
+            if (HttpFailure::isNetworkFailure($current) || $current instanceof RequestException) {
                 return ! HttpFailure::responseOf($current) instanceof ResponseInterface;
             }
 

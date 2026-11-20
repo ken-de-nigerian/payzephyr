@@ -39,7 +39,7 @@
         "ext-ctype": "*",
         "ext-filter": "*",
         "ext-mbstring": "*",
-        "guzzlehttp/guzzle": "^7.8",
+        "guzzlehttp/guzzle": "^7.8|^8.0",
         "illuminate/bus": "^12.0|^13.0",
         "illuminate/console": "^12.0|^13.0",
         "illuminate/contracts": "^12.0|^13.0",
@@ -50,6 +50,7 @@
         "illuminate/support": "^12.0|^13.0",
         "laravel/prompts": "^0.3",
         "nesbot/carbon": "^3.0",
+        "psr/http-client": "^1.0",
         "psr/http-message": "^1.1|^2.0",
         "stripe/stripe-php": "^21.0",
         "symfony/http-foundation": "^7.0|^8.0"

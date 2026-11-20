@@ -57,7 +57,7 @@ function razorpaySent(array $history, int $i = 0): array
 
 function razorpayRequestError(string $body, ?Throwable $previous = null): RequestException
 {
-    return new RequestException('Bad Request', new Request('POST', '/v1/payment_links'), new Response(400, [], $body), $previous);
+    return failureWithResponse('Bad Request', new Request('POST', '/v1/payment_links'), new Response(400, [], $body), $previous);
 }
 
 // ---------------------------------------------------------------------------

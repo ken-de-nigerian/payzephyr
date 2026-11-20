@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
@@ -18,7 +17,7 @@ test('it handles a generic transfer error that is not a connect/server/request e
     // HasNetworkErrorHandling::handleNetworkError(), since every more
     // specific Guzzle exception is caught by an earlier branch first.
     $mock = new MockHandler([
-        new TransferException('Generic transfer failure'),
+        transferFailure('Generic transfer failure'),
     ]);
 
     $client = new Client(['handler' => HandlerStack::create($mock)]);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace KenDeNigerian\PayZephyr\Drivers;
 
 use GuzzleHttp\Exception\ClientException;
-use GuzzleHttp\Exception\RequestException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
@@ -15,6 +14,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\PaymentException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
+use KenDeNigerian\PayZephyr\Support\HttpFailure;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\RazorpayRefundMethods;
 use Psr\Http\Message\ResponseInterface;
@@ -444,8 +444,10 @@ final class RazorpayDriver extends AbstractDriver implements SupportsRefundsInte
     protected function describeFailure(Throwable $e): string
     {
         for ($current = $e; $current instanceof Throwable; $current = $current->getPrevious()) {
-            if ($current instanceof RequestException && $current->getResponse() instanceof ResponseInterface) {
-                $error = Payload::of(json_decode((string) $current->getResponse()->getBody(), true))->get('error');
+            $response = HttpFailure::responseOf($current);
+
+            if ($response instanceof ResponseInterface) {
+                $error = Payload::of(json_decode((string) $response->getBody(), true))->get('error');
 
                 if (is_array($error) && is_string($error['description'] ?? null) && $error['description'] !== '') {
                     return $e->getMessage().' Razorpay: '.$error['description'];

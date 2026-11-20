@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
-use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\TransferException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
+use KenDeNigerian\PayZephyr\Support\HttpFailure;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -38,7 +38,7 @@ trait HasNetworkErrorHandling
             'error_class' => $exception::class,
         ];
 
-        if ($exception instanceof ConnectException) {
+        if (HttpFailure::isNetworkFailure($exception)) {
             $errorType = 'connection_error';
             $userMessage = 'Unable to connect to payment provider. Please check your internet connection and try again.';
             $context['error_type'] = 'connection_failure';
@@ -52,7 +52,7 @@ trait HasNetworkErrorHandling
         } elseif ($exception instanceof RequestException) {
             $errorType = 'request_error';
             $userMessage = 'Request to payment provider failed. Please check your request and try again.';
-            $response = $exception->getResponse();
+            $response = HttpFailure::responseOf($exception);
             if ($response instanceof ResponseInterface) {
                 $context['status_code'] = $response->getStatusCode();
             }
@@ -79,7 +79,7 @@ trait HasNetworkErrorHandling
      */
     protected function getNetworkErrorMessage(GuzzleException $exception): string
     {
-        if ($exception instanceof ConnectException) {
+        if (HttpFailure::isNetworkFailure($exception)) {
             return 'Unable to connect to payment provider. This may be due to a network timeout, connection issue, or the provider being temporarily unavailable. Please try again.';
         }
 
@@ -91,16 +91,14 @@ trait HasNetworkErrorHandling
             }
         }
 
-        if ($exception instanceof RequestException) {
-            $response = $exception->getResponse();
-            if ($response instanceof ResponseInterface) {
-                $statusCode = $response->getStatusCode();
-                if ($statusCode === HttpStatusCodes::TOO_MANY_REQUESTS) {
-                    return 'Too many requests. Please wait a moment and try again.';
-                }
-                if (HttpStatusCodes::isClientError($statusCode)) {
-                    return 'Invalid request to payment provider. Please check your payment details and try again.';
-                }
+        $response = HttpFailure::responseOf($exception);
+        if ($response instanceof ResponseInterface) {
+            $statusCode = $response->getStatusCode();
+            if ($statusCode === HttpStatusCodes::TOO_MANY_REQUESTS) {
+                return 'Too many requests. Please wait a moment and try again.';
+            }
+            if (HttpStatusCodes::isClientError($statusCode)) {
+                return 'Invalid request to payment provider. Please check your payment details and try again.';
             }
         }
 

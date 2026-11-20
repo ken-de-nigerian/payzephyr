@@ -5,7 +5,6 @@ declare(strict_types=1);
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
-use GuzzleHttp\Exception\TransferException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
@@ -145,9 +144,9 @@ test('a failed request is recorded and logged by what failed, and raised with wh
 })->with([
     'timed out, in any case' => [new ConnectException('Connection Timed Out after 30 seconds', new Request('GET', '/bank')), TraceEvent::PROVIDER_TIMEOUT, 'connection_error'],
     'refused' => [new ConnectException('Connection refused', new Request('GET', '/bank')), TraceEvent::PROVIDER_EXCEPTION, 'connection_error'],
-    'answered with an error' => [new RequestException('Server error', new Request('GET', '/bank'), new Response(503)), TraceEvent::PROVIDER_ERROR, 'request_error'],
+    'answered with an error' => [failureWithResponse('Server error', new Request('GET', '/bank'), new Response(503)), TraceEvent::PROVIDER_ERROR, 'request_error'],
     'no answer' => [new RequestException('Stream closed', new Request('GET', '/bank')), TraceEvent::PROVIDER_EXCEPTION, 'request_error'],
-    'transfer failure' => [new TransferException('Too many redirects'), TraceEvent::PROVIDER_EXCEPTION, 'transfer_error'],
+    'transfer failure' => [transferFailure('Too many redirects'), TraceEvent::PROVIDER_EXCEPTION, 'transfer_error'],
 ]);
 
 test('the HTTP client is built with the default headers, TLS verification, the configured timeout and base URL', function (array $config, array $expected): void {
@@ -157,8 +156,10 @@ test('the HTTP client is built with the default headers, TLS verification, the c
 
     expect(callDriver($driver, 'clientOptions'))->toBe(['timeout' => $expected['timeout'], 'verify' => true, 'headers' => $headers] + $expected);
 })->with([
-    'configured' => [['base_url' => 'https://api.paystack.co/', 'timeout' => 5], ['timeout' => 5, 'base_uri' => 'https://api.paystack.co/']],
+    'configured' => [['base_url' => 'https://api.paystack.co/', 'timeout' => 5], ['timeout' => 5.0, 'base_uri' => 'https://api.paystack.co/']],
+    'a timeout from env() is a numeric string' => [['timeout' => '45'], ['timeout' => 45.0]],
     'unconfigured: thirty seconds, and no base URL' => [[], ['timeout' => 30]],
+    'no number, and no base URL that is not a string' => [['timeout' => 'soon', 'base_url' => ['not', 'a', 'url']], ['timeout' => 30]],
 ]);
 
 test('a driver logs unless logging is switched off: an unset switch means on', function (): void {

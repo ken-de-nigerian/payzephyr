@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\NetworkTimeoutException;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -108,7 +109,7 @@ test('a definitive error response from the provider safely falls back to the nex
     $request = new Request('POST', 'https://api.paystack.co/transaction/initialize');
     $response = new Response(500, [], 'Internal Server Error');
     $primary = makeGuzzleThrowingPaystackDriver(
-        new RequestException('Server error', $request, $response)
+        failureWithResponse('Server error', $request, $response)
     );
     $secondary = makeCountingSuccessDriver('stripe');
 
@@ -133,3 +134,21 @@ test('ChargeException::isAmbiguousProviderOutcome is true for a Stripe SDK conne
 
     expect($exception->isAmbiguousProviderOutcome())->toBeTrue();
 });
+
+// Guzzle 8 reports a read timeout as NetworkTimeoutException, not a RequestException:
+// it is just as ambiguous.
+test('a response lost after sending is ambiguous: the charge is not retried elsewhere', function (): void {
+    $request = new Request('POST', 'https://api.paystack.co/transaction/initialize');
+    $primary = makeGuzzleThrowingPaystackDriver(new NetworkTimeoutException('Operation timed out after 30001 milliseconds', $request));
+    $secondary = makeCountingSuccessDriver('stripe');
+    $manager = new PaymentManager;
+    injectFakeDrivers($manager, ['paystack' => $primary, 'stripe' => $secondary]);
+
+    try {
+        $manager->chargeWithFallback(makeStandardChargeRequest());
+        $this->fail('The charge should not have fallen back.');
+    } catch (ProviderException $e) {
+        expect($e->getContext()['ambiguous_outcome'] ?? null)->toBeTrue()
+            ->and($secondary->chargeCalls)->toBe(0);
+    }
+})->skip(! guzzleHasNetworkExceptions(), 'Guzzle 8 only');

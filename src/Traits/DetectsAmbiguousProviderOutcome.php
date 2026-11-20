@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace KenDeNigerian\PayZephyr\Traits;
 
-use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
+use KenDeNigerian\PayZephyr\Support\HttpFailure;
 use Psr\Http\Message\ResponseInterface;
 use Stripe\Exception\ApiConnectionException;
 
@@ -42,12 +42,16 @@ trait DetectsAmbiguousProviderOutcome
         $current = $this->getPrevious();
 
         while ($current !== null) {
-            if ($current instanceof ConnectException) {
+            // The connection was never made: the provider cannot have seen it.
+            if (HttpFailure::neverSent($current)) {
                 return false;
             }
 
-            if ($current instanceof RequestException) {
-                return ! $current->getResponse() instanceof ResponseInterface;
+            // Sent, and no answer came back: a request error without a response,
+            // or (Guzzle 8) a network failure after sending, such as a read
+            // timeout or a dropped connection.
+            if (HttpFailure::isNetworkFailure($current) || $current instanceof RequestException) {
+                return ! HttpFailure::responseOf($current) instanceof ResponseInterface;
             }
 
             if ($current instanceof ApiConnectionException) {

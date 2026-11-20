@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Guzzle 8 support.** `guzzlehttp/guzzle` is now `^7.8|^8.0`, so Laravel 13 apps on Guzzle 8 can
   install PayZephyr. A failure's response is read through the new `Support\HttpFailure`, which
   works under both: Guzzle 8 keeps responses only on its `ResponseException` branch.
+  `psr/http-client` (`^1.0`, already installed through Guzzle) is now declared, since
+  `HttpFailure` uses its `NetworkExceptionInterface`.
 
 ### Changed
 

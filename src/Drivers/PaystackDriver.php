@@ -105,7 +105,9 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
         $fee = $split->float('platform_fee');
 
         if ($fee !== null) {
-            $payload['transaction_charge'] = (int) round($fee * 100);
+            // Whole kobo. round() returns a float, but a whole float is written to JSON
+            // without a fraction (1999.0 → 1999), so Paystack receives an integer.
+            $payload['transaction_charge'] = round($fee * 100);
         }
 
         return $payload;

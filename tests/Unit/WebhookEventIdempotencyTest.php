@@ -220,7 +220,7 @@ test('a typed mollie event carries its own id and is deduplicated normally', fun
 test('a stateless delivery that fails leaves no marker behind', function (): void {
     config(['payments.providers.mollie.webhook_secret' => 'whsec_test']);
     Event::fakeExcept([WebhookReceived::class]);
-    Event::listen(WebhookReceived::class, fn () => throw new RuntimeException('listener exploded'));
+    Event::listen(WebhookReceived::class, fn (): never => throw new RuntimeException('listener exploded'));
 
     expect(fn () => dispatchWebhookJob('mollie', ['id' => 'tr_fails']))->toThrow(RuntimeException::class, 'listener exploded');
     expect(WebhookEvent::count())->toBe(0);

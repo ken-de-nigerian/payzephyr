@@ -160,7 +160,7 @@ test('an initialized charge is logged with its reference, and one Monnify refuse
 test('an unexpected failure inside a charge is logged and wrapped, coded 0, and leaves no key behind', function (): void {
     $logs = captureLogs();
     $history = [];
-    $driver = monnifyContractDriver([monnifyLogin(), fn () => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
+    $driver = monnifyContractDriver([monnifyLogin(), fn (): never => throw new LogicException('handler blew up'), new Response(200, [], '{}')], $history);
 
     try {
         $driver->charge(monnifyCharge(['idempotencyKey' => 'idem-1']));
@@ -222,7 +222,7 @@ test('a verification that fails on the way is logged and wrapped, coded 0', func
     $logs = captureLogs();
 
     try {
-        monnifyContractDriver([monnifyLogin(), fn () => throw new LogicException('handler blew up')])->verify('MON_B');
+        monnifyContractDriver([monnifyLogin(), fn (): never => throw new LogicException('handler blew up')])->verify('MON_B');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -248,7 +248,7 @@ test('the health check is up when Monnify answers a login, even with a client er
 
     expect(monnifyContractDriver([monnifyLogin()])->healthCheck())->toBeTrue()
         ->and(monnifyContractDriver([$clientError])->healthCheck())->toBeTrue()
-        ->and(monnifyContractDriver([fn () => throw new LogicException('handler blew up')])->healthCheck())->toBeFalse()
+        ->and(monnifyContractDriver([fn (): never => throw new LogicException('handler blew up')])->healthCheck())->toBeFalse()
         ->and(loggedEntry($logs, 'Health check failed')['context'])->toBe([
             'error' => 'Monnify authentication failed: handler blew up', 'error_class' => ChargeException::class,
         ]);

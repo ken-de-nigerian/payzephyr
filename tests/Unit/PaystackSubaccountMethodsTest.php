@@ -282,7 +282,7 @@ describe('failures', function (): void {
     });
 
     test('an answer without a status is a refusal', function (): void {
-        expect(fn () => paystackWith([paystackJson(['data' => subaccountData()])])->fetchSubaccount('ACCT_abc'))
+        expect(fn (): SubaccountDTO => paystackWith([paystackJson(['data' => subaccountData()])])->fetchSubaccount('ACCT_abc'))
             ->toThrow(SubaccountException::class, 'Failed to fetch Paystack subaccount');
     });
 });

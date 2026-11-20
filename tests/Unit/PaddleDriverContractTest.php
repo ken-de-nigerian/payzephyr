@@ -124,7 +124,7 @@ test('an unexpected failure inside a charge is logged and wrapped, coded 0', fun
     $logs = captureLogs();
 
     try {
-        paddleContractDriver([fn () => throw new LogicException('handler blew up')])->charge(paddleCharge());
+        paddleContractDriver([fn (): never => throw new LogicException('handler blew up')])->charge(paddleCharge());
         test()->fail('Expected a ChargeException.');
     } catch (ChargeException $e) {
         expect($e->getMessage())->toBe('Payment initialization failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -179,7 +179,7 @@ test('a verification that fails is logged and wrapped, coded 0', function (): vo
     $logs = captureLogs();
 
     try {
-        paddleContractDriver([fn () => throw new LogicException('handler blew up')])->verify('txn_B');
+        paddleContractDriver([fn (): never => throw new LogicException('handler blew up')])->verify('txn_B');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -271,7 +271,7 @@ test('the health check counts Paddle\'s 400 and 404 as healthy, and anything els
 
     expect(paddleContractDriver([new ClientException('Not Found', $request, new Response(404))])->healthCheck())->toBeTrue()
         ->and(loggedEntry($logs, 'Health check successful')['level'])->toBe('info')
-        ->and(paddleContractDriver([fn () => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
+        ->and(paddleContractDriver([fn (): never => throw new RuntimeException('not ours', 0, new ClientException('x', $request, new Response(400)))])->healthCheck())->toBeFalse()
         ->and(paddleContractDriver([new ConnectException('refused', $request)])->healthCheck())->toBeFalse()
         ->and(array_column(array_filter($logs->getArrayCopy(), fn (array $r): bool => str_contains($r['message'], 'Health check failed')), 'context')[0])->toBe(['error' => 'not ours']);
 });

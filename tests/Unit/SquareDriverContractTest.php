@@ -161,7 +161,7 @@ test('a charge failing for any other reason is rethrown as it was, or logged and
     }
 
     try {
-        squareContractDriver([fn () => throw new LogicException('handler blew up')])->charge(squareCharge());
+        squareContractDriver([fn (): never => throw new LogicException('handler blew up')])->charge(squareCharge());
         test()->fail('Expected a ChargeException.');
     } catch (ChargeException $e) {
         expect($e->getMessage())->toBe('Payment initialization failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -297,7 +297,7 @@ test('a verification Square refuses is raised with its detail, coded 0, and logg
 test('a verification failing without an answer from Square is wrapped, coded 0', function (string $kind, string $message): void {
     $logs = captureLogs();
     $failure = $kind === 'unexpected'
-        ? fn () => throw new LogicException('handler blew up')
+        ? fn (): never => throw new LogicException('handler blew up')
         : new ConnectException('Connection refused', new Request('GET', '/v2/payments/payment_1'));
 
     try {

@@ -198,7 +198,7 @@ test('an initialized charge is logged with both references, and a failed one is 
     paypalContractDriver([paypalToken(), paypalOrder()])->charge(paypalCharge());
 
     try {
-        paypalContractDriver([paypalToken(), fn () => throw new LogicException('handler blew up')])->charge(paypalCharge());
+        paypalContractDriver([paypalToken(), fn (): never => throw new LogicException('handler blew up')])->charge(paypalCharge());
         test()->fail('Expected a ChargeException.');
     } catch (ChargeException $e) {
         expect($e->getMessage())->toBe('Payment initialization failed: handler blew up')->and($e->getCode())->toBe(0);
@@ -283,7 +283,7 @@ test('an approved order with no capture yet is captured, and logged when that fa
         ->and($result->metadata['capture_id'])->toBe('CAP_NEW');
 
     try {
-        paypalContractDriver([paypalToken(), $approved, fn () => throw new LogicException('capture blew up')])->verify('ORDER 1');
+        paypalContractDriver([paypalToken(), $approved, fn (): never => throw new LogicException('capture blew up')])->verify('ORDER 1');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('PayPal capture failed: capture blew up')->and($e->getCode())->toBe(0);
@@ -296,7 +296,7 @@ test('a verification that fails is logged and wrapped, coded 0, and a missing or
     $logs = captureLogs();
 
     try {
-        paypalContractDriver([paypalToken(), fn () => throw new LogicException('handler blew up')])->verify('ORDER_B');
+        paypalContractDriver([paypalToken(), fn (): never => throw new LogicException('handler blew up')])->verify('ORDER_B');
         test()->fail('Expected a VerificationException.');
     } catch (VerificationException $e) {
         expect($e->getMessage())->toBe('Payment verification failed: handler blew up')->and($e->getCode())->toBe(0);

@@ -261,7 +261,7 @@ test('stripe charge still surfaces a missing callback URL as a configuration err
                 {
                     $this->sessions = new class
                     {
-                        public function create()
+                        public function create(): \stdClass
                         {
                             return (object) ['id' => 'cs_1', 'url' => 'https://x.test'];
                         }

@@ -15,6 +15,13 @@ final readonly class ChargeRequestDTO
     use NormalizesMetadata;
 
     /**
+     * Who pays the provider's processing fees on a split charge.
+     *
+     * @var list<string>
+     */
+    public const SPLIT_BEARERS = ['subaccount', 'platform'];
+
+    /**
      * @param  array<string, mixed>  $metadata
      * @param  array<array-key, mixed>|null  $customer
      * @param  array<array-key, mixed>|null  $customFields
@@ -74,6 +81,53 @@ final readonly class ChargeRequestDTO
         if ($this->reference !== null && ! $this->isValidReference($this->reference)) {
             throw new InvalidArgumentException('Invalid reference format');
         }
+
+        if ($this->split !== null) {
+            $this->validateSplit($this->split);
+        }
+    }
+
+    /**
+     * Check PayZephyr's own split keys (Payment::split() / Payment::splitCode()).
+     * A provider's native split format (any other keys) is passed through as-is.
+     *
+     * @param  array<array-key, mixed>  $split
+     *
+     * @throws InvalidArgumentException
+     */
+    private function validateSplit(array $split): void
+    {
+        if (array_key_exists('subaccount', $split) && (! is_string($split['subaccount']) || trim($split['subaccount']) === '')) {
+            throw new InvalidArgumentException('Split subaccount must be a non-empty string');
+        }
+
+        if (array_key_exists('split_code', $split) && (! is_string($split['split_code']) || trim($split['split_code']) === '')) {
+            throw new InvalidArgumentException('Split code must be a non-empty string');
+        }
+
+        if (array_key_exists('platform_fee', $split)) {
+            $fee = $split['platform_fee'];
+
+            if ((! is_int($fee) && ! is_float($fee)) || $fee < 0) {
+                throw new InvalidArgumentException('Platform fee must be zero or more');
+            }
+
+            if ($fee >= $this->amount) {
+                throw new InvalidArgumentException('Platform fee must be less than the amount');
+            }
+        }
+
+        if (array_key_exists('bearer', $split) && ! in_array($split['bearer'], self::SPLIT_BEARERS, true)) {
+            throw new InvalidArgumentException('Split bearer must be one of: '.implode(', ', self::SPLIT_BEARERS));
+        }
+    }
+
+    /**
+     * Whether this charge is split (it may only go to a driver that can split it).
+     */
+    public function hasSplit(): bool
+    {
+        return $this->split !== null && $this->split !== [];
     }
 
     private function isValidEmail(string $email): bool

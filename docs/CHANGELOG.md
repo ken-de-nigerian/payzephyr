@@ -8,7 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Split payments.** `Payment::split($subaccount, platformFee:, bearer:)` settles a charge
+  straight to a seller's subaccount while the platform keeps a fee, and `Payment::splitCode()`
+  uses a split the provider already holds. The arguments are validated before anything is sent
+  (a fee below zero or as large as the amount, an empty subaccount, an unknown bearer). Supported
+  on Paystack, where the fee is sent as `transaction_charge` even when it is `0`. A provider's own
+  split format, given as `ChargeRequestDTO`'s `split`, is passed through unchanged (it used to be
+  accepted and ignored).
+- **A split charge is never sent to a provider that cannot split it.** Drivers that can implement
+  `SupportsSplitPaymentsInterface`; in a fallback chain the others are skipped for split charges
+  (traced as `PROVIDER_SKIPPED`, reason `split_unsupported`), and with none able to split the
+  charge fails, rather than settling a seller's money into the platform's account.
+- **Subaccounts.** `Payment::subaccounts()` lists banks, resolves an account number to the name
+  it is registered to, and creates, updates and fetches subaccounts, through the new
+  `SupportsSubaccountsInterface` (implemented on Paystack). New `BankDTO`, `ResolvedAccountDTO`,
+  `SubaccountDTO`, `SubaccountRequestDTO` and `SubaccountException`.
+- New chapter: [Split Payments & Subaccounts](split-payments.md).
 
 ---
 ## [5.2.0] - 2026-11-02

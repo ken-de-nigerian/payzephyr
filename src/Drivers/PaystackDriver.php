@@ -7,6 +7,8 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 use GuzzleHttp\Exception\ClientException;
 use KenDeNigerian\PayZephyr\Constants\HttpStatusCodes;
 use KenDeNigerian\PayZephyr\Contracts\SupportsRefundsInterface;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSplitPaymentsInterface;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSubaccountsInterface;
 use KenDeNigerian\PayZephyr\Contracts\SupportsSubscriptionsInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -16,15 +18,17 @@ use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Exceptions\VerificationException;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\PaystackRefundMethods;
+use KenDeNigerian\PayZephyr\Traits\PaystackSubaccountMethods;
 use KenDeNigerian\PayZephyr\Traits\PaystackSubscriptionMethods;
 use Throwable;
 
 /**
  * Driver implementation for the Paystack payment gateway.
  */
-final class PaystackDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSubscriptionsInterface
+final class PaystackDriver extends AbstractDriver implements SupportsRefundsInterface, SupportsSplitPaymentsInterface, SupportsSubaccountsInterface, SupportsSubscriptionsInterface
 {
     use PaystackRefundMethods;
+    use PaystackSubaccountMethods;
     use PaystackSubscriptionMethods;
 
     protected string $name = 'paystack';
@@ -67,6 +71,47 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
     }
 
     /**
+     * The split part of an initialize request. PayZephyr's own keys map to
+     * Paystack's: `split_code`; or `subaccount`, `platform_fee` (major units)
+     * to `transaction_charge` (kobo) and `bearer` ('platform' is Paystack's
+     * main 'account'). Any other split array is Paystack's native dynamic
+     * split, sent as `split`.
+     *
+     * @return array<string, mixed>
+     */
+    private function splitPayload(ChargeRequestDTO $request): array
+    {
+        if (! $request->hasSplit()) {
+            return [];
+        }
+
+        $split = new Payload($request->split ?? []);
+        $code = $split->string('split_code');
+
+        if ($code !== null) {
+            return ['split_code' => $code];
+        }
+
+        $subaccount = $split->string('subaccount');
+
+        if ($subaccount === null) {
+            return ['split' => $request->split];
+        }
+
+        $payload = [
+            'subaccount' => $subaccount,
+            'bearer' => $split->string('bearer') === 'platform' ? 'account' : 'subaccount',
+        ];
+        $fee = $split->float('platform_fee');
+
+        if ($fee !== null) {
+            $payload['transaction_charge'] = (int) round($fee * 100);
+        }
+
+        return $payload;
+    }
+
+    /**
      * Create a new payment on Paystack.
      *
      * @throws ChargeException If the payment creation fails.
@@ -92,8 +137,10 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                 $payload['channels'] = $channels;
             }
 
+            // The split is added after filtering: a platform fee of 0 must still be
+            // sent, or Paystack would apply the subaccount's default percentage.
             $response = $this->makeRequest('POST', '/transaction/initialize', [
-                'json' => array_filter($payload),
+                'json' => [...array_filter($payload), ...$this->splitPayload($request)],
             ]);
 
             $data = $this->parseResponse($response);

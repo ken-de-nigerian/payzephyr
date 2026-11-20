@@ -52,6 +52,11 @@ $shards = [
         'Drivers\\MonnifyDriver',
         'Drivers\\PaddleDriver',
     ],
+    'split-payments' => [
+        'Traits\\PaystackSubaccountMethods',
+        'Subaccounts',
+        'DataObjects\\SubaccountRequestDTO',
+    ],
 ];
 
 $argument = $argv[1] ?? null;

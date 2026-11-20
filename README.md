@@ -183,37 +183,38 @@ The chapters below are written to be read roughly in order if you're new to PayZ
 
 6. [Subscriptions](docs/subscriptions.md): recurring billing, supported on most bundled providers
 7. [Refunds](docs/refunds.md): full and partial refunds, supported on every bundled provider
-8. [Tracing](docs/tracing.md): the step-by-step record of why a payment took the path it took
-9. [Webhooks](docs/webhooks.md): why they exist and how to handle them
-10. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
-11. [Testing](docs/testing.md): testing code that charges money, without charging money
-12. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
-13. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
-14. [Queues](docs/queues.md): why a queue worker is required, not optional
+8. [Split Payments & Subaccounts](docs/split-payments.md): pay sellers straight to their own accounts, keeping a platform fee
+9. [Tracing](docs/tracing.md): the step-by-step record of why a payment took the path it took
+10. [Webhooks](docs/webhooks.md): why they exist and how to handle them
+11. [Events](docs/events.md): every event PayZephyr fires and how to listen for it
+12. [Testing](docs/testing.md): testing code that charges money, without charging money
+13. [Error Handling](docs/error-handling.md): what can go wrong and how PayZephyr tells you
+14. [Security](docs/security.md): webhook verification, replay protection, and what PayZephyr does *not* protect you from
+15. [Queues](docs/queues.md): why a queue worker is required, not optional
 
 **Going further**
 
-15. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
-16. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
-17. [Extending a Driver](docs/extending-drivers.md): add refunds and subscriptions to a custom driver
-18. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
+16. [Multiple Providers](docs/providers.md): per-provider setup, currencies, and feature support
+17. [Custom Drivers](docs/custom-drivers.md): adding a provider PayZephyr doesn't support yet
+18. [Extending a Driver](docs/extending-drivers.md): add refunds and subscriptions to a custom driver
+19. [Advanced Usage](docs/advanced-usage.md): direct driver access, health checks, idempotency patterns
 
 **Shipping it**
 
-19. [Production Checklist](docs/production-checklist.md): what to double-check before going live
-20. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
-21. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
+20. [Production Checklist](docs/production-checklist.md): what to double-check before going live
+21. [Deployment](docs/deployment.md): migrations, environment variables, monitoring
+22. [Upgrade Guide](docs/upgrade-guide.md): moving between major versions
 
 **When things go wrong**
 
-22. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
-23. [FAQ](docs/faq.md)
+23. [Troubleshooting](docs/troubleshooting.md): common problems, their causes, and their fixes
+24. [FAQ](docs/faq.md)
 
 **Reference**
 
-24. [API Reference](docs/api-reference.md): every public method, documented
-25. [Architecture](docs/architecture.md): how the package is put together internally
-26. [Contributing](docs/contributing.md)
+25. [API Reference](docs/api-reference.md): every public method, documented
+26. [Architecture](docs/architecture.md): how the package is put together internally
+27. [Contributing](docs/contributing.md)
 
 The full table of contents, if you'd rather browse than read linearly, is in [docs/INDEX.md](docs/INDEX.md).
 

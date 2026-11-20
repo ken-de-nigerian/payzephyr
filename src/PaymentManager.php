@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use KenDeNigerian\PayZephyr\Constants\PaymentConstants;
 use KenDeNigerian\PayZephyr\Contracts\DriverInterface;
 use KenDeNigerian\PayZephyr\Contracts\ProviderDetectorInterface;
+use KenDeNigerian\PayZephyr\Contracts\SupportsSplitPaymentsInterface;
 use KenDeNigerian\PayZephyr\Contracts\TransactionRepositoryInterface;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeRequestDTO;
 use KenDeNigerian\PayZephyr\DataObjects\ChargeResponseDTO;
@@ -199,6 +200,20 @@ final class PaymentManager
                         payload: ['reason' => 'unsupported_currency', 'currency' => $request->currency],
                         provider: $providerName,
                     );
+
+                    continue;
+                }
+
+                // A split charge only ever goes to a driver that can split it:
+                // sent anywhere else, the seller's money would settle into the
+                // platform's own account.
+                if ($request->hasSplit() && ! $driver instanceof SupportsSplitPaymentsInterface) {
+                    $this->log('info', "Provider [$providerName] cannot split payments, skipping");
+                    $this->trace($request->reference, TraceEvent::PROVIDER_SKIPPED,
+                        payload: ['reason' => 'split_unsupported'],
+                        provider: $providerName,
+                    );
+                    $exceptions[$providerName] = new ChargeException("Provider [$providerName] does not support split payments");
 
                     continue;
                 }

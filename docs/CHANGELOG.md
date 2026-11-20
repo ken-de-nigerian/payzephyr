@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.4.1] - 2026-11-20
+
 ### Fixed
 
 - **PayZephyr no longer breaks the host app's tests.** Its models switched to a database

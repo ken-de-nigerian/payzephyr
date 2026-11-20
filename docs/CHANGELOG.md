@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.3.0] - 2026-11-20
+
 ### Added
 
 - **Split payments.** `Payment::split($subaccount, platformFee:, bearer:)` settles a charge
@@ -26,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SupportsSubaccountsInterface` (implemented on Paystack). New `BankDTO`, `ResolvedAccountDTO`,
   `SubaccountDTO`, `SubaccountRequestDTO` and `SubaccountException`.
 - New chapter: [Split Payments & Subaccounts](split-payments.md).
+
+### Changed
+
+- **CI only:** Composer authenticates its GitHub downloads with the run's own token, so the
+  parallel jobs are no longer rate limited (HTTP 429). Test closures and anonymous classes carry
+  the return types Rector 2.8.5 requires. Nothing the package ships changes.
 
 ---
 ## [5.2.0] - 2026-11-02

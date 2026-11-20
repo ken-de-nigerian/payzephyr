@@ -101,7 +101,7 @@ final class PaymentTraceEvent extends Model
             return $configured;
         }
 
-        return parent::getConnectionName() ?? (app()->environment('testing') ? 'testing' : null);
+        return parent::getConnectionName();
     }
 
     /**

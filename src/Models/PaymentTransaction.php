@@ -80,11 +80,6 @@ final class PaymentTransaction extends Model
         $instance->table = $table;
     }
 
-    public function getConnectionName(): ?string
-    {
-        return parent::getConnectionName() ?? (app()->environment('testing') ? 'testing' : null);
-    }
-
     /**
      * @param  Builder<PaymentTransaction>  $query
      * @return Builder<PaymentTransaction>

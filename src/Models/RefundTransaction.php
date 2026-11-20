@@ -69,11 +69,6 @@ final class RefundTransaction extends Model
         ];
     }
 
-    public function getConnectionName(): ?string
-    {
-        return parent::getConnectionName() ?? (app()->environment('testing') ? 'testing' : null);
-    }
-
     /**
      * Scope to filter pending/processing refunds.
      *

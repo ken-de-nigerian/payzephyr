@@ -8,7 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- **PayZephyr no longer breaks the host app's tests.** Its models switched to a database
+  connection named `testing` whenever the app ran in the `testing` environment - a shortcut for
+  this package's own suite. Apps rarely define one, so a webhook received in an app's test failed
+  with "Database connection [testing] not configured" (and the webhook endpoint answered 500).
+  Every model now uses the app's default connection; the trace table can still be given its own
+  (`payments.trace.connection`).
 
 ---
 ## [5.4.0] - 2026-11-20

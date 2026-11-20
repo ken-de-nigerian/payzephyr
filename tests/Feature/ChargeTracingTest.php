@@ -528,7 +528,7 @@ test('a refused connection is not recorded as a timeout', function (): void {
 
 test('a provider error response is recorded with its status code', function (): void {
     $manager = paystackTracingManager([
-        new RequestException(
+        failureWithResponse(
             'Unauthorized',
             new Request('POST', 'https://api.paystack.co'),
             new Response(401, [], (string) json_encode(['status' => false, 'message' => 'Invalid key'])),

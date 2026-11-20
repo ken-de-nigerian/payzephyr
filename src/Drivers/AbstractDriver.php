@@ -6,9 +6,7 @@ namespace KenDeNigerian\PayZephyr\Drivers;
 
 use Carbon\CarbonImmutable;
 use GuzzleHttp\Client;
-use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\Exception\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -23,6 +21,7 @@ use KenDeNigerian\PayZephyr\Exceptions\ChargeException;
 use KenDeNigerian\PayZephyr\Exceptions\InvalidConfigurationException;
 use KenDeNigerian\PayZephyr\Services\ChannelMapper;
 use KenDeNigerian\PayZephyr\Services\StatusNormalizer;
+use KenDeNigerian\PayZephyr\Support\HttpFailure;
 use KenDeNigerian\PayZephyr\Support\PackageConfig;
 use KenDeNigerian\PayZephyr\Support\Payload;
 use KenDeNigerian\PayZephyr\Traits\HasLogSanitization;
@@ -40,6 +39,14 @@ use Throwable;
  * This is the parent class that all payment provider drivers extend.
  * It provides common functionality like HTTP requests, health checks,
  * currency validation, and reference generation.
+ *
+ * @phpstan-type RequestOptions array{
+ *     json?: mixed,
+ *     query?: array<array-key, mixed>|string,
+ *     form_params?: array<array-key, string|int|float|bool|null|array<array-key, mixed>>,
+ *     headers?: array<array-key, string|non-empty-array<array-key, string>>,
+ *     timeout?: int|float,
+ * }
  */
 abstract class AbstractDriver implements DriverInterface
 {
@@ -144,17 +151,18 @@ abstract class AbstractDriver implements DriverInterface
      * verification, a timeout (30 seconds unless configured), and the base URL
      * when one is configured - without one, a request's URI is used as given.
      *
-     * @return array<string, mixed>
+     * @return array{timeout: int|float, verify: bool, headers: array<string, string>, base_uri?: string}
      */
     protected function clientOptions(): array
     {
         $options = [
-            'timeout' => $this->config['timeout'] ?? 30,
+            // A number, or a numeric string from env(); anything else is the default.
+            'timeout' => Payload::of($this->config)->float('timeout') ?? 30,
             'verify' => true,
             'headers' => $this->getDefaultHeaders(),
         ];
 
-        if (isset($this->config['base_url'])) {
+        if (isset($this->config['base_url']) && is_string($this->config['base_url'])) {
             $options['base_uri'] = $this->config['base_url'];
         }
 
@@ -178,7 +186,7 @@ abstract class AbstractDriver implements DriverInterface
      * Network errors are caught and wrapped with more user-friendly messages
      * to prevent crashes and provide better error context.
      *
-     * @param  array<array-key, mixed>  $options  Additional Guzzle options (json, query, etc.)
+     * @param  RequestOptions  $options  Additional Guzzle options (json, query, form_params, headers, timeout)
      *
      * @throws ChargeException If the HTTP request fails.
      */
@@ -187,7 +195,7 @@ abstract class AbstractDriver implements DriverInterface
         if ($this->currentRequest?->idempotencyKey) {
             $idempotencyHeaders = $this->getIdempotencyHeader($this->currentRequest->idempotencyKey);
 
-            $headers = Payload::of($options)->array('headers');
+            $headers = $options['headers'] ?? [];
 
             // A caller that set the header itself keeps its own value.
             if (array_intersect_key($idempotencyHeaders, $headers) === []) {
@@ -230,7 +238,7 @@ abstract class AbstractDriver implements DriverInterface
                     correlationId: $this->traceCorrelationId,
                     httpMethod: $method,
                     httpUrl: $this->absoluteUri($uri),
-                    httpStatusCode: $e instanceof RequestException ? $e->getResponse()?->getStatusCode() : null,
+                    httpStatusCode: HttpFailure::responseOf($e)?->getStatusCode(),
                     responseTimeMs: $this->nowInMilliseconds() - $startedAt,
                 );
             }
@@ -282,13 +290,13 @@ abstract class AbstractDriver implements DriverInterface
      */
     private function traceEventForNetworkError(GuzzleException $e): TraceEvent
     {
-        if ($e instanceof ConnectException) {
+        if (HttpFailure::isNetworkFailure($e)) {
             return str_contains(strtolower($e->getMessage()), 'timed out')
                 ? TraceEvent::PROVIDER_TIMEOUT
                 : TraceEvent::PROVIDER_EXCEPTION;
         }
 
-        if ($e instanceof RequestException && $e->getResponse() instanceof ResponseInterface) {
+        if (HttpFailure::responseOf($e) instanceof ResponseInterface) {
             return TraceEvent::PROVIDER_ERROR;
         }
 

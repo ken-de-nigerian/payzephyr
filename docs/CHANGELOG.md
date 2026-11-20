@@ -8,7 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Guzzle 8 support.** `guzzlehttp/guzzle` is now `^7.8|^8.0`, so Laravel 13 apps on Guzzle 8 can
+  install PayZephyr. A failure's response is read through the new `Support\HttpFailure`, which
+  works under both: Guzzle 8 keeps responses only on its `ResponseException` branch.
+
+### Changed
+
+- **A read timeout under Guzzle 8 is an ambiguous outcome.** Guzzle 8 reports failures after the
+  request may have been sent (a read timeout, a dropped connection) as `NetworkException`, which
+  is not a `ConnectException`. They are treated like a `RequestException` without a response: the
+  charge or refund is not retried against another provider. A `ConnectException` still means the
+  provider never saw the request. Such failures get the network error message and, when the
+  message says so, the `PROVIDER_TIMEOUT` trace event.
+- `AbstractDriver::makeRequest()` documents the options it passes to Guzzle (`json`, `query`,
+  `form_params`, `headers`, `timeout`) as a PHPStan shape, so a custom driver's call is checked.
+  Other Guzzle options still reach Guzzle at runtime.
+- A configured `timeout` given as a numeric string (from `env()`) is used as a number; anything
+  that is not a number falls back to 30 seconds, and a `base_url` that is not a string is ignored.
 
 ---
 ## [5.3.0] - 2026-11-20

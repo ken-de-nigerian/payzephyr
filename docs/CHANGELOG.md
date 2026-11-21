@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
+Nothing yet.
+
+---
+## [5.5.0] - 2026-11-21
+
 ### Added
 
 - **What was asked for, apart from what was charged.** `VerificationResponseDTO` gains

@@ -15,6 +15,11 @@ final readonly class VerificationResponseDTO
     use NormalizesMetadata;
 
     /**
+     * `amount` is what the customer was charged. Where the provider reports them, `requestedAmount`
+     * is what the merchant asked for and `fees` the provider's fee (both major units): they differ
+     * from `amount` when the account passes the fee on to the customer (Paystack's "charge the
+     * customer"), so check what was asked for against `requestedAmount`. Null when not reported.
+     *
      * @param  array<string, mixed>  $metadata
      * @param  array<array-key, mixed>|null  $customer
      */
@@ -31,7 +36,18 @@ final readonly class VerificationResponseDTO
         public ?string $bank = null,
         public ?array $customer = null,
         public ?string $authorizationCode = null,
+        public ?float $requestedAmount = null,
+        public ?float $fees = null,
     ) {}
+
+    /**
+     * What the merchant asked for: the provider's requested amount where it reports one, else the
+     * amount charged.
+     */
+    public function amountRequested(): float
+    {
+        return $this->requestedAmount ?? $this->amount;
+    }
 
     protected function getNormalizedStatus(): string
     {
@@ -67,6 +83,8 @@ final readonly class VerificationResponseDTO
             bank: $input->string('bank'),
             customer: $input->arrayOrNull('customer'),
             authorizationCode: $input->string('authorization_code'),
+            requestedAmount: $input->float('requested_amount'),
+            fees: $input->float('fees'),
         );
     }
 
@@ -88,6 +106,8 @@ final readonly class VerificationResponseDTO
             'bank' => $this->bank,
             'customer' => $this->customer,
             'authorization_code' => $this->authorizationCode,
+            'requested_amount' => $this->requestedAmount,
+            'fees' => $this->fees,
         ];
     }
 

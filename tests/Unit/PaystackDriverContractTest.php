@@ -173,6 +173,32 @@ test('a verified payment is read in full and logged with its status', function (
         ->and(loggedEntry($logs, 'Payment verified')['context'])->toBe(['reference' => 'PZ_V1', 'status' => 'success']);
 });
 
+test('a verification reads what was asked for and Paystack\'s fee, apart from what the customer was charged', function (): void {
+    // The business passes Paystack's fee on to the customer: they pay ₦105,000 + ₦1,700.51.
+    $driver = paystackContractDriver([new Response(200, [], (string) json_encode(['status' => true, 'data' => [
+        'reference' => 'PZ_FEES', 'status' => 'success', 'amount' => 10670051, 'requested_amount' => 10500000, 'fees' => '170051', 'currency' => 'NGN',
+    ]]))]);
+
+    $result = $driver->verify('PZ_FEES');
+
+    expect($result->amount)->toBe(106700.51)
+        ->and($result->requestedAmount)->toBe(105000.0)
+        ->and($result->fees)->toBe(1700.51)
+        ->and($result->amountRequested())->toBe(105000.0);
+});
+
+test('a verification without a requested amount or fees reports neither, and what was asked for is the amount charged', function (): void {
+    $driver = paystackContractDriver([new Response(200, [], (string) json_encode(['status' => true, 'data' => [
+        'reference' => 'PZ_PLAIN', 'status' => 'success', 'amount' => 25000, 'currency' => 'NGN', 'fees' => null,
+    ]]))]);
+
+    $result = $driver->verify('PZ_PLAIN');
+
+    expect($result->requestedAmount)->toBeNull()
+        ->and($result->fees)->toBeNull()
+        ->and($result->amountRequested())->toBe(250.0);
+});
+
 test('a verification Paystack answers without a status is refused with its message', function (): void {
     $driver = paystackContractDriver([new Response(200, [], '{"message":"Transaction reference not found"}')]);
 

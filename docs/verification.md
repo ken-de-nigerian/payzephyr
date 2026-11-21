@@ -34,6 +34,9 @@ $verification->bank;              // ?string  - issuing bank, if available
 $verification->customer;          // ?array   - customer details from the provider
 $verification->provider;          // ?string  - which provider processed this
 $verification->metadata;          // array    - whatever metadata you attached at charge time
+$verification->requestedAmount;   // ?float   - what you asked for, where the provider reports it (Paystack)
+$verification->fees;              // ?float   - the provider's fee, where it reports it (Paystack)
+$verification->amountRequested(); // float    - requestedAmount, else amount
 
 $verification->isSuccessful();    // bool
 $verification->isFailed();        // bool
@@ -43,10 +46,16 @@ $verification->isPending();       // bool
 **Always check the amount, not just success.** This is the single most important habit to build around verification:
 
 ```php
-if ($verification->isSuccessful() && $verification->amount == $order->amount) {
+if ($verification->isSuccessful() && $verification->amountRequested() == $order->amount) {
     $order->update(['status' => 'paid']);
 }
 ```
+
+Compare with `amountRequested()`, not `amount`: when an account passes the provider's fee on to
+the customer (Paystack's "charge the customer"), `amount` is what they were charged *including*
+that fee, so an order for ₦105,000 verifies as ₦106,700.51. `requestedAmount` is the ₦105,000
+you asked for and `fees` the ₦1,700.51 fee. Providers that don't report them leave both null,
+and `amountRequested()` falls back to `amount`.
 
 Why check the amount at all, if the provider already confirmed success? Because `isSuccessful()` only tells you *a* payment succeeded for that reference: checking the amount against what you expected to charge protects you against a class of bugs (not attacks: a forged amount wouldn't get past provider-side verification) where, say, a reference gets reused or a race condition lets an order's price change between charge and verify. It costs one comparison and removes an entire category of "why did this order get marked paid for the wrong amount" bug reports.
 

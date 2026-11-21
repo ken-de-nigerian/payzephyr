@@ -54,3 +54,20 @@ test('verification response handles all status variations with normalization', f
         expect($response->isFailed())->toBeTrue("Failed for status: $status");
     }
 });
+
+test('the requested amount and fees survive fromArray and toArray, and are null when absent', function (): void {
+    $withFees = VerificationResponseDTO::fromArray([
+        'reference' => 'PZ_1', 'status' => 'success', 'amount' => 106700.51, 'currency' => 'ngn',
+        'requested_amount' => '105000', 'fees' => 1700.51,
+    ]);
+    $plain = VerificationResponseDTO::fromArray(['reference' => 'PZ_2', 'status' => 'success', 'amount' => 250, 'currency' => 'NGN']);
+
+    expect($withFees->requestedAmount)->toBe(105000.0)
+        ->and($withFees->fees)->toBe(1700.51)
+        ->and($withFees->amountRequested())->toBe(105000.0)
+        ->and($withFees->toArray())->toMatchArray(['amount' => 106700.51, 'requested_amount' => 105000.0, 'fees' => 1700.51])
+        ->and($plain->requestedAmount)->toBeNull()
+        ->and($plain->fees)->toBeNull()
+        ->and($plain->amountRequested())->toBe(250.0)
+        ->and($plain->toArray())->toMatchArray(['requested_amount' => null, 'fees' => null]);
+});

@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **What was asked for, apart from what was charged.** `VerificationResponseDTO` gains
+  `requestedAmount` and `fees` (major units, null where the provider doesn't report them) and
+  `amountRequested()` (`requestedAmount`, else `amount`). Paystack fills both from
+  `requested_amount` and `fees`. When a Paystack business passes the fee on to the customer,
+  `amount` includes it: a ₦105,000 payment verifies with `amount` 106,700.51, `requestedAmount`
+  105,000 and `fees` 1,700.51, so apps checking the amount they expected should compare
+  `amountRequested()`. Both are appended to the constructor, so existing calls are unaffected.
 
 ---
 ## [5.4.1] - 2026-11-20

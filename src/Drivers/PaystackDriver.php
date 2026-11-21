@@ -223,6 +223,10 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
                     'code' => $details->string('customer', 'customer_code'),
                 ],
                 authorizationCode: $details->string('authorization', 'authorization_code'),
+                // What was asked for and Paystack's fee, in kobo: the amount above includes the
+                // fee when the business passes it on to the customer.
+                requestedAmount: self::koboToNaira($details->float('requested_amount')),
+                fees: self::koboToNaira($details->float('fees')),
             );
         } catch (VerificationException $e) {
             throw $e;
@@ -234,6 +238,14 @@ final class PaystackDriver extends AbstractDriver implements SupportsRefundsInte
             ]);
             throw new VerificationException('Payment verification failed: '.$e->getMessage(), 0, $e);
         }
+    }
+
+    /**
+     * An optional amount Paystack reports in kobo, in naira (null when it reports none).
+     */
+    private static function koboToNaira(?float $kobo): ?float
+    {
+        return $kobo === null ? null : $kobo / 100;
     }
 
     /**
